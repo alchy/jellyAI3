@@ -2,9 +2,10 @@ import torch
 from dataset import TextDataset
 from model import LSTMModel
 from train import train_model
-from helpers import load_texts_from_directory, beam_search
+from helpers import load_texts_from_directory, beam_search, remove_diacritics
 from torch.utils.data import DataLoader, random_split
 from settings import *
+import re
 
 # Zařízení
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -30,6 +31,7 @@ model = LSTMModel(
     embedding_dim=EMBEDDING_DIM,
     hidden_dim=HIDDEN_DIM
 ).to(DEVICE)
+print("Model vocab size:", model.embedding.num_embeddings)  # Debug print
 
 # Trénování modelu
 final_loss = train_model(model, train_loader, val_loader, epochs=EPOCHS, device=DEVICE)
@@ -39,6 +41,16 @@ while True:
     user_input = input("Zadejte text pro predikci (nebo 'exit' pro ukončení): ")
     if user_input.lower() == 'exit':
         break
+    # Preprocess input
+    user_input = remove_diacritics(user_input).lower()
+    user_input = re.sub(r'[^\w\s]', '', user_input)  # Remove punctuation
+    user_input = re.sub(r'\d+', '<NUM>', user_input)  # Replace numbers
+    # Debug tokenization
+    tokens = dataset.sp.encode_as_ids(user_input)
+    print("Input text:", user_input)
+    print("Tokenized IDs:", tokens)
+    print("Max token ID:", max(tokens) if tokens else "Empty")
+    print("Vocab size:", dataset.vocab_size)
     predicted_tokens = beam_search(
         model, dataset, user_input,
         num_words=NUM_WORDS, seq_length=SEQ_LENGTH,

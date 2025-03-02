@@ -15,6 +15,7 @@ class TextDataset(Dataset):
         # Načtení SentencePiece modelu
         self.sp = spm.SentencePieceProcessor()
         self.sp.load(f"{MODEL_PREFIX}.model")
+        print("Loaded SentencePiece vocab size:", self.sp.get_piece_size())  # Debug print
         
         # Tokenizace textu na subword jednotky
         self.tokens = self.sp.encode_as_ids(text)

@@ -66,11 +66,31 @@ def beam_search(model, dataset, input_text, num_words=NUM_WORDS, seq_length=SEQ_
     if len(tokens) > seq_length:
         tokens = tokens[-seq_length:]
     elif len(tokens) < seq_length:
-        tokens = [dataset.sp.pad_id()] * (seq_length - len(tokens)) + tokens  # Použití padding tokenu
+        tokens = [0] * (seq_length - len(tokens)) + tokens  # Use 0 as padding token instead of pad_id()
     
     beams = [(tokens, 0.0)]  # Inicializace s počáteční sekvencí a skóre 0
     
     for step in range(num_words):
         new_beams = []
         for beam in beams:
-            current_sequence, current_scor
+            current_sequence, current_score = beam
+            input_tensor = torch.tensor([current_sequence[-seq_length:]], dtype=torch.long).to(device)
+            print(f"Step {step}, Input tensor: {input_tensor.tolist()[0]}")  # Debug print
+            with torch.no_grad():
+                output = model(input_tensor)
+                probabilities = torch.log_softmax(output, dim=1)
+                top_probs, top_indices = torch.topk(probabilities, beam_width, dim=1)
+                for i in range(beam_width):
+                    next_token = top_indices[0][i].item()
+                    print(f"Step {step}, Predicted next_token: {next_token}")  # Debug print
+                    # Validate next_token
+                    if next_token >= dataset.vocab_size:
+                        next_token = dataset.sp.unk_id()  # Replace invalid token with <unk>
+                    next_score = current_score + top_probs[0][i].item()
+                    new_sequence = current_sequence + [next_token]
+                    new_beams.append((new_sequence, next_score))
+        
+        beams = sorted(new_beams, key=lambda x: x[1], reverse=True)[:beam_width]
+    
+    best_sequence, _ = beams[0]
+    return best_sequence[-num_words:]
