@@ -9,4 +9,4 @@ Použití předtrénovaných embeddingů pro češtinu.
 Experimentování s generováním textu (sampling místo beam search).
 Ponechání diakritiky/interpunkce a optimalizace slovníku podle dat.
 Přechod na transformery.
-Subword tokenizace (např. Byte Pair Encoding z knihovny tokenizers), abys lépe zpracoval neznámá slova.
+Subword tokenizace (např. Byte Pair Encoding z knihovny tokenizers).
