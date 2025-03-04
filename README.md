@@ -1,5 +1,11 @@
+'''
 .\.venv\Scripts\Activate.ps1
+'''
+
+'''
 pip install torch torchvision torchaudio
+'''
+
 
 TO DO
 https://fasttext.cc/docs/en/english-vectors.html
