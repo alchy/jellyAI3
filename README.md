@@ -1,10 +1,10 @@
-'''
+```
 .\.venv\Scripts\Activate.ps1
-'''
+```
 
-'''
+```
 pip install torch torchvision torchaudio
-'''
+```
 
 
 TO DO
