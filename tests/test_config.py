@@ -1,0 +1,21 @@
+from config import Config, ChunkerConfig, RetrieverConfig
+
+
+def test_config_defaults():
+    cfg = Config()
+    assert cfg.chunker.size == 3
+    assert cfg.chunker.overlap == 1
+    assert cfg.chunker.unit == "sentences"
+    assert cfg.retriever.method == "bm25"
+    assert cfg.retriever.top_k == 5
+    assert cfg.retriever.use_stopwords is True
+    assert cfg.answerer.template is True
+    assert cfg.data.processed_dir == "data/processed"
+
+
+def test_config_override():
+    cfg = Config(retriever=RetrieverConfig(method="tfidf", top_k=3))
+    assert cfg.retriever.method == "tfidf"
+    assert cfg.retriever.top_k == 3
+    # ostatní bloky zůstávají výchozí
+    assert cfg.chunker.size == 3
