@@ -73,6 +73,26 @@ class AnswererConfig:
 
 
 @dataclass
+class QagenConfig:
+    """Nastavení generování syntetických QA párů (pro trénink generátoru V2).
+
+    Atributy:
+        qa_path (str): Kam zapsat JSONL dataset dvojic otázka→odpověď.
+        morphodita_model (str): Cesta k modelu MorphoDiTa (POS/lemma).
+        nametag_model (str): Cesta k modelu NameTag (NER).
+        min_tokens (int): Minimální počet slov ve větě, aby dávala smysl jako kontext.
+        max_answers_per_sentence (int): Kolik nejvíc odpovědí vytěžit z jedné věty.
+        types (tuple): Povolené typy otázek.
+    """
+    qa_path: str = "data/qa/qapairs.jsonl"
+    morphodita_model: str = "data/models/czech-morfflex.tagger"
+    nametag_model: str = "data/models/czech-cnec.ner"
+    min_tokens: int = 5
+    max_answers_per_sentence: int = 2
+    types: tuple = ("Kdo", "Co", "Kde", "Kdy", "Kolik")
+
+
+@dataclass
 class Config:
     """Zastřešující konfigurace — jeden objekt vládne všem blokům.
 
@@ -81,8 +101,10 @@ class Config:
         chunker (ChunkerConfig): Nastavení krájení na pasáže.
         retriever (RetrieverConfig): Nastavení vyhledávání.
         answerer (AnswererConfig): Nastavení skládání odpovědi.
+        qagen (QagenConfig): Nastavení generování syntetických QA dat (V2).
     """
     data: DataConfig = field(default_factory=DataConfig)
     chunker: ChunkerConfig = field(default_factory=ChunkerConfig)
     retriever: RetrieverConfig = field(default_factory=RetrieverConfig)
     answerer: AnswererConfig = field(default_factory=AnswererConfig)
+    qagen: QagenConfig = field(default_factory=QagenConfig)

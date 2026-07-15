@@ -19,3 +19,11 @@ def test_config_override():
     assert cfg.retriever.top_k == 3
     # ostatní bloky zůstávají výchozí
     assert cfg.chunker.size == 3
+
+
+def test_config_has_qagen_defaults():
+    cfg = Config()
+    assert cfg.qagen.qa_path == "data/qa/qapairs.jsonl"
+    assert cfg.qagen.min_tokens == 5
+    assert cfg.qagen.max_answers_per_sentence == 2
+    assert "Kdo" in cfg.qagen.types
