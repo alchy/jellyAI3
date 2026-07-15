@@ -16,6 +16,8 @@ algebra a trocha logaritmů.
 """
 
 import math
+import os
+import pickle
 
 import numpy as np
 
@@ -188,6 +190,66 @@ class Retriever:
             denom = f + k1 * (1 - b + b * self.doc_len / self.avg_len)
             scores += idf * (f * (k1 + 1)) / denom
         return scores
+
+    def save(self, path):
+        """Uloží postavený index na disk, ať se nemusí stavět znovu.
+
+        Stavba indexu (tokenizace celého korpusu a spočítání vah) je jednorázová
+        práce — je zbytečné ji opakovat při každém dotazu. Uloží se všechno, co
+        `search` potřebuje: pasáže, slovník a předpočítané matice/vektory. Formát
+        je pickle, takže načítej jen indexy, které sis sám vytvořil (pickle umí
+        při načtení spustit kód — u cizích souborů bacha).
+
+        Args:
+            path (str): Cílová cesta k souboru s indexem (typicky data/index.pkl).
+
+        Returns:
+            str: Cesta, kam byl index uložen (pro pohodlný řetězený zápis/log).
+        """
+        directory = os.path.dirname(path)
+        if directory:
+            os.makedirs(directory, exist_ok=True)
+        state = {
+            "config": self.config,
+            "passages": self.passages,
+            "vocab": self.vocab,
+            "counts": self.counts,
+            "doc_len": self.doc_len,
+            "avg_len": self.avg_len,
+            "df": self.df,
+            "idf": self.idf,
+            "tfidf_norm": self._tfidf_norm,
+        }
+        with open(path, "wb") as f:
+            pickle.dump(state, f)
+        return path
+
+    @classmethod
+    def load(cls, path):
+        """Načte dříve uložený index z disku.
+
+        Rekonstruuje retriever přesně do stavu, v jakém byl uložen — připravený
+        okamžitě odpovídat na dotazy, bez opětovné stavby. Používá to interaktivní
+        prompt, aby naskočil bleskurychle.
+
+        Args:
+            path (str): Cesta k souboru s uloženým indexem.
+
+        Returns:
+            Retriever: Plně načtený retriever připravený k `search`.
+        """
+        with open(path, "rb") as f:
+            state = pickle.load(f)
+        retriever = cls(state["config"])
+        retriever.passages = state["passages"]
+        retriever.vocab = state["vocab"]
+        retriever.counts = state["counts"]
+        retriever.doc_len = state["doc_len"]
+        retriever.avg_len = state["avg_len"]
+        retriever.df = state["df"]
+        retriever.idf = state["idf"]
+        retriever._tfidf_norm = state["tfidf_norm"]
+        return retriever
 
 
 def explain():

@@ -30,3 +30,25 @@ def test_main_ask_smoke(tmp_path, capsys):
     cli.main(["ask", "kdo vyráběl roboty", "--processed-dir", cfg.data.processed_dir])
     captured = capsys.readouterr()
     assert "roboty" in captured.out.lower()
+
+
+def test_reindex_builds_saves_and_answers(tmp_path):
+    raw = tmp_path / "raw"
+    raw.mkdir()
+    (raw / "kniha.txt").write_text(
+        "Roboty vyráběla firma Rossumovy univerzální roboty. "
+        "Starý Rossum je vynalezl.",
+        encoding="utf-8",
+    )
+    cfg = Config(data=DataConfig(
+        raw_dir=str(raw),
+        processed_dir=str(tmp_path / "processed"),
+        index_path=str(tmp_path / "index.pkl"),
+    ))
+    n = cli.cmd_reindex(cfg)
+    assert n > 0
+    assert (tmp_path / "processed" / "kniha.txt").exists()
+    assert (tmp_path / "index.pkl").exists()
+    # Následný dotaz teď načte uložený index a odpoví.
+    out = cli.cmd_ask(cfg, "kdo vyráběl roboty")
+    assert "roboty" in out.lower()

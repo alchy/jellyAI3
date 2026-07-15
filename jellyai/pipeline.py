@@ -61,6 +61,26 @@ class QAPipeline:
         answerer = ExtractiveAnswerer(config.answerer)
         return cls(retriever, answerer)
 
+    @classmethod
+    def from_index(cls, index_path, config):
+        """Postaví pipeline z už uloženého indexu — bez opětovné stavby.
+
+        Protahovací zkratka k :meth:`from_corpus`: retriever se místo počítání
+        načte hotový z disku (tam je ta drahá práce), answerer se doplní z
+        konfigurace. Díky tomu interaktivní prompt naskočí okamžitě, i kdyby
+        korpus narostl.
+
+        Args:
+            index_path (str): Cesta k uloženému indexu (viz Retriever.save).
+            config (Config): Konfigurace (použije se pro answerer).
+
+        Returns:
+            QAPipeline: Připravená pipeline s načteným indexem.
+        """
+        retriever = Retriever.load(index_path)
+        answerer = ExtractiveAnswerer(config.answerer)
+        return cls(retriever, answerer)
+
 
 def explain():
     """Vrátí lidský popis bloku Pipeline pro výukovou vrstvu.

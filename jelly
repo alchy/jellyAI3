@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+#
+# jelly — pohodlný wrapper nad jellyAI3.
+#
+# Volá vždy správný Python z projektového .venv, ať ho spustíš odkudkoli a bez
+# ruční aktivace. Zkrátka: aby ses mohl soustředit na dotazy, ne na prostředí.
+#
+# Použití:
+#   ./jelly setup            # jednorázově: vytvoří .venv a nainstaluje závislosti
+#   ./jelly prepare          # bootstrap dat (seed R.U.R. + vyčistí + zaindexuje)
+#   ./jelly index            # po vhození textu do data/raw/ přegeneruje index
+#   ./jelly ask "otázka?"    # jednorázový dotaz
+#   ./jelly ask              # interaktivní prompt na dotazování
+#   ./jelly explain retriever# vysvětlí blok (bez argumentu vypíše seznam)
+
+set -euo pipefail
+
+# Kořen projektu = adresář, kde leží tento skript (funguje i přes symlink cd).
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PY="$ROOT/.venv/bin/python"
+
+cmd="${1:-help}"
+shift || true
+
+case "$cmd" in
+  setup)
+    python3.11 -m venv "$ROOT/.venv"
+    "$PY" -m pip install --quiet --upgrade pip
+    "$PY" -m pip install --quiet -r "$ROOT/requirements.txt"
+    echo "✅ Prostředí připraveno v $ROOT/.venv"
+    ;;
+
+  prepare|index|ask|explain)
+    if [ ! -x "$PY" ]; then
+      echo "❌ Chybí .venv — spusť nejdřív: ./jelly setup" >&2
+      exit 1
+    fi
+    case "$cmd" in
+      prepare) "$PY" "$ROOT/cli.py" prepare-data ;;
+      index)   "$PY" "$ROOT/cli.py" reindex ;;
+      ask)
+        if [ "$#" -gt 0 ]; then
+          "$PY" "$ROOT/cli.py" ask "$*"      # jednorázový dotaz ze zbytku argumentů
+        else
+          "$PY" "$ROOT/cli.py" repl          # bez otázky → interaktivní prompt
+        fi
+        ;;
+      explain) "$PY" "$ROOT/cli.py" explain "$@" ;;
+    esac
+    ;;
+
+  *)
+    echo "Použití: ./jelly {setup|prepare|index|ask [otázka]|explain [blok]}"
+    ;;
+esac

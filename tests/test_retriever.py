@@ -35,5 +35,17 @@ def test_search_empty_index():
     assert r.search("cokoliv") == []
 
 
+def test_save_load_roundtrip(tmp_path):
+    r = Retriever(RetrieverConfig(method="bm25")).build(_passages())
+    path = str(tmp_path / "index.pkl")
+    r.save(path)
+    loaded = Retriever.load(path)
+    res_orig = r.search("roboty")
+    res_loaded = loaded.search("roboty")
+    # Načtený index dává stejné pořadí i stejnou top pasáž jako originál.
+    assert [p.index for p, _ in res_orig] == [p.index for p, _ in res_loaded]
+    assert res_loaded[0][0].index == 0
+
+
 def test_explain_nonempty():
     assert explain().strip()

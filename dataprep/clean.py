@@ -43,12 +43,13 @@ def clean_text(raw):
 
 
 def build_processed(raw_dir, processed_dir):
-    """Vyčistí všechny `.txt` z jednoho adresáře do druhého.
+    """Vyčistí `.txt` z raw adresáře do processed tak, aby ho přesně zrcadlil.
 
     Dávková obálka nad :func:`clean_text` — projde syrové texty v `raw_dir`,
-    každý vyčistí a zapíše pod stejným jménem do `processed_dir` (ten se v případě
-    potřeby vytvoří). Oddělení „syrové vs. vyčištěné" umožňuje kdykoli přečistit
-    data znovu bez opětovného stahování.
+    každý vyčistí a zapíše pod stejným jménem do `processed_dir`. Aby processed
+    věrně odpovídal raw, **odstraní i osiřelé** vyčištěné texty, které už v raw
+    nemají svůj zdroj (jinak by po smazání knihy z raw strašila dál v korpusu).
+    Oddělení „syrové vs. vyčištěné" umožňuje kdykoli přečistit data bez stahování.
 
     Args:
         raw_dir (str): Adresář se syrovými `.txt` soubory.
@@ -58,10 +59,15 @@ def build_processed(raw_dir, processed_dir):
         list[str]: Cesty k zapsaným vyčištěným souborům (v pořadí zpracování).
     """
     os.makedirs(processed_dir, exist_ok=True)
+    raw_names = {n for n in os.listdir(raw_dir) if n.endswith(".txt")}
+
+    # Zrcadlení: co v raw není, nemá co dělat ani v processed.
+    for name in os.listdir(processed_dir):
+        if name.endswith(".txt") and name not in raw_names:
+            os.remove(os.path.join(processed_dir, name))
+
     written = []
-    for name in sorted(os.listdir(raw_dir)):
-        if not name.endswith(".txt"):
-            continue
+    for name in sorted(raw_names):
         with open(os.path.join(raw_dir, name), encoding="utf-8") as f:
             cleaned = clean_text(f.read())
         dest = os.path.join(processed_dir, name)

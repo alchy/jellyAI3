@@ -30,3 +30,16 @@ def test_build_processed(tmp_path):
     written = build_processed(str(raw_dir), str(proc_dir))
     assert len(written) == 1
     assert (proc_dir / "kniha.txt").read_text(encoding="utf-8") == "Text knihy."
+
+
+def test_build_processed_removes_stale(tmp_path):
+    raw_dir = tmp_path / "raw"
+    proc_dir = tmp_path / "processed"
+    raw_dir.mkdir()
+    proc_dir.mkdir()
+    # V processed straší starý text, který v raw už není.
+    (proc_dir / "stary.txt").write_text("zbytek", encoding="utf-8")
+    (raw_dir / "novy.txt").write_text("Nový text.", encoding="utf-8")
+    build_processed(str(raw_dir), str(proc_dir))
+    assert (proc_dir / "novy.txt").exists()
+    assert not (proc_dir / "stary.txt").exists()  # osiřelý byl odstraněn

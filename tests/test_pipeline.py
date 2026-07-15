@@ -26,5 +26,16 @@ def test_pipeline_no_answer(tmp_path):
     assert "nenašel" in ans.text.lower()
 
 
+def test_pipeline_from_index(tmp_path):
+    pipe = QAPipeline.from_corpus(_corpus(tmp_path), Config())
+    index_path = str(tmp_path / "index.pkl")
+    pipe.retriever.save(index_path)
+    # Znovu postavená pipeline z uloženého indexu odpovídá stejně dobře.
+    pipe2 = QAPipeline.from_index(index_path, Config())
+    ans = pipe2.ask("kdo vyráběl roboty")
+    assert "roboty" in ans.text.lower()
+    assert ans.sources and ans.sources[0].startswith("rur#")
+
+
 def test_explain_nonempty():
     assert explain().strip()

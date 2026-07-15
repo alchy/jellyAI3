@@ -9,41 +9,82 @@ externích služeb** (žádná Ollama, žádné API) a s minimem závislostí (n
 > dohledatelná v git historii. Proč a jak vznikla tahle podoba, viz
 > `docs/superpowers/specs/2026-07-15-cesky-gpt-design.md`.
 
-## Setup
+## Rychlý start (přes `./jelly`)
 
-Vyžaduje **Python 3.11 nebo 3.12** (novější verze mají problém s torch, který
-přijde až ve V2).
-
-```bash
-python3.11 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-```
-
-## Použití
+Wrapper `./jelly` volá vždy správný Python z projektového `.venv`, takže nemusíš
+nic ručně aktivovat. Vyžaduje **Python 3.11 nebo 3.12** (novější verze mají
+problém s torch, který přijde až ve V2).
 
 ```bash
-# 1) připravit data (naseeduje R.U.R. z training_text/, vyčistí do data/processed)
-python cli.py prepare-data
-
-# 2) zeptat se
-python cli.py ask "kdo vynalezl roboty?"
-python cli.py ask "co znamená R.U.R.?"
-
-# kolik pasáží je v indexu
-python cli.py build-index
-
-# jak funguje který blok (výuková vrstva)
-python cli.py explain retriever
-python cli.py explain            # vypíše seznam bloků
+./jelly setup                    # jednorázově: vytvoří .venv a nainstaluje závislosti
+./jelly prepare                  # připraví data (seed R.U.R. + vyčistí + zaindexuje)
+./jelly ask "kdo vynalezl roboty?"
 ```
 
 Příklad výstupu:
 
 ```
-$ python cli.py ask "kdo vynalezl roboty?"
+$ ./jelly ask "kdo vynalezl roboty?"
 Podle textu: Stojí tam například, že Roboty vynalezl starý pán.
 (zdroj: rur#85)
+```
+
+## Přidání vlastního textu
+
+Přesně tři kroky — vhoď text, přegeneruj vektory, ptej se:
+
+```bash
+# 1) vlož libovolný .txt do data/raw/
+cp ~/moje_kniha.txt data/raw/
+
+# 2) přegeneruj index (vyčistí data/raw → data/processed a postaví vektory)
+./jelly index
+
+# 3) ptej se — buď jednorázově, nebo v interaktivním promptu
+./jelly ask "na co se chci zeptat?"
+./jelly ask                      # bez otázky spustí interaktivní prompt
+```
+
+Index se ukládá na disk (`data/index.pkl`), takže se při dotazu nestaví znovu a
+prompt naskočí okamžitě. Smažeš-li text z `data/raw/` a dáš `./jelly index`,
+zmizí i z korpusu (processed zrcadlí raw).
+
+Interaktivní prompt vypadá takhle (ukončíš prázdným řádkem, `konec` nebo Ctrl-D):
+
+```
+$ ./jelly ask
+Ptej se česky. Prázdný řádek nebo 'konec' ukončí.
+
+❓ kdo je Helena?
+💬 Podle textu: Helena: Robotka Helena.
+   (zdroj: rur#1404)
+
+❓ konec
+Měj se! 👋
+```
+
+## Příkazy `./jelly`
+
+| Příkaz | Co dělá |
+|---|---|
+| `./jelly setup` | jednorázově vytvoří `.venv` a nainstaluje závislosti |
+| `./jelly prepare` | bootstrap dat: seed R.U.R. + vyčistí + zaindexuje |
+| `./jelly index` | po změně textů v `data/raw/` přegeneruje a uloží index |
+| `./jelly ask "otázka?"` | jednorázový dotaz |
+| `./jelly ask` | interaktivní prompt na dotazování |
+| `./jelly explain <blok>` | vysvětlí blok (bez argumentu vypíše seznam bloků) |
+
+## Bez wrapperu (přímo přes Python)
+
+Kdo chce vidět, co se děje pod pokličkou, může volat CLI napřímo (po aktivaci venv):
+
+```bash
+python3.11 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt
+python cli.py prepare-data
+python cli.py reindex
+python cli.py ask "co znamená R.U.R.?"
+python cli.py repl
+python cli.py explain retriever
 ```
 
 ## Jak to funguje — bloky
@@ -63,7 +104,7 @@ Loader → Chunker → Retriever → ExtractiveAnswerer → Pipeline
 | **Pipeline** | pospojuje bloky do `ask(otázka) → odpověď` |
 
 Veškerá konfigurace (velikost pasáží, metoda vyhledávání, top-k, …) je v
-`config.py`. Každý blok umí `explain()` popsat, co dělá.
+`config.py`. Každý blok umí `explain()` popsat, co dělá — zkus `./jelly explain retriever`.
 
 ## Testy
 

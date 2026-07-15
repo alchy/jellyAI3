@@ -1,9 +1,11 @@
 """Příkazová řádka — jedno rozhraní k celé knihovně.
 
-Sešívá bloky do čtyř příkazů, kterými se dá projít celý životní cyklus:
-`prepare-data` (obstarat texty), `build-index` (sanity check indexu),
-`ask` (zeptat se) a `explain` (nechat si vysvětlit blok). Cíl je, aby se dal
-projekt vyzkoušet bez psaní jediného řádku Pythonu — jen z terminálu.
+Sešívá bloky do příkazů, kterými se dá projít celý životní cyklus:
+`prepare-data` (bootstrap dat), `reindex` (přegenerovat index po přidání textu),
+`build-index` (jen postavit index z hotových dat), `ask` (jednorázový dotaz),
+`repl` (interaktivní prompt) a `explain` (nechat si vysvětlit blok). Cíl je, aby
+se dal projekt ovládat bez psaní jediného řádku Pythonu — a přes wrapper `./jelly`
+i bez ruční aktivace venv.
 """
 
 import argparse
@@ -21,57 +23,136 @@ from jellyai.explain import explain_block, list_blocks
 _SEED_RUR = "training_text/karel_capek_rur.txt"
 
 
-def cmd_prepare_data(config):
-    """Obstará a připraví korpus: stáhne knihy, naseeduje R.U.R., vyčistí.
+def _build_and_save_index(config):
+    """Postaví index z vyčištěných textů a uloží ho na disk.
 
-    Nejdřív zkusí stáhnout nakonfigurované knihy, pak zkopíruje původní R.U.R.
-    do raw adresáře (pojistka, ať je vždy z čeho odpovídat) a nakonec všechny
-    syrové texty vyčistí do processed adresáře.
-
-    Args:
-        config (Config): Konfigurace s cestami a seznamem knih.
-
-    Returns:
-        list[str]: Cesty k vyčištěným textům připraveným k indexaci.
-    """
-    os.makedirs(config.data.raw_dir, exist_ok=True)
-    download_books(config)
-    if os.path.exists(_SEED_RUR):
-        shutil.copyfile(_SEED_RUR, os.path.join(config.data.raw_dir, "rur.txt"))
-    written = build_processed(config.data.raw_dir, config.data.processed_dir)
-    print(f"Připraveno {len(written)} textů v {config.data.processed_dir}")
-    return written
-
-
-def cmd_build_index(config):
-    """Postaví index a vypíše, kolik pasáží vzniklo (rychlá kontrola dat).
+    Sdílený krok „vygeneruj vektory": z processed adresáře se postaví retriever
+    a uloží do `index_path`, aby dotazování později naskočilo okamžitě.
 
     Args:
-        config (Config): Konfigurace (čte se processed_dir a nastavení bloků).
+        config (Config): Konfigurace (čte processed_dir, index_path, nastavení bloků).
 
     Returns:
         int: Počet zaindexovaných pasáží.
     """
     pipe = QAPipeline.from_corpus(config.data.processed_dir, config)
+    pipe.retriever.save(config.data.index_path)
     n = len(pipe.retriever.passages)
-    print(f"Index postaven: {n} pasáží z {config.data.processed_dir}")
+    print(f"Index postaven a uložen: {n} pasáží → {config.data.index_path}")
     return n
+
+
+def _load_pipeline(config):
+    """Načte pipeline — přednostně z uloženého indexu, jinak ji postaví.
+
+    Když existuje uložený index, načte se bleskově z disku; když ne (třeba se
+    zapomnělo na `reindex`), pipeline se poctivě postaví z processed textů, aby
+    dotaz nespadl.
+
+    Args:
+        config (Config): Konfigurace s cestami a nastavením bloků.
+
+    Returns:
+        QAPipeline: Pipeline připravená odpovídat.
+    """
+    if os.path.exists(config.data.index_path):
+        return QAPipeline.from_index(config.data.index_path, config)
+    return QAPipeline.from_corpus(config.data.processed_dir, config)
+
+
+def cmd_prepare_data(config):
+    """Bootstrap dat: stáhne knihy, naseeduje R.U.R., vyčistí a zaindexuje.
+
+    Kompletní „nastartuj projekt" příkaz. Nejdřív zkusí stáhnout nakonfigurované
+    knihy, přidá původní R.U.R. (pojistka, ať je vždy z čeho odpovídat), a pak
+    vyčistí a postaví index.
+
+    Args:
+        config (Config): Konfigurace s cestami a seznamem knih.
+
+    Returns:
+        int: Počet zaindexovaných pasáží.
+    """
+    os.makedirs(config.data.raw_dir, exist_ok=True)
+    download_books(config)
+    if os.path.exists(_SEED_RUR):
+        shutil.copyfile(_SEED_RUR, os.path.join(config.data.raw_dir, "rur.txt"))
+    return cmd_reindex(config)
+
+
+def cmd_reindex(config):
+    """Přegeneruje index po ruční změně textů v data/raw.
+
+    Přesně ten krok, který uživatel spustí po vhození nového `.txt` do
+    `data/raw/`: vyčistí syrové texty do processed a postaví/uloží nad nimi index.
+    Nestahuje ani neseeduje — pracuje čistě s tím, co je v raw adresáři.
+
+    Args:
+        config (Config): Konfigurace s cestami a nastavením bloků.
+
+    Returns:
+        int: Počet zaindexovaných pasáží.
+    """
+    written = build_processed(config.data.raw_dir, config.data.processed_dir)
+    print(f"Vyčištěno {len(written)} textů z {config.data.raw_dir}")
+    return _build_and_save_index(config)
+
+
+def cmd_build_index(config):
+    """Postaví a uloží index z už vyčištěných textů (bez čištění).
+
+    Args:
+        config (Config): Konfigurace (čte processed_dir a nastavení bloků).
+
+    Returns:
+        int: Počet zaindexovaných pasáží.
+    """
+    return _build_and_save_index(config)
 
 
 def cmd_ask(config, question):
     """Odpoví na jeden dotaz a naformátuje odpověď i se zdrojem.
 
     Args:
-        config (Config): Konfigurace (čte se processed_dir a nastavení bloků).
+        config (Config): Konfigurace s cestami a nastavením bloků.
         question (str): Dotaz uživatele v češtině.
 
     Returns:
         str: Odpověď a pod ní řádek se zdrojem (nebo pomlčka, když zdroj není).
     """
-    pipe = QAPipeline.from_corpus(config.data.processed_dir, config)
+    pipe = _load_pipeline(config)
     ans = pipe.ask(question)
     src = ", ".join(ans.sources) if ans.sources else "—"
     return f"{ans.text}\n(zdroj: {src})"
+
+
+def cmd_repl(config):
+    """Spustí interaktivní prompt na dotazování.
+
+    Index se načte jednou na začátku a pak se ve smyčce ptá pořád dokola — takže
+    v rámci jednoho sezení se nic nepřestavuje a odpovědi chodí okamžitě. Ukončí
+    se prázdným řádkem, slovem „konec"/„exit"/„quit" nebo Ctrl-D.
+
+    Args:
+        config (Config): Konfigurace s cestami a nastavením bloků.
+
+    Returns:
+        None: Interakce probíhá na standardním vstupu/výstupu.
+    """
+    pipe = _load_pipeline(config)
+    print("Ptej se česky. Prázdný řádek nebo 'konec' ukončí.\n")
+    while True:
+        try:
+            question = input("❓ ").strip()
+        except EOFError:  # Ctrl-D
+            break
+        if not question or question.lower() in {"konec", "exit", "quit"}:
+            break
+        ans = pipe.ask(question)
+        src = ", ".join(ans.sources) if ans.sources else "—"
+        print(f"💬 {ans.text}")
+        print(f"   (zdroj: {src})\n")
+    print("Měj se! 👋")
 
 
 def cmd_explain(name):
@@ -87,7 +168,7 @@ def cmd_explain(name):
 
 
 def _build_parser():
-    """Sestaví argparse parser se čtyřmi příkazy.
+    """Sestaví argparse parser se všemi příkazy.
 
     Sdílený přepínač `--processed-dir` je připojen ke každému podpříkazu přes
     společný „rodičovský" parser, takže funguje i napsaný ZA názvem příkazu
@@ -103,9 +184,11 @@ def _build_parser():
 
     parser = argparse.ArgumentParser(prog="cli", description="Český QA nad texty (V1)")
     sub = parser.add_subparsers(dest="command", required=True)
-    sub.add_parser("prepare-data", parents=[common], help="stáhne + vyčistí texty")
-    sub.add_parser("build-index", parents=[common], help="postaví index a vypíše statistiku")
-    p_ask = sub.add_parser("ask", parents=[common], help="odpoví na dotaz")
+    sub.add_parser("prepare-data", parents=[common], help="stáhne + seeduje + vyčistí + zaindexuje")
+    sub.add_parser("reindex", parents=[common], help="přegeneruje index z data/raw")
+    sub.add_parser("build-index", parents=[common], help="postaví index z hotových textů")
+    sub.add_parser("repl", parents=[common], help="interaktivní prompt na dotazování")
+    p_ask = sub.add_parser("ask", parents=[common], help="odpoví na jeden dotaz")
     p_ask.add_argument("question", help="otázka v češtině")
     p_explain = sub.add_parser("explain", parents=[common], help="popíše blok")
     p_explain.add_argument("block", nargs="?",
@@ -128,12 +211,21 @@ def main(argv=None):
 
     config = Config()
     if args.processed_dir:
-        config = Config(data=DataConfig(processed_dir=args.processed_dir))
+        # Vlastní processed adresář = vlastní korpus → i vlastní index vedle něj,
+        # ať se omylem nenačte uložený index jiného (výchozího) korpusu.
+        config = Config(data=DataConfig(
+            processed_dir=args.processed_dir,
+            index_path=os.path.join(args.processed_dir, "index.pkl"),
+        ))
 
     if args.command == "prepare-data":
         cmd_prepare_data(config)
+    elif args.command == "reindex":
+        cmd_reindex(config)
     elif args.command == "build-index":
         cmd_build_index(config)
+    elif args.command == "repl":
+        cmd_repl(config)
     elif args.command == "ask":
         print(cmd_ask(config, args.question))
     elif args.command == "explain":

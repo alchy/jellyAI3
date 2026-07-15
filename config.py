@@ -15,13 +15,16 @@ class DataConfig:
     """Kde leží data a odkud se stahují.
 
     Atributy:
-        raw_dir (str): Adresář pro syrové stažené texty.
+        raw_dir (str): Adresář pro syrové stažené/vložené texty.
         processed_dir (str): Adresář pro vyčištěné texty připravené k indexaci.
+        index_path (str): Cesta k uloženému indexu („vektorům"), aby se nemusel
+            stavět znovu při každém dotazu.
         books (list): Seznam dvojic (url, filename) public-domain knih ke stažení;
             dostupnost se ověřuje až při běhu `prepare-data`.
     """
     raw_dir: str = "data/raw"
     processed_dir: str = "data/processed"
+    index_path: str = "data/index.pkl"
     books: list = field(default_factory=list)
 
 
