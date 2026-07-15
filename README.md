@@ -114,20 +114,30 @@ python -m pytest -v
 
 ## V2a — syntetická QA data (příprava pro generátor)
 
-Generuje dvojice otázka→odpověď z korpusu pomocí českých NLP modelů ÚFAL
-(NameTag = entity, MorphoDiTa = POS/lemma). Slouží jako tréninková data pro
-budoucí generátor (V2b). Vyžaduje extra závislosti a modely (CC BY-NC-SA,
+Generuje dvojice otázka→odpověď z korpusu pomocí českého NER modelu ÚFAL
+**NameTag** (entity → typy otázek Kdo/Co/Kde/Kdy/Kolik). Slouží jako tréninková
+data pro budoucí generátor (V2b). Vyžaduje extra závislosti a model (CC BY-NC-SA,
 nekomerční = pro osobní/výukové OK):
 
 ```bash
 pip install -r requirements-v2.txt
-./jelly qa-models      # stáhne české modely (MorphoDiTa + NameTag) do data/models
+./jelly qa-models      # stáhne český NameTag model do data/models
 ./jelly qa             # vygeneruje data/qa/qapairs.jsonl z data/processed
 ```
 
+Kvalita otázek hodně závisí na zdroji: **čistá próza** je mnohem lepší než
+divadlo. Nejlíp funguje česká Wikipedie:
+
+```bash
+./jelly wiki           # stáhne kurátorované české wiki články do data/raw
+./jelly index          # vyčistí (reference, datové závorky) → data/processed
+./jelly qa             # QA dataset s lepším dělením vět + filtrem kvality
+```
+
 Každý řádek datasetu je `{question, context, answer, type, doc_id, passage_index}`.
-Otázky vznikají šablonou z entit/čísel — část je gramaticky kostrbatá (čeština),
-to je očekávaný „realistický strop".
+Otázky vznikají šablonou z entit; filtr kvality zahodí zjevné paskvily. Část
+zbývajících otázek je pořád gramaticky kostrbatá — to je očekávaný „realistický
+strop" jednoduché šablony.
 
 ## Roadmapa
 
