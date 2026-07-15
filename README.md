@@ -112,6 +112,23 @@ Veškerá konfigurace (velikost pasáží, metoda vyhledávání, top-k, …) je
 python -m pytest -v
 ```
 
+## V2a — syntetická QA data (příprava pro generátor)
+
+Generuje dvojice otázka→odpověď z korpusu pomocí českých NLP modelů ÚFAL
+(NameTag = entity, MorphoDiTa = POS/lemma). Slouží jako tréninková data pro
+budoucí generátor (V2b). Vyžaduje extra závislosti a modely (CC BY-NC-SA,
+nekomerční = pro osobní/výukové OK):
+
+```bash
+pip install -r requirements-v2.txt
+./jelly qa-models      # stáhne české modely (MorphoDiTa + NameTag) do data/models
+./jelly qa             # vygeneruje data/qa/qapairs.jsonl z data/processed
+```
+
+Každý řádek datasetu je `{question, context, answer, type, doc_id, passage_index}`.
+Otázky vznikají šablonou z entit/čísel — část je gramaticky kostrbatá (čeština),
+to je očekávaný „realistický strop".
+
 ## Roadmapa
 
 - **V2:** syntetické QA páry + malý seq2seq generátor od nuly → plynulejší,

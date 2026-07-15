@@ -17,6 +17,8 @@ from dataprep.download import download_books
 from dataprep.clean import build_processed
 from jellyai.pipeline import QAPipeline
 from jellyai.explain import explain_block, list_blocks
+from qagen.build import build_dataset
+from qagen.download_models import download_models
 
 # Původní R.U.R. je už v repu (dědictví po LSTM verzi). Použijeme ho jako výchozí
 # korpus, aby QA fungovalo hned po `prepare-data` i bez připojení k internetu.
@@ -167,6 +169,37 @@ def cmd_explain(name):
     return explain_block(name)
 
 
+def cmd_qa_models(config):
+    """Stáhne ÚFAL modely (MorphoDiTa + NameTag) pro generování QA dat.
+
+    Args:
+        config (Config): Konfigurace (rezervováno pro cesty modelů).
+
+    Returns:
+        list[tuple[str, bool]]: Výsledek stažení každého modelu.
+    """
+    return download_models(config)
+
+
+def cmd_gen_qa(config, tagger=None):
+    """Vygeneruje syntetický QA dataset z korpusu.
+
+    Args:
+        config (Config): Konfigurace (processed_dir, chunker, qagen).
+        tagger (Tagger | None): Analyzátor; když None, vytvoří se UfalTagger
+            z modelů v konfiguraci. Injektování usnadňuje testy (FakeTagger).
+
+    Returns:
+        int: Počet vygenerovaných párů.
+    """
+    if tagger is None:
+        from qagen.tagger import UfalTagger
+        tagger = UfalTagger(config.qagen.morphodita_model, config.qagen.nametag_model)
+    pairs = build_dataset(config, tagger)
+    print(f"Vygenerováno {len(pairs)} QA párů → {config.qagen.qa_path}")
+    return len(pairs)
+
+
 def _build_parser():
     """Sestaví argparse parser se všemi příkazy.
 
@@ -188,6 +221,8 @@ def _build_parser():
     sub.add_parser("reindex", parents=[common], help="přegeneruje index z data/raw")
     sub.add_parser("build-index", parents=[common], help="postaví index z hotových textů")
     sub.add_parser("repl", parents=[common], help="interaktivní prompt na dotazování")
+    sub.add_parser("qa-models", parents=[common], help="stáhne ÚFAL modely (MorphoDiTa+NameTag)")
+    sub.add_parser("gen-qa", parents=[common], help="vygeneruje syntetický QA dataset z korpusu")
     p_ask = sub.add_parser("ask", parents=[common], help="odpoví na jeden dotaz")
     p_ask.add_argument("question", help="otázka v češtině")
     p_explain = sub.add_parser("explain", parents=[common], help="popíše blok")
@@ -226,6 +261,10 @@ def main(argv=None):
         cmd_build_index(config)
     elif args.command == "repl":
         cmd_repl(config)
+    elif args.command == "qa-models":
+        cmd_qa_models(config)
+    elif args.command == "gen-qa":
+        cmd_gen_qa(config)
     elif args.command == "ask":
         print(cmd_ask(config, args.question))
     elif args.command == "explain":

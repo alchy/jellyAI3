@@ -52,3 +52,21 @@ def test_reindex_builds_saves_and_answers(tmp_path):
     # Následný dotaz teď načte uložený index a odpoví.
     out = cli.cmd_ask(cfg, "kdo vyráběl roboty")
     assert "roboty" in out.lower()
+
+
+def test_cmd_gen_qa_with_fake_tagger(tmp_path):
+    from config import QagenConfig
+    from qagen.tagger import Entity, FakeTagger
+
+    proc = tmp_path / "processed"
+    proc.mkdir()
+    s = "Roboty vynalezl starý Rossum."
+    (proc / "rur.txt").write_text(s, encoding="utf-8")
+    cfg = Config(
+        data=DataConfig(processed_dir=str(proc)),
+        qagen=QagenConfig(qa_path=str(tmp_path / "qa" / "p.jsonl"), min_tokens=3),
+    )
+    ft = FakeTagger(entities={s: [Entity("starý Rossum", "P", 16, 28)]})
+    n = cli.cmd_gen_qa(cfg, tagger=ft)
+    assert n == 1
+    assert (tmp_path / "qa" / "p.jsonl").exists()
