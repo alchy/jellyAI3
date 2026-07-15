@@ -30,7 +30,7 @@ case "$cmd" in
     echo "✅ Prostředí připraveno v $ROOT/.venv"
     ;;
 
-  prepare|index|ask|explain|qa|qa-models)
+  prepare|index|ask|explain|qa|qa-models|wiki)
     if [ ! -x "$PY" ]; then
       echo "❌ Chybí .venv — spusť nejdřív: ./jelly setup" >&2
       exit 1
@@ -39,6 +39,7 @@ case "$cmd" in
       prepare)   "$PY" "$ROOT/cli.py" prepare-data ;;
       index)     "$PY" "$ROOT/cli.py" reindex ;;
       qa-models) "$PY" "$ROOT/cli.py" qa-models ;;
+      wiki)      "$PY" "$ROOT/cli.py" wiki ;;
       qa)        "$PY" "$ROOT/cli.py" gen-qa ;;
       ask)
         if [ "$#" -gt 0 ]; then
@@ -52,6 +53,6 @@ case "$cmd" in
     ;;
 
   *)
-    echo "Použití: ./jelly {setup|prepare|index|ask [otázka]|explain [blok]|qa-models|qa}"
+    echo "Použití: ./jelly {setup|prepare|index|ask [otázka]|explain [blok]|wiki|qa-models|qa}"
     ;;
 esac

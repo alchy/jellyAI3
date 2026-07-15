@@ -181,6 +181,19 @@ def cmd_qa_models(config):
     return download_models(config)
 
 
+def cmd_wiki(config):
+    """Stáhne kurátorované české wiki články do raw adresáře.
+
+    Args:
+        config (Config): Konfigurace (wiki_titles, raw_dir).
+
+    Returns:
+        list[str]: Cesty ke staženým souborům.
+    """
+    from dataprep.wiki import fetch_articles
+    return fetch_articles(list(config.data.wiki_titles), config.data.raw_dir)
+
+
 def cmd_gen_qa(config, tagger=None):
     """Vygeneruje syntetický QA dataset z korpusu.
 
@@ -222,6 +235,7 @@ def _build_parser():
     sub.add_parser("build-index", parents=[common], help="postaví index z hotových textů")
     sub.add_parser("repl", parents=[common], help="interaktivní prompt na dotazování")
     sub.add_parser("qa-models", parents=[common], help="stáhne ÚFAL modely (MorphoDiTa+NameTag)")
+    sub.add_parser("wiki", parents=[common], help="stáhne české wiki články do data/raw")
     sub.add_parser("gen-qa", parents=[common], help="vygeneruje syntetický QA dataset z korpusu")
     p_ask = sub.add_parser("ask", parents=[common], help="odpoví na jeden dotaz")
     p_ask.add_argument("question", help="otázka v češtině")
@@ -263,6 +277,8 @@ def main(argv=None):
         cmd_repl(config)
     elif args.command == "qa-models":
         cmd_qa_models(config)
+    elif args.command == "wiki":
+        cmd_wiki(config)
     elif args.command == "gen-qa":
         cmd_gen_qa(config)
     elif args.command == "ask":

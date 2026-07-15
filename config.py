@@ -21,11 +21,17 @@ class DataConfig:
             stavět znovu při každém dotazu.
         books (list): Seznam dvojic (url, filename) public-domain knih ke stažení;
             dostupnost se ověřuje až při běhu `prepare-data`.
+        wiki_titles (tuple): Názvy českých wiki článků ke stažení jako korpus
+            čisté prózy (dobrý zdroj pro syntetická QA data).
     """
     raw_dir: str = "data/raw"
     processed_dir: str = "data/processed"
     index_path: str = "data/index.pkl"
     books: list = field(default_factory=list)
+    wiki_titles: tuple = (
+        "Karel Čapek", "Josef Čapek", "R.U.R.", "Válka s mloky",
+        "Bílá nemoc", "Božena Němcová", "Jan Neruda",
+    )
 
 
 @dataclass
