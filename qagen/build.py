@@ -39,7 +39,9 @@ def build_dataset(config, tagger):
     for doc in docs:
         for passage in chunk(doc, config.chunker):
             for sentence in split_sentences(passage.text):
-                if len(sentence.split()) < config.qagen.min_tokens:
+                n_words = len(sentence.split())
+                # Moc krátká věta = málo kontextu; moc dlouhá = run-on paskvil.
+                if n_words < config.qagen.min_tokens or n_words > config.qagen.max_tokens:
                     continue
                 for cand in candidates(sentence, tagger, config.qagen):
                     question = build_question(sentence, cand)

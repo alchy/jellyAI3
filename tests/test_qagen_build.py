@@ -26,3 +26,18 @@ def test_build_dataset(tmp_path):
     assert qa.exists()
     first = json.loads(qa.read_text(encoding="utf-8").splitlines()[0])
     assert first["question"] == "Kdo roboty vynalezl?"
+
+
+def test_build_dataset_skips_long_sentences(tmp_path):
+    proc = tmp_path / "processed"
+    proc.mkdir()
+    # Run-on „věta" (přes max_tokens) se přeskočí i s přítomnou entitou.
+    sentence = "Roboty vynalezl starý Rossum " + "a " * 50 + "konec."
+    (proc / "rur.txt").write_text(sentence, encoding="utf-8")
+    cfg = Config(
+        data=DataConfig(processed_dir=str(proc)),
+        qagen=QagenConfig(qa_path=str(tmp_path / "qa" / "p.jsonl"),
+                          min_tokens=3, max_tokens=10),
+    )
+    ft = FakeTagger(entities={sentence: [Entity("starý Rossum", "P", 16, 28)]})
+    assert build_dataset(cfg, ft) == []

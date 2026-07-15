@@ -9,7 +9,8 @@ Jinými slovy: hledáme ve větě to nejzajímavější, na co se dá zeptat.
 from dataclasses import dataclass
 
 # První písmeno CNEC typu → tázací slovo. (CNEC = Czech Named Entity Corpus.)
-_ENTITY_QTYPE = {"p": "Kdo", "g": "Kde", "i": "Co", "t": "Kdy"}
+# „n" jsou číselné entity (počty, míry…) → Kolik; číslovky umí dodat i POS „C" níže.
+_ENTITY_QTYPE = {"p": "Kdo", "g": "Kde", "i": "Co", "t": "Kdy", "n": "Kolik"}
 
 
 @dataclass

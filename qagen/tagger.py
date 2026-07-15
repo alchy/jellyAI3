@@ -88,71 +88,47 @@ class FakeTagger:
         return self._tokens.get(text, [])
 
 
-def _pdt_pos(tag):
-    """Vrátí slovní druh = první znak PDT tagu (N/A/C/V…).
-
-    Args:
-        tag (str): Plný poziční PDT tag (např. „NNIP1-----A----").
-
-    Returns:
-        str: První znak tagu, nebo prázdný řetězec pro prázdný tag.
-    """
-    return tag[:1] if tag else ""
-
-
 class UfalTagger:
-    """Reálný tagger nad ÚFAL MorphoDiTa (POS/lemma) a NameTag (NER).
+    """Reálný tagger nad ÚFAL NameTag (rozpoznávání pojmenovaných entit).
 
-    Modely se načtou při vytvoření. Analýza probíhá po jedné větě, znakové offsety
+    Pozn.: záměrně **jen NameTag**, ne MorphoDiTa. `ufal.morphodita` a
+    `ufal.nametag` jsou dva SWIG moduly sdílející C++ typ `std::vector<std::string>`
+    a v jednom procesu se perou — ten použitý druhý spadne. NameTag sám pokryje
+    naše typy odpovědí: osoby/místa/instituce/čas (Kdo/Kde/Co/Kdy) i číselné
+    entity (Kolik). MorphoDiTa (lemmatizace) se dá vrátit později přes izolaci do
+    subprocesu, ale pro V2a ji nepotřebujeme.
+
+    Model se načte při vytvoření. Analýza probíhá po jedné větě, znakové offsety
     jsou relativní k předané větě (shodně s FakeTagger, aby byl blok zaměnitelný).
-    Importy ÚFAL jsou schválně uvnitř metod, aby šel modul naimportovat i bez
+    Import ÚFAL je schválně uvnitř metod, aby šel modul naimportovat i bez
     nainstalovaného ÚFAL (kvůli hermetickým testům zbytku pipeline).
 
     Args:
-        morphodita_model (str): Cesta k modelu MorphoDiTa (.tagger).
         nametag_model (str): Cesta k modelu NameTag (.ner).
 
     Raises:
-        FileNotFoundError: Když se některý model nepodaří načíst.
+        FileNotFoundError: Když se model nepodaří načíst.
     """
 
-    def __init__(self, morphodita_model, nametag_model):
-        from ufal.morphodita import Tagger as MorphoTagger
+    def __init__(self, nametag_model):
         from ufal.nametag import Ner
-        self._morpho = MorphoTagger.load(morphodita_model)
-        if self._morpho is None:
-            raise FileNotFoundError(f"Nelze načíst MorphoDiTa model: {morphodita_model}")
         self._ner = Ner.load(nametag_model)
         if self._ner is None:
             raise FileNotFoundError(f"Nelze načíst NameTag model: {nametag_model}")
 
     def tokens(self, text):
-        """Otaguje větu MorphoDiTou a vrátí tokeny s lemma + POS a offsety.
+        """NameTag POS/lemma neposkytuje — vrací prázdný seznam.
+
+        Čísla (Kolik) chodí u UfalTaggeru z číselných entit (viz answers.py),
+        ne z POS. Metoda tu je kvůli dodržení rozhraní Tagger.
 
         Args:
-            text (str): Věta k analýze.
+            text (str): Věta (nepoužije se).
 
         Returns:
-            list[Token]: Tokeny věty v pořadí výskytu.
+            list: Vždy prázdný seznam.
         """
-        from ufal.morphodita import Forms, TaggedLemmas, TokenRanges
-        forms, lemmas, ranges = Forms(), TaggedLemmas(), TokenRanges()
-        tokenizer = self._morpho.newTokenizer()
-        tokenizer.setText(text)
-        out = []
-        while tokenizer.nextSentence(forms, ranges):
-            self._morpho.tag(forms, lemmas)
-            for i in range(len(lemmas)):
-                start = ranges[i].start
-                length = ranges[i].length
-                out.append(Token(
-                    text=text[start:start + length],
-                    lemma=lemmas[i].lemma,
-                    pos=_pdt_pos(lemmas[i].tag),
-                    start=start,
-                    end=start + length,
-                ))
-        return out
+        return []
 
     def entities(self, text):
         """Najde ve větě pojmenované entity NameTagem a vrátí je se offsety.

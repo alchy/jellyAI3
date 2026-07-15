@@ -194,7 +194,7 @@ def cmd_gen_qa(config, tagger=None):
     """
     if tagger is None:
         from qagen.tagger import UfalTagger
-        tagger = UfalTagger(config.qagen.morphodita_model, config.qagen.nametag_model)
+        tagger = UfalTagger(config.qagen.nametag_model)
     pairs = build_dataset(config, tagger)
     print(f"Vygenerováno {len(pairs)} QA párů → {config.qagen.qa_path}")
     return len(pairs)

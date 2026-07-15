@@ -81,6 +81,9 @@ class QagenConfig:
         morphodita_model (str): Cesta k modelu MorphoDiTa (POS/lemma).
         nametag_model (str): Cesta k modelu NameTag (NER).
         min_tokens (int): Minimální počet slov ve větě, aby dávala smysl jako kontext.
+        max_tokens (int): Maximální počet slov ve větě; delší se přeskočí. Chrání
+            před run-on „větami" (scénické poznámky, seznamy), z nichž by šablona
+            udělala nesmyslně dlouhou otázku.
         max_answers_per_sentence (int): Kolik nejvíc odpovědí vytěžit z jedné věty.
         types (tuple): Povolené typy otázek.
     """
@@ -88,6 +91,7 @@ class QagenConfig:
     morphodita_model: str = "data/models/czech-morfflex.tagger"
     nametag_model: str = "data/models/czech-cnec.ner"
     min_tokens: int = 5
+    max_tokens: int = 40
     max_answers_per_sentence: int = 2
     types: tuple = ("Kdo", "Co", "Kde", "Kdy", "Kolik")
 
