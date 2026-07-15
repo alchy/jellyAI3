@@ -13,6 +13,41 @@ import re
 _GUTENBERG_START = re.compile(r"\*\*\*\s*START OF.*?\*\*\*", re.IGNORECASE | re.DOTALL)
 _GUTENBERG_END = re.compile(r"\*\*\*\s*END OF.*", re.IGNORECASE | re.DOTALL)
 
+# Řádek se sekčním nadpisem (Wikipedia „explaintext" je nechává jako „== Nadpis ==").
+_SECTION_RE = re.compile(r"^\s*=+\s*(.+?)\s*=+\s*$")
+# Sekce, od nichž dál je už jen bibliografický balast (ne próza) → uříznout.
+_REFERENCE_SECTIONS = {
+    "odkazy", "reference", "literatura", "externí odkazy", "související články",
+    "související", "poznámky", "bibliografie", "prameny",
+}
+
+
+def _strip_wiki_apparatus(text):
+    """Odřízne referenční/bibliografické sekce a zahodí sekční nadpisy.
+
+    Wikipedia je skvělá čistá próza, jenže na konci má seznamy zdrojů, ISBN a
+    citace, z nichž by generátor QA dat dělal nesmyslné otázky. Od prvního
+    „referenčního" nadpisu (Odkazy/Reference/Literatura…) proto text uřízneme;
+    ostatní sekční nadpisy (samotné „== Dílo ==") zahodíme, protože to není próza.
+    Na běžný text bez „==" nadpisů (třeba drama) tahle funkce nesáhne.
+
+    Args:
+        text (str): Text s normalizovanými konci řádků (\\n).
+
+    Returns:
+        str: Text bez sekčních nadpisů a bez referenční části.
+    """
+    kept = []
+    for line in text.split("\n"):
+        match = _SECTION_RE.match(line)
+        if match:
+            title = match.group(1).strip().lower()
+            if title in _REFERENCE_SECTIONS:
+                break            # odtud dál je jen balast
+            continue             # ostatní nadpisy nejsou próza → pryč
+        kept.append(line)
+    return "\n".join(kept)
+
 
 def clean_text(raw):
     """Vyčistí jeden syrový text do podoby vhodné pro indexaci.
@@ -36,6 +71,7 @@ def clean_text(raw):
     if m:
         text = text[:m.start()]
     text = text.replace("\r\n", "\n").replace("\r", "\n")
+    text = _strip_wiki_apparatus(text)  # pryč s referencemi/nadpisy (řádkově)
     text = re.sub(r"[ \t]+", " ", text)
     text = re.sub(r" *\n *", "\n", text)
     text = re.sub(r"\n{3,}", "\n\n", text)

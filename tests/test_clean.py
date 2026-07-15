@@ -22,6 +22,24 @@ def test_clean_strips_gutenberg_boilerplate():
     assert "License" not in out
 
 
+def test_clean_strips_wiki_references_and_headers():
+    raw = (
+        "Karel Čapek byl spisovatel.\n"
+        "== Dílo ==\n"
+        "Napsal R.U.R.\n"
+        "== Odkazy ==\n"
+        "=== Reference ===\n"
+        "ISBN 80-7185-332-1\n"
+        "Melantrich 1993\n"
+    )
+    out = clean_text(raw)
+    assert "Karel Čapek byl spisovatel." in out
+    assert "Napsal R.U.R." in out
+    assert "Dílo" not in out       # sekční nadpis zahozen
+    assert "ISBN" not in out       # referenční část odříznuta
+    assert "Melantrich" not in out
+
+
 def test_build_processed(tmp_path):
     raw_dir = tmp_path / "raw"
     proc_dir = tmp_path / "processed"
