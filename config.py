@@ -1,38 +1,84 @@
+"""Konfigurace všech bloků na jednom místě.
+
+Každý blok knihovny (chunker, retriever, answerer, data) má svůj malý dataclass
+s parametry a jejich výchozími hodnotami. Sdružení do jednoho `Config` znamená,
+že celé chování systému se dá odečíst — a přeladit — z jediného objektu, aniž by
+se parametry musely protahovat půltuctem funkcí. Kdo chce experimentovat, mění
+hodnoty tady; zbytek kódu se nemusí dotknout.
+"""
+
 from dataclasses import dataclass, field
 
 
 @dataclass
 class DataConfig:
+    """Kde leží data a odkud se stahují.
+
+    Atributy:
+        raw_dir (str): Adresář pro syrové stažené texty.
+        processed_dir (str): Adresář pro vyčištěné texty připravené k indexaci.
+        books (list): Seznam dvojic (url, filename) public-domain knih ke stažení;
+            dostupnost se ověřuje až při běhu `prepare-data`.
+    """
     raw_dir: str = "data/raw"
     processed_dir: str = "data/processed"
-    # seznam (url, filename) public-domain knih; ověřeno při plnění dat
     books: list = field(default_factory=list)
 
 
 @dataclass
 class ChunkerConfig:
-    size: int = 3            # počet vět na pasáž
-    overlap: int = 1         # počet vět sdílených mezi sousedními pasážemi
-    unit: str = "sentences"  # "sentences" | "chars"
+    """Jak krájet dokumenty na pasáže.
+
+    Atributy:
+        size (int): Počet vět na jednu pasáž.
+        overlap (int): Kolik vět sdílejí sousední pasáže (kvůli odpovědím na řezu).
+        unit (str): Jednotka dělení; zatím "sentences" (prostor pro "chars").
+    """
+    size: int = 3
+    overlap: int = 1
+    unit: str = "sentences"
 
 
 @dataclass
 class RetrieverConfig:
-    method: str = "bm25"     # "bm25" | "tfidf"
+    """Jak vyhledávat relevantní pasáže.
+
+    Atributy:
+        method (str): "bm25" (výchozí, obvykle lepší) nebo "tfidf".
+        top_k (int): Kolik nejlepších pasáží vrátit.
+        k1 (float): BM25 — nasycení četnosti slova (vyšší = četnost víc rozhoduje).
+        b (float): BM25 — míra normalizace délkou dokumentu (0 = žádná, 1 = plná).
+        use_stopwords (bool): Zda při tokenizaci zahazovat česká stopslova.
+    """
+    method: str = "bm25"
     top_k: int = 5
-    k1: float = 1.5          # BM25 parametr
-    b: float = 0.75          # BM25 parametr
+    k1: float = 1.5
+    b: float = 0.75
     use_stopwords: bool = True
 
 
 @dataclass
 class AnswererConfig:
+    """Jak z nalezených pasáží složit odpověď.
+
+    Atributy:
+        max_sentences (int): Kolik vět nejvýš vrátit jako odpověď (V1: typicky 1).
+        template (bool): Zda odpověď zabalit do šablony („Podle textu: …").
+    """
     max_sentences: int = 1
     template: bool = True
 
 
 @dataclass
 class Config:
+    """Zastřešující konfigurace — jeden objekt vládne všem blokům.
+
+    Atributy:
+        data (DataConfig): Nastavení dat.
+        chunker (ChunkerConfig): Nastavení krájení na pasáže.
+        retriever (RetrieverConfig): Nastavení vyhledávání.
+        answerer (AnswererConfig): Nastavení skládání odpovědi.
+    """
     data: DataConfig = field(default_factory=DataConfig)
     chunker: ChunkerConfig = field(default_factory=ChunkerConfig)
     retriever: RetrieverConfig = field(default_factory=RetrieverConfig)
