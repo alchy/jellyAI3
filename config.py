@@ -73,9 +73,11 @@ class AnswererConfig:
     Atributy:
         max_sentences (int): Kolik vět nejvýš vrátit jako odpověď (V1: typicky 1).
         template (bool): Zda odpověď zabalit do šablony („Podle textu: …").
+        mode (str): Který answerer použít — "extractive" (V1) nebo "generative" (V2b).
     """
     max_sentences: int = 1
     template: bool = True
+    mode: str = "extractive"
 
 
 @dataclass
@@ -103,6 +105,40 @@ class QagenConfig:
 
 
 @dataclass
+class GeneratorConfig:
+    """Nastavení generátoru odpovědí (V2b — decoder-only transformer).
+
+    Atributy:
+        vocab_size (int): Velikost slovníku SentencePiece (přenastaví se dle modelu).
+        n_layer, n_head, n_embd (int): Rozměry transformeru.
+        block_size (int): Maximální délka sekvence (kontext+otázka+odpověď).
+        dropout (float): Dropout pro regularizaci.
+        lr, warmup_steps, epochs, batch_size, weight_decay, grad_clip: trénink.
+        sp_prefix (str): Předpona souborů SentencePiece modelu.
+        ckpt_path (str): Cesta k uloženému checkpointu modelu.
+        temperature, top_k, top_p, max_new_tokens: parametry samplingu při generování.
+    """
+    vocab_size: int = 8000
+    n_layer: int = 4
+    n_head: int = 4
+    n_embd: int = 256
+    block_size: int = 256
+    dropout: float = 0.1
+    lr: float = 3e-4
+    warmup_steps: int = 100
+    epochs: int = 15
+    batch_size: int = 16
+    weight_decay: float = 0.1
+    grad_clip: float = 1.0
+    sp_prefix: str = "model/sp_qa"
+    ckpt_path: str = "model/ckpt.pt"
+    temperature: float = 0.8
+    top_k: int = 40
+    top_p: float = 0.95
+    max_new_tokens: int = 48
+
+
+@dataclass
 class Config:
     """Zastřešující konfigurace — jeden objekt vládne všem blokům.
 
@@ -112,9 +148,11 @@ class Config:
         retriever (RetrieverConfig): Nastavení vyhledávání.
         answerer (AnswererConfig): Nastavení skládání odpovědi.
         qagen (QagenConfig): Nastavení generování syntetických QA dat (V2).
+        generator (GeneratorConfig): Nastavení generátoru odpovědí (V2b).
     """
     data: DataConfig = field(default_factory=DataConfig)
     chunker: ChunkerConfig = field(default_factory=ChunkerConfig)
     retriever: RetrieverConfig = field(default_factory=RetrieverConfig)
     answerer: AnswererConfig = field(default_factory=AnswererConfig)
     qagen: QagenConfig = field(default_factory=QagenConfig)
+    generator: GeneratorConfig = field(default_factory=GeneratorConfig)

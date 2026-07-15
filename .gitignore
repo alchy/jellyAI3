@@ -6,5 +6,8 @@ data/processed/
 data/*.pkl
 data/qa/
 data/models/
+model/*.model
+model/*.vocab
+model/*.pt
 *.egg-info/
 .pytest_cache/

@@ -27,3 +27,11 @@ def test_config_has_qagen_defaults():
     assert cfg.qagen.min_tokens == 5
     assert cfg.qagen.max_answers_per_sentence == 2
     assert "Kdo" in cfg.qagen.types
+
+
+def test_config_has_generator_defaults():
+    cfg = Config()
+    assert cfg.generator.n_layer == 4
+    assert cfg.generator.block_size == 256
+    assert cfg.generator.ckpt_path == "model/ckpt.pt"
+    assert cfg.answerer.mode == "extractive"
