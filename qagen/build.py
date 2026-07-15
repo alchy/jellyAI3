@@ -14,6 +14,7 @@ from jellyai.chunker import chunk
 from jellyai.text import split_sentences
 from qagen.answers import candidates
 from qagen.questions import build_question
+from qagen.quality import is_acceptable
 
 
 def build_dataset(config, tagger):
@@ -45,6 +46,8 @@ def build_dataset(config, tagger):
                     continue
                 for cand in candidates(sentence, tagger, config.qagen):
                     question = build_question(sentence, cand)
+                    if not is_acceptable(question, cand.answer):
+                        continue
                     key = (question, cand.answer, doc.doc_id)
                     if key in seen:
                         continue
