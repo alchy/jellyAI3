@@ -21,6 +21,11 @@ _REFERENCE_SECTIONS = {
     "související", "poznámky", "bibliografie", "prameny",
 }
 
+# Rozsahová biografická závorka: obsahuje rok (15xx–20xx) i pomlčku (narození–úmrtí).
+_DATE_RANGE_PAREN = re.compile(
+    r"\s*\([^()]*\b(?:1[5-9]\d\d|20\d\d)\b[^()]*[–—-][^()]*\)"
+)
+
 
 def _strip_wiki_apparatus(text):
     """Odřízne referenční/bibliografické sekce a zahodí sekční nadpisy.
@@ -49,6 +54,22 @@ def _strip_wiki_apparatus(text):
     return "\n".join(kept)
 
 
+def _strip_date_range_parens(text):
+    """Odstraní jednoznačné rozsahové datové závorky (narození–úmrtí).
+
+    Cílí jen na závorky, které mají rok i pomlčku — ty v úvodních větách dělají
+    otázky nečitelnými. Běžné závorky (bez roku a pomlčky) nechá být, ať se
+    nesmaže užitečný obsah.
+
+    Args:
+        text (str): Vstupní text.
+
+    Returns:
+        str: Text bez rozsahových datových závorek.
+    """
+    return _DATE_RANGE_PAREN.sub("", text)
+
+
 def clean_text(raw):
     """Vyčistí jeden syrový text do podoby vhodné pro indexaci.
 
@@ -72,6 +93,7 @@ def clean_text(raw):
         text = text[:m.start()]
     text = text.replace("\r\n", "\n").replace("\r", "\n")
     text = _strip_wiki_apparatus(text)  # pryč s referencemi/nadpisy (řádkově)
+    text = _strip_date_range_parens(text)  # pryč s (narození – úmrtí) závorkami
     text = re.sub(r"[ \t]+", " ", text)
     text = re.sub(r" *\n *", "\n", text)
     text = re.sub(r"\n{3,}", "\n\n", text)

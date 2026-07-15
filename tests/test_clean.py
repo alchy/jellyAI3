@@ -22,6 +22,18 @@ def test_clean_strips_gutenberg_boilerplate():
     assert "License" not in out
 
 
+def test_clean_removes_date_range_parentheses():
+    raw = "Karel Čapek (9. ledna 1890 Úpice – 25. prosince 1938 Praha) byl spisovatel."
+    out = clean_text(raw)
+    assert out == "Karel Čapek byl spisovatel."
+
+
+def test_clean_keeps_normal_parentheses():
+    raw = "Slovo robot (z českého robota) zdomácnělo."
+    out = clean_text(raw)
+    assert "(z českého robota)" in out
+
+
 def test_clean_strips_wiki_references_and_headers():
     raw = (
         "Karel Čapek byl spisovatel.\n"
