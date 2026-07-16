@@ -291,7 +291,8 @@ def build_graph(annotations):
         field = ActivationField()
         for _, annotation in items:
             subject = field.hottest()          # (id, typ) nejteplejší osoby, nebo None
-            for fact in extract_facts(annotation, default_subject=subject, canon=canon):
+            for fact in extract_facts(annotation, default_subject=subject,
+                                      canon=canon, context=field.ranked()):
                 graph.add_fact(fact)
             _associate_context(graph, annotation, subject, canon)
             _warm_persons(field, annotation, canon)

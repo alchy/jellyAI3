@@ -46,6 +46,21 @@ def _stem(word):
     return low
 
 
+def name_gender(name):
+    """Heuristický rod jména z TVARU posledního slova — koncovky ženských
+    jmen jsou jazyková data (`feminine_name_suffixes`). „Němcová"/„Božena"
+    → Fem, jinak Masc. Sdílí ho anafora (extract) i rodový filtr odpovídače.
+
+    Args:
+        name (str): Jméno (povrchový/kanonický tvar).
+
+    Returns:
+        str: „Fem" nebo „Masc".
+    """
+    last = name.split()[-1] if name else ""
+    return "Fem" if last.endswith(current()["feminine_name_suffixes"]) else "Masc"
+
+
 def cluster_key(name):
     """Kmenový klíč jména — n-tice kmenů jeho slov (case-varianty → stejný klíč)."""
     return tuple(_stem(word) for word in name.split())

@@ -12,16 +12,9 @@ from jellyai.answerer.question import analyze_question
 from jellyai.answerer.pattern import question_pattern, SubQuery
 from jellyai.answerer.template import _to_nominative
 from jellyai.graph.activation import ActivationField
-from jellyai.graph.canon import _stem
+from jellyai.graph.canon import _stem, name_gender
 
 _DATE_PARTS = {"rok", "měsíc", "den"}   # drill: „v kterém roce/měsíci…"
-
-
-def _name_gender(name):
-    """Heuristický rod českého jména podle posledního slova: „-á/-a"→Fem
-    (Němcová, Božena), jinak Masc (Čapek, Karel, Josef). Jen orientační."""
-    last = name.split()[-1] if name else ""
-    return "Fem" if last.endswith(("á", "a")) else "Masc"
 
 
 class GraphAnswerer(Answerer):
@@ -105,7 +98,7 @@ class GraphAnswerer(Answerer):
         node = self.graph.nodes.get(node_id)
         if qa.gender is None or node is None or node.type != "person":
             return True
-        return _name_gender(node_id) == qa.gender
+        return name_gender(node_id) == qa.gender
 
     def _pattern_answer(self, question, qa):
         """Univerzální match: otázka → neúplný fakt → najdi shodný v grafu → díra.

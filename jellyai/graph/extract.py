@@ -8,6 +8,7 @@ Uzel účastníka je pojmenovaná entita (kanonicky) nebo nominativní lemma tok
 from dataclasses import dataclass
 
 from jellyai.answerer.selection import _clean_lemma
+from jellyai.graph.canon import name_gender
 from jellyai.lang import current
 
 _SUBJ = {"nsubj", "nsubj:pass"}
@@ -99,6 +100,36 @@ def _node_for(token, entities, canon=None):
 def _children(sent, head_id):
     """Tokeny věty s `head` == head_id (1-based)."""
     return [t for t in sent if t.get("head") == head_id]
+
+
+def _pronoun_person(tok, context):
+    """Anafora: osobní zájmeno 3. osoby → nejteplejší rodově shodná osoba.
+
+    Zobecněný pro-drop: rod zájmena (feats `Gender`) se páruje s rodem jména
+    (`name_gender` — tvar příjmení, jazyková data) přes kandidáty aktivačního
+    pole (nejteplejší první). Demonstrativa (`PronType=Dem`, „to"), reflexiva
+    (`Reflex=Yes`, „se") a 1./2. osoba osobu nevážou nikdy.
+
+    Args:
+        tok (dict | None): Zájmenný token (s feats).
+        context (list[tuple] | None): Kandidáti [(id, typ), …] dle jasu.
+
+    Returns:
+        tuple | None: (id, typ) navázané osoby, nebo None.
+    """
+    if tok is None:
+        return None
+    feats = tok.get("feats", {})
+    if feats.get("PronType") != "Prs" or feats.get("Reflex") == "Yes" \
+            or feats.get("Person") not in (None, "3"):
+        return None
+    gender = feats.get("Gender")
+    if gender not in ("Masc", "Fem"):
+        return None
+    for candidate in context or ():
+        if candidate[1] == "person" and name_gender(candidate[0]) == gender:
+            return candidate
+    return None
 
 
 def _relation_person(children, sent, entities, canon):
@@ -208,21 +239,22 @@ def _copular_facts(sent, head_id, subj_tok, subj, entities, canon):  # pylint: d
     return facts
 
 
-def extract_facts(annotation, default_subject=None, canon=None):
+def extract_facts(annotation, default_subject=None, canon=None, context=None):
     # pylint: disable=too-many-locals,too-many-branches
     """Vytáhne z anotace věty seznam reifikovaných faktů.
 
-    Pro každý sloveso-token vznikne jeden n-ární fakt (podmět + předmět + atributy).
-    Zájmenný podmět/předmět je balast a přeskočí se. České věty často **elidují
-    podmět** (pro-drop: „Narodil se 1890"); když podmět chybí (nebo je zájmeno) a je
-    dán `default_subject` (hlavní entita dokumentu), doplní se — tím se zachytí
-    biografická fakta, která by jinak zmizela. Fakt bez dalšího účastníka než podmět
-    se zahazuje.
+    Pro každý sloveso-token vznikne jeden n-ární fakt (podmět + předmět +
+    atributy). **Elidovaný podmět** (pro-drop: „Narodil se 1890") dostane
+    `default_subject` (hlavní entita dokumentu). **Osobní zájmeno** v roli
+    podmětu/předmětu se rozváže anaforou (`_pronoun_person`) na rodově shodnou
+    osobu z `context`; demonstrativa a nerozvázaná zájmena osobu NEdědí —
+    overtní podmět není elize. Fakt bez dalšího účastníka než podmět se zahazuje.
 
     Args:
         annotation (dict): {"entities": [...], "sentences": [[token,...],...]}.
         default_subject (tuple | None): (id, typ) náhradního podmětu pro pro-drop.
         canon (dict | None): Kanonizace osobních jmen (sjednocení fragmentů).
+        context (list[tuple] | None): Kandidáti anafory [(id, typ), …] dle jasu.
 
     Returns:
         list[Fact]: Nalezené fakty (mohou se opakovat — agreguje graf).
@@ -247,20 +279,21 @@ def extract_facts(annotation, default_subject=None, canon=None):
             head = sent[head_id - 1]
             children = _children(sent, head_id)
             subj_tok = _first(children, _SUBJ)
-            # zájmenný podmět je balast; ponecháme prostor pro pro-drop náhradu
+            pronoun_subj = (subj_tok is not None
+                            and subj_tok.get("upos") in _SKIP_UPOS)
             subj_node = None
-            if subj_tok is not None and subj_tok.get("upos") not in _SKIP_UPOS:
+            if subj_tok is not None and not pronoun_subj:
                 subj_node = _node_for(subj_tok, entities, canon)
+            elif pronoun_subj:
+                subj_node = _pronoun_person(subj_tok, context)   # anafora on/ona
 
             # sponová věta: (podmět)–být–(přísudek). Rozlišíme **identitu**
             # (podstatné jméno → role „pred": „je spisovatelka") od **vlastnosti/
             # stavu** (přídavné jméno → role „attr": „je nemocná") — „Kdo je"
             # čerpá z identity, „Jaký je" z vlastnosti, takže se nepletou.
             if _first(children, {"cop"}):
-                # overtní zájmenný podmět („Je TO lepra") NENÍ pro-drop elize —
-                # dosazení nejteplejší osoby by vyrábělo šum být(osoba, lepra)
-                pronoun_subj = (subj_tok is not None
-                                and subj_tok.get("upos") in _SKIP_UPOS)
+                # overtní zájmenný podmět NENÍ pro-drop elize: buď se rozváže
+                # anaforou (on/ona), nebo („Je TO lepra") osobu nedědí vůbec
                 subj = subj_node or (None if pronoun_subj else default_subject)
                 facts.extend(_copular_facts(sent, head_id, subj_tok, subj,
                                             entities, canon))
@@ -271,14 +304,17 @@ def extract_facts(annotation, default_subject=None, canon=None):
             verb = _clean_lemma(head.get("lemma", ""))
             extra = []
             obj = _first(children, _OBJ)
-            if obj is not None and obj.get("upos") not in _SKIP_UPOS:
-                o = _node_for(obj, entities, canon)
+            if obj is not None:
+                o = (_node_for(obj, entities, canon)
+                     if obj.get("upos") not in _SKIP_UPOS
+                     else _pronoun_person(obj, context))    # anafora „ji/mu"
                 if o:
                     extra.append(Participant("obj", o[0], o[1]))
             extra.extend(sorted(attrs_by_verb.get(head_id, ()), key=lambda p: (p.role, p.node)))
             if not extra:
                 continue
-            subj = subj_node or default_subject
+            # nerozvázaný overtní zájmenný podmět („To vedlo…") osobu nedědí
+            subj = subj_node or (None if pronoun_subj else default_subject)
             if subj is None:
                 continue
             facts.append(make_fact(verb, [Participant("subj", subj[0], subj[1])] + extra))

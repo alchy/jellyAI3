@@ -37,6 +37,8 @@ def load_rules(language="cs"):
                                          key=len, reverse=True))
         rules["work_nouns"] = frozenset(rules.get("work_nouns", ()))
         rules["work_verbs"] = frozenset(rules.get("work_verbs", ()))
+        rules["feminine_name_suffixes"] = tuple(
+            rules.get("feminine_name_suffixes", ()))
         _cache[path] = rules
     return _cache[path]
 

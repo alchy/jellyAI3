@@ -6,6 +6,7 @@
                "e", "ě", "y", "u", "a", "o", "i", "í", "é"],
   "vowels": "aeiouyáéíóúýěů",
   "epenthesis_vowel": "e",
+  "feminine_name_suffixes": ["ová", "á", "a"],
   "work_nouns": ["hra", "dílo", "kniha", "román", "povídka", "obraz", "film",
                  "báseň", "sbírka", "drama", "text", "komedie", "novela",
                  "tragédie", "publikace", "esej", "fejeton", "trilogie"],

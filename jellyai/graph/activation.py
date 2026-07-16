@@ -42,6 +42,10 @@ class ActivationField:
             return None
         return max(self.scores, key=self.scores.get)
 
+    def ranked(self):
+        """Klíče seřazené podle jasu (nejteplejší první; tie deterministicky)."""
+        return sorted(self.scores, key=lambda k: (-self.scores[k], str(k)))
+
     def to_dict(self):
         """Serializuje pole do prostého dictu (JSON-friendly)."""
         return {"decay": self.decay, "floor": self.floor, "scores": dict(self.scores)}
