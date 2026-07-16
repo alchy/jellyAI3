@@ -24,11 +24,13 @@ _TYPE_STYLE = {
 class ViewBaseView:
     """viewBase adaptér: build/modify v kódu + prompt + živé aktualizace."""
 
-    def __init__(self, title="jellyAI3"):
+    def __init__(self, title="jellyAI3", *, theme="cyber"):
         """Vytvoří plátno viewBase (líný import).
 
         Args:
             title (str): Titulek okna.
+            theme (str | dict): Téma viewBase — výchozí „cyber" (tmavé); „modern"
+                je světlé, nebo vlastní dict.
 
         Raises:
             JellyError: Když viewBase není nainstalovaný (akční hláška).
@@ -40,7 +42,7 @@ class ViewBaseView:
                 "viewBase není nainstalovaný — nainstaluj ho: pip install viewbase "
                 "(je volitelný, jádro jellyAI3 ho nepotřebuje).") from exc
         self._vb = vb
-        self._canvas = vb.Canvas(title=title)
+        self._canvas = vb.Canvas(title=title, theme=theme)
         self._handle = None
         self._terminal_id = None
 
