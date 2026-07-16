@@ -70,14 +70,12 @@ class GraphAnswerer(Answerer):
 
     def _pick(self, facts, role):
         """Z faktů vrátí (hodnotu cílové role, fakt) z faktu s nejvyšší vahou."""
-        best = None
+        best_weight, best_value, best_fact = -1, None, None
         for fact in facts:
             values = self.graph.participants(fact, role)
-            if not values:
-                continue
-            if best is None or fact.weight > best[0]:
-                best = (fact.weight, values[0], fact)
-        return (best[1], best[2]) if best else (None, None)
+            if values and fact.weight > best_weight:
+                best_weight, best_value, best_fact = fact.weight, values[0], fact
+        return best_value, best_fact
 
     def _traverse(self, qa, topic):
         """Projde graf podle typu otázky; vrátí (hodnota, fakt) nebo (None, None).
