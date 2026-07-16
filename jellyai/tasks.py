@@ -5,6 +5,8 @@ volají totéž (žádná duplikace). Import ÚFAL klienta je líný — funkce 
 anotacemi (build/load grafu) jdou použít bez modelů.
 """
 
+# funkce lazy-importují ÚFAL/answerer (optional deps, rychlý start) — záměr
+# pylint: disable=import-outside-toplevel
 from jellyai.loader import load_documents
 from jellyai.annotate import annotate_documents, save_annotations, load_annotations
 from jellyai.graph.graph import build_graph, FactGraph
@@ -45,6 +47,8 @@ def build_fact_graph(config):
     """
     annotations = load_annotations(config.services.annotations_path)
     graph = build_graph(annotations)
+    from jellyai.graph.recover import recover_entities
+    recover_entities(annotations, graph)      # role ②: doplnit tituly, co NER minul
     graph.save(config.graph.graph_path)
     return graph
 

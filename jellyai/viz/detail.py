@@ -18,6 +18,7 @@ _CZ_TYPE = {
     "number": "číslo",
     "concept": "pojem",
     "institution": "instituce",
+    "dílo": "dílo (doplněno spreadem)",
     "fact": "fakt",
 }
 

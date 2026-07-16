@@ -88,17 +88,25 @@ _WORK_NOUNS = {"hra", "dílo", "kniha", "román", "povídka", "obraz", "film",
                "báseň", "sbírka", "drama", "text"}
 
 
+def _title_like(form):
+    """Hrubá sanita titulu: začíná velkým, délka ≥ 2, jen písmena/číslice/tečky
+    (odfiltruje paskvily „N", „Němcové“ s uvozovkou apod.)."""
+    return (len(form) >= 2 and form[:1].isupper()
+            and form.replace(".", "").isalnum())
+
+
 def entity_candidates(tokens, known, *, threshold=0.75, window=4):
     """Role ②: horké spany (autoregresní spread), které v grafu CHYBÍ a vypadají
     jako titul díla — kandidáti na doplnění entity.
 
-    Filtr: token je horký (≥ threshold), začíná velkým písmenem, není v `known`,
-    a nalevo (réma za slovesem) má v okně „work" sloveso/podstatné (napsal/hra…).
-    Tím se chytí i „R.U.R.", které NER minul. Autoregresní vážení (`back>fwd`)
-    réma na konci klauze rozehřeje.
+    Filtr: token je horký (≥ threshold), vypadá jako titul (`_title_like`), není
+    v `known`, **není podmět** (`nsubj` = osoba, ne titul), a nalevo (réma za
+    slovesem) má v okně „work" sloveso/podstatné (napsal/hra…). Tak se chytí
+    i „R.U.R.", které NER minul; autoregresní vážení réma na konci klauze rozehřeje.
+    Skloňovaná jména uvnitř osobní entity se filtrují až v `recover_entities`.
 
     Args:
-        tokens (list[dict]): Tokeny věty (form/lemma/upos, head).
+        tokens (list[dict]): Tokeny věty (form/lemma/upos/deprel, head).
         known (set[str]): Id uzlů, které už v grafu jsou (ty přeskoč).
         threshold (float): Minimální teplota kandidáta.
         window (int): Kolik tokenů vlevo prohlédnout na „work" kontext.
@@ -110,7 +118,8 @@ def entity_candidates(tokens, known, *, threshold=0.75, window=4):
     out = []
     for i, tok in enumerate(tokens):
         form = tok.get("form", "")
-        if heat[i] < threshold or not form[:1].isupper() or form in known:
+        if (heat[i] < threshold or not _title_like(form) or form in known
+                or tok.get("deprel") in {"nsubj", "nsubj:pass"}):
             continue
         left = {(t.get("lemma") or t.get("form", "")).lower()
                 for t in tokens[max(0, i - window):i]}

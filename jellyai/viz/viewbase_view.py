@@ -17,6 +17,7 @@ _TYPE_STYLE = {
     "number": {"color": "#b0832f"},
     "concept": {"color": "#43678a"},
     "institution": {"color": "#8a4a17"},
+    "dílo": {"color": "#c74f7a", "size": 1.2},   # titul doplněný role ② (neighbor-spread)
     "fact": {"color": "#8a949f", "size": 0.7},
 }
 
