@@ -25,7 +25,7 @@ def set_debug(on):
     Args:
         on (bool): True přidá StreamHandler + DEBUG; False ho odebere.
     """
-    global _debug_handler
+    global _debug_handler  # pylint: disable=global-statement  (přepínač stavu modulu)
     log = get_logger()
     if on and _debug_handler is None:
         _debug_handler = logging.StreamHandler()
