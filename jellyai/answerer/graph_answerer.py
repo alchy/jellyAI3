@@ -246,15 +246,21 @@ class GraphAnswerer(Answerer):
         self.last_trace = None
         qa = analyze_question(question, self.client)
         topic, value, fact = self._attend(qa)
+        reverse = False
         if value is None:
             # poslední záchrana: „Co se stalo <datum>?" — datum → událost
             topic, value, fact = self._reverse_lookup(question)
+            reverse = value is not None
         if value is not None:
             if qa.qtype == "Kde":
                 value = _to_nominative(value, self.client) or value   # „Slezsku"→„Slezsko"
             alternatives = []
             if temperature:
-                facts, roles = self._candidate_facts_roles(qa, topic)
+                # fuzzy: další kontext s menší vahou (krmivo pro kompozitor/NN)
+                if reverse:
+                    facts, roles = self.graph.facts_of(topic, role="time"), ["subj"]
+                else:
+                    facts, roles = self._candidate_facts_roles(qa, topic)
                 alternatives = [v for v in self._rank_values(facts, roles, temperature)
                                 if v != value]
             self.last_trace = {"topic": topic, "predicate": fact.predicate,

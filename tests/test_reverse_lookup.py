@@ -32,6 +32,27 @@ def test_reverse_date_to_event():
     assert ans.trace["predicate"] == "narodit"
 
 
+def test_reverse_with_temperature_returns_context_rows():
+    """Fuzzy (temperature) → k primární odpovědi i další kontext s menší vahou."""
+    g = FactGraph()
+    g.add_fact(make_fact("narodit", [Participant("subj", "Božena", "person"),
+                                     Participant("time", "1818", "time")]))
+    g.add_fact(make_fact("zemřít", [Participant("subj", "Jan", "person"),
+                                    Participant("time", "1818", "time")]))
+    q = "Co se stalo roku 1818?"
+    client = FakeUfalClient(parse={q: [[
+        {"form": "Co", "lemma": "co", "upos": "PRON", "head": 2, "deprel": "obj"},
+        {"form": "stalo", "lemma": "stát", "upos": "VERB", "head": 0, "deprel": "root"},
+        {"form": "roku", "lemma": "rok", "upos": "NOUN", "head": 2, "deprel": "obl"},
+        {"form": "1818", "lemma": "1818", "upos": "NUM", "head": 3, "deprel": "nummod"},
+    ]]})
+    a = GraphAnswerer(g, client, ExtractiveAnswerer(AnswererConfig()))
+    ans = a.answer(q, [], temperature=0.6)
+    assert ans.text in ("Božena", "Jan")
+    others = {"Božena", "Jan"} - {ans.text}
+    assert others <= set(ans.alternatives)   # druhá událost jako kontext s menší vahou
+
+
 def test_no_year_no_reverse():
     """Otázka bez roku reverzní lookup nespustí (nezmate běžné dotazy)."""
     g = FactGraph()

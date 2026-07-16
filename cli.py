@@ -290,7 +290,8 @@ def cmd_web(config, view=None):
     pulse = TracePulse()             # aktivace („context window") → jas + provoz tras
 
     def on_query(question):
-        answer = answerer.answer(question, [])
+        # temperature > 0 → fuzzy: k odpovědi i další kontext s menší vahou
+        answer = answerer.answer(question, [], temperature=0.35)
         context = getattr(answerer, "context", None)
         scores = dict(context.scores) if context is not None else {}
         trace = getattr(answerer, "last_trace", None)
@@ -301,7 +302,10 @@ def cmd_web(config, view=None):
             view.update_node(node_id, size=1.0 + bright)
         for node_id in state["extinguish"]:   # uzly mimo pole → zpět na základ
             view.update_node(node_id, size=1.0)
-        view.write(f"❓ {question}\n💬 {answer.text}")   # odpověď v prohlížeči
+        reply = f"❓ {question}\n💬 {answer.text}"
+        if answer.alternatives:      # souvislosti (krmivo pro budoucí kompozitor/NN)
+            reply += f"\n   souvislosti: {', '.join(answer.alternatives[:4])}"
+        view.write(reply)            # odpověď (+ souvislosti) v prohlížeči
         # --- debug výpis konverzace (do logu serveru; flush kvůli RT) ---
         top = sorted(scores.items(), key=lambda kv: -kv[1])[:6]
         trace_line = (f"{trace['topic']} ─[{trace['predicate']}]→ {trace['answer']}"
@@ -310,6 +314,7 @@ def cmd_web(config, view=None):
             f"\n❓ {question}"
             f"\n💬 {answer.text}   (zdroj: {', '.join(answer.sources) or '—'})"
             f"\n   trasa: {trace_line}"
+            f"\n   souvislosti (fuzzy): {', '.join(answer.alternatives) or '—'}"
             f"\n   aktivace (kontext): "
             f"{', '.join(f'{n}={v:.2f}' for n, v in top) or '—'}",
             flush=True)
