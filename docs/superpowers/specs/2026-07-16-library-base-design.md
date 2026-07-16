@@ -42,16 +42,29 @@ Pipeline jako vyměnitelné porty. Výchozí je „od nuly"; každý port unese 
 | Fáze | Port (`Protocol`) | Výchozí | NN hook |
 |---|---|---|---|
 | tokenizace | `Tokenizer.tokenize(text) -> list[str]` | regex + stopslova | subword/embeddings |
-| retrieval | `Retriever.search(q) -> list[(Passage, float)]` | BM25 | embedding retriever |
+| retrieval | `Retriever.search(q, *, temperature=0.0) -> list[(Passage, float)]` | BM25 | embedding retriever |
 | korpus | `CorpusPort.parse/entities/analyze/generate` | UDPipe/NameTag/MorphoDiTa | neuronový NER/parser |
 | extrakce | `FactExtractor.extract(anotace) -> list[Fact]` | pravidla | neural relation extractor |
 | analýza otázky | `QuestionAnalyzer.analyze(q) -> QuestionAnalysis` | lemma/pravidla | intent/slot klasifikátor |
 | téma/koreference | `TopicResolver` nad `ActivationField` | aktivace | neuronová koreference |
-| answerer | `Answerer.answer(q, retrieved) -> Answer` | extractive/graph | generativní NN |
-| formulace | `Phraser.phrase(fact) -> str` | šablona/MorphoDiTa | malý generátor |
+| answerer | `Answerer.answer(q, retrieved, *, temperature=0.0) -> Answer` | extractive/graph | generativní NN |
+| **kompozice** | `Composer.compose(q, facts) -> str` | šablona (spoj fakty do vět) | **malý generátor (čitelný odstavec)** |
 
 **Poznámka:** rozhraní jsou **strukturální** (`Protocol`), takže **stávající třídy je
 už splňují** (Retriever, GraphAnswerer, …) — porty se přidají bez přepisu bloků.
+
+### 3.1 Teplota shody + kompozice
+
+**Teplota** = jeden knoflík `temperature ∈ [0,1]` (jednodušší než ES DSL). Práh =
+`nejlepší_skóre × (1 − temperature)`; vrátí všechny kandidáty nad prahem, seřazené.
+`0` = jen nejlepší (dnešek); `1` = široce (primární + alternativy). Platí pro
+`Retriever.search` i pro **průchod grafem** — „kdy se narodil X" pak vrátí
+`[1890 (váha 3), 1915 (váha 1)]` místo jen 1890.
+
+**Kompozice**: kandidátní fakty (sada z teploty) předá answerer `Composer`u, který
+z nich složí **čitelný strukturovaný text** (víc než jednoslovná odpověď). Výchozí je
+šablonový (spoj fakty do vět); **NN hook** = malý generativní model. Toto je most
+z „1890" na odstavec „Karel Čapek se narodil 9. ledna 1890 v Malých Svatoňovicích…".
 
 ## 4. Fasáda `Jelly` (composition root)
 
@@ -148,7 +161,7 @@ from jellyai import (
     Retriever, build_fact_graph, FactGraph, extract_facts, Fact, Participant,
     ExtractiveAnswerer, GraphAnswerer, analyze_question, Answer,
     # porty (protokoly) pro vlastní/NN implementace
-    Tokenizer, FactExtractor, QuestionAnalyzer, Answerer,
+    Tokenizer, FactExtractor, QuestionAnalyzer, Answerer, Composer,
     # korpus, fasáda, výuka
     CorpusTools, Jelly, demo, explain,
     JellyError,
@@ -164,6 +177,10 @@ from jellyai import (
 - `CorpusTools` lifecycle (mock/Fake): start/stop, context manager.
 - `answer.explain()` obsahuje trasu.
 - Injektování: `Jelly(retriever=Fake)` použije vlastní port.
+- **Teplota:** `search(q, temperature=1.0)` vrátí víc kandidátů než `temperature=0.0`
+  (a graf vrátí primární + alternativu). Práh = `top × (1 − temperature)`.
+- **Kompozice:** výchozí `Composer.compose(q, facts)` složí ze sady faktů větu (ne jen
+  jednoslovnou odpověď); injektovaný NN `Composer` se použije, když je dán.
 - Chyby: chybějící model → `JellyError` s akční hláškou.
 
 ## 14. Rozsah a fáze
