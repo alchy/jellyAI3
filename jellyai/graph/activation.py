@@ -41,3 +41,14 @@ class ActivationField:
         if not self.scores:
             return None
         return max(self.scores, key=self.scores.get)
+
+    def to_dict(self):
+        """Serializuje pole do prostého dictu (JSON-friendly)."""
+        return {"decay": self.decay, "floor": self.floor, "scores": dict(self.scores)}
+
+    @classmethod
+    def from_dict(cls, data):
+        """Obnoví pole z dictu (viz `to_dict`)."""
+        field = cls(decay=data.get("decay", 0.55), floor=data.get("floor", 1e-3))
+        field.scores = dict(data.get("scores", {}))
+        return field
