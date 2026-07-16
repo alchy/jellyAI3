@@ -125,6 +125,8 @@ def _parse_sent(sent):
                       if _clean_lemma(t.get("lemma", "")).lower() in _DATE_PARTS), None)
     cop = any(t.get("deprel") == "cop" or _clean_lemma(t.get("lemma", "")) == "být"
               for t in sent)
+    # eliptická otázka bez slovesa („Jaká rodina?") má sponovou sémantiku
+    cop = cop or not any(t.get("upos") == "VERB" for t in sent)
     verb = next((_clean_lemma(t.get("lemma", "")) for t in sent
                  if t.get("upos") == "VERB"), None)
     hole_role = hole_type = None

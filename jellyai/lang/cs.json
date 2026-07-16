@@ -9,6 +9,7 @@
   "feminine_name_suffixes": ["ová", "á", "a"],
   "metalanguage_nouns": ["jméno", "slovo", "název", "pojmenování", "zkratka",
                          "výraz", "označení"],
+  "generic_event_verbs": ["stát", "dít", "udát", "přihodit"],
   "work_nouns": ["hra", "dílo", "kniha", "román", "povídka", "obraz", "film",
                  "báseň", "sbírka", "drama", "text", "komedie", "novela",
                  "tragédie", "publikace", "esej", "fejeton", "trilogie"],

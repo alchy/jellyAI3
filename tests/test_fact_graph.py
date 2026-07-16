@@ -173,3 +173,27 @@ def test_date_decomposition_subfacts():
     # datum je uzel s pod-faktem rok → 1890 (zanoření v grafu)
     rok = g.facts_of("13. ledna 1890", role="subj", predicate="rok")
     assert rok and g.participants(rok[0], "val") == ["1890"]
+
+
+def test_concept_subject_gets_context_binding():
+    """Konceptový podmět faktu („rodina se ocitla…") se váže na aktuální osobu
+    dokumentu — slovo „rodina" musí mít vazby na další elementy."""
+    A = {
+        ("d", 0): {"entities": [{"text": "Božena Němcová", "type": "P", "start": 0, "end": 14}],
+                   "sentences": [[
+            {"form": "Božena", "lemma": "Božena", "upos": "PROPN", "head": 3, "deprel": "nsubj", "start": 0, "end": 6},
+            {"form": "Němcová", "lemma": "Němcová", "upos": "PROPN", "head": 1, "deprel": "flat", "start": 7, "end": 14},
+            {"form": "psala", "lemma": "psát", "upos": "VERB", "head": 0, "deprel": "root", "start": 15, "end": 20},
+            {"form": "knihy", "lemma": "kniha", "upos": "NOUN", "head": 3, "deprel": "obj", "start": 21, "end": 26},
+        ]]},
+        ("d", 1): {"entities": [], "sentences": [[
+            {"form": "Rodina", "lemma": "rodina", "upos": "NOUN", "head": 3, "deprel": "nsubj", "start": 0, "end": 6},
+            {"form": "se", "lemma": "se", "upos": "PRON", "head": 3, "deprel": "expl", "start": 7, "end": 9},
+            {"form": "ocitla", "lemma": "ocitnout", "upos": "VERB", "head": 0, "deprel": "root", "start": 10, "end": 16},
+            {"form": "v", "lemma": "v", "upos": "ADP", "head": 5, "deprel": "case", "start": 17, "end": 18},
+            {"form": "Domažlicích", "lemma": "Domažlice", "upos": "PROPN", "head": 3, "deprel": "obl", "start": 19, "end": 30},
+        ]]},
+    }
+    g = build_graph(A)
+    kontext = g.facts_of("rodina", role="obj", predicate="kontext")
+    assert kontext and g.participants(kontext[0], "subj") == ["Božena Němcová"]

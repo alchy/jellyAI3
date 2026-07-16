@@ -232,7 +232,7 @@ def _warm_persons(field, annotation, canon):
         field.warm((canon.get(e["text"], e["text"]), "person"), 2.0 if is_subject else 1.0)
 
 
-def _associate_context(graph, annotation, subject, canon):
+def _associate_context(graph, annotation, subject, canon, extra=()):
     """Role ③ aktivačního pole: KONTEXTOVÁ ASOCIACE entit věty se subjektem.
 
     Dokumentová struktura (bibliografický řádek, výčet) často nemá sloveso,
@@ -248,9 +248,16 @@ def _associate_context(graph, annotation, subject, canon):
         annotation (dict): Anotace věty (entities).
         subject (tuple | None): (id, typ) aktuálního subjektu dokumentu.
         canon (dict): Kanonizace osobních jmen dokumentu.
+        extra (iterable): Další (id, typ) k asociaci — konceptové podměty
+            faktů věty („rodina" musí mít vazby, i když ji NER nevidí).
     """
     if subject is None:
         return
+    for node in sorted(extra):
+        if node[0] != subject[0]:
+            graph.add_fact(make_fact("kontext", [
+                Participant("subj", subject[0], subject[1]),
+                Participant("obj", node[0], node[1])]))
     entities = annotation.get("entities", [])
     for e in entities:
         typ = _entity_type(e)
@@ -293,10 +300,15 @@ def build_graph(annotations):
         field = ActivationField()
         for _, annotation in items:
             subject = field.hottest()          # (id, typ) nejteplejší osoby, nebo None
-            for fact in extract_facts(annotation, default_subject=subject,
-                                      canon=canon, context=field.ranked()):
+            sentence_facts = extract_facts(annotation, default_subject=subject,
+                                           canon=canon, context=field.ranked())
+            for fact in sentence_facts:
                 graph.add_fact(fact)
-            _associate_context(graph, annotation, subject, canon)
+            concept_subjects = {(p.node, p.type) for f in sentence_facts
+                                for p in f.participants
+                                if p.role == "subj" and p.type == "concept"}
+            _associate_context(graph, annotation, subject, canon,
+                               extra=concept_subjects)
             _warm_persons(field, annotation, canon)
             field.step()
     _decompose_dates(graph)

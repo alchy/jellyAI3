@@ -9,7 +9,7 @@ Spouštět po každé změně extrakce a reportovat spolu s etalonem.
 import pickle
 
 from config import Config
-from jellyai.graph.graph import _canonical_persons, _warm_persons
+from jellyai.graph.graph import FactGraph, _canonical_persons, _warm_persons
 from jellyai.graph.extract import extract_facts
 from jellyai.graph.activation import ActivationField
 
@@ -56,6 +56,42 @@ def _audit_document(items, buckets):
     return total, empty
 
 
+def node_answerability(graph):
+    """Zodpověditelnost UZLŮ — vzor „okrajový uzel" měřený plošně.
+
+    Pro každý entitní uzel: má identitu (`být` pred), děj (slovesný fakt),
+    aspoň kontext, nebo je izolovaný? Většina dotazů míří na okrajové uzly
+    (ne huby) — tohle říká, na kolik z nich graf umí odpovědět a čím.
+
+    Returns:
+        dict: kbelík → počet uzlů.
+    """
+    buckets = {"identita (být)": 0, "děj (sloveso)": 0,
+               "jen kontext": 0, "izolovaný": 0}
+    for node in graph.nodes.values():
+        if node.type in ("time", "number"):
+            continue
+        identity = event = context = False
+        for fact in graph.facts_of(node.id):
+            if fact.predicate == "být":
+                identity = identity or any(
+                    p.role in ("pred", "attr") and p.node != node.id
+                    for p in fact.participants)
+            elif fact.predicate == "kontext":
+                context = True
+            else:
+                event = True
+        if identity:
+            buckets["identita (být)"] += 1
+        if event:
+            buckets["děj (sloveso)"] += 1
+        if context and not (identity or event):
+            buckets["jen kontext"] += 1
+        if not (identity or event or context):
+            buckets["izolovaný"] += 1
+    return buckets
+
+
 def main():
     """Spočítá věty bez jediného faktu napříč korpusem (viz docstring modulu)."""
     with open(Config().services.annotations_path, "rb") as fh:
@@ -79,7 +115,19 @@ def main():
     for name in _BUCKETS:
         if buckets[name]:
             print(f"  {buckets[name]:4}  {name}")
+
+    _print_answerability()
     return total, empty, buckets
+
+
+def _print_answerability():
+    """Vypíše plošnou zodpověditelnost uzlů (vzor okrajového uzlu)."""
+    graph = FactGraph.load(Config().graph.graph_path)
+    answerable = node_answerability(graph)
+    entity_total = sum(1 for n in graph.nodes.values()
+                       if n.type not in ("time", "number"))
+    print(f"UZLY ({entity_total} entitních): "
+          + ", ".join(f"{name}={count}" for name, count in answerable.items()))
 
 
 if __name__ == "__main__":

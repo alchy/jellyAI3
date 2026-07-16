@@ -91,3 +91,45 @@ def test_concept_known_acts_as_type_filter():
     ]]})
     a = GraphAnswerer(g, client, ExtractiveAnswerer(AnswererConfig()))
     assert a.answer(q, []).text == "R.U.R."
+
+
+def test_followup_attr_uses_context_when_topic_is_hot():
+    """„Jaká rodina?" jako NAVAZUJÍCÍ otázka (rodina svítí z minulé odpovědi)
+    smí čerpat z kontextových vazeb; svěží identitní otázka dál nehádá."""
+    g = FactGraph()
+    g.add_fact(make_fact("kontext", [Participant("subj", "Božena Němcová", "person"),
+                                     Participant("obj", "rodina", "concept")]))
+    q = "Jaká rodina?"
+    client = FakeUfalClient(parse={q: [[
+        {"form": "Jaká", "lemma": "jaký", "upos": "DET", "head": 2, "deprel": "amod",
+         "feats": {"PronType": "Int"}},
+        {"form": "rodina", "lemma": "rodina", "upos": "NOUN", "head": 0,
+         "deprel": "root"},
+    ]]})
+    a = GraphAnswerer(g, client, ExtractiveAnswerer(AnswererConfig()))
+    cold = a.answer(q, []).text
+    assert "Božena" not in cold                  # svěží dotaz nehádá
+    a.context.warm("rodina", 2.0)                # rodina byla minulou odpovědí
+    hot = a.answer(q, []).text
+    assert "Božena Němcová" in hot               # navazující čerpá z kontextu
+
+
+def test_generic_event_question_returns_event_of_topic():
+    """„Co se stalo s rodinou?" — „stát se" je lehké sloveso (jazyková data):
+    odpověď = nejsilnější UDÁLOST tématu s účastníky, ne holé jméno."""
+    g = FactGraph()
+    g.add_fact(make_fact("ocitnout", [Participant("subj", "rodina", "concept"),
+                                      Participant("loc", "Domažlicích", "geo")]))
+    g.add_fact(make_fact("kontext", [Participant("subj", "Božena Němcová", "person"),
+                                     Participant("obj", "rodina", "concept")]))
+    q = "Co se stalo s rodinou?"
+    client = FakeUfalClient(parse={q: [[
+        {"form": "Co", "lemma": "co", "upos": "PRON", "head": 3, "deprel": "nsubj"},
+        {"form": "se", "lemma": "se", "upos": "PRON", "head": 3, "deprel": "expl"},
+        {"form": "stalo", "lemma": "stát", "upos": "VERB", "head": 0, "deprel": "root"},
+        {"form": "s", "lemma": "s", "upos": "ADP", "head": 5, "deprel": "case"},
+        {"form": "rodinou", "lemma": "rodina", "upos": "NOUN", "head": 3, "deprel": "obl"},
+    ]]})
+    a = GraphAnswerer(g, client, ExtractiveAnswerer(AnswererConfig()))
+    text = a.answer(q, []).text
+    assert "ocitnout" in text and "Domažlicích" in text

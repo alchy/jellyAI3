@@ -41,6 +41,8 @@ def load_rules(language="cs"):
             rules.get("feminine_name_suffixes", ()))
         rules["metalanguage_nouns"] = frozenset(
             rules.get("metalanguage_nouns", ()))
+        rules["generic_event_verbs"] = frozenset(
+            rules.get("generic_event_verbs", ()))
         _cache[path] = rules
     return _cache[path]
 

@@ -78,3 +78,19 @@ def test_oblique_participant_becomes_known():
     ]]})
     pat = question_pattern(q, client)
     assert ("theme", "Karel Čapek") in pat.known
+
+
+def test_elliptic_question_without_verb_is_copular():
+    """„Jaká rodina?" (bez slovesa i spony) = eliptická identita:
+    být(rodina → díra attr)."""
+    q = "Jaká rodina?"
+    client = FakeUfalClient(parse={q: [[
+        {"form": "Jaká", "lemma": "jaký", "upos": "DET", "head": 2, "deprel": "amod",
+         "feats": {"PronType": "Int"}},
+        {"form": "rodina", "lemma": "rodina", "upos": "NOUN", "head": 0,
+         "deprel": "root"},
+    ]]})
+    pat = question_pattern(q, client)
+    assert pat.predicate == "být"
+    assert pat.known == [("subj", "rodina")]
+    assert pat.hole_role == "attr"

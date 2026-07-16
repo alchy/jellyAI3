@@ -27,7 +27,7 @@ def test_reverse_date_to_event():
     ]]})
     a = GraphAnswerer(g, client, ExtractiveAnswerer(AnswererConfig()))
     ans = a.answer(q, [])
-    assert ans.text == "Božena Němcová"
+    assert ans.text == "narodit: Božena Němcová"    # děj = sloveso první
     assert ans.trace["topic"] == "2. května 1818"
     assert ans.trace["predicate"] == "narodit"
 
@@ -48,8 +48,9 @@ def test_reverse_with_temperature_returns_context_rows():
     ]]})
     a = GraphAnswerer(g, client, ExtractiveAnswerer(AnswererConfig()))
     ans = a.answer(q, [], temperature=0.6)
-    assert ans.text in ("Božena", "Jan")
-    others = {"Božena", "Jan"} - {ans.text}
+    subject = ans.text.split(": ")[1]        # text = „děj: účastníci"
+    assert subject in ("Božena", "Jan")
+    others = {"Božena", "Jan"} - {subject}
     assert others <= set(ans.alternatives)   # druhá událost jako kontext s menší vahou
 
 
@@ -69,7 +70,7 @@ def test_reverse_includes_neighborhood_of_answer():
     ]]})
     a = GraphAnswerer(g, client, ExtractiveAnswerer(AnswererConfig()))
     ans = a.answer(q, [], temperature=0.5)
-    assert ans.text == "Božena Němcová"
+    assert ans.text == "narodit: Božena Němcová"
     assert "Babička" in ans.alternatives   # okolí odpovědi jako souvislost
 
 
@@ -86,3 +87,26 @@ def test_no_year_no_reverse():
     a = GraphAnswerer(g, client, ExtractiveAnswerer(AnswererConfig()))
     ans = a.answer(q, [])
     assert ans.trace is None
+
+
+def test_reverse_lookup_respects_month():
+    """„Co se stalo v listopadu 1848?" nesmí vzít uzel „července 1848" —
+    měsíc z otázky se páruje s měsícem časového uzlu."""
+    g = FactGraph()
+    g.add_fact(make_fact("ocitnout", [Participant("subj", "rodina", "concept"),
+                                      Participant("time", "července 1848", "time")]))
+    g.add_fact(make_fact("vyjít", [Participant("subj", "svazek", "concept"),
+                                   Participant("time", "listopadu 1848", "time")]))
+    q = "Co se stalo v listopadu 1848?"
+    client = FakeUfalClient(parse={q: [[
+        {"form": "Co", "lemma": "co", "upos": "PRON", "head": 3, "deprel": "nsubj"},
+        {"form": "se", "lemma": "se", "upos": "PRON", "head": 3, "deprel": "expl"},
+        {"form": "stalo", "lemma": "stát", "upos": "VERB", "head": 0, "deprel": "root"},
+        {"form": "v", "lemma": "v", "upos": "ADP", "head": 5, "deprel": "case"},
+        {"form": "listopadu", "lemma": "listopad", "upos": "NOUN", "head": 3, "deprel": "obl"},
+        {"form": "1848", "lemma": "1848", "upos": "NUM", "head": 5, "deprel": "nummod"},
+    ]]})
+    a = GraphAnswerer(g, client, ExtractiveAnswerer(AnswererConfig()))
+    text = a.answer(q, []).text
+    assert "svazek" in text and "rodina" not in text
+    assert text.startswith("vyjít")   # děj = sloveso první

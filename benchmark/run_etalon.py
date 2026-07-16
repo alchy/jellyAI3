@@ -24,6 +24,17 @@ def _matches(answer, expect, reject=()):
             and not any(r.lower() in low for r in reject))
 
 
+def _run_item(answerer, item):
+    """Zodpoví položku; {"dialog": [q1, q2…]} je navazující rozhovor (bez
+    resetu mezi tahy) — hodnotí se poslední odpověď (konverzační těžiště)."""
+    questions = item.get("dialog") or [item["q"]]
+    answer = ""
+    for question in questions:
+        answer = answerer.answer(question, []).text
+    item.setdefault("q", " → ".join(questions))
+    return answer
+
+
 def main():
     """Projede etalon proti aktuálnímu grafu a vypíše PASS/FAIL/gap + skóre."""
     with open(ETALON, encoding="utf-8") as fh:
@@ -32,7 +43,7 @@ def main():
     rows, passed, failed, gap_open, gap_fixed = [], 0, 0, 0, 0
     for item in items:
         answerer.reset()
-        answer = answerer.answer(item["q"], []).text
+        answer = _run_item(answerer, item)
         ok = _matches(answer, item["expect"], item.get("reject", ()))
         if "gap" in item:
             status = "GAP-FIXED ✅" if ok else "gap"

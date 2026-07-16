@@ -5,9 +5,9 @@ predikátu) a z faktu s **nejvyšší vahou** vezme účastníka cílové role. 
 i „kdy" čerpají z téhož narozovacího faktu. Když nic nesedí, deleguje na fallback.
 """
 
-import re
-
 from jellyai.answerer.base import Answer, Answerer
+from jellyai.graph.graph import parse_date
+from jellyai.lang import current
 from jellyai.answerer.question import analyze_question
 from jellyai.answerer.pattern import question_pattern, SubQuery
 from jellyai.answerer.template import _to_nominative
@@ -16,6 +16,13 @@ from jellyai.graph.canon import _stem, name_gender
 
 _DATE_PARTS = {"rok", "měsíc", "den"}   # drill: „v kterém roce/měsíci…"
 _MAX_ENUM = 5                           # strop výčtové odpovědi (čitelnost)
+
+
+def _event_text(fact, exclude=()):
+    """Děj jako odpověď: SLOVESO první, pak účastníci. „Co se stalo?" se ptá
+    na děj — faktový uzel je děj reifikovaný, holý podmět odpovědí není."""
+    others = [p.node for p in fact.participants if p.node not in exclude]
+    return fact.predicate + (": " + ", ".join(others[:5]) if others else "")
 
 
 class GraphAnswerer(Answerer):
@@ -101,7 +108,7 @@ class GraphAnswerer(Answerer):
             return True
         return name_gender(node_id) == qa.gender
 
-    def _pattern_answer(self, question, qa):
+    def _pattern_answer(self, question, qa):  # pylint: disable=too-many-return-statements
         """Univerzální match: otázka → neúplný fakt → najdi shodný v grafu → díra.
 
         Nahrazuje ruční qtype/relační pravidla i attention: predikát + známé role
@@ -125,6 +132,14 @@ class GraphAnswerer(Answerer):
                 if node is None:
                     return None, [], None    # pojmenované, ale neznámé → nehádat
                 known_set.add(node)
+            if pat.predicate in current()["generic_event_verbs"] \
+                    and "rok" not in parse_date(question):
+                # „Co se stalo s X?" — lehké sloveso: odpověď je DĚJ tématu.
+                # Otázky s datem nechává reverznímu lookupu (přesné párování
+                # složek data > fuzzy rozřešení termínu „května")
+                topic, values, fact = self._event_answer(known_set)
+                if values:
+                    return topic, values, fact
             if qa.qtype is None and pat.hole_role is None:
                 # zjišťovací otázka („Napsal X Y?") — existence, ne díra
                 return self._existence(pat.predicate, known_set)
@@ -167,6 +182,12 @@ class GraphAnswerer(Answerer):
             # výběrová otázka: konceptový known bez místa ve faktu = TYPOVÝ
             # filtr díry (join: napsat(X, ?) ∧ být(?, hra) → „Jakou hru…")
             values, fact = self._typed_match(pat.predicate, known_set)
+        if not values and pat.hole_role in ("pred", "attr") \
+                and self.context.scores.get(node0, 0.0) > 0:
+            # NAVAZUJÍCÍ identitní otázka („Jaká rodina?" po odpovědi „rodina")
+            # smí čerpat souvislosti — téma svítí z konverzace; svěží identitní
+            # dotaz zůstává poctivě bez hádání
+            values, fact = self._match("kontext", known_set, "subj", None)
         return (node0, values, fact) if values else (None, [], None)
 
     def _solve(self, known):
@@ -236,6 +257,27 @@ class GraphAnswerer(Answerer):
         self.visited.extend(p.node for p in scored[0][3].participants)
         return values, scored[0][3]
 
+    def _event_answer(self, known_set):
+        """Nejsilnější UDÁLOST tématu (váha + aktivace účastníků) jako děj —
+        slovesné fakty; identita (být) a asociace (kontext) děj nejsou.
+
+        Returns:
+            tuple: (téma | None, [děj sloveso-první] | [], fakt | None).
+        """
+        node0 = next(iter(known_set))
+        best = None
+        for fact in self.graph.facts_of(node0):
+            if fact.predicate in ("být", "kontext"):
+                continue
+            score = fact.weight + sum(self.context.scores.get(p.node, 0.0)
+                                      for p in fact.participants)
+            if best is None or score > best[0]:  # pylint: disable=unsubscriptable-object
+                best = (score, fact)
+        if best is None:
+            return None, [], None
+        self.visited.extend(p.node for p in best[1].participants)
+        return node0, [_event_text(best[1])], best[1]
+
     def _existence(self, predicate, known_set):
         """Zjišťovací (ano/ne) otázka: existuje fakt s predikátem a všemi
         známými účastníky? → „Ano"; jinak nic (fallback „nenašel" čte se jako
@@ -295,26 +337,30 @@ class GraphAnswerer(Answerer):
         return False
 
     def _reverse_lookup(self, question):
-        """Reverzní dotaz: z roku v otázce najde událost (datum → podmět faktu).
+        """Reverzní dotaz: z data v otázce najde událost (datum → podmět faktu).
 
-        Poslední záchrana pro „Co se stalo <datum>?" — `facts_of` indexuje po uzlu,
-        takže z časového uzlu s daným rokem vezmeme podmět jeho nejsilnějšího faktu.
+        Poslední záchrana pro „Co se stalo <datum>?" — datum otázky se rozloží
+        (`parse_date`) a páruje se VŠEMI složkami s časovým uzlem: „v listopadu
+        1848" nesmí trefit uzel „července 1848" jen kvůli shodě roku.
 
         Args:
-            question (str): Původní dotaz (hledá se v něm rok).
+            question (str): Původní dotaz (hledá se v něm rok/měsíc/den).
 
         Returns:
             tuple: (uzel data | None, podmět | None, fakt | None).
         """
-        match = re.search(r"\b(1\d{3}|20\d{2})\b", question)
-        if not match:
+        wanted = parse_date(question)
+        if "rok" not in wanted:
             return None, None, None
-        year = match.group(1)
         for node in self.graph.nodes.values():
-            if node.type == "time" and year in node.id:
-                value, fact = self._pick(self.graph.facts_of(node.id, role="time"), "subj")
-                if value is not None:
-                    return node.id, value, fact
+            if node.type != "time":
+                continue
+            have = parse_date(node.id)
+            if any(have.get(part) != value for part, value in wanted.items()):
+                continue
+            value, fact = self._pick(self.graph.facts_of(node.id, role="time"), "subj")
+            if value is not None:
+                return node.id, value, fact
         return None, None, None
 
     def _pick(self, facts, role):
@@ -393,11 +439,12 @@ class GraphAnswerer(Answerer):
         # i attention — kontextově navazující dotaz řeší tatáž cesta)
         topic, values, fact = self._pattern_answer(question, qa)
         reverse = False
+        focus = None                # UZEL odpovědi (paměť/okolí ≠ složený text)
         if not values:
-            # poslední záchrana: „Co se stalo <datum>?" — datum → událost
+            # poslední záchrana: „Co se stalo <datum>?" — datum → DĚJ
             topic, single, fact = self._reverse_lookup(question)
-            values = [single] if single is not None else []
-            reverse = bool(values)
+            if single is not None:
+                values, focus, reverse = [_event_text(fact, (topic,))], single, True
         if values:
             if qa.qtype == "Kde":
                 values = [(_to_nominative(v, self.client) or v)
@@ -406,12 +453,13 @@ class GraphAnswerer(Answerer):
             text = ", ".join(values)
             self.last_trace = {"topic": topic, "predicate": fact.predicate,
                                "fact": fact.id, "answer": text}
+            focus = focus or values[0]
             for node in self.visited:        # rozsvítí celou (rekurzivní) cestu, ne jen konce
                 self.context.warm(node, 0.7)
-            self._remember(qa, topic, values[0])
+            self._remember(qa, topic, focus)
             self._log_turn(question, topic, fact.predicate, text)
             return Answer(text=text, sources=["graf"], score=1.0,
-                          alternatives=self._alternatives(qa, topic, values[0],
+                          alternatives=self._alternatives(qa, topic, focus,
                                                           reverse, temperature),
                           trace=self.last_trace)
         # neúspěch NErozmělňuje kontext: attention nesmí vyhasnout jen proto, že
