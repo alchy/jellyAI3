@@ -102,6 +102,15 @@ def _children(sent, head_id):
     return [t for t in sent if t.get("head") == head_id]
 
 
+def _conj_group(tok, sent):
+    """Souřadná skupina tokenu: [tok] + jeho `conj` děti (UD věší všechny
+    konjunkty na první člen). Pro distribuci faktu přes koordinaci."""
+    tok_id = sent.index(tok) + 1
+    return [tok] + [t for t in sent
+                    if t.get("head") == tok_id
+                    and str(t.get("deprel", "")).startswith("conj")]
+
+
 def _pronoun_person(tok, context):
     """Anafora: osobní zájmeno 3. osoby → nejteplejší rodově shodná osoba.
 
@@ -239,6 +248,31 @@ def _copular_facts(sent, head_id, subj_tok, subj, entities, canon):  # pylint: d
     return facts
 
 
+def _subject_group(subj, subj_tok, sent, entities, canon):
+    """Souřadní podměty jako uzly („Karel a Josef psali") — bez duplicit;
+    pro-drop/anaforický podmět (bez tokenu) zůstává jediný."""
+    if subj_tok is None:
+        return [subj]
+    deduped = []
+    for tok in _conj_group(subj_tok, sent):
+        node = _node_for(tok, entities, canon)
+        if node and node not in deduped:
+            deduped.append(node)
+    return deduped or [subj]
+
+
+def _distribute(verb, subj_nodes, obj_nodes, attrs):
+    """Fakty pro kartézský součin souřadných podmětů × předmětů."""
+    out = []
+    for snode in subj_nodes:
+        for onode in (obj_nodes or [None]):
+            parts = [Participant("subj", snode[0], snode[1])]
+            if onode is not None:
+                parts.append(Participant("obj", onode[0], onode[1]))
+            out.append(make_fact(verb, parts + attrs))
+    return out
+
+
 def extract_facts(annotation, default_subject=None, canon=None, context=None):
     # pylint: disable=too-many-locals,too-many-branches
     """Vytáhne z anotace věty seznam reifikovaných faktů.
@@ -309,20 +343,24 @@ def extract_facts(annotation, default_subject=None, canon=None, context=None):
             if head.get("upos") != "VERB":
                 continue
             verb = _clean_lemma(head.get("lemma", ""))
-            extra = []
-            obj = _first(children, _OBJ)
-            if obj is not None:
-                o = (_node_for(obj, entities, canon)
-                     if obj.get("upos") not in _SKIP_UPOS
-                     else _pronoun_person(obj, context))    # anafora „ji/mu"
-                if o:
-                    extra.append(Participant("obj", o[0], o[1]))
-            extra.extend(sorted(attrs_by_verb.get(head_id, ()), key=lambda p: (p.role, p.node)))
-            if not extra:
+            obj_tok = _first(children, _OBJ)
+            obj_nodes = []
+            if obj_tok is not None:
+                for tok in _conj_group(obj_tok, sent):   # „romány a dramata"
+                    o = (_node_for(tok, entities, canon)
+                         if tok.get("upos") not in _SKIP_UPOS
+                         else _pronoun_person(tok, context))    # anafora „ji/mu"
+                    if o and o not in obj_nodes:
+                        obj_nodes.append(o)
+            attrs = sorted(attrs_by_verb.get(head_id, ()),
+                           key=lambda p: (p.role, p.node))
+            if not obj_nodes and not attrs:
                 continue
             # nerozvázaný overtní zájmenný podmět („To vedlo…") osobu nedědí
             subj = subj_node or (None if pronoun_subj else default_subject)
             if subj is None:
                 continue
-            facts.append(make_fact(verb, [Participant("subj", subj[0], subj[1])] + extra))
+            subj_nodes = _subject_group(
+                subj, None if pronoun_subj else subj_tok, sent, entities, canon)
+            facts.extend(_distribute(verb, subj_nodes, obj_nodes, attrs))
     return facts

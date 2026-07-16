@@ -171,3 +171,44 @@ def test_adverb_is_not_theme():
                           default_subject=("Karel Čapek", "person"))
     fact = next(f for f in facts if f.predicate == "psát")
     assert not any(p.role == "theme" for p in fact.participants)
+
+
+def test_coordinated_subjects_distribute():
+    """„Karel a Josef psali romány." → psát(Karel, …) i psát(Josef, …)."""
+    sent = [
+        {"form": "Karel", "lemma": "Karel", "upos": "PROPN", "head": 4,
+         "deprel": "nsubj", "start": 0, "end": 5},
+        {"form": "a", "lemma": "a", "upos": "CCONJ", "head": 3, "deprel": "cc",
+         "start": 6, "end": 7},
+        {"form": "Josef", "lemma": "Josef", "upos": "PROPN", "head": 1,
+         "deprel": "conj", "start": 8, "end": 13},
+        {"form": "psali", "lemma": "psát", "upos": "VERB", "head": 0,
+         "deprel": "root", "start": 14, "end": 19},
+        {"form": "romány", "lemma": "román", "upos": "NOUN", "head": 4,
+         "deprel": "obj", "start": 20, "end": 26},
+    ]
+    entities = [{"text": "Karel", "type": "P", "start": 0, "end": 5},
+                {"text": "Josef", "type": "P", "start": 8, "end": 13}]
+    facts = [f for f in extract_facts({"entities": entities, "sentences": [sent]})
+             if f.predicate == "psát"]
+    subjects = {p.node for f in facts for p in f.participants if p.role == "subj"}
+    assert subjects == {"Karel", "Josef"}
+
+
+def test_coordinated_objects_distribute():
+    """„Psal romány a dramata." → fakt s obj=román i fakt s obj=drama."""
+    sent = [
+        {"form": "Psal", "lemma": "psát", "upos": "VERB", "head": 0,
+         "deprel": "root", "start": 0, "end": 4},
+        {"form": "romány", "lemma": "román", "upos": "NOUN", "head": 1,
+         "deprel": "obj", "start": 5, "end": 11},
+        {"form": "a", "lemma": "a", "upos": "CCONJ", "head": 4, "deprel": "cc",
+         "start": 12, "end": 13},
+        {"form": "dramata", "lemma": "drama", "upos": "NOUN", "head": 2,
+         "deprel": "conj", "start": 14, "end": 21},
+    ]
+    facts = [f for f in extract_facts({"entities": [], "sentences": [sent]},
+                                      default_subject=("Karel Čapek", "person"))
+             if f.predicate == "psát"]
+    objs = {p.node for f in facts for p in f.participants if p.role == "obj"}
+    assert objs == {"román", "drama"}
