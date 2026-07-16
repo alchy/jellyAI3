@@ -176,7 +176,9 @@ class GraphAnswerer(Answerer):
             if time_value is None:
                 return None, None
             return self._pick(g.facts_of(time_value, role="subj", predicate=date_part), "val")
-        if qa.is_copula or qa.qtype in ("Jaký", "Který"):
+        if qa.qtype in ("Jaký", "Který"):     # vlastnost/stav (přídavné jméno)
+            return self._pick(g.facts_of(topic, role="subj", predicate="být"), "attr")
+        if qa.is_copula:                        # identita (podstatné jméno)
             return self._pick(g.facts_of(topic, role="subj", predicate="být"), "pred")
         if qa.qtype in ("Kdy", "Kde", "Kolik"):
             facts = (g.facts_of(topic, role="subj", predicate=verb) if verb
@@ -197,7 +199,9 @@ class GraphAnswerer(Answerer):
     def _candidate_facts_roles(self, qa, topic):
         """Vrátí (fakty, cílové role) pro daný typ otázky (zdroj pro alternativy)."""
         g, verb = self.graph, qa.verb_lemma
-        if qa.is_copula or qa.qtype in ("Jaký", "Který"):
+        if qa.qtype in ("Jaký", "Který"):
+            return g.facts_of(topic, role="subj", predicate="být"), ["attr"]
+        if qa.is_copula:
             return g.facts_of(topic, role="subj", predicate="být"), ["pred"]
         if qa.qtype in ("Kdy", "Kde", "Kolik"):
             facts = (g.facts_of(topic, role="subj", predicate=verb) if verb
@@ -259,7 +263,9 @@ class GraphAnswerer(Answerer):
             self._log_turn(question, topic, fact.predicate, value)
             return Answer(text=value, sources=["graf"], score=1.0,
                           alternatives=alternatives, trace=self.last_trace)
-        self.context.step()
+        # neúspěch NErozmělňuje kontext: attention nesmí vyhasnout jen proto, že
+        # jsme odpověď nenašli (jinak by po pár marných dotazech spadla k nule).
+        # Pohasíná se jen při úspěchu (v _remember spolu s rozsvícením nového tématu).
         self._log_turn(question, topic, None, None)
         return self.fallback.answer(question, retrieved)
 

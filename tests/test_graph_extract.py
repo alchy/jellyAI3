@@ -31,6 +31,19 @@ def test_copula_fact():
     assert expected in facts
 
 
+def test_copula_adjective_goes_to_attr_not_identity():
+    """„Božena je nemocná" → role „attr" (vlastnost), ne „pred" (identita)."""
+    sent = [
+        {"form": "Božena", "lemma": "Božena", "upos": "PROPN", "head": 3, "deprel": "nsubj", "start": 0, "end": 6},
+        {"form": "je", "lemma": "být", "upos": "AUX", "head": 3, "deprel": "cop", "start": 7, "end": 9},
+        {"form": "nemocná", "lemma": "nemocný", "upos": "ADJ", "head": 0, "deprel": "root", "start": 10, "end": 17},
+    ]
+    facts = extract_facts(_ann(sent))
+    fact = next(f for f in facts if f.predicate == "být")
+    roles = {p.role for p in fact.participants}
+    assert "attr" in roles and "pred" not in roles   # vlastnost, ne identita
+
+
 def test_nary_fact_place_and_time():
     sent = [
         {"form": "Čapek", "lemma": "Čapek", "upos": "PROPN", "head": 2, "deprel": "nsubj", "start": 0, "end": 5},

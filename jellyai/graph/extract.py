@@ -81,6 +81,7 @@ def _node_for(token, entities, canon=None):
         for e in entities:
             es, ee = e.get("start"), e.get("end")
             if es is not None and es <= start and end <= ee:
+                # pylint: disable=unsubscriptable-object
                 if best is None or (ee - es) > (best["end"] - best["start"]):
                     best = e            # nejdelší obklopující entita (celé „13. ledna 1890")
         if best is not None:
@@ -131,6 +132,7 @@ def _verb_head(index, sent):
 
 
 def extract_facts(annotation, default_subject=None, canon=None):
+    # pylint: disable=too-many-locals,too-many-branches
     """Vytáhne z anotace věty seznam reifikovaných faktů.
 
     Pro každý sloveso-token vznikne jeden n-ární fakt (podmět + předmět + atributy).
@@ -173,14 +175,18 @@ def extract_facts(annotation, default_subject=None, canon=None):
             if subj_tok is not None and subj_tok.get("upos") not in _SKIP_UPOS:
                 subj_node = _node_for(subj_tok, entities, canon)
 
-            # sponová věta: (podmět)–být–(přísudek)
+            # sponová věta: (podmět)–být–(přísudek). Rozlišíme **identitu**
+            # (podstatné jméno → role „pred": „je spisovatelka") od **vlastnosti/
+            # stavu** (přídavné jméno → role „attr": „je nemocná") — „Kdo je"
+            # čerpá z identity, „Jaký je" z vlastnosti, takže se nepletou.
             if _first(children, {"cop"}):
                 pred = _node_for(head, entities, canon)
                 subj = subj_node or default_subject
                 if pred and subj:
+                    role = "attr" if head.get("upos") == "ADJ" else "pred"
                     facts.append(make_fact("být", [
                         Participant("subj", subj[0], subj[1]),
-                        Participant("pred", pred[0], pred[1]),
+                        Participant(role, pred[0], pred[1]),
                     ]))
                 continue
 

@@ -72,6 +72,24 @@ def test_named_unknown_topic_does_not_guess_from_context():
     assert ans.trace is None          # neuhodne Boženu
 
 
+def test_failed_query_does_not_erode_context():
+    """Nenalezená odpověď NEsmí zeslabit attention (jinak spadne k nule)."""
+    g = FactGraph()
+    g.add_fact(make_fact("napsat", [Participant("subj", "Božena Němcová", "person"),
+                                    Participant("obj", "Babička", "concept")]))
+    q = "Měla děti?"                  # v grafu není → fallback
+    client = FakeUfalClient(parse={q: [[
+        {"form": "Měla", "lemma": "mít", "upos": "VERB", "head": 0, "deprel": "root"},
+        {"form": "děti", "lemma": "dítě", "upos": "NOUN", "head": 1, "deprel": "obj"},
+    ]]})
+    a = GraphAnswerer(g, client, ExtractiveAnswerer(AnswererConfig()))
+    a.context.warm("Božena Němcová", 2.0)
+    before = a.context.scores["Božena Němcová"]
+    a.answer(q, [])
+    a.answer(q, [])                  # i po dvou marných dotazech
+    assert a.context.scores["Božena Němcová"] == before   # attention nezeslábla
+
+
 def test_no_context_no_answer_falls_back():
     """Bez tématu i bez kontextu → fallback (žádná trasa)."""
     g = FactGraph()
