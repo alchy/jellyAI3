@@ -14,6 +14,8 @@ import sys
 import time
 import urllib.request
 
+from jellyai.normalize import merge_abbreviations, expand_abbreviation_entities
+
 # Název služby → skript, který ji spouští.
 _SERVICE_SCRIPTS = {
     "nametag": "services/nametag_service.py",
@@ -112,24 +114,26 @@ class UfalClient:
         return self._handles[name]
 
     def entities(self, text):
-        """Vrátí pojmenované entity věty (NameTag).
+        """Vrátí pojmenované entity věty (NameTag, normalizované zkratky).
 
         Returns:
             list[dict]: [{text, type, start, end}].
         """
         self._ensure("nametag", self.config.nametag_port, self.config.nametag_model)
-        return _post(self.config.host, self.config.nametag_port,
-                     "/entities", {"text": text})["entities"]
+        raw = _post(self.config.host, self.config.nametag_port,
+                    "/entities", {"text": text})["entities"]
+        return expand_abbreviation_entities(text, raw)
 
     def parse(self, text):
-        """Vrátí syntaktický rozbor (UDPipe): věty s tokeny a závislostmi.
+        """Vrátí syntaktický rozbor (UDPipe) s normalizovanými zkratkami.
 
         Returns:
             list[list[dict]]: Věty; token = {form, lemma, upos, head, deprel, start, end}.
         """
         self._ensure("udpipe", self.config.udpipe_port, self.config.udpipe_model)
-        return _post(self.config.host, self.config.udpipe_port,
-                     "/parse", {"text": text})["sentences"]
+        raw = _post(self.config.host, self.config.udpipe_port,
+                    "/parse", {"text": text})["sentences"]
+        return merge_abbreviations(raw)
 
     def analyze(self, text):
         """Vrátí morfologickou analýzu (MorphoDiTa): tokeny s lemma+tag.
