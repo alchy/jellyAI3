@@ -109,9 +109,14 @@ vše **pohasíná**. Když navazující otázka nemá vlastní téma, vezme se n
 ❓ kde se narodila?      → Slezsko            (pořád Němcová)
 ```
 
+Kromě okamžitého těžiště drží answerer i **historii konverzace** (`self.history`) —
+trajektorii: každý tah = otázka, téma, odpověď a **kde je těžiště** po tahu. To je
+posloupnost tras přes graf (pohyb těžiště), přímo pro **viewBase animaci** a pozdější
+**reaktivaci** tématu z historie. `reset()` začne nový rozhovor.
+
 Týž primitiv `ActivationField` (`jellyai/graph/activation.py`) tak slouží třem místům:
 koreference při plnění grafu, trasa answereru, konverzační těžiště. Další krok:
-vizualizace těžiště/tras ve viewBase.
+vizualizace těžiště/trajektorie ve viewBase.
 
 ## Vizualizace
 
