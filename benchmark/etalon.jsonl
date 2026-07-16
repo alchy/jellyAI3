@@ -12,6 +12,7 @@
 {"q": "Kde se narodil bratr Josefa Čapka?", "expect": ["Svatoňovic"], "cat": "rekurze"}
 {"q": "Kdo byl bratr autora, který napsal R.U.R.?", "expect": ["Josef"], "cat": "rekurze"}
 {"q": "Co napsal Karel Čapek?", "expect": ["válk"], "cat": "výčet"}
+{"q": "Jakou hru napsal Karel Čapek?", "expect": ["R.U.R."], "cat": "výběr"}
 {"q": "Jaký je robot?", "expect": ["umělý", "člověku", "stroj"], "cat": "vlastnost"}
 {"q": "Co je robot?", "expect": ["stroj"], "reject": ["Čapek"], "cat": "identita"}
 {"q": "Kdo je Ludvík Němec?", "expect": ["nenašel"], "reject": ["Čapek"], "cat": "poctivost"}

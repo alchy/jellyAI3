@@ -65,3 +65,29 @@ def test_exact_predicate_beats_association():
     q = "Kdo napsal R.U.R.?"
     a = GraphAnswerer(g, _client(q), ExtractiveAnswerer(AnswererConfig()))
     assert a.answer(q, []).text == "Josef Čapek"
+
+
+def test_concept_known_acts_as_type_filter():
+    """„Jakou hru napsal Karel Čapek?" — koncept „hra" nemá místo ve faktu →
+    stane se typovým filtrem díry: napsat/kontext(KČ, ?) ∧ být(?, hra) → R.U.R."""
+    g = FactGraph()
+    g.add_fact(make_fact("napsat", [Participant("subj", "Karel Čapek", "person"),
+                                    Participant("obj", "válka", "concept")]))
+    for _ in range(2):
+        g.add_fact(make_fact("kontext", [Participant("subj", "Karel Čapek", "person"),
+                                         Participant("obj", "R.U.R.", "person")]))
+    g.add_fact(make_fact("kontext", [Participant("subj", "Karel Čapek", "person"),
+                                     Participant("obj", "Josef Čapek", "person")]))
+    g.add_fact(make_fact("být", [Participant("subj", "R.U.R.", "person"),
+                                 Participant("pred", "hra", "concept")]))
+    q = "Jakou hru napsal Karel Čapek?"
+    client = FakeUfalClient(parse={q: [[
+        {"form": "Jakou", "lemma": "jaký", "upos": "DET", "head": 2, "deprel": "amod",
+         "feats": {"PronType": "Int"}},
+        {"form": "hru", "lemma": "hra", "upos": "NOUN", "head": 3, "deprel": "obj"},
+        {"form": "napsal", "lemma": "napsat", "upos": "VERB", "head": 0, "deprel": "root"},
+        {"form": "Karel", "lemma": "Karel", "upos": "PROPN", "head": 3, "deprel": "nsubj"},
+        {"form": "Čapek", "lemma": "Čapek", "upos": "PROPN", "head": 4, "deprel": "flat"},
+    ]]})
+    a = GraphAnswerer(g, client, ExtractiveAnswerer(AnswererConfig()))
+    assert a.answer(q, []).text == "R.U.R."

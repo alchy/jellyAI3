@@ -212,3 +212,44 @@ def test_coordinated_objects_distribute():
              if f.predicate == "psát"]
     objs = {p.node for f in facts for p in f.participants if p.role == "obj"}
     assert objs == {"román", "drama"}
+
+
+def test_apposition_joins_object_in_same_fact():
+    """„Napsal hru R.U.R." → napsat(osoba, obj=hra, obj=R.U.R.) v JEDNOM faktu —
+    „Jakou hru napsal X?" pak najde díru R.U.R. (známí: hra + osoba)."""
+    sent = [
+        {"form": "Napsal", "lemma": "napsat", "upos": "VERB", "head": 0,
+         "deprel": "root", "start": 0, "end": 6},
+        {"form": "hru", "lemma": "hra", "upos": "NOUN", "head": 1,
+         "deprel": "obj", "start": 7, "end": 10},
+        {"form": "R.U.R.", "lemma": "R.U.R.", "upos": "PROPN", "head": 2,
+         "deprel": "appos", "start": 11, "end": 17},
+    ]
+    facts = [f for f in extract_facts({"entities": [], "sentences": [sent]},
+                                      default_subject=("Karel Čapek", "person"))
+             if f.predicate == "napsat"]
+    assert len(facts) == 1
+    objs = {p.node for p in facts[0].participants if p.role == "obj"}
+    assert objs == {"hra", "R.U.R."}
+
+
+def test_nominal_apposition_creates_identity_fact():
+    """„…podle hry R.U.R. …" → být(R.U.R., pred=hra) — apozice je identita
+    (instance ↔ druh), dostupná pro typové otázky „Jakou hru…?"."""
+    sent = [
+        {"form": "podle", "lemma": "podle", "upos": "ADP", "head": 2,
+         "deprel": "case", "start": 0, "end": 5},
+        {"form": "hry", "lemma": "hra", "upos": "NOUN", "head": 4,
+         "deprel": "obl", "start": 6, "end": 9},
+        {"form": "R.U.R.", "lemma": "R.U.R.", "upos": "PROPN", "head": 2,
+         "deprel": "appos", "start": 10, "end": 16},
+        {"form": "složil", "lemma": "složit", "upos": "VERB", "head": 0,
+         "deprel": "root", "start": 17, "end": 23},
+        {"form": "operu", "lemma": "opera", "upos": "NOUN", "head": 4,
+         "deprel": "obj", "start": 24, "end": 29},
+    ]
+    facts = extract_facts({"entities": [], "sentences": [sent]},
+                          default_subject=("Zdeněk Blažek", "person"))
+    byt = next(f for f in facts if f.predicate == "být")
+    roles = [(p.role, p.node) for p in byt.participants]
+    assert ("subj", "R.U.R.") in roles and ("pred", "hra") in roles

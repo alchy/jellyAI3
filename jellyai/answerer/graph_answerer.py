@@ -159,6 +159,10 @@ class GraphAnswerer(Answerer):
             # vlastnost (pred/attr) ani zjišťovací otázka (díra None) kontextem
             # nehádají — poctivé „nenašel" je lepší než nejtěžší soused
             values, fact = self._match("kontext", known_set, pat.hole_role, pat.hole_type)
+        if not values and len(known_set) > 1:
+            # výběrová otázka: konceptový known bez místa ve faktu = TYPOVÝ
+            # filtr díry (join: napsat(X, ?) ∧ být(?, hra) → „Jakou hru…")
+            values, fact = self._typed_match(pat.predicate, known_set)
         return (node0, values, fact) if values else (None, [], None)
 
     def _solve(self, known):
@@ -223,6 +227,47 @@ class GraphAnswerer(Answerer):
         # zapamatuj všechny účastníky použitého faktu → rozsvítí se celá cesta
         self.visited.extend(p.node for p in scored[0][2].participants)
         return values, scored[0][2]
+
+    def _typed_match(self, predicate, known_set):
+        """Join výběrové otázky: koncepty z `known_set` se stanou typovým
+        filtrem díry — kandidát musí být instancí druhu (`_is_a` přes
+        identitní fakty). Kontextové patro je tu povolené: typ dodává
+        přesnost, kterou samotná asociace nemá.
+
+        Returns:
+            tuple: (list hodnot [nejlepší kandidát], fakt | None).
+        """
+        concepts = {k for k in known_set
+                    if self.graph.nodes.get(k) is not None
+                    and self.graph.nodes[k].type == "concept"}
+        knowns = known_set - concepts
+        if not concepts or not knowns:
+            return [], None
+        node0 = next(iter(knowns))
+        for pred in (predicate, "kontext"):    # přesný predikát před asociací
+            best = None
+            for fact in self.graph.facts_of(node0, predicate=pred):
+                if not knowns <= {p.node for p in fact.participants}:
+                    continue
+                for part in fact.participants:
+                    if part.node in knowns or part.node in concepts \
+                            or not self._is_a(part.node, concepts):
+                        continue
+                    score = fact.weight + self.context.scores.get(part.node, 0.0)
+                    if best is None or score > best[0]:  # pylint: disable=unsubscriptable-object
+                        best = (score, part.node, fact)
+            if best is not None:
+                self.visited.extend(p.node for p in best[2].participants)
+                return [best[1]], best[2]
+        return [], None
+
+    def _is_a(self, node_id, kinds):
+        """Instance ↔ druh přes identitní fakty: být(node, pred ∈ kinds)."""
+        for fact in self.graph.facts_of(node_id, role="subj", predicate="být"):
+            if any(p.role == "pred" and p.node in kinds
+                   for p in fact.participants):
+                return True
+        return False
 
     def _reverse_lookup(self, question):
         """Reverzní dotaz: z roku v otázce najde událost (datum → podmět faktu).
