@@ -17,6 +17,8 @@ from jellyai.answerer.extractive import ExtractiveAnswerer
 from jellyai.answerer.graph_answerer import GraphAnswerer
 from jellyai.answerer.question import analyze_question
 from jellyai.explain import explain_block as explain, list_blocks
+from jellyai.ports import (Tokenizer, QuestionAnalyzer, FactExtractor, Composer,
+                           CorpusPort)
 
 __version__ = "0.1.0"
 
@@ -25,4 +27,5 @@ __all__ = [
     "Retriever", "build_fact_graph", "FactGraph", "extract_facts", "Fact", "Participant",
     "Answer", "Answerer", "ExtractiveAnswerer", "GraphAnswerer", "analyze_question",
     "explain", "list_blocks",
+    "Tokenizer", "QuestionAnalyzer", "FactExtractor", "Composer", "CorpusPort",
 ]
