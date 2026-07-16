@@ -176,16 +176,37 @@ extraktivní větu. Bez změny dat (anotace z V3 stačí).
 ```
 
 Poctivé omezení: čistou jednoslovnou definici složí, jen když retrieval vytáhne
-definiční větu nahoru — což je přesně to, co má zlepšit fáze B (konverzační
-aktivace). Detaily v `docs/superpowers/2026-07-16-v4a-results.md`.
+definiční větu nahoru — což měla zlepšit fáze B. Detaily v
+`docs/superpowers/2026-07-16-v4a-results.md`.
+
+## B1 — vzdálenostní jádro (experimentální opt-in)
+
+Větný retrieval: skóruje po **větách**, nalezená věta vyzařuje skóre do okolí
+s útlumem podle vzdálenosti (`exp(−d/τ)`, soubor = tvrdá hranice), vrchol → ostřicí
+okno. Anotace jsou nově **větné** (`(doc_id, index věty)`), takže answerer skládá
+anotaci libovolné pasáže z rozsahu jejích vět.
+
+```bash
+# v config.py: RetrieverConfig.granularity = "sentence"
+./jelly annotate      # větné anotace (nutné po změně formátu)
+./jelly index         # postaví větný index
+./jelly template "Jaká byla Božena Němcová?"
+```
+
+**Poctivý výsledek — smíšený, ne jasná výhra.** Na tomhle korpusu větný režim jednu
+otázku zlepší (Němcová → přísudek), ale definiční („Josef Čapek → český malíř") a
+datové („1890") zhorší, protože kanonická definice bývá v úvodní pasáži, kterou
+hrubší passage režim zachytí celou. **Default proto zůstává `"passage"`.** Detaily
+a další směr (ladění τ/poloměru, hybrid) v `docs/superpowers/2026-07-16-vb1-results.md`.
 
 ## Roadmapa
 
 - **Hotovo:** V1 (retrieval + extraktivní QA), V2a (syntetická QA data),
   V3 (pravidlové odpovědi — služby + role + šablony), V4a fáze A (bohatá analýza
-  otázky + sponové odpovědi). V2b (generátor od nuly) je na samostatné větvi.
-- **Další (V4a fáze B):** konverzační aktivace / pseudo-attention se vzdálenostním
-  útlumem (přiblížit definiční větu nahoru), pak obecné znalosti mimo korpus.
+  otázky + sponové odpovědi), B1 (větný retrieval — experimentální). V2b (generátor
+  od nuly) je na samostatné větvi.
+- **Další:** ladit/hybridizovat větný retrieval (τ, poloměr, kombinace s pasáží),
+  B2 konverzační paměť (stav napříč dotazy), pak obecné znalosti mimo korpus.
 
 Detaily v `docs/superpowers/specs/2026-07-15-cesky-gpt-design.md` a
 `docs/superpowers/plans/2026-07-15-cesky-qa-v1.md`.

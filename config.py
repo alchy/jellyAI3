@@ -58,12 +58,18 @@ class RetrieverConfig:
         k1 (float): BM25 — nasycení četnosti slova (vyšší = četnost víc rozhoduje).
         b (float): BM25 — míra normalizace délkou dokumentu (0 = žádná, 1 = plná).
         use_stopwords (bool): Zda při tokenizaci zahazovat česká stopslova.
+        granularity (str): "passage" (V1) nebo "sentence" (větný retrieval B1).
+        decay_tau (float): Dosah útlumu τ pro větný režim (exp(−d/τ)).
+        focus_radius (int): Poloměr ostřicího okna ve větách (na každou stranu).
     """
     method: str = "bm25"
     top_k: int = 5
     k1: float = 1.5
     b: float = 0.75
     use_stopwords: bool = True
+    granularity: str = "passage"  # "passage" (V1) nebo "sentence" (B1)
+    decay_tau: float = 1.6         # dosah exponenciálního útlumu (věty)
+    focus_radius: int = 2          # poloměr ostřicího okna (vět na každou stranu)
 
 
 @dataclass

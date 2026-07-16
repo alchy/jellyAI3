@@ -138,6 +138,32 @@ class Retriever:
         order = np.argsort(-scores)[:top_k]
         return [(self.passages[i], float(scores[i])) for i in order if scores[i] > 0]
 
+    def __len__(self):
+        """Počet zaindexovaných pasáží (jednotek vyhledávání)."""
+        return len(self.passages)
+
+    def score_all(self, query):
+        """Vrátí skóre **všech** pasáží k dotazu — bez ořezu na top_k.
+
+        Stejný výpočet jako `search`, ale vrací surový vektor skóre v pořadí
+        `self.passages` (nic se neřadí ani nezahazuje). Slouží nadstavbám, které
+        potřebují skóre každé pasáže zvlášť (např. větný retriever pro vzdálenostní
+        útlum). Chování `search` to nijak nemění.
+
+        Args:
+            query (str): Dotaz v češtině.
+
+        Returns:
+            numpy.ndarray: Skóre pro každou pasáž (v pořadí `self.passages`);
+                prázdné pole pro prázdný index.
+        """
+        if not self.passages:
+            return np.zeros(0)
+        tokens = self._tok(query)
+        if self.config.method == "tfidf":
+            return self._tfidf_scores(tokens)
+        return self._bm25_scores(tokens)
+
     def _tfidf_scores(self, tokens):
         """Spočítá kosinovou podobnost dotazu se všemi pasážemi (TF-IDF).
 

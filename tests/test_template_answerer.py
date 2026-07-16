@@ -29,7 +29,7 @@ def _question_client():
 def test_template_answerer_person():
     q, client = _question_client()
     passage = Passage("wiki_bn", 5, "Božena Němcová napsala Babičku.", 0, 1)
-    answerer = TemplateAnswerer(client, {("wiki_bn", 5): _passage_annotation()},
+    answerer = TemplateAnswerer(client, {("wiki_bn", 0): _passage_annotation()},
                                 ExtractiveAnswerer(AnswererConfig()))
     ans = answerer.answer(q, [(passage, 1.0)])
     assert isinstance(ans, Answer)
@@ -75,7 +75,7 @@ def test_copula_definition_not_tautology():
         {"form": "Rossum", "lemma": "Rossum", "upos": "PROPN", "head": 0, "deprel": "root", "start": 7, "end": 13},
     ]]})
     passage = Passage("wiki", 1, "Rossum je vynálezce.", 0, 1)
-    annotations = {("wiki", 1): {"entities": [{"text": "Rossum", "type": "P", "start": 0, "end": 6}],
+    annotations = {("wiki", 0): {"entities": [{"text": "Rossum", "type": "P", "start": 0, "end": 6}],
                                  "sentences": [[
         {"form": "Rossum", "lemma": "Rossum", "upos": "PROPN", "head": 3, "deprel": "nsubj", "start": 0, "end": 6},
         {"form": "je", "lemma": "být", "upos": "AUX", "head": 3, "deprel": "cop", "start": 7, "end": 9},
@@ -84,6 +84,30 @@ def test_copula_definition_not_tautology():
     answerer = TemplateAnswerer(client, annotations, ExtractiveAnswerer(AnswererConfig()))
     result = answerer.answer(q, [(passage, 1.0)])
     assert result.text == "vynálezce"    # definice, ne tautologie „Rossum"
+
+
+def test_annotation_assembled_across_window():
+    # okno pokrývá věty 0..1; spona je až ve větě 1 → přísudek se najde
+    q = "kdo je Rossum?"
+    client = FakeUfalClient(parse={q: [[
+        {"form": "kdo", "lemma": "kdo", "upos": "PRON", "head": 3, "deprel": "nsubj", "start": 0, "end": 3},
+        {"form": "je", "lemma": "být", "upos": "AUX", "head": 3, "deprel": "cop", "start": 4, "end": 6},
+        {"form": "Rossum", "lemma": "Rossum", "upos": "PROPN", "head": 0, "deprel": "root", "start": 7, "end": 13},
+    ]]})
+    passage = Passage("wiki", 0, "Něco jiného. Rossum je vynálezce.", 0, 2)
+    annotations = {
+        ("wiki", 0): {"entities": [], "sentences": [[
+            {"form": "Něco", "lemma": "něco", "upos": "PRON", "head": 0, "deprel": "root", "start": 0, "end": 4},
+        ]]},
+        ("wiki", 1): {"entities": [], "sentences": [[
+            {"form": "Rossum", "lemma": "Rossum", "upos": "PROPN", "head": 3, "deprel": "nsubj", "start": 13, "end": 19},
+            {"form": "je", "lemma": "být", "upos": "AUX", "head": 3, "deprel": "cop", "start": 20, "end": 22},
+            {"form": "vynálezce", "lemma": "vynálezce", "upos": "NOUN", "head": 0, "deprel": "root", "start": 23, "end": 32},
+        ]]},
+    }
+    answerer = TemplateAnswerer(client, annotations, ExtractiveAnswerer(AnswererConfig()))
+    result = answerer.answer(q, [(passage, 1.0)])
+    assert result.text == "vynálezce"
 
 
 def test_explain_nonempty():

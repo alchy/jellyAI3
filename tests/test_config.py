@@ -35,3 +35,11 @@ def test_config_has_v3_defaults():
     assert cfg.services.host == "127.0.0.1"
     assert cfg.services.udpipe_port == 8082
     assert cfg.services.annotations_path == "data/annotations.pkl"
+
+
+def test_retriever_config_distance_defaults():
+    from config import RetrieverConfig
+    c = RetrieverConfig()
+    assert c.granularity == "passage"
+    assert c.decay_tau == 1.6
+    assert c.focus_radius == 2

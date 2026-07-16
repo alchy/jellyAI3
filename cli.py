@@ -39,8 +39,8 @@ def _build_and_save_index(config):
     """
     pipe = QAPipeline.from_corpus(config.data.processed_dir, config)
     pipe.retriever.save(config.data.index_path)
-    n = len(pipe.retriever.passages)
-    print(f"Index postaven a uložen: {n} pasáží → {config.data.index_path}")
+    n = len(pipe.retriever)
+    print(f"Index postaven a uložen: {n} jednotek → {config.data.index_path}")
     return n
 
 
@@ -214,36 +214,34 @@ def cmd_gen_qa(config, tagger=None):
 
 
 def cmd_annotate(config, client=None):
-    """Offline anotace pasáží (entity + syntaktický rozbor) k indexu (V3).
+    """Offline anotace vět dokumentů (entity + syntaktický rozbor) k indexu (V3/B1).
 
-    Načte pasáže z indexu, přes ÚFAL služby je obohatí o entity a role a uloží do
-    sidecaru. Dotazování v režimu "template" pak jen čte.
+    Načte dokumenty z processed adresáře, přes ÚFAL služby je po větách obohatí o
+    entity a role a uloží do sidecaru (klíč = doc_id + index věty). Dotazování
+    v režimu "template" pak jen čte a skládá anotaci pasáže z rozsahu jejích vět —
+    funguje pro chunkerová i ostřicí okna větného retrieveru.
 
     Args:
-        config (Config): Konfigurace (index_path, services).
+        config (Config): Konfigurace (processed_dir, services).
         client: ÚFAL klient; None = vytvoří UfalClient (injektování usnadňuje testy).
 
     Returns:
-        int: Počet anotovaných pasáží.
+        int: Počet anotovaných vět.
     """
-    from jellyai.retriever import Retriever
-    from jellyai.annotate import annotate_passages, save_annotations
-    if not os.path.exists(config.data.index_path):
-        raise FileNotFoundError(
-            f"Chybí index {config.data.index_path} — spusť nejdřív `index`."
-        )
-    passages = Retriever.load(config.data.index_path).passages
+    from jellyai.loader import load_documents
+    from jellyai.annotate import annotate_documents, save_annotations
+    documents = load_documents(config.data.processed_dir)
     own = client is None
     if own:
         from jellyai.ufal_client import UfalClient
         client = UfalClient(config.services)
     try:
-        annotations = annotate_passages(passages, client)
+        annotations = annotate_documents(documents, client)
     finally:
         if own:
             client.close()
     save_annotations(annotations, config.services.annotations_path)
-    print(f"Anotováno {len(annotations)} pasáží → {config.services.annotations_path}")
+    print(f"Anotováno {len(annotations)} vět → {config.services.annotations_path}")
     return len(annotations)
 
 

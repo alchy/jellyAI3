@@ -60,6 +60,32 @@ class TemplateAnswerer(Answerer):
         self.annotations = annotations or {}
         self.fallback = fallback
 
+    def _annotation_for(self, passage):
+        """Složí anotaci pasáže z větného úložiště přes rozsah jejích vět.
+
+        Anotace jsou klíčované (doc_id, index věty), takže pasáž libovolného původu
+        (chunkerové okno i ostřicí okno větného retrieveru) se poskládá z vět
+        `passage.start … passage.end`. Offsety jsou už v rámci dokumentu
+        (disjunktní), takže spojení entit a vět je konzistentní.
+
+        Args:
+            passage (Passage): Pasáž s rozsahem vět (start/end = lokální indexy).
+
+        Returns:
+            dict | None: {"entities": [...], "sentences": [...]}, nebo None když
+                žádná věta pasáže není anotovaná.
+        """
+        sentences, entities = [], []
+        for i in range(passage.start, passage.end):
+            annotation = self.annotations.get((passage.doc_id, i))
+            if not annotation:
+                continue
+            sentences += annotation.get("sentences", [])
+            entities += annotation.get("entities", [])
+        if not sentences:
+            return None
+        return {"entities": entities, "sentences": sentences}
+
     def _render(self, qtype, candidate):
         """Převede kandidáta do cílového tvaru a vloží do šablony."""
         case = templates.target_case(qtype)
@@ -88,7 +114,7 @@ class TemplateAnswerer(Answerer):
         if qa.qtype is None:
             return self.fallback.answer(question, retrieved)
         for passage, score in retrieved:
-            annotation = self.annotations.get((passage.doc_id, passage.index))
+            annotation = self._annotation_for(passage)
             if not annotation:
                 continue
             candidate = select_answer(qa.qtype, qa.verb_lemma, annotation,

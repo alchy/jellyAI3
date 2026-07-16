@@ -39,6 +39,45 @@ def _make_answerer(config):
     return ExtractiveAnswerer(config.answerer)
 
 
+def _build_retriever(config, documents):
+    """Postaví retriever podle `config.retriever.granularity`.
+
+    "sentence" → větný `SentenceRetriever` (B1, vzdálenostní útlum) nad dokumenty;
+    jinak V1 `Retriever` nad chunkerovými pasážemi. Import větného retrieveru je
+    líný, ať passage cesta nezávisí na modulu B1.
+
+    Args:
+        config (Config): Konfigurace (retriever + chunker).
+        documents (list[Document]): Načtené dokumenty.
+
+    Returns:
+        Retriever | SentenceRetriever: Postavený index.
+    """
+    if config.retriever.granularity == "sentence":
+        from jellyai.sentence_retriever import SentenceRetriever
+        return SentenceRetriever(config.retriever).build(documents)
+    passages = []
+    for doc in documents:
+        passages.extend(chunk(doc, config.chunker))
+    return Retriever(config.retriever).build(passages)
+
+
+def _load_retriever(index_path, config):
+    """Načte uložený retriever podle `config.retriever.granularity`.
+
+    Args:
+        index_path (str): Cesta k uloženému indexu.
+        config (Config): Konfigurace (rozhoduje o typu indexu).
+
+    Returns:
+        Retriever | SentenceRetriever: Načtený index.
+    """
+    if config.retriever.granularity == "sentence":
+        from jellyai.sentence_retriever import SentenceRetriever
+        return SentenceRetriever.load(index_path)
+    return Retriever.load(index_path)
+
+
 class QAPipeline:
     """Spojí Retriever a Answerer do jednoho QA celku."""
 
@@ -80,10 +119,7 @@ class QAPipeline:
             QAPipeline: Připravená pipeline s postaveným indexem.
         """
         docs = load_documents(directory)
-        passages = []
-        for doc in docs:
-            passages.extend(chunk(doc, config.chunker))
-        retriever = Retriever(config.retriever).build(passages)
+        retriever = _build_retriever(config, docs)
         answerer = _make_answerer(config)
         return cls(retriever, answerer)
 
@@ -103,7 +139,7 @@ class QAPipeline:
         Returns:
             QAPipeline: Připravená pipeline s načteným indexem.
         """
-        retriever = Retriever.load(index_path)
+        retriever = _load_retriever(index_path, config)
         answerer = _make_answerer(config)
         return cls(retriever, answerer)
 
