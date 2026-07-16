@@ -12,6 +12,10 @@ from dataclasses import dataclass
 _PERSON, _GEO, _TIME = "p", "g", "t"
 _SUBJECT = {"nsubj", "nsubj:pass"}
 _OBJECT = {"obj", "iobj", "dobj"}
+# přívlastky, které patří k přísudku (přídavné jméno, víceslovné jméno)
+_PREDICATE_MODIFIERS = {"amod", "flat", "compound"}
+# slovní druhy, které nejsou odpověď (zájmena, spojky, předložky, interpunkce)
+_SKIP_UPOS = {"PRON", "DET", "CCONJ", "SCONJ", "ADP", "PUNCT"}
 
 
 @dataclass
@@ -100,8 +104,8 @@ def _select_object(annotation, verb_lemma, qtype):
     fallback = None
     for sent in annotation.get("sentences", []):
         for tok in sent:
-            if tok.get("deprel") not in _OBJECT:
-                continue
+            if tok.get("deprel") not in _OBJECT or tok.get("upos") in _SKIP_UPOS:
+                continue  # předmět ano, ale ne zájmeno/spojka
             cand = Candidate(form=tok["form"], lemma=_clean_lemma(tok["lemma"]), qtype=qtype)
             head = tok.get("head", 0)
             if verb_lemma and 0 < head <= len(sent) \
@@ -129,18 +133,56 @@ def _select_number(annotation, qtype):
     return None
 
 
-def select_answer(qtype, verb_lemma, annotation):
-    """Vybere kandidáta na odpověď podle typu otázky a rolí v anotaci.
+def select_predicate(annotation, qtype):
+    """Sponový přísudek: „X je/byl Y" → Y (nominální/adjektivní přísudek).
+
+    V UD je u sponové věty přísudek kořenem a spona („být") jeho `cop` potomkem;
+    např. „Němcová byla významná spisovatelka" → přísudek „spisovatelka" + přívlastek
+    „významná". To je odpověď na definiční/vlastnostní otázky.
 
     Args:
-        qtype (str): Typ otázky (Kdo/Co/Kde/Kdy/Kolik).
+        annotation (dict): Anotace pasáže.
+        qtype (str): Typ otázky.
+
+    Returns:
+        Candidate | None: Přísudková fráze, nebo None když věta není sponová.
+    """
+    for sent in annotation.get("sentences", []):
+        cop_heads = [t["head"] for t in sent if t.get("deprel") == "cop"]
+        for head_id in cop_heads:
+            if not 0 < head_id <= len(sent):
+                continue
+            predicate = sent[head_id - 1]
+            phrase = [predicate] + [
+                t for t in sent
+                if t.get("head") == head_id and t.get("deprel") in _PREDICATE_MODIFIERS
+            ]
+            phrase.sort(key=lambda t: t.get("start") or 0)
+            return Candidate(form=" ".join(t["form"] for t in phrase),
+                             lemma=_nominative(phrase), qtype=qtype)
+    return None
+
+
+def select_answer(qtype, verb_lemma, annotation, is_copula=False):
+    """Vybere kandidáta na odpověď podle typu otázky, spony a rolí v anotaci.
+
+    U sponových otázek a u „Jaký/Který" zkusí nejdřív přísudek; jinak entitu podle
+    typu a syntaktické role.
+
+    Args:
+        qtype (str): Typ otázky (Kdo/Co/Kde/Kdy/Kolik/Jaký/Který/Čí).
         verb_lemma (str | None): Lemma hlavního slovesa otázky (pro výběr role).
         annotation (dict): Anotace pasáže {"entities": ..., "sentences": ...}.
+        is_copula (bool): Zda je otázka sponová (přednost přísudku).
 
     Returns:
         Candidate | None: Vybraná odpověď, nebo None když nic nesedí.
     """
-    if qtype == "Kdo":
+    if is_copula or qtype in ("Jaký", "Který"):
+        predicate = select_predicate(annotation, qtype)
+        if predicate:
+            return predicate
+    if qtype in ("Kdo", "Čí"):
         return _select_subject_entity(annotation, verb_lemma, qtype)
     if qtype == "Co":
         return _select_object(annotation, verb_lemma, qtype)

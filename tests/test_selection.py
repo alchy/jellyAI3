@@ -42,6 +42,30 @@ def test_disambiguates_two_persons():
     assert c.form == "Karel Čapek"       # podmět slovesa, ne druhá osoba
 
 
+def test_select_predicate_copula():
+    from jellyai.answerer.selection import select_predicate
+    # „Němcová byla významná spisovatelka." (přísudek = kořen se sponou)
+    sent = [
+        {"form": "Němcová", "lemma": "Němcová", "upos": "PROPN", "head": 4, "deprel": "nsubj", "start": 0, "end": 7},
+        {"form": "byla", "lemma": "být", "upos": "AUX", "head": 4, "deprel": "cop", "start": 8, "end": 12},
+        {"form": "významná", "lemma": "významný", "upos": "ADJ", "head": 4, "deprel": "amod", "start": 13, "end": 21},
+        {"form": "spisovatelka", "lemma": "spisovatelka", "upos": "NOUN", "head": 0, "deprel": "root", "start": 22, "end": 34},
+    ]
+    c = select_predicate({"entities": [], "sentences": [sent]}, "Jaký")
+    assert c.form == "významná spisovatelka"
+
+
+def test_co_skips_pronoun_object():
+    # předmět-zájmeno „který" se přeskočí, vybere se podstatné jméno „knihu"
+    sent = [
+        {"form": "napsal", "lemma": "napsat", "upos": "VERB", "head": 0, "deprel": "root", "start": 0, "end": 6},
+        {"form": "který", "lemma": "který", "upos": "PRON", "head": 1, "deprel": "obj", "start": 7, "end": 12},
+        {"form": "knihu", "lemma": "kniha", "upos": "NOUN", "head": 1, "deprel": "obj", "start": 13, "end": 18},
+    ]
+    c = select_answer("Co", "napsat", {"entities": [], "sentences": [sent]})
+    assert c.form == "knihu"
+
+
 def test_kolik_selects_number():
     sent = [
         {"form": "Měl", "lemma": "mít", "upos": "VERB", "head": 0, "deprel": "root", "start": 0, "end": 3},
