@@ -245,6 +245,37 @@ def cmd_annotate(config, client=None):
     return len(annotations)
 
 
+def cmd_graph(config, view=False):
+    """Postaví reifikovaný faktový graf z větných anotací a uloží ho.
+
+    Načte anotace (`services.annotations_path`), poskládá vážený faktový graf
+    (fakty = uzly, role-hrany, váha = opakování) a uloží do `graph.graph_path`.
+    S `view=True` navíc exportuje do viewBase.
+
+    Args:
+        config (Config): Konfigurace (annotations_path, graph_path).
+        view (bool): Zda po postavení exportovat do viewBase.
+
+    Returns:
+        int: Počet entitních uzlů grafu.
+    """
+    from jellyai.annotate import load_annotations
+    from jellyai.graph.graph import build_graph
+    annotations = load_annotations(config.services.annotations_path)
+    graph = build_graph(annotations)
+    graph.save(config.graph.graph_path)
+    print(f"Faktový graf: {len(graph.nodes)} uzlů, {len(graph.facts)} faktů "
+          f"→ {config.graph.graph_path}")
+    if view:
+        from jellyai.graph.viewbase_export import to_networkx
+        try:
+            from viewbase import Canvas
+            Canvas.from_networkx(to_networkx(graph)).serve()
+        except ImportError:
+            print("viewBase/networkx není k dispozici — přeskočeno.")
+    return len(graph.nodes)
+
+
 def _build_parser():
     """Sestaví argparse parser se všemi příkazy.
 
@@ -259,6 +290,8 @@ def _build_parser():
     common = argparse.ArgumentParser(add_help=False)
     common.add_argument("--processed-dir", default=None,
                         help="adresář s vyčištěnými texty (výchozí data/processed)")
+    common.add_argument("--graph", action="store_true",
+                        help="odpovídat přes faktový graf (mode=graph)")
     common.add_argument("--template", action="store_true",
                         help="použít pravidlový (template) answerer V3 místo extraktivního")
 
@@ -272,6 +305,8 @@ def _build_parser():
     sub.add_parser("wiki", parents=[common], help="stáhne české wiki články do data/raw")
     sub.add_parser("gen-qa", parents=[common], help="vygeneruje syntetický QA dataset z korpusu")
     sub.add_parser("annotate", parents=[common], help="offline anotace pasáží (entity+role) pro V3")
+    p_graph = sub.add_parser("graph", parents=[common], help="postaví faktový graf z anotací")
+    p_graph.add_argument("--view", action="store_true", help="export do viewBase")
     p_ask = sub.add_parser("ask", parents=[common], help="odpoví na jeden dotaz")
     p_ask.add_argument("question", help="otázka v češtině")
     p_explain = sub.add_parser("explain", parents=[common], help="popíše blok")
@@ -303,6 +338,8 @@ def main(argv=None):
         ))
     if getattr(args, "template", False):
         config.answerer.mode = "template"  # přepnout na pravidlový answerer (V3)
+    if getattr(args, "graph", False):
+        config.answerer.mode = "graph"     # přepnout na faktový graf
 
     if args.command == "prepare-data":
         cmd_prepare_data(config)
@@ -320,6 +357,8 @@ def main(argv=None):
         cmd_gen_qa(config)
     elif args.command == "annotate":
         cmd_annotate(config)
+    elif args.command == "graph":
+        cmd_graph(config, view=args.view)
     elif args.command == "ask":
         print(cmd_ask(config, args.question))
     elif args.command == "explain":

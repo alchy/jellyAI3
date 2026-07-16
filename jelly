@@ -30,7 +30,7 @@ case "$cmd" in
     echo "✅ Prostředí připraveno v $ROOT/.venv"
     ;;
 
-  prepare|index|ask|explain|qa|qa-models|wiki|annotate|template)
+  prepare|index|ask|explain|qa|qa-models|wiki|annotate|template|graph|graph-ask)
     if [ ! -x "$PY" ]; then
       echo "❌ Chybí .venv — spusť nejdřív: ./jelly setup" >&2
       exit 1
@@ -42,11 +42,19 @@ case "$cmd" in
       wiki)      "$PY" "$ROOT/cli.py" wiki ;;
       qa)        "$PY" "$ROOT/cli.py" gen-qa ;;
       annotate)  "$PY" "$ROOT/cli.py" annotate ;;
+      graph)     "$PY" "$ROOT/cli.py" graph "$@" ;;   # postaví faktový graf (příp. --view)
       template)
         if [ "$#" -gt 0 ]; then
           "$PY" "$ROOT/cli.py" ask --template "$*"    # pravidlový jednorázový dotaz
         else
           "$PY" "$ROOT/cli.py" repl --template        # pravidlový interaktivní prompt
+        fi
+        ;;
+      graph-ask)
+        if [ "$#" -gt 0 ]; then
+          "$PY" "$ROOT/cli.py" ask --graph "$*"       # dotaz přes faktový graf
+        else
+          "$PY" "$ROOT/cli.py" repl --graph           # interaktivní prompt přes graf
         fi
         ;;
       ask)
@@ -61,6 +69,6 @@ case "$cmd" in
     ;;
 
   *)
-    echo "Použití: ./jelly {setup|prepare|index|ask [otázka]|explain [blok]|wiki|qa-models|qa|annotate|template [otázka]}"
+    echo "Použití: ./jelly {setup|prepare|index|ask [otázka]|explain [blok]|wiki|qa-models|qa|annotate|template [otázka]|graph [--view]|graph-ask [otázka]}"
     ;;
 esac

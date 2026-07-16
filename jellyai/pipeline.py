@@ -36,6 +36,13 @@ def _make_answerer(config):
             annotations = load_annotations(config.services.annotations_path)
         return TemplateAnswerer(UfalClient(config.services), annotations,
                                 ExtractiveAnswerer(config.answerer))
+    if config.answerer.mode == "graph":
+        from jellyai.graph.graph import FactGraph
+        from jellyai.answerer.graph_answerer import GraphAnswerer
+        from jellyai.ufal_client import UfalClient
+        graph = FactGraph.load(config.graph.graph_path)
+        return GraphAnswerer(graph, UfalClient(config.services),
+                             ExtractiveAnswerer(config.answerer))
     return ExtractiveAnswerer(config.answerer)
 
 
