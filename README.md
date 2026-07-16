@@ -218,24 +218,23 @@ n-ární fakt odpoví na „kdy" i „kde" z jedné události.
 ./jelly graph --view        # export do viewBase (force-graph; potřebuje networkx)
 ```
 
-**Výsledek:** funguje mechanismus i n-arita (Němcová: „kdy"→1818 a „kde"→Slezsku
-z téhož faktu; „kdo napsal Babičku"→Božena Němcová; „kde se narodil Karel Čapek"→
-Malých Svatoňovicích). Extrakce má **aktivační koreferenci** (pro-drop podmět +
-přesun tématu), **kanonizaci osobních jmen** a **precizní answerer** (žádná špatná
-odpověď). Zbývá zachytávání zanořených dat (rok narození). Default `mode` zůstává
-`extractive` → nulová regrese. Detaily v
-`docs/superpowers/2026-07-16-fact-graph-results.md`.
+**Výsledek:** funguje mechanismus i n-arita (Němcová „kdy"→1818 / „kde"→Slezsko
+z téhož faktu; „kdo napsal Babičku"→Božena Němcová). Extrakce má **aktivační
+koreferenci** (pro-drop podmět + přesun tématu), **kanonizaci jmen**, **zanořená data**
+(datum = uzel s pod-fakty rok/měsíc/den → drill „v kterém roce"), **normalizaci tvarů**
+a **precizní answerer**. **Konverzační těžiště** (B2) navazuje follow-up otázky
+(„…kdy se narodila? → 1818, …kde? → Slezsko"). Default `mode` zůstává `extractive`
+→ nulová regrese. Detaily v `docs/superpowers/2026-07-16-fact-graph-results.md`.
 
 ## Roadmapa
 
 - **Hotovo:** V1 (retrieval + extraktivní QA), V2a (syntetická QA data),
-  V3 (pravidlové odpovědi — služby + role + šablony), V4a fáze A (bohatá analýza
-  otázky + sponové odpovědi), B1 (větný retrieval — experimentální), faktový graf
-  (reifikované n-ární fakty — experimentální). V2b (generátor od nuly) je na
-  samostatné větvi.
-- **Další:** zlepšit extrakci faktů (filtr podmětů, reflexiva, normalizace tvarů),
-  vizualizace tras dotazu ve viewBase, konverzační „těžiště" (B2), a *podmíněně*
-  konsolidace kódu k grafu.
+  V3 (pravidlové odpovědi), V4a fáze A (bohatá analýza otázky), B1 (větný retrieval —
+  zakonzervováno), **faktový graf** (reifikované n-ární fakty, zanořená data,
+  aktivační koreference, konverzační těžiště B2 — experimentální). V2b (generátor)
+  je na samostatné větvi.
+- **Další:** vizualizace tras/těžiště ve viewBase; fakt-jako-účastník (vedlejší věty);
+  *podmíněně* konsolidace kódu k grafu.
 
 Detaily v `docs/superpowers/specs/2026-07-15-cesky-gpt-design.md` a
 `docs/superpowers/plans/2026-07-15-cesky-qa-v1.md`.

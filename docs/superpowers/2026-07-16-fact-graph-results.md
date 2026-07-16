@@ -96,12 +96,22 @@ Svatoňovicích" zůstane); Čapkův **rok** narození stále chybí — v korpu
 v infoboxu/závorce, ne v parsovatelné větě (není co zanořit). Další patro: fakt-jako-
 účastník pro celé vedlejší věty.
 
-## Konverzační vrstva (B2) — připraveno
+## Konverzační těžiště (B2) — hotovo
 
-Atributy grafu (`id`, `type`, statická `weight`) jsou dobrý **prior**; konverzační
-aktivace patří mimo graf jako overlay (`ActivationField` už existuje). Cesta
-answereru vrací **trasu** → warming uzlů/faktů. „Těžiště" = argmax aktivace. Viz
-`jellyai/graph/activation.py`.
+`GraphAnswerer` drží `ActivationField` nad id uzlů. Každý tah **rozsvítí** téma a
+odpověď (odpověď-entitu u „Kdo/Co" nejsilněji — bývá tématem navazující otázky) a
+vše **pohasíná**. Když navazující otázka nemá vlastní téma, vezme se nejteplejší uzel.
+
+**Živě (repl přes graf):**
+```
+❓ kdo napsal Babičku?   → Božena Němcová
+❓ kdy se narodila?      → 2. května 1818     (navázalo na Němcovou)
+❓ kde se narodila?      → Slezsko            (pořád Němcová)
+```
+
+Týž primitiv `ActivationField` (`jellyai/graph/activation.py`) tak slouží třem místům:
+koreference při plnění grafu, trasa answereru, konverzační těžiště. Další krok:
+vizualizace těžiště/tras ve viewBase.
 
 ## Vizualizace
 
