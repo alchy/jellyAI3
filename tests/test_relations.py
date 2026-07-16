@@ -183,3 +183,77 @@ def test_nonrelational_copula_stays_identity():
     facts = extract_facts(_ann(sent, entities))
     byt = next(f for f in facts if f.predicate == "být")
     assert any(p.role == "pred" and p.node == "spisovatel" for p in byt.participants)
+
+
+def test_existential_copula_blocked_by_gender_disagreement():
+    """„Byla válka." (Fem) při nejteplejším Čapkovi (Masc) → existenciál,
+    ŽÁDNÉ být(Čapek, válka). Rod slovesného tvaru rozhoduje."""
+    sent = [
+        {"form": "Byla", "lemma": "být", "upos": "AUX", "head": 2,
+         "deprel": "cop", "start": 0, "end": 4, "feats": {"Gender": "Fem"}},
+        {"form": "válka", "lemma": "válka", "upos": "NOUN", "head": 0,
+         "deprel": "root", "start": 5, "end": 10},
+    ]
+    facts = extract_facts(_ann(sent, []),
+                          default_subject=("Karel Čapek", "person"))
+    assert not facts
+
+
+def test_prodrop_with_gender_agreement_survives():
+    """„Byl spisovatelem." (Masc) při Čapkovi (Masc) → pro-drop platí."""
+    sent = [
+        {"form": "Byl", "lemma": "být", "upos": "AUX", "head": 2,
+         "deprel": "cop", "start": 0, "end": 3, "feats": {"Gender": "Masc"}},
+        {"form": "spisovatelem", "lemma": "spisovatel", "upos": "NOUN", "head": 0,
+         "deprel": "root", "start": 4, "end": 16},
+    ]
+    facts = extract_facts(_ann(sent, []),
+                          default_subject=("Karel Čapek", "person"))
+    byt = next(f for f in facts if f.predicate == "být")
+    assert any(p.role == "subj" and p.node == "Karel Čapek"
+               for p in byt.participants)
+
+
+def test_verb_prodrop_gender_mismatch_blocked():
+    """„Narodila se roku 1820." (Fem) při Čapkovi (Masc) → fakt nevznikne."""
+    sent = [
+        {"form": "Narodila", "lemma": "narodit", "upos": "VERB", "head": 0,
+         "deprel": "root", "start": 0, "end": 8, "feats": {"Gender": "Fem"}},
+        {"form": "se", "lemma": "se", "upos": "PRON", "head": 1,
+         "deprel": "expl", "start": 9, "end": 11},
+        {"form": "1820", "lemma": "1820", "upos": "NUM", "head": 1,
+         "deprel": "obl", "start": 17, "end": 21},
+    ]
+    facts = extract_facts(_ann(sent, []),
+                          default_subject=("Karel Čapek", "person"))
+    assert not any(p.node == "Karel Čapek" for f in facts for p in f.participants)
+
+
+def test_interrogative_pred_makes_no_identity():
+    """Sponová věta s tázacím kořenem („…jaký je.") nezakládá být(osoba, jaký)."""
+    sent = [
+        {"form": "jaký", "lemma": "jaký", "upos": "ADJ", "head": 0,
+         "deprel": "root", "start": 0, "end": 4,
+         "feats": {"PronType": "Int"}},
+        {"form": "je", "lemma": "být", "upos": "AUX", "head": 1,
+         "deprel": "cop", "start": 5, "end": 7},
+    ]
+    facts = extract_facts(_ann(sent, []),
+                          default_subject=("Karel Čapek", "person"))
+    assert not facts
+
+
+def test_demonstrative_determiner_blocks_identity():
+    """„…byl TOUTO válkou (ovlivněn)" — demonstrativum u přísudkového jména
+    značí adjunkt (parser-quirk), ne identitu → žádné být(osoba, válka)."""
+    sent = [
+        {"form": "byl", "lemma": "být", "upos": "AUX", "head": 3,
+         "deprel": "cop", "start": 0, "end": 3, "feats": {"Gender": "Masc"}},
+        {"form": "touto", "lemma": "tento", "upos": "DET", "head": 3,
+         "deprel": "det", "start": 4, "end": 9, "feats": {"PronType": "Dem"}},
+        {"form": "válkou", "lemma": "válka", "upos": "NOUN", "head": 0,
+         "deprel": "root", "start": 10, "end": 16},
+    ]
+    facts = extract_facts(_ann(sent, []),
+                          default_subject=("Karel Čapek", "person"))
+    assert not any(f.predicate == "být" for f in facts)

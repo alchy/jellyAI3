@@ -253,3 +253,20 @@ def test_nominal_apposition_creates_identity_fact():
     byt = next(f for f in facts if f.predicate == "být")
     roles = [(p.role, p.node) for p in byt.participants]
     assert ("subj", "R.U.R.") in roles and ("pred", "hra") in roles
+
+
+def test_metalanguage_noun_is_not_identity_kind():
+    """„rodným jménem Karel Antonín Čapek" — „jméno" je metajazyk (tabulka
+    v lang), ne druh → žádné být(Karel Antonín Čapek, jméno)."""
+    sent = [
+        {"form": "rodným", "lemma": "rodný", "upos": "ADJ", "head": 2,
+         "deprel": "amod", "start": 0, "end": 6},
+        {"form": "jménem", "lemma": "jméno", "upos": "NOUN", "head": 4,
+         "deprel": "obl", "start": 7, "end": 13},
+        {"form": "Karel", "lemma": "Karel", "upos": "PROPN", "head": 2,
+         "deprel": "nmod", "start": 14, "end": 19},
+        {"form": "psal", "lemma": "psát", "upos": "VERB", "head": 0,
+         "deprel": "root", "start": 20, "end": 24},
+    ]
+    facts = extract_facts({"entities": [], "sentences": [sent]})
+    assert not any(f.predicate == "být" for f in facts)

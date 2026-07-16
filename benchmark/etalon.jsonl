@@ -1,6 +1,6 @@
 {"q": "Kdo napsal Babičku?", "expect": ["Božena Němcová"], "cat": "autor"}
 {"q": "Kdo napsal Vějíř?", "expect": ["Seifert"], "cat": "autor"}
-{"q": "Kdo je Karel Čapek?", "expect": ["spisovatel"], "cat": "identita"}
+{"q": "Kdo je Karel Čapek?", "expect": ["spisovatel"], "reject": ["jaký", "válka", "jméno", "obava"], "cat": "identita"}
 {"q": "Kdo je Josef Čapek?", "expect": ["malíř"], "cat": "identita"}
 {"q": "Kdo byl robot?", "expect": ["stroj"], "cat": "identita"}
 {"q": "Kde se narodil Josef Čapek?", "expect": ["Hronov"], "cat": "místo"}

@@ -102,6 +102,21 @@ def _children(sent, head_id):
     return [t for t in sent if t.get("head") == head_id]
 
 
+def _default_if_agrees(default_subject, tok):
+    """Pro-drop dosazení jen při shodě rodu slovesného tvaru se jménem osoby.
+
+    „**Byla** válka" (Fem) při nejteplejším Čapkovi (Masc) je existenciál,
+    ne elize — dosazení by vyrobilo šum být(Čapek, válka). Tvary bez rodu
+    (prézens „je") dosazení nechávají.
+    """
+    if default_subject is None:
+        return None
+    gender = tok.get("feats", {}).get("Gender")
+    if gender is not None and gender != name_gender(default_subject[0]):
+        return None
+    return default_subject
+
+
 def _conj_group(tok, sent):
     """Souřadná skupina tokenu: [tok] + jeho `conj` děti (UD věší všechny
     konjunkty na první člen). Pro distribuci faktu přes koordinaci."""
@@ -238,6 +253,14 @@ def _copular_facts(sent, head_id, subj_tok, subj, entities, canon):  # pylint: d
                 Participant("subj", other[0], other[1]),
                 Participant("obj", subj[0], subj[1]),
             ]))
+    if rel_head.get("feats", {}).get("PronType") in ("Int", "Rel"):
+        return facts                       # tázací/vztažný kořen („jaký") ≠ identita
+    rel_id = sent.index(rel_head) + 1
+    if any(c.get("head") == rel_id and c.get("upos") == "DET"
+           and c.get("feats", {}).get("PronType") == "Dem" for c in sent):
+        # „byl TOUTO válkou (ovlivněn)" — demonstrativum u přísudkového jména
+        # = adjunkt s přivěšenou sponou (parser-quirk), ne identita
+        return facts
     pred = _node_for(rel_head, entities, canon)
     if pred and subj:
         role = "attr" if rel_head.get("upos") == "ADJ" else "pred"
@@ -297,6 +320,7 @@ def _apposition_identities(sent, entities, canon):
         kind = _node_for(sent[head_id - 1], entities, canon)
         instance = _surface_node(tok, entities, canon)
         if instance and kind and kind[1] == "concept" \
+                and kind[0] not in current()["metalanguage_nouns"] \
                 and instance[0] != kind[0]:
             facts.append(make_fact("být", [
                 Participant("subj", instance[0], instance[1]),
@@ -403,10 +427,13 @@ def extract_facts(annotation, default_subject=None, canon=None, context=None):
             # (podstatné jméno → role „pred": „je spisovatelka") od **vlastnosti/
             # stavu** (přídavné jméno → role „attr": „je nemocná") — „Kdo je"
             # čerpá z identity, „Jaký je" z vlastnosti, takže se nepletou.
-            if _first(children, {"cop"}):
+            cop_tok = _first(children, {"cop"})
+            if cop_tok is not None:
                 # overtní zájmenný podmět NENÍ pro-drop elize: buď se rozváže
-                # anaforou (on/ona), nebo („Je TO lepra") osobu nedědí vůbec
-                subj = subj_node or (None if pronoun_subj else default_subject)
+                # anaforou (on/ona), nebo („Je TO lepra") osobu nedědí vůbec;
+                # pro-drop navíc vyžaduje rodovou shodu spony („Byla válka")
+                subj = subj_node or (None if pronoun_subj else
+                                     _default_if_agrees(default_subject, cop_tok))
                 facts.extend(_copular_facts(sent, head_id, subj_tok, subj,
                                             entities, canon))
                 continue
@@ -421,8 +448,10 @@ def extract_facts(annotation, default_subject=None, canon=None, context=None):
                            key=lambda p: (p.role, p.node))
             if not obj_groups and not attrs:
                 continue
-            # nerozvázaný overtní zájmenný podmět („To vedlo…") osobu nedědí
-            subj = subj_node or (None if pronoun_subj else default_subject)
+            # nerozvázaný overtní zájmenný podmět („To vedlo…") osobu nedědí;
+            # pro-drop jen při rodové shodě slovesa („Narodila" ≠ Čapek)
+            subj = subj_node or (None if pronoun_subj else
+                                 _default_if_agrees(default_subject, head))
             if subj is None:
                 continue
             subj_nodes = _subject_group(
