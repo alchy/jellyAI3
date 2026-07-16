@@ -133,3 +133,37 @@ def test_generic_event_question_returns_event_of_topic():
     a = GraphAnswerer(g, client, ExtractiveAnswerer(AnswererConfig()))
     text = a.answer(q, []).text
     assert "ocitnout" in text and "Domažlicích" in text
+
+
+def test_elided_question_subject_inherits_conversation_person():
+    """„Co napsal KČ?" → …; „Jakou hru napsal?" — elidovaný podmět OTÁZKY
+    se doplní rodově shodnou osobou z těžiště (query-side pro-drop; dialog
+    z logu odpovídal osobou místo hry)."""
+    g = FactGraph()
+    g.add_fact(make_fact("napsat", [Participant("subj", "Karel Čapek", "person"),
+                                    Participant("obj", "hra", "concept")]))
+    g.add_fact(make_fact("napsat", [Participant("subj", "Karel Čapek", "person"),
+                                    Participant("obj", "R.U.R.", "dílo")]))
+    g.add_fact(make_fact("být", [Participant("subj", "R.U.R.", "dílo"),
+                                 Participant("pred", "hra", "concept")]))
+    q1 = "Co napsal Karel Čapek?"
+    q2 = "Jakou hru napsal?"
+    client = FakeUfalClient(parse={
+        q1: [[
+            {"form": "Co", "lemma": "co", "upos": "PRON", "head": 2, "deprel": "obj"},
+            {"form": "napsal", "lemma": "napsat", "upos": "VERB", "head": 0, "deprel": "root"},
+            {"form": "Karel", "lemma": "Karel", "upos": "PROPN", "head": 2, "deprel": "nsubj"},
+            {"form": "Čapek", "lemma": "Čapek", "upos": "PROPN", "head": 3, "deprel": "flat"},
+        ]],
+        q2: [[
+            {"form": "Jakou", "lemma": "jaký", "upos": "DET", "head": 2, "deprel": "amod",
+             "feats": {"PronType": "Int"}},
+            {"form": "hru", "lemma": "hra", "upos": "NOUN", "head": 3, "deprel": "obj"},
+            {"form": "napsal", "lemma": "napsat", "upos": "VERB", "head": 0, "deprel": "root",
+             "feats": {"Gender": "Masc"}},
+        ]],
+    })
+    a = GraphAnswerer(g, client, ExtractiveAnswerer(AnswererConfig()))
+    a.answer(q1, [])                       # rozsvítí Karla i hru
+    text = a.answer(q2, []).text
+    assert text == "R.U.R."

@@ -132,6 +132,14 @@ class GraphAnswerer(Answerer):
                 if node is None:
                     return None, [], None    # pojmenované, ale neznámé → nehádat
                 known_set.add(node)
+            filled = self._fill_subject(pat, qa)
+            if filled is not None:
+                # QUERY-SIDE PRO-DROP: elidovaný podmět otázky („Jakou hru
+                # napsal?") zdědí rodově shodnou osobu z těžiště — týž princip
+                # jako pro-drop v extrakci; při neúspěchu se zkusí bez něj
+                topic, values, fact = self._answer_from(pat, known_set | {filled})
+                if values:
+                    return topic, values, fact
             if pat.predicate in current()["generic_event_verbs"] \
                     and "rok" not in parse_date(question):
                 # „Co se stalo s X?" — lehké sloveso: odpověď je DĚJ tématu.
@@ -248,14 +256,36 @@ class GraphAnswerer(Answerer):
         if not scored:
             return [], None
         # remíza se určuje ZÁKLADNÍM skóre (váha+role/typ) — aktivace remízu
-        # jen řadí, nerozbíjí (výčet je stabilní napříč konverzací)
+        # jen řadí, nerozbíjí (výčet subj/obj je stabilní napříč konverzací);
+        # u UPŘESŇUJÍCÍ díry (attr/pred — „Jakou hru?") ale svítící část
+        # remízy vypíná nezasvícené členy: konverzace už zaostřila
         scored.sort(key=lambda t: (-t[0], -t[1]))
         top = scored[0][0]
-        values = list(dict.fromkeys(
-            v for b, _, v, _ in scored if b == top))[:_MAX_ENUM]
+        ties = [(act, v) for b, act, v, _ in scored if b == top]
+        if hole_role in ("attr", "pred") and any(act > 0 for act, _ in ties):
+            ties = [(act, v) for act, v in ties if act > 0]
+        values = list(dict.fromkeys(v for _, v in ties))[:_MAX_ENUM]
         # zapamatuj všechny účastníky použitého faktu → rozsvítí se celá cesta
         self.visited.extend(p.node for p in scored[0][3].participants)
         return values, scored[0][3]
+
+    def _fill_subject(self, pat, qa):
+        """Kandidát na elidovaný podmět otázky: nejteplejší rodově shodná OSOBA
+        konverzačního těžiště. Jen když otázka podmět nemá, neptá se na něj
+        (díra ≠ subj) a predikát není spona (identita má vlastní sémantiku).
+
+        Returns:
+            str | None: Id osoby, nebo None.
+        """
+        if pat.hole_role == "subj" or pat.predicate == "být" \
+                or any(role == "subj" for role, _ in pat.known):
+            return None
+        for candidate in self._context_candidates():
+            node = self.graph.nodes.get(candidate)
+            if node is not None and node.type == "person" \
+                    and self._gender_ok(qa, candidate):
+                return candidate
+        return None
 
     def _event_answer(self, known_set):
         """Nejsilnější UDÁLOST tématu (váha + aktivace účastníků) jako děj —
@@ -456,6 +486,8 @@ class GraphAnswerer(Answerer):
             focus = focus or values[0]
             for node in self.visited:        # rozsvítí celou (rekurzivní) cestu, ne jen konce
                 self.context.warm(node, 0.7)
+            for value in values[1:]:         # výčet svítí celý (stabilita opakování)
+                self.context.warm(value, 0.7)
             self._remember(qa, topic, focus)
             self._log_turn(question, topic, fact.predicate, text)
             return Answer(text=text, sources=["graf"], score=1.0,

@@ -21,6 +21,7 @@
 {"q": "Publikoval Karel v tomto časopisu?", "expect": ["nenašel"], "reject": ["Josef"], "cat": "ano-ne"}
 {"q": "Co se stalo v listopadu 1848?", "expect": ["svazek"], "reject": ["rodina"], "cat": "reverzní"}
 {"dialog": ["Co se stalo v červenci 1848?", "Co se stalo s rodinou?"], "expect": ["ocitnout", "Domažlic"], "cat": "návaznost"}
+{"dialog": ["Co napsal Karel Čapek?", "Jakou hru napsal?"], "expect": ["R.U.R."], "reject": ["Čapek"], "cat": "návaznost"}
 {"q": "Kdo je Božena Němcová?", "expect": ["spisovatelka", "spisovatel"], "cat": "identita", "gap": "copula-profese (#5): vrací 'úřad'"}
 {"q": "Kdo napsal R.U.R.?", "expect": ["Čapek"], "cat": "autor", "gap": "tokenizace tečkované zkratky (#3)"}
 {"q": "Kdo napsal Válku s mloky?", "expect": ["Čapek"], "cat": "autor", "gap": "titul nezachycen"}
