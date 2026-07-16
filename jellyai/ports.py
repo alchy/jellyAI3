@@ -39,3 +39,19 @@ class CorpusPort(Protocol):
     def entities(self, text: str) -> list: ...
     def analyze(self, text: str) -> list: ...
     def generate(self, lemma: str, tag: str) -> list: ...
+
+
+@runtime_checkable
+class GraphView(Protocol):
+    """Vizualizace grafu — build/modify v kódu + prompt pro interakci.
+
+    Abstrakce nad grafovým UI (výchozí adaptér: viewBase). Jádro ji zná, ale žádný
+    konkrétní backend neimportuje — viewBase se importuje až v adaptéru.
+    """
+    def add_node(self, node_id, **meta): ...
+    def add_edge(self, src, dst, **meta): ...
+    def update_node(self, node_id, **attrs): ...   # barva/velikost/label živě
+    def flow(self, path): ...                       # animace po hranách (trasa)
+    def on_prompt(self, callback): ...              # prompt(text) → callback
+    def serve(self, open_browser=True): ...         # nastartuje webserver
+    def stop(self): ...                             # složí webserver
