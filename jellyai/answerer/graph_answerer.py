@@ -58,6 +58,7 @@ class GraphAnswerer(Answerer):
         self.fallback = fallback
         self.context_decay = context_decay
         self.last_trace = None   # trasa poslední odpovědi (téma → fakt → hodnota)
+        self._prev_trace = None  # trasa PŘEDCHOZÍHO tahu (drill „Kdy?")
         self.visited = []        # uzly protnuté (rekurzivním) matchem → rozsvícení
         self.context = ActivationField(decay=context_decay)   # těžiště (id uzlu → jas)
         self.history = []        # trajektorie konverzace (tahy s trasou a těžištěm)
@@ -118,7 +119,7 @@ class GraphAnswerer(Answerer):
             return True
         return name_gender(node_id) == qa.gender
 
-    def _pattern_answer(self, question, qa):  # pylint: disable=too-many-return-statements
+    def _pattern_answer(self, question, qa):  # pylint: disable=too-many-return-statements,too-many-branches
         """Univerzální match: otázka → neúplný fakt → najdi shodný v grafu → díra.
 
         Nahrazuje ruční qtype/relační pravidla i attention: predikát + známé role
@@ -162,6 +163,17 @@ class GraphAnswerer(Answerer):
                 # zjišťovací otázka („Napsal X Y?") — existence, ne díra
                 return self._existence(pat.predicate, known_set)
             return self._answer_from(pat, known_set)
+        if pat.predicate is None and pat.hole_role and self._prev_trace:
+            # holé tázací navázání („Kdy?", „Kde?") = drill do POSLEDNÍHO
+            # faktu — jeho účastník v roli/typu díry
+            fact = self.graph.facts.get(self._prev_trace["fact"])
+            if fact is not None:
+                values = [p.node for p in fact.participants
+                          if p.role == pat.hole_role or p.type == pat.hole_type
+                          or (pat.hole_type == "time" and p.role in ("time", "num"))]
+                if values:
+                    self.visited.extend(p.node for p in fact.participants)
+                    return self._prev_trace["topic"], values[:_MAX_ENUM], fact
         if pat.predicate is None or qa.topic_terms:
             # bez predikátu nelze; pojmenoval-li něco, co pattern nezachytil (RUR),
             # NEhádat z kontextu — kontext je jen pro skutečně navazující dotaz
@@ -483,6 +495,7 @@ class GraphAnswerer(Answerer):
         Returns:
             Answer: Odpověď z grafu (zdroj „graf"), nebo výsledek fallbacku.
         """
+        self._prev_trace = self.last_trace or self._prev_trace
         self.last_trace = None
         qa = analyze_question(question, self.client)
         # UNIVERZÁLNÍ princip: otázka→neúplný fakt→match→díra (nahrazuje qtype pravidla

@@ -12,6 +12,7 @@ je jen mapování tázacích lemmat a deprelů — tenká vrstva, ne rozlitá lo
 from dataclasses import dataclass, field
 
 from jellyai.answerer.selection import _clean_lemma
+from jellyai.lang import current
 
 # tázací lemma → (pevná role díry | None = vezmi z deprelu, preferovaný typ | None)
 _HOLE = {
@@ -161,6 +162,13 @@ def _parse_sent(sent):
         if low in _HOLE:
             fixed, hole_type = _HOLE[low]
             hole_role = fixed or _DEPREL_ROLE.get(tok.get("deprel"))
+            break
+        if tok.get("feats", {}).get("PronType") == "Int" \
+                or low in current()["interrogative_adverbs"]:
+            # nepodporované tázací slovo („proč", „jak") — otázka NENÍ
+            # zjišťovací (jinak by „Proč přišel?" odpovědělo „Ano"); tagger
+            # PronType u příslovcí often nedává → jazyková tabulka
+            hole_role, hole_type = "theme", None
             break
 
     known = []

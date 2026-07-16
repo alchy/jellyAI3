@@ -48,3 +48,32 @@ def test_annotate_documents_keys_per_sentence_and_shifts_offsets():
     # věta 1 posunutá o base = len("Anna spí.") + 1 = 10 → disjunktní od věty 0
     assert ann[("d", 1)]["sentences"][0][0]["start"] == 10
     assert ann[("d", 1)]["sentences"][0][0]["form"] == "Bere"
+
+
+def test_person_entity_splits_on_case_mismatch():
+    """NER na volném slovosledu lepí („Ježíš Duchem" Nom+Ins) — entita osoby
+    se usekne v místě pádové neshody tokenů."""
+    from jellyai.annotate import _trim_case_mismatch
+    entities = [{"text": "Ježíš Duchem", "type": "P", "start": 0, "end": 12}]
+    sent = [
+        {"form": "Ježíš", "upos": "PROPN", "start": 0, "end": 5,
+         "feats": {"Case": "Nom"}},
+        {"form": "Duchem", "upos": "NOUN", "start": 6, "end": 12,
+         "feats": {"Case": "Ins"}},
+    ]
+    out = _trim_case_mismatch(entities, [sent])
+    assert out[0]["text"] == "Ježíš" and out[0]["end"] == 5
+
+
+def test_case_consistent_entity_untouched():
+    """„Karla Čapka" (Gen+Gen) zůstává celé."""
+    from jellyai.annotate import _trim_case_mismatch
+    entities = [{"text": "Karla Čapka", "type": "P", "start": 0, "end": 11}]
+    sent = [
+        {"form": "Karla", "upos": "PROPN", "start": 0, "end": 5,
+         "feats": {"Case": "Gen"}},
+        {"form": "Čapka", "upos": "PROPN", "start": 6, "end": 11,
+         "feats": {"Case": "Gen"}},
+    ]
+    out = _trim_case_mismatch(entities, [sent])
+    assert out[0]["text"] == "Karla Čapka"

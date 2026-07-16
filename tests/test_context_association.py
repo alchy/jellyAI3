@@ -184,3 +184,26 @@ def test_predicate_synonyms_from_language_data():
     ]]})
     a = GraphAnswerer(g, client, ExtractiveAnswerer(AnswererConfig()))
     assert a.answer(q, []).text == "Praze"   # nominativizaci dělá živá morfologie
+
+
+def test_bare_interrogative_drills_last_fact():
+    """Holé „Kdy?" po odpovědi = drill do POSLEDNÍHO faktu (jeho časový
+    účastník) — kontext držíme, tak ho použijme."""
+    g = FactGraph()
+    g.add_fact(make_fact("narodit", [Participant("subj", "Karel Čapek", "person"),
+                                     Participant("loc", "Praze", "geo"),
+                                     Participant("time", "1890", "time")]))
+    q1, q2 = "Kde se narodil Karel Čapek?", "Kdy?"
+    client = FakeUfalClient(parse={
+        q1: [[
+            {"form": "Kde", "lemma": "kde", "upos": "ADV", "head": 3, "deprel": "advmod"},
+            {"form": "se", "lemma": "se", "upos": "PRON", "head": 3, "deprel": "expl"},
+            {"form": "narodil", "lemma": "narodit", "upos": "VERB", "head": 0, "deprel": "root"},
+            {"form": "Karel", "lemma": "Karel", "upos": "PROPN", "head": 3, "deprel": "nsubj"},
+            {"form": "Čapek", "lemma": "Čapek", "upos": "PROPN", "head": 4, "deprel": "flat"},
+        ]],
+        q2: [[{"form": "Kdy", "lemma": "kdy", "upos": "ADV", "head": 0, "deprel": "root"}]],
+    })
+    a = GraphAnswerer(g, client, ExtractiveAnswerer(AnswererConfig()))
+    assert a.answer(q1, []).text == "Praze"
+    assert a.answer(q2, []).text == "1890"

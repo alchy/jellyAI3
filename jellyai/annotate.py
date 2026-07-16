@@ -34,6 +34,49 @@ def _shift(item, base):
     return out
 
 
+def _trim_case_mismatch(entities, sentences):
+    """Usekne osobní entitu v místě PÁDOVÉ NESHODY jejích tokenů.
+
+    NER na volném slovosledu lepí jméno s okolím („Ježíš Duchem" Nom+Ins,
+    „Kain Hospodinu" Nom+Dat) — vzniklý paskvil pak tříští identitu osoby.
+    Tvar rozhoduje: entita drží jen pádově konzistentní prefix.
+
+    Args:
+        entities (list[dict]): Entity věty (start/end/text/type).
+        sentences (list[list[dict]]): Věty s tokeny (feats.Case, start/end).
+
+    Returns:
+        list[dict]: Entity s useknutými paskvily (kopie měněných).
+    """
+    tokens = [t for sent in sentences for t in sent]
+    out = []
+    for entity in entities:
+        if entity.get("type", "")[:1].lower() != "p" \
+                or entity.get("start") is None:
+            out.append(entity)
+            continue
+        covered = [t for t in tokens
+                   if t.get("start") is not None
+                   and entity["start"] <= t["start"] and t["end"] <= entity["end"]
+                   and t.get("feats", {}).get("Case")]
+        first_case, end = None, None
+        for tok in covered:
+            case = tok["feats"]["Case"]
+            if first_case is None:
+                first_case = case
+            if case != first_case:
+                break
+            end = tok["end"]
+        if end is not None and end < entity["end"]:
+            trimmed = dict(entity)
+            trimmed["end"] = end
+            trimmed["text"] = entity["text"][:end - entity["start"]].strip()
+            out.append(trimmed)
+        else:
+            out.append(entity)
+    return out
+
+
 def annotate_documents(documents, client):
     """Obohatí dokumenty o entity a rozbor **po větách** (klíč = index věty).
 
@@ -56,6 +99,7 @@ def annotate_documents(documents, client):
             parsed = client.parse(sent)
             sentences = [[_shift(tok, base) for tok in s] for s in parsed]
             entities = [_shift(e, base) for e in client.entities(sent)]
+            entities = _trim_case_mismatch(entities, sentences)
             annotations[(doc.doc_id, i)] = {"entities": entities, "sentences": sentences}
             base += len(sent) + 1
     return annotations

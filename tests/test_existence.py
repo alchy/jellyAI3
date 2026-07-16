@@ -45,3 +45,22 @@ def test_unknown_when_fact_missing_no_context_guess():
     a = GraphAnswerer(_graph(), client, ExtractiveAnswerer(AnswererConfig()))
     text = a.answer(q, []).text
     assert "Josef" not in text and "Ano" not in text
+
+
+def test_unknown_interrogative_is_not_yes_no():
+    """„PROČ přišel Ježíš?" nesmí odpovědět „Ano" — nepodporované tázací
+    slovo (PronType=Int mimo slovník děr) není zjišťovací otázka."""
+    g = FactGraph()
+    g.add_fact(make_fact("přijít", [Participant("subj", "Ježíš", "person"),
+                                    Participant("loc", "Galileje", "geo")]))
+    q = "Proč přišel Ježíš?"
+    client = FakeUfalClient(parse={q: [[
+        {"form": "Proč", "lemma": "proč", "upos": "ADV", "head": 2,
+         "deprel": "advmod", "feats": {"PronType": "Int"}},
+        {"form": "přišel", "lemma": "přijít", "upos": "VERB", "head": 0,
+         "deprel": "root"},
+        {"form": "Ježíš", "lemma": "Ježíš", "upos": "PROPN", "head": 2,
+         "deprel": "nsubj"},
+    ]]})
+    a = GraphAnswerer(g, client, ExtractiveAnswerer(AnswererConfig()))
+    assert a.answer(q, []).text != "Ano"

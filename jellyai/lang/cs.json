@@ -10,6 +10,8 @@
   "metalanguage_nouns": ["jméno", "slovo", "název", "pojmenování", "zkratka",
                          "výraz", "označení"],
   "generic_event_verbs": ["stát", "dít", "udát", "přihodit"],
+  "interrogative_adverbs": ["proč", "jak", "kudy", "odkud", "nač", "zač",
+                            "kolikrát", "dokdy", "odkdy"],
   "predicate_synonyms": [["bydlet", "žít", "sídlit"],
                          ["napsat", "sepsat"],
                          ["zemřít", "skonat", "zahynout"]],
