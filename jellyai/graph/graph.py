@@ -10,7 +10,8 @@ import pickle
 import re
 from dataclasses import dataclass
 
-from jellyai.graph.extract import extract_facts, make_fact, Participant, _SUBJ
+from jellyai.graph.extract import (extract_facts, make_fact, Participant,
+                                   _SUBJ, _entity_type)
 from jellyai.graph.activation import ActivationField
 from jellyai.graph.canon import cluster_key
 
@@ -229,6 +230,42 @@ def _warm_persons(field, annotation, canon):
         field.warm((canon.get(e["text"], e["text"]), "person"), 2.0 if is_subject else 1.0)
 
 
+def _associate_context(graph, annotation, subject, canon):
+    """Role ③ aktivačního pole: KONTEXTOVÁ ASOCIACE entit věty se subjektem.
+
+    Dokumentová struktura (bibliografický řádek, výčet) často nemá sloveso,
+    ale vazbu nese: entita zmíněná, „když svítí" určitá osoba, k ní patří.
+    Každá kontejnerová entita věty se přiváže slabým faktem `kontext` na
+    aktuální subjekt dokumentu; opakovaná blízkost váhu akumuluje a resolver
+    pádové tvary subjektu sloučí, takže asociace konverguje na jednu osobu.
+    Predikát `kontext` je primitiv modelu — dotaz ho čte jako druhé patro,
+    když přesný predikát fakt nemá (predikát je preference, ne filtr).
+
+    Args:
+        graph (FactGraph): Graf (mění se in-place).
+        annotation (dict): Anotace věty (entities).
+        subject (tuple | None): (id, typ) aktuálního subjektu dokumentu.
+        canon (dict): Kanonizace osobních jmen dokumentu.
+    """
+    if subject is None:
+        return
+    entities = annotation.get("entities", [])
+    for e in entities:
+        typ = _entity_type(e)
+        if typ in ("time", "number"):
+            continue                     # data/čísla patří slovesným faktům
+        es, ee = e.get("start"), e.get("end")
+        if any(o is not e and o.get("start") is not None and es is not None
+               and o["start"] <= es and ee <= o["end"] for o in entities):
+            continue                     # fragment uvnitř delší entity
+        text = canon.get(e["text"], e["text"]) if typ == "person" else e["text"]
+        if text == subject[0]:
+            continue
+        graph.add_fact(make_fact("kontext", [
+            Participant("subj", subject[0], subject[1]),
+            Participant("obj", text, typ)]))
+
+
 def build_graph(annotations):
     """Postaví faktový graf ze všech větných anotací (s aktivační koreferencí).
 
@@ -256,6 +293,7 @@ def build_graph(annotations):
             subject = field.hottest()          # (id, typ) nejteplejší osoby, nebo None
             for fact in extract_facts(annotation, default_subject=subject, canon=canon):
                 graph.add_fact(fact)
+            _associate_context(graph, annotation, subject, canon)
             _warm_persons(field, annotation, canon)
             field.step()
     _decompose_dates(graph)

@@ -129,33 +129,40 @@ class GraphAnswerer(Answerer):
             for _, known in pat.known:
                 node = self._solve(known)    # rekurzivně (i vnořené pod-dotazy)
                 if node is None:
-                    return None, None, None  # pojmenované, ale neznámé → nehádat
+                    return None, [], None    # pojmenované, ale neznámé → nehádat
                 known_set.add(node)
             return self._answer_from(pat, known_set)
         if pat.predicate is None or qa.topic_terms:
             # bez predikátu nelze; pojmenoval-li něco, co pattern nezachytil (RUR),
             # NEhádat z kontextu — kontext je jen pro skutečně navazující dotaz
-            return None, None, None
+            return None, [], None
         for candidate in self._context_candidates():   # navazující dotaz → z těžiště
             if not self._gender_ok(qa, candidate):
                 continue                     # „narodil?" ≠ ženská entita (a naopak)
-            topic, value, fact = self._answer_from(pat, {candidate})
-            if value is not None:
-                return topic, value, fact
-        return None, None, None
+            topic, values, fact = self._answer_from(pat, {candidate})
+            if values:
+                return topic, values, fact
+        return None, [], None
 
     def _answer_from(self, pat, known_set):
-        """Z množiny známých uzlů dořeší díru patternu (vč. 2-skokového drillu)."""
+        """Z množiny známých uzlů dořeší díru patternu (vč. 2-skokového drillu).
+
+        Returns:
+            tuple: (téma | None, list hodnot, fakt | None).
+        """
         node0 = next(iter(known_set))
         if pat.date_part:
             # 2-SKOK (rekurze): událost → datum (uzel) → jeho pod-fakt rok/měsíc/den
-            date_node, _ = self._match(pat.predicate, known_set, "time", "time")
-            if date_node is None:
-                return None, None, None
-            value, fact = self._match(pat.date_part, {date_node}, "val", "number")
-            return (date_node, value, fact) if value is not None else (None, None, None)
-        value, fact = self._match(pat.predicate, known_set, pat.hole_role, pat.hole_type)
-        return (node0, value, fact) if value is not None else (None, None, None)
+            date_nodes, _ = self._match(pat.predicate, known_set, "time", "time")
+            if not date_nodes:
+                return None, [], None
+            values, fact = self._match(pat.date_part, {date_nodes[0]}, "val", "number")
+            return (date_nodes[0], values, fact) if values else (None, [], None)
+        values, fact = self._match(pat.predicate, known_set, pat.hole_role, pat.hole_type)
+        if not values:
+            # predikát je preference, ne filtr: druhé patro = kontextová asociace
+            values, fact = self._match("kontext", known_set, pat.hole_role, pat.hole_type)
+        return (node0, values, fact) if values else (None, [], None)
 
     def _solve(self, known):
         """Rekurzivně vyřeší `known` na uzel: list = přímá entita; `SubQuery` =
@@ -176,21 +183,27 @@ class GraphAnswerer(Answerer):
             if node is None:
                 return None
             sub.add(node)
-        value, _ = self._match(known.predicate, sub, known.hole_role, None)
-        return value
+        values, _ = self._match(known.predicate, sub, known.hole_role, None)
+        if not values:
+            # i vnořený skok smí spadnout do kontextové asociace (rekurze
+            # „autor, který napsal X" bez explicitního napsat-faktu)
+            values, _ = self._match("kontext", sub, known.hole_role, None)
+        return values[0] if values else None
 
     def _match(self, predicate, known_set, hole_role, hole_type):
-        """Jeden skok matche: najdi fakt s `predicate` obsahující všechny `known_set`
-        a vrať nejlepší **díru** (jiný účastník) — role/typ díry je preference (ne
-        filtr), ranking dělá váha faktu + aktivace. Znovupoužitelné pro rekurzi.
+        """Jeden skok matche: najdi fakty s `predicate` obsahující všechny
+        `known_set` a vrať **všechny rovnocenné díry** (jiné účastníky s top
+        skóre) — role/typ díry je preference (ne filtr), ranking dělá váha
+        faktu + aktivace. Víc rovnocenných faktů = výčtová odpověď („Co napsal
+        X?"); jednohodnotová otázka vrátí jednoprvkový seznam. Pro rekurzi.
 
         Returns:
-            tuple: (hodnota | None, fakt | None).
+            tuple: (list[str] hodnoty s top skóre, fakt nejlepší | None).
         """
         if not known_set:
-            return None, None
+            return [], None
         node0 = next(iter(known_set))
-        best = None
+        scored = []
         for fact in self.graph.facts_of(node0, predicate=predicate):
             if not known_set <= {p.node for p in fact.participants}:
                 continue
@@ -204,13 +217,15 @@ class GraphAnswerer(Answerer):
                     score += 1000
                 if hole_type and part.type == hole_type:
                     score += 100
-                if best is None or score > best[0]:   # pylint: disable=unsubscriptable-object
-                    best = (score, part.node, fact)
-        if best is not None:
-            # zapamatuj všechny účastníky použitého faktu → rozsvítí se celá cesta
-            self.visited.extend(p.node for p in best[2].participants)
-            return best[1], best[2]
-        return None, None
+                scored.append((score, part.node, fact))
+        if not scored:
+            return [], None
+        scored.sort(key=lambda t: -t[0])     # stabilní → determinismus mezi shodami
+        top = scored[0][0]
+        values = list(dict.fromkeys(v for s, v, _ in scored if s == top))
+        # zapamatuj všechny účastníky použitého faktu → rozsvítí se celá cesta
+        self.visited.extend(p.node for p in scored[0][2].participants)
+        return values, scored[0][2]
 
     def _reverse_lookup(self, question):
         """Reverzní dotaz: z roku v otázce najde událost (datum → podmět faktu).
@@ -309,41 +324,51 @@ class GraphAnswerer(Answerer):
         qa = analyze_question(question, self.client)
         # UNIVERZÁLNÍ princip: otázka→neúplný fakt→match→díra (nahrazuje qtype pravidla
         # i attention — kontextově navazující dotaz řeší tatáž cesta)
-        topic, value, fact = self._pattern_answer(question, qa)
+        topic, values, fact = self._pattern_answer(question, qa)
         reverse = False
-        if value is None:
+        if not values:
             # poslední záchrana: „Co se stalo <datum>?" — datum → událost
-            topic, value, fact = self._reverse_lookup(question)
-            reverse = value is not None
-        if value is not None:
+            topic, single, fact = self._reverse_lookup(question)
+            values = [single] if single is not None else []
+            reverse = bool(values)
+        if values:
             if qa.qtype == "Kde":
-                value = _to_nominative(value, self.client) or value   # „Slezsku"→„Slezsko"
-            alternatives = []
-            if temperature:
-                # fuzzy: další kontext s menší vahou (krmivo pro kompozitor/NN)
-                if reverse:
-                    facts, roles = self.graph.facts_of(topic, role="time"), ["subj"]
-                else:
-                    facts, roles = self._candidate_facts_roles(qa, topic)
-                alternatives = [v for v in self._rank_values(facts, roles, temperature)
-                                if v != value]
-                # + širší kontext: okolí odpovědi v grafu (co ji spojuje)
-                for near in self._neighbor_context(value, {value, topic}):
-                    if near not in alternatives:
-                        alternatives.append(near)
+                values = [(_to_nominative(v, self.client) or v)
+                          for v in values]                    # „Slezsku"→„Slezsko"
+            # výčtová odpověď: víc rovnocenných děr se vyjmenuje („Co napsal X?")
+            text = ", ".join(values)
             self.last_trace = {"topic": topic, "predicate": fact.predicate,
-                               "fact": fact.id, "answer": value}
+                               "fact": fact.id, "answer": text}
             for node in self.visited:        # rozsvítí celou (rekurzivní) cestu, ne jen konce
                 self.context.warm(node, 0.7)
-            self._remember(qa, topic, value)
-            self._log_turn(question, topic, fact.predicate, value)
-            return Answer(text=value, sources=["graf"], score=1.0,
-                          alternatives=alternatives, trace=self.last_trace)
+            self._remember(qa, topic, values[0])
+            self._log_turn(question, topic, fact.predicate, text)
+            return Answer(text=text, sources=["graf"], score=1.0,
+                          alternatives=self._alternatives(qa, topic, values[0],
+                                                          reverse, temperature),
+                          trace=self.last_trace)
         # neúspěch NErozmělňuje kontext: attention nesmí vyhasnout jen proto, že
         # jsme odpověď nenašli (jinak by po pár marných dotazech spadla k nule).
         # Pohasíná se jen při úspěchu (v _remember spolu s rozsvícením nového tématu).
         self._log_turn(question, topic, None, None)
         return self.fallback.answer(question, retrieved)
+
+    def _alternatives(self, qa, topic, value, reverse, temperature):  # pylint: disable=too-many-arguments,too-many-positional-arguments
+        """Alternativy odpovědi pro teplotu > 0 — fuzzy kandidáti (další hodnoty
+        s menší vahou) + širší kontext (okolí odpovědi v grafu). Krmivo pro
+        kompozitor/NN; při teplotě 0 prázdné."""
+        if not temperature:
+            return []
+        if reverse:
+            facts, roles = self.graph.facts_of(topic, role="time"), ["subj"]
+        else:
+            facts, roles = self._candidate_facts_roles(qa, topic)
+        alternatives = [v for v in self._rank_values(facts, roles, temperature)
+                        if v != value]
+        for near in self._neighbor_context(value, {value, topic}):
+            if near not in alternatives:
+                alternatives.append(near)
+        return alternatives
 
     def _log_turn(self, question, topic, predicate, answer):
         """Zapíše tah do historie (trajektorie těžiště přes graf).

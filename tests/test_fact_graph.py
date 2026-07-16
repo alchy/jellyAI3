@@ -127,6 +127,30 @@ def test_build_graph_merges_case_variants_across_documents():
     assert bratr and g.participants(bratr[0], "subj") == ["Karel"]
 
 
+def test_context_association_binds_entities_to_hot_subject():
+    """Role ③ aktivačního pole: bezslovesná zmínka entity (bibliografický řádek)
+    se váže faktem „kontext" na aktuální subjekt dokumentu; fragmenty entit se
+    neasociují. Kontextové porozumění strukturou, ne SELECT vzorem."""
+    A = {
+        ("d", 0): {"entities": [{"text": "Karel Čapek", "type": "P", "start": 0, "end": 11}],
+                   "sentences": [[
+            {"form": "Karel", "lemma": "Karel", "upos": "PROPN", "head": 3, "deprel": "nsubj", "start": 0, "end": 5},
+            {"form": "Čapek", "lemma": "Čapek", "upos": "PROPN", "head": 1, "deprel": "flat", "start": 6, "end": 11},
+            {"form": "psal", "lemma": "psát", "upos": "VERB", "head": 0, "deprel": "root", "start": 12, "end": 16},
+            {"form": "knihy", "lemma": "kniha", "upos": "NOUN", "head": 3, "deprel": "obj", "start": 17, "end": 22},
+        ]]},
+        ("d", 1): {"entities": [{"text": "R.U.R.", "type": "P", "start": 0, "end": 6},
+                                {"text": "R.", "type": "pf", "start": 0, "end": 2}],
+                   "sentences": [[
+            {"form": "R.U.R.", "lemma": "R.U.R.", "upos": "PROPN", "head": 0, "deprel": "root", "start": 0, "end": 6},
+        ]]},
+    }
+    g = build_graph(A)
+    kontext = g.facts_of("R.U.R.", role="obj", predicate="kontext")
+    assert kontext and g.participants(kontext[0], "subj") == ["Karel Čapek"]
+    assert not g.facts_of("R.", predicate="kontext")     # fragment ne
+
+
 def _capek_birth_annotations():
     return {("d", 0): {"entities": [{"text": "Karel Čapek", "type": "P", "start": 0, "end": 11},
                                     {"text": "13. ledna 1890", "type": "T", "start": 24, "end": 37}],

@@ -10,6 +10,8 @@
 {"q": "Kdo byl bratr Josefa Čapka?", "expect": ["Karel"], "cat": "vztah"}
 {"q": "Kde se narodil bratr Karla Čapka?", "expect": ["Hronov"], "cat": "rekurze"}
 {"q": "Kde se narodil bratr Josefa Čapka?", "expect": ["Svatoňovic"], "cat": "rekurze"}
+{"q": "Kdo byl bratr autora, který napsal R.U.R.?", "expect": ["Josef"], "cat": "rekurze"}
+{"q": "Co napsal Karel Čapek?", "expect": ["válk"], "cat": "výčet"}
 {"q": "Jaký je robot?", "expect": ["umělý", "člověku", "stroj"], "cat": "vlastnost"}
 {"q": "Kdo je Božena Němcová?", "expect": ["spisovatelka", "spisovatel"], "cat": "identita", "gap": "copula-profese (#5): vrací 'úřad'"}
 {"q": "Kdo napsal R.U.R.?", "expect": ["Čapek"], "cat": "autor", "gap": "tokenizace tečkované zkratky (#3)"}
