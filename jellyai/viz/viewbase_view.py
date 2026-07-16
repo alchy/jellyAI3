@@ -7,6 +7,7 @@ Líný import (jádro zůstává viewBase-free). Vlastní **životní cyklus web
 """
 
 from jellyai.errors import JellyError
+from jellyai.viz.detail import node_detail_rows, fact_detail_rows
 
 # barvy typů uzlů (paleta jellyAI3) — viewBase vyžaduje define_type před add_node
 _TYPE_STYLE = {
@@ -33,7 +34,7 @@ class ViewBaseView:
             JellyError: Když viewBase není nainstalovaný (akční hláška).
         """
         try:
-            import viewbase as vb
+            import viewbase as vb  # pylint: disable=import-outside-toplevel
         except ImportError as exc:
             raise JellyError(
                 "viewBase není nainstalovaný — nainstaluj ho: pip install viewbase "
@@ -51,13 +52,17 @@ class ViewBaseView:
         Returns:
             ViewBaseView: self (pro řetězení).
         """
+        self._canvas.detail_window()               # klik na uzel → box se všemi meta
         for kind in {node.type for node in graph.nodes.values()} | {"fact"}:
             self._canvas.define_type(kind, **_TYPE_STYLE.get(kind, {"color": "#8a949f"}))
         for node in graph.nodes.values():
-            self.add_node(node.id, label=node.id, type=node.type)
+            # meta = co o uzlu držíme (typ, váha, fakty) → naplní detailní okno
+            self.add_node(node.id, label=node.id, type=node.type,
+                          **dict(node_detail_rows(graph, node.id)))
         for index, fact in enumerate(graph.facts.values()):
             fid = f"fact:{fact.predicate}:{index}"     # unikátní id (bez kolizí)
-            self.add_node(fid, label=fact.predicate, type="fact")
+            self.add_node(fid, label=fact.predicate, type="fact",
+                          **dict(fact_detail_rows(fact)))
             for participant in fact.participants:
                 self.add_edge(fid, participant.node, role=participant.role)
         return self
