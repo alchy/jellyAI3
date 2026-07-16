@@ -140,6 +140,13 @@ def _parse_sent(sent):
         root = next((t for t in sent if t.get("deprel") == "root"
                      and t.get("upos") in ("NOUN", "PROPN")
                      and _clean_lemma(t.get("lemma", "")).lower() not in _HOLE), None)
+        if root is None:
+            # parser dal kořen tázacímu slovu („Co je robot?") — jmenný člen je
+            # jinde ve větě; identita se přesto složí kanonicky (jinak by
+            # predicate=None matchoval cokoli a odpovídal šumem)
+            root = next((t for t in sent if t.get("upos") in ("NOUN", "PROPN")
+                         and _clean_lemma(t.get("lemma", "")).lower() not in _HOLE),
+                        None)
         if root is not None:
             gen = _genitive_child(root, sent)
             if gen is not None and gen.get("upos") in ("PROPN", "NOUN"):

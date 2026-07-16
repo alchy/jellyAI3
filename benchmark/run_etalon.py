@@ -2,9 +2,11 @@
 
 `.venv/bin/python benchmark/run_etalon.py`
 
-Sada `etalon.jsonl`: {q, expect:[přijatelné podřetězce], cat, gap?}. Skóre = úspěšnost
-na JÁDRU (bez „gap" dotazů). „gap" jsou známé neúspěchy (tracking); když gap začne
-procházet, je to POKROK (GAP-FIXED). Shoda je case-insensitive podřetězec.
+Sada `etalon.jsonl`: {q, expect:[přijatelné podřetězce], reject?:[zakázané
+podřetězce], cat, gap?}. Skóre = úspěšnost na JÁDRU (bez „gap" dotazů). „gap"
+jsou známé neúspěchy (tracking); když gap začne procházet, je to POKROK
+(GAP-FIXED). Shoda je case-insensitive podřetězec; `reject` hlídá, že odpověď
+NEobsahuje šum/hádání (negativní očekávání — poctivost > recall).
 """
 import json
 import os
@@ -15,9 +17,11 @@ from jellyai.tasks import make_graph_answerer
 ETALON = os.path.join(os.path.dirname(__file__), "etalon.jsonl")
 
 
-def _matches(answer, expect):
+def _matches(answer, expect, reject=()):
+    """True, když odpověď obsahuje některý očekávaný a žádný zakázaný podřetězec."""
     low = answer.lower()
-    return any(e.lower() in low for e in expect)
+    return (any(e.lower() in low for e in expect)
+            and not any(r.lower() in low for r in reject))
 
 
 def main():
@@ -28,7 +32,7 @@ def main():
     for item in items:
         answerer.reset()
         answer = answerer.answer(item["q"], []).text
-        ok = _matches(answer, item["expect"])
+        ok = _matches(answer, item["expect"], item.get("reject", ()))
         if "gap" in item:
             status = "GAP-FIXED ✅" if ok else "gap"
             gap_fixed += ok

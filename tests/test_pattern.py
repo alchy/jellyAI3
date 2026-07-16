@@ -23,6 +23,24 @@ def test_bare_genitive_triggers_subquery():
     assert pat.known and not isinstance(pat.known[0][1], SubQuery)   # přímý termín
 
 
+def test_interrogative_root_copula_canonicalizes_identity():
+    """„Co je robot?" — parser dává kořen tázacímu „Co"; pattern přesto složí
+    identitu být(robot → díra pred), místo predicate=None (wildcard býval
+    zdrojem odpovědi „Karel Antonín Čapek" přes nazvat)."""
+    q = "Co je robot?"
+    client = FakeUfalClient(parse={q: [[
+        {"form": "Co", "lemma": "co", "upos": "PRON", "head": 0, "deprel": "root",
+         "feats": {"PronType": "Int"}},
+        {"form": "je", "lemma": "být", "upos": "AUX", "head": 1, "deprel": "cop"},
+        {"form": "robot", "lemma": "robot", "upos": "NOUN", "head": 1,
+         "deprel": "nsubj"},
+    ]]})
+    pat = question_pattern(q, client)
+    assert pat.predicate == "být"
+    assert pat.known == [("subj", "robot")]
+    assert pat.hole_role == "pred"
+
+
 def test_prepositional_nmod_stays_inside_term():
     """„Kdo napsal Válku s mloky?" — „s mloky" je předložková fráze titulu,
     NE genitivní pod-dotaz válka(mlok)."""

@@ -151,9 +151,13 @@ class GraphAnswerer(Answerer):
                 return None, [], None
             values, fact = self._match(pat.date_part, {date_nodes[0]}, "val", "number")
             return (date_nodes[0], values, fact) if values else (None, [], None)
+        if pat.predicate is None:
+            return None, [], None            # bez predikátu se nehádá (žádný wildcard)
         values, fact = self._match(pat.predicate, known_set, pat.hole_role, pat.hole_type)
-        if not values:
-            # predikát je preference, ne filtr: druhé patro = kontextová asociace
+        if not values and pat.hole_role in ("subj", "obj"):
+            # kontextové patro jen pro ENTITNÍ díry (kdo napsal X…); identita/
+            # vlastnost (pred/attr) ani zjišťovací otázka (díra None) kontextem
+            # nehádají — poctivé „nenašel" je lepší než nejtěžší soused
             values, fact = self._match("kontext", known_set, pat.hole_role, pat.hole_type)
         return (node0, values, fact) if values else (None, [], None)
 
@@ -177,7 +181,7 @@ class GraphAnswerer(Answerer):
                 return None
             sub.add(node)
         values, _ = self._match(known.predicate, sub, known.hole_role, None)
-        if not values:
+        if not values and known.hole_role in ("subj", "obj"):
             # i vnořený skok smí spadnout do kontextové asociace (rekurze
             # „autor, který napsal X" bez explicitního napsat-faktu)
             values, _ = self._match("kontext", sub, known.hole_role, None)

@@ -34,6 +34,26 @@ def test_predicate_falls_back_to_context_association():
     assert a.answer(q, []).text == "Karel Čapek"     # váha 3 > 1
 
 
+def test_identity_hole_never_guesses_from_context():
+    """„Kdo je X?" (díra pred) kontextovou asociací NEhádá — bez být-faktu je
+    poctivá odpověď „nenašel", ne nejtěžší soused (dialog: Ludvík Němec)."""
+    g = FactGraph()
+    for _ in range(3):
+        g.add_fact(make_fact("kontext", [Participant("subj", "Karel Čapek", "person"),
+                                         Participant("obj", "Ludvík Němec", "person")]))
+    q = "Kdo je Ludvík Němec?"
+    client = FakeUfalClient(parse={q: [[
+        {"form": "Kdo", "lemma": "kdo", "upos": "PRON", "head": 3, "deprel": "nsubj"},
+        {"form": "je", "lemma": "být", "upos": "AUX", "head": 3, "deprel": "cop"},
+        {"form": "Ludvík", "lemma": "Ludvík", "upos": "PROPN", "head": 0,
+         "deprel": "root"},
+        {"form": "Němec", "lemma": "Němec", "upos": "PROPN", "head": 3,
+         "deprel": "flat"},
+    ]]})
+    a = GraphAnswerer(g, client, ExtractiveAnswerer(AnswererConfig()))
+    assert "Karel" not in a.answer(q, []).text
+
+
 def test_exact_predicate_beats_association():
     """Existuje-li přesný fakt, asociace se nepoužije (predikát = preference)."""
     g = FactGraph()
