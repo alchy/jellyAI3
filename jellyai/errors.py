@@ -9,12 +9,14 @@ class ModelsMissingError(JellyError):
     """Chybí ÚFAL modely."""
 
     def __init__(self, path):
-        super().__init__(f"Modely nenalezeny v „{path}" — stáhni je: ./jelly qa-models")
+        super().__init__(
+            f"Modely nenalezeny v {path!r} — stáhni je příkazem: ./jelly qa-models")
 
 
 class CorpusNotStartedError(JellyError):
     """Korpusové služby nejsou nastartované."""
 
     def __init__(self):
-        super().__init__("Korpus není nastartovaný — použij `with jellyai.CorpusTools() "
-                         "as t:` nebo zavolej `tools.start()`.")
+        super().__init__(
+            "Korpus není nastartovaný — použij `with jellyai.CorpusTools() as t:` "
+            "nebo zavolej `tools.start()`.")
