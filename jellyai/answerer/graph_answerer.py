@@ -8,12 +8,18 @@ i „kdy" čerpají z téhož narozovacího faktu. Když nic nesedí, deleguje n
 from jellyai.answerer.base import Answer, Answerer
 from jellyai.answerer.question import analyze_question
 from jellyai.answerer.template import _to_nominative
+from jellyai.graph.activation import ActivationField
 
 _DATE_PARTS = {"rok", "měsíc", "den"}   # drill: „v kterém roce/měsíci…"
 
 
 class GraphAnswerer(Answerer):
-    """Odpovídá z globálního faktového grafu; jinak fallback."""
+    """Odpovídá z globálního faktového grafu; jinak fallback.
+
+    Drží **konverzační těžiště** (`ActivationField` nad id uzlů): každý tah rozsvítí
+    téma a odpověď, každý tah pohasíná. Když navazující otázka nemá vlastní téma
+    („Kdy se narodila?"), vezme se nejteplejší uzel z rozhovoru — dialog tak plyne.
+    """
 
     def __init__(self, graph, client, fallback):
         """Vytvoří answerer.
@@ -27,6 +33,7 @@ class GraphAnswerer(Answerer):
         self.client = client
         self.fallback = fallback
         self.last_trace = None   # trasa poslední odpovědi (téma → fakt → hodnota)
+        self.context = ActivationField()   # konverzační těžiště (id uzlu → jas)
 
     def _resolve_topic(self, topic_terms):
         """Najde uzel tématu otázky — nejlepší shodu s obsahovými lemmaty.
@@ -122,7 +129,8 @@ class GraphAnswerer(Answerer):
         """
         self.last_trace = None
         qa = analyze_question(question, self.client)
-        topic = self._resolve_topic(qa.topic_terms)
+        # téma z otázky, jinak konverzační těžiště (navazující dotaz bez tématu)
+        topic = self._resolve_topic(qa.topic_terms) or self.context.hottest()
         if topic is not None:
             value, fact = self._traverse(qa, topic)
             if value is not None:
@@ -130,5 +138,26 @@ class GraphAnswerer(Answerer):
                     value = _to_nominative(value, self.client) or value   # „Slezsku"→„Slezsko"
                 self.last_trace = {"topic": topic, "predicate": fact.predicate,
                                    "fact": fact.id, "answer": value}
+                self._remember(qa, topic, value)
                 return Answer(text=value, sources=["graf"], score=1.0)
+        self.context.step()
         return self.fallback.answer(question, retrieved)
+
+    def _remember(self, qa, topic, value):
+        """Zapíše tah do konverzačního těžiště a pohasí ho.
+
+        Odpověď-entita (Kdo/Co) se rozsvítí nejsilněji — bývá tématem navazující
+        otázky („…kdo napsal X? Y. …kdy se narodila?"). U hodnotových odpovědí
+        (datum/místo) drží těžiště téma. Pak se vše pohasí (× decay).
+
+        Args:
+            qa (QuestionAnalysis): Rozbor otázky.
+            topic (str): Id uzlu tématu.
+            value (str): Vrácená odpověď (id uzlu).
+        """
+        if qa.qtype in ("Kdo", "Co"):
+            self.context.warm(value, 2.0)
+            self.context.warm(topic, 1.0)
+        else:
+            self.context.warm(topic, 2.0)
+        self.context.step()
