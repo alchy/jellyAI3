@@ -95,3 +95,53 @@ class SentenceRetriever:
                 self._bounds[doc.doc_id] = (start, len(self.sent_text))
         self._retriever = Retriever(self.config).build(passages)
         return self
+
+    def search(self, query, top_k=None):
+        """Najde ostřicí okna kolem vrcholů aktivace k dotazu.
+
+        Základní BM25 skóre vět (`score_all`) se rozlije vzdálenostním útlumem
+        (`distance_activation`). Vrcholy se berou hladově odshora; věty, které už
+        leží v dřívějším okně, se přeskočí (aby okna byla různá). Kolem každého
+        vrcholu se vyrobí okno ± `focus_radius` vět (ořezané na hranice dokumentu)
+        jako běžná `Passage` — rozhraní se tak neliší od V1.
+
+        Args:
+            query (str): Dotaz v češtině.
+            top_k (int | None): Kolik oken vrátit; None = z konfigurace.
+
+        Returns:
+            list[tuple[Passage, float]]: (ostřicí okno, skóre vrcholu) sestupně;
+                prázdný seznam pro prázdný index nebo nulové skóre.
+        """
+        if top_k is None:
+            top_k = self.config.top_k
+        n = len(self.sent_text)
+        if n == 0:
+            return []
+        base = self._retriever.score_all(query)
+        finals = distance_activation(base, self.sent_doc, self.sent_local,
+                                     self.config.decay_tau)
+        radius = self.config.focus_radius
+        results = []
+        covered = set()
+        for k in np.argsort(-finals):
+            if finals[k] <= 0:
+                break
+            if k in covered:
+                continue
+            doc_id = self.sent_doc[k]
+            g0, g1 = self._bounds[doc_id]
+            lo = max(g0, k - radius)
+            hi = min(g1 - 1, k + radius)
+            window = Passage(
+                doc_id=doc_id,
+                index=self.sent_local[k],
+                text=" ".join(self.sent_text[lo:hi + 1]),
+                start=self.sent_local[lo],
+                end=self.sent_local[hi] + 1,
+            )
+            results.append((window, float(finals[k])))
+            covered.update(range(lo, hi + 1))
+            if len(results) >= top_k:
+                break
+        return results

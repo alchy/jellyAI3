@@ -23,3 +23,17 @@ def test_build_indexes_sentences_per_document():
     assert sr.sent_doc == ["da", "da", "da", "db", "db"]
     assert sr.sent_local == [0, 1, 2, 0, 1]          # lokální index se resetuje per dokument
     assert sr._bounds["da"] == (0, 3) and sr._bounds["db"] == (3, 5)
+
+
+def test_search_focuses_on_matching_sentence():
+    docs = [Document("da", "da", "Alfa jedna. Klíč leží tady. Gama tři."),
+            Document("db", "db", "Delta prší. Epsilon svítí.")]
+    cfg = RetrieverConfig(granularity="sentence", focus_radius=1, decay_tau=1.5)
+    sr = SentenceRetriever(cfg).build(docs)
+    results = sr.search("klíč", top_k=2)
+    assert results, "něco se má najít"
+    top_passage, top_score = results[0]
+    assert top_passage.doc_id == "da"
+    assert "Klíč leží tady" in top_passage.text
+    assert top_passage.start <= 1 < top_passage.end
+    assert top_score > 0
