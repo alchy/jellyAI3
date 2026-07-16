@@ -7,6 +7,7 @@ i „kdy" čerpají z téhož narozovacího faktu. Když nic nesedí, deleguje n
 
 from jellyai.answerer.base import Answer, Answerer
 from jellyai.answerer.question import analyze_question
+from jellyai.answerer.template import _to_nominative
 
 _DATE_PARTS = {"rok", "měsíc", "den"}   # drill: „v kterém roce/měsíci…"
 
@@ -125,6 +126,8 @@ class GraphAnswerer(Answerer):
         if topic is not None:
             value, fact = self._traverse(qa, topic)
             if value is not None:
+                if qa.qtype == "Kde":
+                    value = _to_nominative(value, self.client) or value   # „Slezsku"→„Slezsko"
                 self.last_trace = {"topic": topic, "predicate": fact.predicate,
                                    "fact": fact.id, "answer": value}
                 return Answer(text=value, sources=["graf"], score=1.0)
