@@ -22,6 +22,7 @@ class Answer:
     text: str
     sources: list = field(default_factory=list)
     score: float = 0.0
+    alternatives: list = field(default_factory=list)   # další kandidáti dle teploty
 
 
 class Answerer:

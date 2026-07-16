@@ -121,15 +121,47 @@ class GraphAnswerer(Answerer):
             return self._pick(g.facts_of(topic, role="subj", predicate=verb), "obj")
         return None, None
 
-    def answer(self, question, retrieved):
+    def _candidate_facts_roles(self, qa, topic):
+        """Vrátí (fakty, cílové role) pro daný typ otázky (zdroj pro alternativy)."""
+        g, verb = self.graph, qa.verb_lemma
+        if qa.is_copula or qa.qtype in ("Jaký", "Který"):
+            return g.facts_of(topic, role="subj", predicate="být"), ["pred"]
+        if qa.qtype in ("Kdy", "Kde", "Kolik"):
+            facts = (g.facts_of(topic, role="subj", predicate=verb) if verb
+                     else g.facts_of(topic, role="subj"))
+            roles = {"Kdy": ["time", "num"], "Kde": ["loc"], "Kolik": ["num"]}[qa.qtype]
+            return facts, roles
+        if qa.qtype in ("Kdo", "Co"):
+            facts = g.facts_of(topic, role="obj", predicate=verb)
+            return (facts, ["subj"]) if facts else \
+                (g.facts_of(topic, role="subj", predicate=verb), ["obj"])
+        return [], []
+
+    def _rank_values(self, facts, roles, temperature):
+        """Seřadí hodnoty cílových rolí dle váhy faktu; nechá ty nad prahem teploty."""
+        weight_by_value = {}
+        for fact in facts:
+            for role in roles:
+                for value in self.graph.participants(fact, role):
+                    if fact.weight > weight_by_value.get(value, 0):
+                        weight_by_value[value] = fact.weight
+        ranked = sorted(weight_by_value.items(), key=lambda kv: -kv[1])
+        if not ranked:
+            return []
+        top = ranked[0][1]
+        return [v for v, w in ranked if w >= top * (1.0 - temperature)]
+
+    def answer(self, question, retrieved, *, temperature=0.0):
         """Odpoví 2-skokem grafu; při neúspěchu deleguje na fallback.
 
-        Uloží i `last_trace` (téma → fakt → hodnota) — krmivo pro konverzační
-        aktivaci (B2) a vizualizaci tras ve viewBase.
+        Uloží i `last_trace` (téma → fakt → hodnota). **Teplota** `> 0` navíc vrátí
+        v `Answer.alternatives` další kandidáty (nad prahem `top × (1 − temperature)`)
+        — vhodné, když z nich kompozitor skládá delší text.
 
         Args:
             question (str): Dotaz uživatele.
             retrieved (list): Pasáže (jen pro fallback).
+            temperature (float): Teplota shody (0 = jen primární, 1 = široce).
 
         Returns:
             Answer: Odpověď z grafu (zdroj „graf"), nebo výsledek fallbacku.
@@ -143,11 +175,17 @@ class GraphAnswerer(Answerer):
             if value is not None:
                 if qa.qtype == "Kde":
                     value = _to_nominative(value, self.client) or value   # „Slezsku"→„Slezsko"
+                alternatives = []
+                if temperature:
+                    facts, roles = self._candidate_facts_roles(qa, topic)
+                    alternatives = [v for v in self._rank_values(facts, roles, temperature)
+                                    if v != value]
                 self.last_trace = {"topic": topic, "predicate": fact.predicate,
                                    "fact": fact.id, "answer": value}
                 self._remember(qa, topic, value)
                 self._log_turn(question, topic, fact.predicate, value)
-                return Answer(text=value, sources=["graf"], score=1.0)
+                return Answer(text=value, sources=["graf"], score=1.0,
+                              alternatives=alternatives)
         self.context.step()
         self._log_turn(question, topic, None, None)
         return self.fallback.answer(question, retrieved)
