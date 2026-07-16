@@ -26,6 +26,7 @@ from jellyai.facade import Jelly
 from jellyai.demo import demo
 from jellyai.tasks import (annotate_corpus, build_fact_graph, load_fact_graph,
                            make_graph_answerer)
+from jellyai.viz.reflect import reflect
 
 __version__ = "0.1.0"
 
@@ -37,4 +38,5 @@ __all__ = [
     "Tokenizer", "QuestionAnalyzer", "FactExtractor", "Composer", "CorpusPort", "GraphView",
     "JellyError", "CorpusTools", "TemplateComposer", "Jelly", "demo",
     "annotate_corpus", "build_fact_graph", "load_fact_graph", "make_graph_answerer",
+    "reflect",
 ]
