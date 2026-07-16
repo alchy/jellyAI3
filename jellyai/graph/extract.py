@@ -262,7 +262,8 @@ def extract_facts(annotation, default_subject=None, canon=None, context=None):
     facts = []
     entities = annotation.get("entities", [])
     for sent in annotation.get("sentences", []):
-        # atributy (čas/místo/číslo) — i zanořené — přiřaď nejbližšímu slovesu-předku
+        # atributy (čas/místo/číslo/téma) — i zanořené — přiřaď nejbližšímu
+        # slovesu-předku
         attrs_by_verb = {}
         for i, tok in enumerate(sent):
             node = _node_for(tok, entities, canon)
@@ -270,7 +271,13 @@ def extract_facts(annotation, default_subject=None, canon=None, context=None):
                 continue
             role = _ATTR_ROLE.get(node[1])
             if role is None:
-                continue
+                # konceptové příslovečné určení („uvažovat o souvislosti")
+                # se nezahazuje — role „theme"; jen obl substantiva
+                if node[1] == "concept" and tok.get("upos") in ("NOUN", "PROPN") \
+                        and str(tok.get("deprel", "")).startswith("obl"):
+                    role = "theme"
+                else:
+                    continue
             vh = _verb_head(i, sent)
             if vh is not None:
                 attrs_by_verb.setdefault(vh, set()).add(Participant(role, node[0], node[1]))

@@ -138,3 +138,36 @@ def test_attribute_goes_to_its_own_clause_verb():
     assert any(p.node == "1918" for p in debut.participants)
     assert any(p.node == "1938" for p in zemr.participants)
     assert not any(p.node == "1938" for p in debut.participants)
+
+
+def test_concept_oblique_becomes_theme_participant():
+    """„Uvažoval o souvislosti." → uvažovat(osoba, theme=souvislost) —
+    konceptové obl se už nezahazuje (největší kbelík coverage auditu)."""
+    sent = [
+        {"form": "Uvažoval", "lemma": "uvažovat", "upos": "VERB", "head": 0,
+         "deprel": "root", "start": 0, "end": 8},
+        {"form": "o", "lemma": "o", "upos": "ADP", "head": 3, "deprel": "case",
+         "start": 9, "end": 10},
+        {"form": "souvislosti", "lemma": "souvislost", "upos": "NOUN", "head": 1,
+         "deprel": "obl", "start": 11, "end": 22},
+    ]
+    facts = extract_facts({"entities": [], "sentences": [sent]},
+                          default_subject=("Karel Čapek", "person"))
+    fact = next(f for f in facts if f.predicate == "uvažovat")
+    assert ("theme", "souvislost") in [(p.role, p.node) for p in fact.participants]
+
+
+def test_adverb_is_not_theme():
+    """Příslovce ani přídavné jméno roli theme nedostane (jen obl substantiva)."""
+    sent = [
+        {"form": "Psal", "lemma": "psát", "upos": "VERB", "head": 0,
+         "deprel": "root", "start": 0, "end": 4},
+        {"form": "rychle", "lemma": "rychle", "upos": "ADV", "head": 1,
+         "deprel": "advmod", "start": 5, "end": 11},
+        {"form": "romány", "lemma": "román", "upos": "NOUN", "head": 1,
+         "deprel": "obj", "start": 12, "end": 18},
+    ]
+    facts = extract_facts({"entities": [], "sentences": [sent]},
+                          default_subject=("Karel Čapek", "person"))
+    fact = next(f for f in facts if f.predicate == "psát")
+    assert not any(p.role == "theme" for p in fact.participants)
