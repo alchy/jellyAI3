@@ -118,3 +118,21 @@ def test_answer_exposes_trace():
     a.answer(q, [])
     assert a.last_trace["topic"] == "Babička"
     assert a.last_trace["answer"] == "Božena Němcová"
+
+
+def test_drill_v_kterem_roce():
+    from jellyai.graph.graph import build_graph
+    from tests.test_fact_graph import _capek_birth_annotations
+    g = build_graph(_capek_birth_annotations())
+    q = "v kterém roce se narodil Karel Čapek?"
+    client = _client(q, [
+        {"form": "v", "lemma": "v", "upos": "ADP", "head": 3, "deprel": "case", "start": 0, "end": 1},
+        {"form": "kterém", "lemma": "který", "upos": "DET", "head": 3, "deprel": "det", "start": 2, "end": 8},
+        {"form": "roce", "lemma": "rok", "upos": "NOUN", "head": 5, "deprel": "obl", "start": 9, "end": 13},
+        {"form": "se", "lemma": "se", "upos": "PRON", "head": 5, "deprel": "expl", "start": 14, "end": 16},
+        {"form": "narodil", "lemma": "narodit", "upos": "VERB", "head": 0, "deprel": "root", "start": 17, "end": 24},
+        {"form": "Karel", "lemma": "Karel", "upos": "PROPN", "head": 5, "deprel": "nsubj", "start": 25, "end": 30},
+        {"form": "Čapek", "lemma": "Čapek", "upos": "PROPN", "head": 6, "deprel": "flat", "start": 31, "end": 36},
+    ])
+    a = GraphAnswerer(g, client, ExtractiveAnswerer(AnswererConfig()))
+    assert a.answer(q, []).text == "1890"      # drill: událost → datum → rok
