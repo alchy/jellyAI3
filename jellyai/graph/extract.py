@@ -8,6 +8,7 @@ Uzel účastníka je pojmenovaná entita (kanonicky) nebo nominativní lemma tok
 from dataclasses import dataclass
 
 from jellyai.answerer.selection import _clean_lemma
+from jellyai.lang import current
 
 _SUBJ = {"nsubj", "nsubj:pass"}
 _OBJ = {"obj", "iobj"}
@@ -15,10 +16,6 @@ _ATTR = {"obl", "nmod"}
 _ENTITY_TYPE = {"p": "person", "g": "geo", "t": "time", "i": "institution"}
 _ATTR_ROLE = {"time": "time", "geo": "loc", "number": "num"}   # typ cíle → role
 _SKIP_UPOS = {"PRON", "DET"}   # zájmena/určovatele = balast (a záminka pro pro-drop)
-# relační podstatná jména: „bratr Karla Čapka" → hrana osoba–vztah–osoba
-_REL_NOUNS = {"bratr", "sestra", "matka", "otec", "syn", "dcera", "rodič",
-              "manžel", "manželka", "žena", "muž", "přítel", "přítelkyně",
-              "spolupracovník", "kolega", "žák", "učitel", "následovník"}
 
 
 @dataclass(frozen=True)
@@ -104,10 +101,18 @@ def _children(sent, head_id):
     return [t for t in sent if t.get("head") == head_id]
 
 
-def _relation_person(children, entities, canon):
-    """Osobní genitivní přívlastek relačního jména („bratr **Karla Čapka**")."""
+def _relation_person(children, sent, entities, canon):
+    """Osoba v HOLÉM genitivním přívlastku („bratr **Karla Čapka**").
+
+    Osoba s předložkou („drama **o Karlu Čapkovi**") vztah/autorství nenese —
+    je to „o kom", ne „čí". Holý genitiv poznáme podle chybějícího `case`
+    (ADP) dítěte u nmod tokenu.
+    """
     for tok in children:
         if tok.get("deprel", "").startswith("nmod") and tok.get("upos") not in _SKIP_UPOS:
+            tok_id = sent.index(tok) + 1
+            if any(c.get("head") == tok_id and c.get("upos") == "ADP" for c in sent):
+                continue
             node = _node_for(tok, entities, canon)
             if node is not None and node[1] == "person":
                 return node
@@ -143,6 +148,64 @@ def _verb_head(index, sent):
             return None
         cur = head - 1
     return None
+
+
+def _copular_facts(sent, head_id, subj_tok, subj, entities, canon):  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
+    """Fakty sponové věty „X je Y" — univerzální reifikace genitivu + identita.
+
+    Y s osobním genitivem → `Y(X, osoba)` pro **libovolné** Y (bratr, drama,
+    román…): vztah je struktura věty, ne položka slovníku. Žánrové Y
+    (`work_nouns` z jazykových dat) přidá autorství `napsat(osoba, X)`. Vždy
+    vznikne i identita/vlastnost `být(X, Y)` („Kdo/Jaký je X?"). Kompenzuje
+    parser-quirk, kdy kořenem spony je adjektivum („je satirický sci-fi román
+    Karla Čapka") a jmenný přísudek visí jako druhý nsubj za sponou — slovosled
+    dělí podmět|přísudek.
+
+    Args:
+        sent (list[dict]): Věta (tokeny).
+        head_id (int): 1-based id hlavy sponové věty.
+        subj_tok (dict | None): Token skutečného podmětu (kvůli odlišení).
+        subj (tuple | None): (id, typ) podmětu (i pro-drop náhrada).
+        entities (list[dict]): Entity věty.
+        canon (dict | None): Kanonizace osobních jmen.
+
+    Returns:
+        list[Fact]: Fakty věty (reifikovaný vztah, autorství, identita).
+    """
+    head = sent[head_id - 1]
+    children = _children(sent, head_id)
+    rel_head, rel_children = head, children
+    if head.get("upos") == "ADJ":
+        cop_tok = _first(children, {"cop"})
+        nominal = next(
+            (t for t in children
+             if t.get("deprel") in _SUBJ and t.get("upos") == "NOUN"
+             and t is not subj_tok and sent.index(t) > sent.index(cop_tok)),
+            None)
+        if nominal is not None:
+            rel_head = nominal
+            rel_children = _children(sent, sent.index(nominal) + 1)
+    facts = []
+    rel = _clean_lemma(rel_head.get("lemma", ""))
+    other = _relation_person(rel_children, sent, entities, canon)
+    if subj and rel and other is not None and rel_head.get("upos") == "NOUN":
+        facts.append(make_fact(rel, [
+            Participant("subj", subj[0], subj[1]),
+            Participant("obj", other[0], other[1]),
+        ]))
+        if rel in current()["work_nouns"]:
+            facts.append(make_fact("napsat", [
+                Participant("subj", other[0], other[1]),
+                Participant("obj", subj[0], subj[1]),
+            ]))
+    pred = _node_for(rel_head, entities, canon)
+    if pred and subj:
+        role = "attr" if rel_head.get("upos") == "ADJ" else "pred"
+        facts.append(make_fact("být", [
+            Participant("subj", subj[0], subj[1]),
+            Participant(role, pred[0], pred[1]),
+        ]))
+    return facts
 
 
 def extract_facts(annotation, default_subject=None, canon=None):
@@ -195,22 +258,8 @@ def extract_facts(annotation, default_subject=None, canon=None):
             # čerpá z identity, „Jaký je" z vlastnosti, takže se nepletou.
             if _first(children, {"cop"}):
                 subj = subj_node or default_subject
-                rel = _clean_lemma(head.get("lemma", ""))
-                other = _relation_person(children, entities, canon)
-                if subj and rel in _REL_NOUNS and other is not None:
-                    # „Josef byl bratr Karla Čapka" → bratr(Josef, Karel Čapek)
-                    facts.append(make_fact(rel, [
-                        Participant("subj", subj[0], subj[1]),
-                        Participant("obj", other[0], other[1]),
-                    ]))
-                    continue
-                pred = _node_for(head, entities, canon)
-                if pred and subj:
-                    role = "attr" if head.get("upos") == "ADJ" else "pred"
-                    facts.append(make_fact("být", [
-                        Participant("subj", subj[0], subj[1]),
-                        Participant(role, pred[0], pred[1]),
-                    ]))
+                facts.extend(_copular_facts(sent, head_id, subj_tok, subj,
+                                            entities, canon))
                 continue
 
             if head.get("upos") != "VERB":

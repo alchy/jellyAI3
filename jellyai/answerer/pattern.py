@@ -46,11 +46,19 @@ class Pattern:
 
 
 def _genitive_child(head_tok, sent):
-    """Genitivní přívlastek (nmod) daného tokenu — pro „bratr **Karla Čapka**"."""
+    """HOLÝ genitivní přívlastek (nmod) tokenu — pro „bratr **Karla Čapka**".
+
+    nmod s předložkou („Válka **s mloky**", „drama **o robotech**") genitivní
+    vztah NENÍ — je to fráze uvnitř termínu; poznáme ji podle `case` (ADP)
+    dítěte. Bez tohoto rozlišení by se víceslovný titul rozpadl na rekurzi.
+    """
     hid = sent.index(head_tok) + 1
-    for tok in sent:
+    for i, tok in enumerate(sent):
         if tok.get("head") == hid and str(tok.get("deprel", "")).startswith("nmod"):
-            return tok
+            has_adp = any(c.get("head") == i + 1 and c.get("upos") == "ADP"
+                          for c in sent)
+            if not has_adp:
+                return tok
     return None
 
 

@@ -35,6 +35,108 @@ def test_relational_noun_with_genitive_person():
     assert not any(p.role == "pred" and p.node == "bratr" for p in rel.participants)
 
 
+def test_any_copular_noun_with_genitive_person_reifies():
+    """„R.U.R. je (vědeckofantastické) drama Karla Čapka" → drama(R.U.R., Karel
+    Čapek) univerzálně (vztah = struktura, ne slovník); k tomu autorství
+    napsat(Karel Čapek, R.U.R.) (work_nouns z jazykových dat) a identita
+    být(R.U.R., drama) pro „Co je R.U.R.?"."""
+    sent = [
+        {"form": "R.U.R.", "lemma": "R.U.R.", "upos": "PROPN", "head": 4,
+         "deprel": "nsubj", "start": 0, "end": 6},
+        {"form": "je", "lemma": "být", "upos": "AUX", "head": 4,
+         "deprel": "cop", "start": 7, "end": 9},
+        {"form": "vědeckofantastické", "lemma": "vědeckofantastický", "upos": "ADJ",
+         "head": 4, "deprel": "amod", "start": 10, "end": 28},
+        {"form": "drama", "lemma": "drama", "upos": "NOUN", "head": 0,
+         "deprel": "root", "start": 29, "end": 34},
+        {"form": "Karla", "lemma": "Karel", "upos": "PROPN", "head": 4,
+         "deprel": "nmod", "start": 35, "end": 40},
+        {"form": "Čapka", "lemma": "Čapek", "upos": "PROPN", "head": 5,
+         "deprel": "flat", "start": 41, "end": 46},
+    ]
+    entities = [{"text": "R.U.R.", "type": "P", "start": 0, "end": 6},
+                {"text": "Karla Čapka", "type": "P", "start": 35, "end": 46}]
+    facts = extract_facts(_ann(sent, entities))
+    assert {"drama", "napsat", "být"} <= {f.predicate for f in facts}
+    napsat = next(f for f in facts if f.predicate == "napsat")
+    roles = [(p.role, p.node) for p in napsat.participants]
+    assert ("subj", "Karla Čapka") in roles and ("obj", "R.U.R.") in roles
+
+
+def test_adjective_root_copula_with_nominal_predicate_reifies():
+    """„Válka s Mloky je satirický sci-fi román Karla Čapka" — parser dává kořen
+    na adjektivum a jmenný přísudek („román" s genitivem) věší jako druhý nsubj
+    za sponu; kompenzace ho najde → román(válka, Karel Čapek) + napsat(Karel
+    Čapek, válka) + být(válka, román)."""
+    sent = [
+        {"form": "Válka", "lemma": "válka", "upos": "NOUN", "head": 5,
+         "deprel": "nsubj", "start": 0, "end": 5},
+        {"form": "s", "lemma": "s", "upos": "ADP", "head": 3,
+         "deprel": "case", "start": 6, "end": 7},
+        {"form": "Mloky", "lemma": "mlok", "upos": "NOUN", "head": 1,
+         "deprel": "nmod", "start": 8, "end": 13},
+        {"form": "je", "lemma": "být", "upos": "AUX", "head": 5,
+         "deprel": "cop", "start": 14, "end": 16},
+        {"form": "satirický", "lemma": "satirický", "upos": "ADJ", "head": 0,
+         "deprel": "root", "start": 17, "end": 26},
+        {"form": "román", "lemma": "román", "upos": "NOUN", "head": 5,
+         "deprel": "nsubj", "start": 27, "end": 32},
+        {"form": "Karla", "lemma": "Karel", "upos": "PROPN", "head": 6,
+         "deprel": "nmod", "start": 33, "end": 38},
+        {"form": "Čapka", "lemma": "Čapek", "upos": "PROPN", "head": 7,
+         "deprel": "flat", "start": 39, "end": 44},
+    ]
+    entities = [{"text": "Karla Čapka", "type": "P", "start": 33, "end": 44}]
+    facts = extract_facts(_ann(sent, entities))
+    assert {"román", "napsat"} <= {f.predicate for f in facts}
+    napsat = next(f for f in facts if f.predicate == "napsat")
+    roles = [(p.role, p.node) for p in napsat.participants]
+    assert ("subj", "Karla Čapka") in roles and ("obj", "válka") in roles
+    byt = next(f for f in facts if f.predicate == "být")
+    assert any(p.role == "pred" and p.node == "román" for p in byt.participants)
+
+
+def test_prepositional_person_phrase_is_not_authorship():
+    """„X je drama o Karlu Čapkovi" — osoba s předložkou (aboutness) NENÍ genitivní
+    vztah → žádné drama(X, Karel) ani napsat(Karel, X)."""
+    sent = [
+        {"form": "Hra", "lemma": "hra", "upos": "NOUN", "head": 3,
+         "deprel": "nsubj", "start": 0, "end": 3},
+        {"form": "je", "lemma": "být", "upos": "AUX", "head": 3,
+         "deprel": "cop", "start": 4, "end": 6},
+        {"form": "drama", "lemma": "drama", "upos": "NOUN", "head": 0,
+         "deprel": "root", "start": 7, "end": 12},
+        {"form": "o", "lemma": "o", "upos": "ADP", "head": 5,
+         "deprel": "case", "start": 13, "end": 14},
+        {"form": "Karlu", "lemma": "Karel", "upos": "PROPN", "head": 3,
+         "deprel": "nmod", "start": 15, "end": 20},
+        {"form": "Čapkovi", "lemma": "Čapek", "upos": "PROPN", "head": 5,
+         "deprel": "flat", "start": 21, "end": 28},
+    ]
+    entities = [{"text": "Karlu Čapkovi", "type": "P", "start": 15, "end": 28}]
+    facts = extract_facts(_ann(sent, entities))
+    assert not any(f.predicate in ("drama", "napsat") for f in facts)
+
+
+def test_copular_noun_with_nonperson_genitive_stays_identity():
+    """„Praha je město kontrastů" — genitiv není osoba → žádná relace, jen identita."""
+    sent = [
+        {"form": "Praha", "lemma": "Praha", "upos": "PROPN", "head": 3,
+         "deprel": "nsubj", "start": 0, "end": 5},
+        {"form": "je", "lemma": "být", "upos": "AUX", "head": 3,
+         "deprel": "cop", "start": 6, "end": 8},
+        {"form": "město", "lemma": "město", "upos": "NOUN", "head": 0,
+         "deprel": "root", "start": 9, "end": 14},
+        {"form": "kontrastů", "lemma": "kontrast", "upos": "NOUN", "head": 3,
+         "deprel": "nmod", "start": 15, "end": 24},
+    ]
+    entities = [{"text": "Praha", "type": "G", "start": 0, "end": 5}]
+    facts = extract_facts(_ann(sent, entities))
+    assert not any(f.predicate == "město" for f in facts)
+    byt = next(f for f in facts if f.predicate == "být")
+    assert any(p.role == "pred" and p.node == "město" for p in byt.participants)
+
+
 def test_nonrelational_copula_stays_identity():
     """Nevztahové sponové podstatné jméno („spisovatel") zůstane identitou (pred)."""
     sent = [
