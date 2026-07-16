@@ -8,32 +8,9 @@ extraktivní answerer (radši věta z textu než mlčení).
 """
 
 from jellyai.answerer.base import Answer, Answerer
-from jellyai.answerer.selection import select_answer, _clean_lemma
+from jellyai.answerer.selection import select_answer
+from jellyai.answerer.question import analyze_question
 from jellyai import templates
-
-# tázací slovo → typ otázky
-_QWORDS = {"kdo": "Kdo", "co": "Co", "kde": "Kde", "kdy": "Kdy", "kolik": "Kolik"}
-
-
-def _analyze_question(question, client):
-    """Z otázky zjistí typ (Kdo/Co/…) a lemma hlavního slovesa.
-
-    Args:
-        question (str): Dotaz uživatele.
-        client: ÚFAL klient (kvůli syntaktickému rozboru otázky).
-
-    Returns:
-        tuple[str|None, str|None]: (typ otázky, lemma slovesa).
-    """
-    qtype, verb_lemma = None, None
-    for sentence in client.parse(question):
-        for tok in sentence:
-            low = tok.get("form", "").lower()
-            if qtype is None and low in _QWORDS:
-                qtype = _QWORDS[low]
-            if verb_lemma is None and tok.get("upos") == "VERB":
-                verb_lemma = _clean_lemma(tok.get("lemma", ""))
-    return qtype, verb_lemma
 
 
 def _to_nominative(phrase, client):
@@ -107,17 +84,18 @@ class TemplateAnswerer(Answerer):
         """
         if not retrieved:
             return self.fallback.answer(question, retrieved)
-        qtype, verb_lemma = _analyze_question(question, self.client)
-        if qtype is None:
+        qa = analyze_question(question, self.client)
+        if qa.qtype is None:
             return self.fallback.answer(question, retrieved)
         for passage, score in retrieved:
             annotation = self.annotations.get((passage.doc_id, passage.index))
             if not annotation:
                 continue
-            candidate = select_answer(qtype, verb_lemma, annotation)
+            candidate = select_answer(qa.qtype, qa.verb_lemma, annotation,
+                                      is_copula=qa.is_copula)
             if candidate is None:
                 continue
-            text = self._render(qtype, candidate)
+            text = self._render(qa.qtype, candidate)
             if text.strip():
                 return Answer(text=text, sources=[f"{passage.doc_id}#{passage.index}"],
                               score=float(score))
