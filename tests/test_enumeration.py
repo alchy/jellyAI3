@@ -86,3 +86,23 @@ def test_enumeration_caps_and_filters_junk():
     text = a.answer(q, []).text
     assert "V" not in text.split(", ")
     assert len(text.split(", ")) == 5
+
+
+def test_identity_never_echoes_topic_word():
+    """„Kdo je Adam stvořitel?" nesmí odpovědět „stvořitel" — hodnota, která
+    je slovem id samotného tématu (echo apozice titulu), je tautologie."""
+    g = FactGraph()
+    g.add_fact(make_fact("být", [Participant("subj", "Adam stvořitel", "person"),
+                                 Participant("pred", "stvořitel", "concept")]))
+    g.add_fact(make_fact("být", [Participant("subj", "Adam stvořitel", "person"),
+                                 Participant("pred", "hra", "concept")]))
+    q = "Kdo je Adam stvořitel?"
+    client = FakeUfalClient(parse={q: [[
+        {"form": "Kdo", "lemma": "kdo", "upos": "PRON", "head": 3, "deprel": "nsubj"},
+        {"form": "je", "lemma": "být", "upos": "AUX", "head": 3, "deprel": "cop"},
+        {"form": "Adam", "lemma": "Adam", "upos": "PROPN", "head": 0, "deprel": "root"},
+        {"form": "stvořitel", "lemma": "stvořitel", "upos": "NOUN", "head": 3,
+         "deprel": "flat"},
+    ]]})
+    a = GraphAnswerer(g, client, ExtractiveAnswerer(AnswererConfig()))
+    assert a.answer(q, []).text == "hra"

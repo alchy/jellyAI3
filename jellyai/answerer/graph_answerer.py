@@ -255,6 +255,13 @@ class GraphAnswerer(Answerer):
                 for part in fact.participants:
                     if part.node in known_set or len(part.node) < 2:
                         continue             # díra ≠ známé; 1-znak = artefakt NER
+                    if pred in ("být", "kontext") \
+                            and any(part.node.lower() in k.lower().split()
+                                    for k in known_set):
+                        # identitní echo slova tématu („Adam stvořitel" →
+                        # „stvořitel") = tautologie; dekompoziční predikáty
+                        # (rok z „13. ledna 1890") echo naopak CHTĚJÍ
+                        continue
                     base = fact.weight + (10 if exact else 0)
                     # „kdy" bere čas i rok-jako-číslo; jinak přesná role díry
                     if hole_role and (part.role == hole_role
