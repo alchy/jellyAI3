@@ -15,6 +15,7 @@ from jellyai.graph.activation import ActivationField
 from jellyai.graph.canon import _stem, name_gender
 
 _DATE_PARTS = {"rok", "měsíc", "den"}   # drill: „v kterém roce/měsíci…"
+_MAX_ENUM = 5                           # strop výčtové odpovědi (čitelnost)
 
 
 class GraphAnswerer(Answerer):
@@ -209,24 +210,28 @@ class GraphAnswerer(Answerer):
             if not known_set <= {p.node for p in fact.participants}:
                 continue
             for part in fact.participants:
-                if part.node in known_set:
-                    continue                 # díra = jiný než známé (i symetrie vztahů)
-                score = fact.weight + self.context.scores.get(part.node, 0.0)
+                if part.node in known_set or len(part.node) < 2:
+                    continue                 # díra ≠ známé; 1-znak = artefakt NER
+                base = fact.weight
                 # „kdy" bere čas i rok-jako-číslo; jinak přesná role díry
                 if hole_role and (part.role == hole_role
                                   or (hole_type == "time" and part.role in ("time", "num"))):
-                    score += 1000
+                    base += 1000
                 if hole_type and part.type == hole_type:
-                    score += 100
-                scored.append((score, part.node, fact))
+                    base += 100
+                scored.append((base, self.context.scores.get(part.node, 0.0),
+                               part.node, fact))
         if not scored:
             return [], None
-        scored.sort(key=lambda t: -t[0])     # stabilní → determinismus mezi shodami
+        # remíza se určuje ZÁKLADNÍM skóre (váha+role/typ) — aktivace remízu
+        # jen řadí, nerozbíjí (výčet je stabilní napříč konverzací)
+        scored.sort(key=lambda t: (-t[0], -t[1]))
         top = scored[0][0]
-        values = list(dict.fromkeys(v for s, v, _ in scored if s == top))
+        values = list(dict.fromkeys(
+            v for b, _, v, _ in scored if b == top))[:_MAX_ENUM]
         # zapamatuj všechny účastníky použitého faktu → rozsvítí se celá cesta
-        self.visited.extend(p.node for p in scored[0][2].participants)
-        return values, scored[0][2]
+        self.visited.extend(p.node for p in scored[0][3].participants)
+        return values, scored[0][3]
 
     def _typed_match(self, predicate, known_set):
         """Join výběrové otázky: koncepty z `known_set` se stanou typovým

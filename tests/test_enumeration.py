@@ -48,3 +48,41 @@ def test_heavier_fact_stays_single():
     ]]})
     a = GraphAnswerer(g, client, ExtractiveAnswerer(AnswererConfig()))
     assert a.answer(q, []).text == "Josef Čapek"
+
+
+def _client_co_napsal():
+    q = "Co napsal Karel Čapek?"
+    return q, FakeUfalClient(parse={q: [[
+        {"form": "Co", "lemma": "co", "upos": "PRON", "head": 2, "deprel": "obj"},
+        {"form": "napsal", "lemma": "napsat", "upos": "VERB", "head": 0, "deprel": "root"},
+        {"form": "Karel", "lemma": "Karel", "upos": "PROPN", "head": 2, "deprel": "nsubj"},
+        {"form": "Čapek", "lemma": "Čapek", "upos": "PROPN", "head": 3, "deprel": "flat"},
+    ]]})
+
+
+def test_enumeration_ties_ignore_activation_for_grouping():
+    """Aktivace remízu jen ŘADÍ, nerozbíjí — opakovaná otázka nesmí ztrácet
+    hodnoty (dialog: „Co napsal?" → hra, válka; podruhé už jen hra)."""
+    g = FactGraph()
+    for title in ["hra", "válka"]:
+        g.add_fact(make_fact("napsat", [Participant("subj", "Karel Čapek", "person"),
+                                        Participant("obj", title, "concept")]))
+    q, client = _client_co_napsal()
+    a = GraphAnswerer(g, client, ExtractiveAnswerer(AnswererConfig()))
+    a.context.warm("válka", 3.0)              # dřívější zmínka ve stejné konverzaci
+    text = a.answer(q, []).text
+    assert "hra" in text and "válka" in text  # výčet drží obě
+    assert text.startswith("válka")           # aktivace řadí dopředu
+
+
+def test_enumeration_caps_and_filters_junk():
+    """Strop výčtu (5) a filtr jednoznakových artefaktů NER („V")."""
+    g = FactGraph()
+    for title in ["a1", "a2", "a3", "a4", "a5", "a6", "V"]:
+        g.add_fact(make_fact("napsat", [Participant("subj", "Karel Čapek", "person"),
+                                        Participant("obj", title, "concept")]))
+    q, client = _client_co_napsal()
+    a = GraphAnswerer(g, client, ExtractiveAnswerer(AnswererConfig()))
+    text = a.answer(q, []).text
+    assert "V" not in text.split(", ")
+    assert len(text.split(", ")) == 5
