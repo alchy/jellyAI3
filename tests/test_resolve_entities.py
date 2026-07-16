@@ -72,6 +72,40 @@ def test_non_person_nodes_untouched():
     assert "Praha" in g.nodes and "Prahy" in g.nodes
 
 
+def test_positional_merge_short_name_into_long():
+    """„Karel Čapek" ⊂ „Karel Antonín Čapek": kmeny sedí na první (křestní)
+    i poslední (příjmení) pozici → merge. Fakty obou splynou na delším uzlu."""
+    g = FactGraph()
+    g.add_fact(_narodit("Karel Antonín Čapek", "Malých Svatoňovicích"))
+    g.add_fact(_bratr("Karel Čapek", "Josef Čapek"))
+    resolve_entities(g)
+    assert "Karel Čapek" not in g.nodes
+    bratr = g.facts_of("Karel Antonín Čapek", role="subj", predicate="bratr")
+    assert bratr and g.participants(bratr[0], "obj") == ["Josef Čapek"]
+
+
+def test_positional_merge_skips_father():
+    """„Antonín Čapek" (otec): křestní kmen sedí na PROSTŘEDNÍ pozici syna,
+    ne na první → zůstává vlastním uzlem (žádné hladové subset-slučování)."""
+    g = FactGraph()
+    g.add_fact(_narodit("Karel Antonín Čapek", "Malých Svatoňovicích"))
+    g.add_fact(_narodit("Antonína Čapka", "Žernově"))
+    g.add_fact(_narodit("Čapek", "Praze"))          # holé příjmení taky ne
+    resolve_entities(g)
+    assert {"Karel Antonín Čapek", "Antonína Čapka", "Čapek"} <= set(g.nodes)
+
+
+def test_positional_merge_requires_unique_target():
+    """Dvojznačný cíl (dva delší kandidáti se stejným křestním i příjmením)
+    → kratší jméno zůstává raději oddělené."""
+    g = FactGraph()
+    g.add_fact(_narodit("Karel Antonín Čapek", "Malých Svatoňovicích"))
+    g.add_fact(_narodit("Karel Josef Čapek", "Praze"))
+    g.add_fact(_narodit("Karel Čapek", "Brně"))
+    resolve_entities(g)
+    assert "Karel Čapek" in g.nodes
+
+
 def test_resolve_is_idempotent_and_deterministic():
     def build():
         g = FactGraph()

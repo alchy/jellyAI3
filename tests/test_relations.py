@@ -137,6 +137,38 @@ def test_copular_noun_with_nonperson_genitive_stays_identity():
     assert any(p.role == "pred" and p.node == "město" for p in byt.participants)
 
 
+def test_overt_pronoun_subject_blocks_prodrop():
+    """„Je to lepra." má overtní zájmenný podmět („to") — to NENÍ pro-drop
+    elize; dosazení nejteplejší osoby by vyrobilo šum být(Karel, lepra),
+    který po sloučení uzlů přebíjí skutečnou identitu."""
+    sent = [
+        {"form": "Je", "lemma": "být", "upos": "AUX", "head": 3,
+         "deprel": "cop", "start": 0, "end": 2},
+        {"form": "to", "lemma": "ten", "upos": "DET", "head": 3,
+         "deprel": "nsubj", "start": 3, "end": 5},
+        {"form": "lepra", "lemma": "lepra", "upos": "NOUN", "head": 0,
+         "deprel": "root", "start": 6, "end": 11},
+    ]
+    facts = extract_facts(_ann(sent, []),
+                          default_subject=("Karel Čapek", "person"))
+    assert not facts
+
+
+def test_true_prodrop_copula_still_inherits_subject():
+    """„Byl spisovatel." bez podmětu = skutečný pro-drop → osoba se dosadí."""
+    sent = [
+        {"form": "Byl", "lemma": "být", "upos": "AUX", "head": 2,
+         "deprel": "cop", "start": 0, "end": 3},
+        {"form": "spisovatel", "lemma": "spisovatel", "upos": "NOUN", "head": 0,
+         "deprel": "root", "start": 4, "end": 14},
+    ]
+    facts = extract_facts(_ann(sent, []),
+                          default_subject=("Karel Čapek", "person"))
+    byt = next(f for f in facts if f.predicate == "být")
+    assert any(p.role == "subj" and p.node == "Karel Čapek"
+               for p in byt.participants)
+
+
 def test_nonrelational_copula_stays_identity():
     """Nevztahové sponové podstatné jméno („spisovatel") zůstane identitou (pred)."""
     sent = [

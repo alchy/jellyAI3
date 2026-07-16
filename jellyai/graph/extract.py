@@ -257,7 +257,11 @@ def extract_facts(annotation, default_subject=None, canon=None):
             # stavu** (přídavné jméno → role „attr": „je nemocná") — „Kdo je"
             # čerpá z identity, „Jaký je" z vlastnosti, takže se nepletou.
             if _first(children, {"cop"}):
-                subj = subj_node or default_subject
+                # overtní zájmenný podmět („Je TO lepra") NENÍ pro-drop elize —
+                # dosazení nejteplejší osoby by vyrábělo šum být(osoba, lepra)
+                pronoun_subj = (subj_tok is not None
+                                and subj_tok.get("upos") in _SKIP_UPOS)
+                subj = subj_node or (None if pronoun_subj else default_subject)
                 facts.extend(_copular_facts(sent, head_id, subj_tok, subj,
                                             entities, canon))
                 continue

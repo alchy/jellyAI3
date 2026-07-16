@@ -136,6 +136,27 @@ class FactGraph:
         """Id účastníků faktu dané role."""
         return [p.node for p in fact_node.participants if p.role == role]
 
+    def replace_facts(self, facts):
+        """Vymění množinu faktů a přestaví uzly i index `_by_node`.
+
+        Váha uzlu = Σ vah faktů za každou účast (sémantika `_touch`); typ
+        uzlu = typ z prvního faktu v pořadí (deterministické).
+
+        Args:
+            facts (dict): (predicate, participants) → FactNode.
+        """
+        self.facts = facts
+        self.nodes = {}
+        self._by_node = {}
+        for key, fact in facts.items():
+            for p in fact.participants:
+                node = self.nodes.get(p.node)
+                if node is None:
+                    self.nodes[p.node] = Node(p.node, p.type, fact.weight)
+                else:
+                    node.weight += fact.weight
+                self._by_node.setdefault(p.node, []).append((key, p.role))
+
     def save(self, path):
         """Uloží graf (pickle). Vrátí cestu."""
         directory = os.path.dirname(path)
@@ -260,18 +281,52 @@ def _decompose_dates(graph):
                                             Participant("val", value, vtype)]))
 
 
-def resolve_entities(graph):
-    """Post-build entity resolution: sloučí pádové varianty osob do jednoho uzlu.
+def _positional_merge(canon_by_key):
+    """Druhý pass resolveru: kratší víceslovné jméno → jednoznačné delší.
 
-    Osoby se shluknou kmenovým klíčem (`cluster_key`); kanonické id clusteru je
-    **lexikograficky nejmenší člen** — pádové koncovky nominativ prodlužují
-    („Josef Čapek" < „Josefa Čapka" < „Josefem Čapkem"), takže minimum bývá
-    nominativ. (Subj-count jako proxy nominativu nefunguje: pro-drop koreference
-    rozdává podměty i genitivním uzlům.) Fakty se přepíšou s přemapovanými
-    účastníky (kolize identity → součet vah), uzly a index `_by_node` se přestaví.
-    Jen person↔person; fragmenty s jiným počtem slov mají jiný klíč, takže se
-    nedotknou (žádné hladové subset-slučování). Idempotentní a deterministické —
-    smí běžet i opakovaně (po `recover_entities`).
+    Sloučí se jen při shodě kmenů na **první (křestní) a poslední (příjmení)**
+    pozici: „Karel Čapek" → „Karel Antonín Čapek". Otec „Antonín Čapek" má
+    křestní kmen na prostřední pozici syna → zůstává. Dvojznačný cíl (víc
+    delších kandidátů) nebo jednoslovné jméno → žádné slučování.
+
+    Args:
+        canon_by_key (dict): Kmenový klíč clusteru → kanonické id.
+
+    Returns:
+        dict: Kanonické id → kanonické id delšího jména.
+    """
+    mapping = {}
+    keys = sorted(canon_by_key)
+    for key in keys:
+        if len(key) < 2:
+            continue
+        targets = [k for k in keys
+                   if len(k) > len(key) and k[0] == key[0] and k[-1] == key[-1]]
+        if len(targets) == 1:
+            mapping[canon_by_key[key]] = canon_by_key[targets[0]]
+    for src in list(mapping):
+        # zřetězení (2-slovné → 3-slovné → 4-slovné); cíl má vždy víc slov,
+        # cyklus nehrozí
+        dst = mapping[src]
+        while dst in mapping:
+            dst = mapping[dst]
+        mapping[src] = dst
+    return mapping
+
+
+def resolve_entities(graph):
+    """Post-build entity resolution: sloučí varianty osoby do jednoho uzlu.
+
+    Dva konzervativní passy: (1) **pádové varianty** — shluk kmenovým klíčem
+    (`cluster_key`), kanonické id = lexikograficky nejmenší člen (pádové
+    koncovky nominativ prodlužují, takže minimum bývá nominativ; subj-count
+    jako proxy nefunguje — pro-drop koreference rozdává podměty i genitivům);
+    (2) **poziční fragmenty** — kratší víceslovné jméno do jednoznačného
+    delšího se shodou křestního a příjmení (`_positional_merge`). Fakty se
+    přepíšou s přemapovanými účastníky (kolize identity → součet vah), uzly a
+    index `_by_node` se přestaví. Jen person↔person; holá jednoslovná jména se
+    neslučují. Idempotentní a deterministické — smí běžet i opakovaně (po
+    `recover_entities`).
 
     Args:
         graph (FactGraph): Graf k přepsání (in-place).
@@ -279,16 +334,19 @@ def resolve_entities(graph):
     Returns:
         FactGraph: Týž graf (pro řetězení).
     """
+    persons = sorted(n.id for n in graph.nodes.values() if n.type == "person")
     clusters = {}
-    for node in graph.nodes.values():
-        if node.type == "person":
-            clusters.setdefault(cluster_key(node.id), []).append(node.id)
+    for name in persons:
+        clusters.setdefault(cluster_key(name), []).append(name)
+    canon_by_key = {key: min(members) for key, members in clusters.items()}
+    positional = _positional_merge(canon_by_key)
     node_map = {}
-    for members in clusters.values():
-        canonical = min(members)
+    for key, members in clusters.items():
+        canonical = canon_by_key[key]
+        final = positional.get(canonical, canonical)
         for name in members:
-            if name != canonical:
-                node_map[name] = canonical
+            if name != final:
+                node_map[name] = final
     if not node_map:
         return graph
     remapped = {}
@@ -303,15 +361,5 @@ def resolve_entities(graph):
                                      moved.participants)
         else:
             existing.weight += fact.weight
-    graph.facts = remapped
-    graph.nodes = {}
-    graph._by_node = {}
-    for key, fact in remapped.items():
-        for p in fact.participants:
-            node = graph.nodes.get(p.node)
-            if node is None:
-                graph.nodes[p.node] = Node(p.node, p.type, fact.weight)
-            else:
-                node.weight += fact.weight
-            graph._by_node.setdefault(p.node, []).append((key, p.role))
+    graph.replace_facts(remapped)
     return graph
