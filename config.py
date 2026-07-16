@@ -165,3 +165,41 @@ class Config:
     qagen: QagenConfig = field(default_factory=QagenConfig)
     services: ServicesConfig = field(default_factory=ServicesConfig)
     graph: GraphConfig = field(default_factory=GraphConfig)
+
+    def to_json(self, path):
+        """Uloží konfiguraci jako čitelný JSON (všechny knoflíky na jednom místě).
+
+        Args:
+            path (str): Cílová cesta k `.json`.
+
+        Returns:
+            str: Cesta, kam byla konfigurace uložena.
+        """
+        import json
+        from dataclasses import asdict
+        with open(path, "w", encoding="utf-8") as handle:
+            json.dump(asdict(self), handle, ensure_ascii=False, indent=2)
+        return path
+
+    @classmethod
+    def from_json(cls, path):
+        """Načte konfiguraci z JSON; chybějící pole doplní výchozími.
+
+        Args:
+            path (str): Cesta k `.json` (viz `to_json`).
+
+        Returns:
+            Config: Naplněná konfigurace.
+        """
+        import json
+        with open(path, encoding="utf-8") as handle:
+            data = json.load(handle)
+        config = cls()
+        for block, values in data.items():
+            target = getattr(config, block, None)
+            if target is None or not isinstance(values, dict):
+                continue
+            for key, value in values.items():
+                if hasattr(target, key):
+                    setattr(target, key, value)
+        return config
