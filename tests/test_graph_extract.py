@@ -45,3 +45,36 @@ def test_nary_fact_place_and_time():
                                      Participant("loc", "Praha", "geo"),
                                      Participant("num", "1890", "number")])
     assert expected in facts
+
+
+def test_skips_pronoun_object():
+    # objekt-zájmeno „který" se nezahrne → z (subj) samotného nevznikne fakt
+    sent = [
+        {"form": "Čapek", "lemma": "Čapek", "upos": "PROPN", "head": 2, "deprel": "nsubj", "start": 0, "end": 5},
+        {"form": "napsal", "lemma": "napsat", "upos": "VERB", "head": 0, "deprel": "root", "start": 6, "end": 12},
+        {"form": "který", "lemma": "který", "upos": "PRON", "head": 2, "deprel": "obj", "start": 13, "end": 18},
+    ]
+    ents = [{"text": "Čapek", "type": "P", "start": 0, "end": 5}]
+    assert extract_facts(_ann(sent, ents)) == []
+
+
+def test_prodrop_attributes_default_subject():
+    # „Narodil se roku 1890." bez explicitního podmětu → doplní default subjekt
+    sent = [
+        {"form": "Narodil", "lemma": "narodit", "upos": "VERB", "head": 0, "deprel": "root", "start": 0, "end": 7},
+        {"form": "se", "lemma": "se", "upos": "PRON", "head": 1, "deprel": "expl", "start": 8, "end": 10},
+        {"form": "1890", "lemma": "1890", "upos": "NUM", "head": 1, "deprel": "obl", "start": 15, "end": 19},
+    ]
+    facts = extract_facts(_ann(sent), default_subject=("Karel Čapek", "person"))
+    expected = make_fact("narodit", [Participant("subj", "Karel Čapek", "person"),
+                                     Participant("num", "1890", "number")])
+    assert expected in facts
+
+
+def test_no_default_no_subject_no_fact():
+    # bez explicitního podmětu i bez defaultu → žádný fakt (nespekuluje)
+    sent = [
+        {"form": "Narodil", "lemma": "narodit", "upos": "VERB", "head": 0, "deprel": "root", "start": 0, "end": 7},
+        {"form": "1890", "lemma": "1890", "upos": "NUM", "head": 1, "deprel": "obl", "start": 8, "end": 12},
+    ]
+    assert extract_facts(_ann(sent)) == []
