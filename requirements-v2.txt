@@ -1,2 +1,3 @@
 ufal.morphodita>=1.11
 ufal.nametag>=1.2
+ufal.udpipe>=1.3
