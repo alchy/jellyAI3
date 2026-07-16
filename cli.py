@@ -228,21 +228,10 @@ def cmd_annotate(config, client=None):
     Returns:
         int: Počet anotovaných vět.
     """
-    from jellyai.loader import load_documents
-    from jellyai.annotate import annotate_documents, save_annotations
-    documents = load_documents(config.data.processed_dir)
-    own = client is None
-    if own:
-        from jellyai.ufal_client import UfalClient
-        client = UfalClient(config.services)
-    try:
-        annotations = annotate_documents(documents, client)
-    finally:
-        if own:
-            client.close()
-    save_annotations(annotations, config.services.annotations_path)
-    print(f"Anotováno {len(annotations)} vět → {config.services.annotations_path}")
-    return len(annotations)
+    from jellyai.tasks import annotate_corpus
+    count = annotate_corpus(config, client)
+    print(f"Anotováno {count} vět → {config.services.annotations_path}")
+    return count
 
 
 def cmd_graph(config, view=False):
@@ -259,11 +248,8 @@ def cmd_graph(config, view=False):
     Returns:
         int: Počet entitních uzlů grafu.
     """
-    from jellyai.annotate import load_annotations
-    from jellyai.graph.graph import build_graph
-    annotations = load_annotations(config.services.annotations_path)
-    graph = build_graph(annotations)
-    graph.save(config.graph.graph_path)
+    from jellyai.tasks import build_fact_graph
+    graph = build_fact_graph(config)
     print(f"Faktový graf: {len(graph.nodes)} uzlů, {len(graph.facts)} faktů "
           f"→ {config.graph.graph_path}")
     if view:
