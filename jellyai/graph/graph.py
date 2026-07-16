@@ -7,10 +7,42 @@ najít fakty, v nichž vystupuje (a v jaké roli) — to je základ 2-skokového
 
 import os
 import pickle
+import re
 from dataclasses import dataclass
 
-from jellyai.graph.extract import extract_facts, _SUBJ
+from jellyai.graph.extract import extract_facts, make_fact, Participant, _SUBJ
 from jellyai.graph.activation import ActivationField
+
+_MONTHS = {
+    "ledna": "leden", "února": "únor", "března": "březen", "dubna": "duben",
+    "května": "květen", "června": "červen", "července": "červenec", "srpna": "srpen",
+    "září": "září", "října": "říjen", "listopadu": "listopad", "prosince": "prosinec",
+}
+
+
+def parse_date(text):
+    """Rozloží české datum na složky, které najde (rok/měsíc/den).
+
+    Robustně regexem — datum bývá „13. ledna 1890", „roku 1890" i jen „1890".
+
+    Args:
+        text (str): Text časové entity.
+
+    Returns:
+        dict: Podmnožina {„rok": str, „měsíc": str (nominativ), „den": str}.
+    """
+    out = {}
+    year = re.search(r"\b(1\d{3}|20\d{2})\b", text)
+    if year:
+        out["rok"] = year.group(1)
+    day = re.search(r"\b([12]?\d|3[01])\.\s", text)
+    if day:
+        out["den"] = day.group(1)
+    for genitive, nominative in _MONTHS.items():
+        if genitive in text:
+            out["měsíc"] = nominative
+            break
+    return out
 
 
 @dataclass
@@ -202,4 +234,23 @@ def build_graph(annotations):
                 graph.add_fact(fact)
             _warm_persons(field, annotation, canon)
             field.step()
+    _decompose_dates(graph)
     return graph
+
+
+def _decompose_dates(graph):
+    """Zanoří časové uzly: datum se stane uzlem s vlastními pod-fakty rok/měsíc/den.
+
+    „13. ledna 1890" pak není jen řetězcová hodnota, ale uzel grafu, z něhož se dá
+    dojít na rok (1890) — umožní dotaz „v kterém roce". Reifikace o patro níž.
+
+    Args:
+        graph (FactGraph): Graf s časovými uzly (upraví se in-place).
+    """
+    for node in list(graph.nodes.values()):
+        if node.type != "time":
+            continue
+        for part, value in parse_date(node.id).items():
+            vtype = "number" if part in ("rok", "den") else "concept"
+            graph.add_fact(make_fact(part, [Participant("subj", node.id, "time"),
+                                            Participant("val", value, vtype)]))

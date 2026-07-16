@@ -75,6 +75,27 @@ v úvodní závorce/infoboxu a data bývají **zanořená** (`nummod` pod měsí
 `obl` slovesa). Řešení: brát NameTag časové entity kdekoli ve větě + rozlišit
 narození od jiných událostí. Také normalizace tvarů („Slezsku"→„Slezsko").
 
+## Zanořené informace + normalizace (3. kolo)
+
+Na uživatelův podnět „zanořená informace může být novou součástí grafu" jsme šli
+naplno — a **test rozhodl, že to funguje**:
+
+- **Zanořené atributy**: datum/číslo se přiváže k **nejbližšímu slovesu-předku**
+  (ne jen přímé děti), takže se zachytí i „nummod pod měsícem"; v souvětí zůstane
+  u svého slovesa. `_node_for` bere **nejdelší** entitu (celé „13. ledna 1890").
+- **Datum = uzel s pod-fakty**: „13. ledna 1890" není řetězec, ale uzel s vlastními
+  fakty `rok`/`měsíc`/`den` — reifikace o patro níž. Umožní **drill-down**.
+- **Drill v answereru**: „v kterém roce se narodil X" → událost → datum-uzel → `rok`.
+- **Normalizace místa** (MorphoDiTa): odpověď na „kde" se skloní do 1. pádu.
+
+**Živě:** „v kterém roce se narodila Božena Němcová?" → **1818** (drill přes graf);
+„kde…?" → **Slezsko** (dřív „Slezsku"). Mechanismus zanoření i normalizace potvrzen.
+
+**Zbývající limity (poctivě):** MorphoDiTa neskloní OOV pomnožná místa („Malých
+Svatoňovicích" zůstane); Čapkův **rok** narození stále chybí — v korpusu žije
+v infoboxu/závorce, ne v parsovatelné větě (není co zanořit). Další patro: fakt-jako-
+účastník pro celé vedlejší věty.
+
 ## Konverzační vrstva (B2) — připraveno
 
 Atributy grafu (`id`, `type`, statická `weight`) jsou dobrý **prior**; konverzační

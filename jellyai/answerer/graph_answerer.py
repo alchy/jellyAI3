@@ -7,6 +7,9 @@ i „kdy" čerpají z téhož narozovacího faktu. Když nic nesedí, deleguje n
 
 from jellyai.answerer.base import Answer, Answerer
 from jellyai.answerer.question import analyze_question
+from jellyai.answerer.template import _to_nominative
+
+_DATE_PARTS = {"rok", "měsíc", "den"}   # drill: „v kterém roce/měsíci…"
 
 
 class GraphAnswerer(Answerer):
@@ -77,6 +80,15 @@ class GraphAnswerer(Answerer):
             tuple: (hodnota | None, fakt | None).
         """
         g, verb = self.graph, qa.verb_lemma
+        # drill „v kterém roce se narodil X": událost → datum (uzel) → pod-fakt rok
+        date_part = next((t for t in qa.topic_terms if t in _DATE_PARTS), None)
+        if date_part:
+            facts = (g.facts_of(topic, role="subj", predicate=verb) if verb
+                     else g.facts_of(topic, role="subj"))
+            time_value, _ = self._pick(facts, "time")
+            if time_value is None:
+                return None, None
+            return self._pick(g.facts_of(time_value, role="subj", predicate=date_part), "val")
         if qa.is_copula or qa.qtype in ("Jaký", "Který"):
             return self._pick(g.facts_of(topic, role="subj", predicate="být"), "pred")
         if qa.qtype in ("Kdy", "Kde", "Kolik"):
@@ -114,6 +126,8 @@ class GraphAnswerer(Answerer):
         if topic is not None:
             value, fact = self._traverse(qa, topic)
             if value is not None:
+                if qa.qtype == "Kde":
+                    value = _to_nominative(value, self.client) or value   # „Slezsku"→„Slezsko"
                 self.last_trace = {"topic": topic, "predicate": fact.predicate,
                                    "fact": fact.id, "answer": value}
                 return Answer(text=value, sources=["graf"], score=1.0)

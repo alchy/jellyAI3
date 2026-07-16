@@ -99,3 +99,27 @@ def test_person_canonicalization_unifies_prodrop():
     g = build_graph(A)
     assert g.facts_of("Karel Čapek", role="subj", predicate="narodit")   # sjednoceno
     assert not g.facts_of("Karel", role="subj", predicate="narodit")     # fragment nezůstal
+
+
+def _capek_birth_annotations():
+    return {("d", 0): {"entities": [{"text": "Karel Čapek", "type": "P", "start": 0, "end": 11},
+                                    {"text": "13. ledna 1890", "type": "T", "start": 24, "end": 37}],
+                       "sentences": [[
+        {"form": "Karel", "lemma": "Karel", "upos": "PROPN", "head": 3, "deprel": "nsubj", "start": 0, "end": 5},
+        {"form": "Čapek", "lemma": "Čapek", "upos": "PROPN", "head": 1, "deprel": "flat", "start": 6, "end": 11},
+        {"form": "narodil", "lemma": "narodit", "upos": "VERB", "head": 0, "deprel": "root", "start": 12, "end": 19},
+        {"form": "se", "lemma": "se", "upos": "PRON", "head": 3, "deprel": "expl", "start": 20, "end": 22},
+        {"form": "13", "lemma": "13", "upos": "NUM", "head": 6, "deprel": "nummod", "start": 24, "end": 26},
+        {"form": "ledna", "lemma": "leden", "upos": "NOUN", "head": 3, "deprel": "obl", "start": 27, "end": 32},
+        {"form": "1890", "lemma": "1890", "upos": "NUM", "head": 6, "deprel": "nummod", "start": 33, "end": 37},
+    ]]}}
+
+
+def test_date_decomposition_subfacts():
+    g = build_graph(_capek_birth_annotations())
+    # narození má celé datum jako hodnotu
+    born = g.facts_of("Karel Čapek", role="subj", predicate="narodit")
+    assert born and "13. ledna 1890" in g.participants(born[0], "time")
+    # datum je uzel s pod-faktem rok → 1890 (zanoření v grafu)
+    rok = g.facts_of("13. ledna 1890", role="subj", predicate="rok")
+    assert rok and g.participants(rok[0], "val") == ["1890"]

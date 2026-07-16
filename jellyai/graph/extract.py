@@ -77,12 +77,17 @@ def _node_for(token, entities, canon=None):
     """
     start, end = token.get("start"), token.get("end")
     if start is not None and end is not None:
+        best = None
         for e in entities:
-            if e.get("start") is not None and e["start"] <= start and end <= e["end"]:
-                text, typ = e["text"], _entity_type(e)
-                if typ == "person" and canon:
-                    text = canon.get(text, text)
-                return text, typ
+            es, ee = e.get("start"), e.get("end")
+            if es is not None and es <= start and end <= ee:
+                if best is None or (ee - es) > (best["end"] - best["start"]):
+                    best = e            # nejdelší obklopující entita (celé „13. ledna 1890")
+        if best is not None:
+            text, typ = best["text"], _entity_type(best)
+            if typ == "person" and canon:
+                text = canon.get(text, text)
+            return text, typ
     lemma = _clean_lemma(token.get("lemma", ""))
     if not lemma:
         return None
@@ -97,6 +102,32 @@ def _children(sent, head_id):
 def _first(tokens, deprels):
     """První token s `deprel` z množiny, nebo None."""
     return next((t for t in tokens if t.get("deprel") in deprels), None)
+
+
+def _verb_head(index, sent):
+    """Vrátí 1-based id nejbližšího slovesa-předka tokenu (i sebe), nebo None.
+
+    Zanořený atribut (datum/číslo pod přívlastkem) se tak přiřadí slovesu, které ho
+    skutečně řídí — a v souvětí zůstane u svého slovesa, ne u sousedního.
+
+    Args:
+        index (int): 0-based index tokenu ve větě.
+        sent (list[dict]): Věta (tokeny s `head`, 1-based; 0 = kořen).
+
+    Returns:
+        int | None: 1-based id slovesa-předka, nebo None.
+    """
+    seen = set()
+    cur = index
+    while 0 <= cur < len(sent) and cur not in seen:
+        seen.add(cur)
+        if sent[cur].get("upos") == "VERB":
+            return cur + 1
+        head = sent[cur].get("head", 0)
+        if not head:
+            return None
+        cur = head - 1
+    return None
 
 
 def extract_facts(annotation, default_subject=None, canon=None):
@@ -120,6 +151,19 @@ def extract_facts(annotation, default_subject=None, canon=None):
     facts = []
     entities = annotation.get("entities", [])
     for sent in annotation.get("sentences", []):
+        # atributy (čas/místo/číslo) — i zanořené — přiřaď nejbližšímu slovesu-předku
+        attrs_by_verb = {}
+        for i, tok in enumerate(sent):
+            node = _node_for(tok, entities, canon)
+            if node is None:
+                continue
+            role = _ATTR_ROLE.get(node[1])
+            if role is None:
+                continue
+            vh = _verb_head(i, sent)
+            if vh is not None:
+                attrs_by_verb.setdefault(vh, set()).add(Participant(role, node[0], node[1]))
+
         for head_id in range(1, len(sent) + 1):
             head = sent[head_id - 1]
             children = _children(sent, head_id)
@@ -149,13 +193,7 @@ def extract_facts(annotation, default_subject=None, canon=None):
                 o = _node_for(obj, entities, canon)
                 if o:
                     extra.append(Participant("obj", o[0], o[1]))
-            for attr in children:
-                base = (attr.get("deprel") or "").split(":")[0]
-                if base not in _ATTR:
-                    continue
-                a = _node_for(attr, entities, canon)
-                if a and a[1] in _ATTR_ROLE:
-                    extra.append(Participant(_ATTR_ROLE[a[1]], a[0], a[1]))
+            extra.extend(sorted(attrs_by_verb.get(head_id, ()), key=lambda p: (p.role, p.node)))
             if not extra:
                 continue
             subj = subj_node or default_subject
