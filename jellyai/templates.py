@@ -16,6 +16,9 @@ TEMPLATES = {
     "Kde": {"frame": "{answer}", "case": _NOMINATIVE},
     "Kdy": {"frame": "{answer}", "case": None},
     "Kolik": {"frame": "{answer}", "case": None},
+    "Jaký": {"frame": "{answer}", "case": None},        # přísudek/adjektivum — ponech tvar (shodne se sám)
+    "Který": {"frame": "{answer}", "case": _NOMINATIVE},
+    "Čí": {"frame": "{answer}", "case": _NOMINATIVE},   # přivlastnění → osoba v 1. pádě
 }
 
 

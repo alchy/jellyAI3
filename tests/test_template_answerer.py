@@ -67,5 +67,24 @@ def test_to_nominative_without_data_returns_phrase():
     assert _to_nominative("cokoliv", FakeUfalClient()) == "cokoliv"
 
 
+def test_copula_definition_not_tautology():
+    q = "kdo je Rossum?"
+    client = FakeUfalClient(parse={q: [[
+        {"form": "kdo", "lemma": "kdo", "upos": "PRON", "head": 3, "deprel": "nsubj", "start": 0, "end": 3},
+        {"form": "je", "lemma": "být", "upos": "AUX", "head": 3, "deprel": "cop", "start": 4, "end": 6},
+        {"form": "Rossum", "lemma": "Rossum", "upos": "PROPN", "head": 0, "deprel": "root", "start": 7, "end": 13},
+    ]]})
+    passage = Passage("wiki", 1, "Rossum je vynálezce.", 0, 1)
+    annotations = {("wiki", 1): {"entities": [{"text": "Rossum", "type": "P", "start": 0, "end": 6}],
+                                 "sentences": [[
+        {"form": "Rossum", "lemma": "Rossum", "upos": "PROPN", "head": 3, "deprel": "nsubj", "start": 0, "end": 6},
+        {"form": "je", "lemma": "být", "upos": "AUX", "head": 3, "deprel": "cop", "start": 7, "end": 9},
+        {"form": "vynálezce", "lemma": "vynálezce", "upos": "NOUN", "head": 0, "deprel": "root", "start": 10, "end": 19},
+    ]]}}
+    answerer = TemplateAnswerer(client, annotations, ExtractiveAnswerer(AnswererConfig()))
+    result = answerer.answer(q, [(passage, 1.0)])
+    assert result.text == "vynálezce"    # definice, ne tautologie „Rossum"
+
+
 def test_explain_nonempty():
     assert explain().strip()
