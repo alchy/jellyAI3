@@ -9,6 +9,42 @@ externích služeb** (žádná Ollama, žádné API) a s minimem závislostí (n
 > dohledatelná v git historii. Proč a jak vznikla tahle podoba, viz
 > `docs/superpowers/specs/2026-07-15-cesky-gpt-design.md`.
 
+## Knihovna (`import jellyai`)
+
+Píšeš program nad `import jellyai` a skládáš granulární **bloky (porty)** — každý
+jde vyměnit či parametrizovat, včetně pozdějšího zapojení NN. Fasáda `Jelly` je jen
+tenké dráty; `demo()` je zero-setup první krok.
+
+```bash
+pip install -e .        # editovatelná instalace (pak import jellyai funguje odkudkoli)
+```
+
+```python
+import jellyai
+
+jellyai.demo()          # bez modelů: mini-graf + pár odpovědí
+
+# granulárně: retrieval od nuly
+from config import RetrieverConfig
+r = jellyai.Retriever(RetrieverConfig()).build(passages)
+r.search("kdo napsal Babičku", temperature=0.7)   # teplota shody → víc kandidátů
+
+# korpusové nástroje se start/stop (potřebuje ./jelly qa-models)
+with jellyai.CorpusTools() as tools:
+    tools.parse("Karel Čapek se narodil 1890.")
+
+# fasáda: injektuj vlastní/NN port
+jelly = jellyai.Jelly(answerer=muj_answerer)
+ans = jelly.ask("kdo napsal Babičku?")
+print(ans.explain())    # vysvětlitelná odpověď (trasa grafu)
+jelly.save_session("capkovi")     # JSON: váhy těžiště + historie
+```
+
+Porty (rozhraní pro vlastní/NN implementace): `Tokenizer`, `QuestionAnalyzer`,
+`FactExtractor`, `Composer`, `CorpusPort` + existující `Retriever`/`Answerer`.
+Runnable ukázky jsou v `examples/` (01 retrieval, 02 graf, 03 korpus, 04 konverzace,
+05 injektování bloku). Návrh v `docs/superpowers/specs/2026-07-16-library-base-design.md`.
+
 ## Rychlý start (přes `./jelly`)
 
 Wrapper `./jelly` volá vždy správný Python z projektového `.venv`, takže nemusíš
