@@ -1,6 +1,6 @@
 """Testy rozprostření teploty po tokenech (pseudo-attention na úrovni slov)."""
 
-from jellyai.graph.spread import spread_field, _neighbor_weights
+from jellyai.graph.spread import spread_field, entity_candidates, _neighbor_weights
 
 
 def _tok(form, upos, head):
@@ -45,6 +45,29 @@ def test_direction_changes_landscape():
     backward = spread_field(tokens, back=2.0, fwd=0.5)
     forward = spread_field(tokens, back=0.5, fwd=2.0)
     assert backward != forward
+
+
+def _wtok(form, upos, head, lemma=None):
+    return {"form": form, "lemma": lemma or form, "upos": upos, "head": head}
+
+
+def test_entity_candidate_recovers_missing_title():
+    """Role ②: „R.U.R." (chybí, réma za napsal/hru) → kandidát na doplnění."""
+    tokens = [_wtok("Karel", "PROPN", 2), _wtok("Čapek", "PROPN", 3),
+              _wtok("napsal", "VERB", 0, "napsat"), _wtok("hru", "NOUN", 3, "hra"),
+              _wtok("R.U.R.", "PROPN", 4)]
+    cands = entity_candidates(tokens, known={"Čapek", "Karel"})
+    assert "R.U.R." in cands
+
+
+def test_entity_candidate_skips_known_and_subject():
+    """Podmět (téma, chladnější, bez work-kontextu vlevo) a známé uzly se nepřidávají."""
+    tokens = [_wtok("Karel", "PROPN", 2), _wtok("Čapek", "PROPN", 3),
+              _wtok("napsal", "VERB", 0, "napsat"), _wtok("hru", "NOUN", 3, "hra"),
+              _wtok("R.U.R.", "PROPN", 4)]
+    cands = entity_candidates(tokens, known={"Čapek"})
+    assert "Karel" not in cands            # podmět vlevo, žádný work-kontext před ním
+    assert "Čapek" not in cands            # známý uzel
 
 
 def test_empty_sentence():

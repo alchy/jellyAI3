@@ -81,6 +81,44 @@ def spread_field(tokens, *, window=2, tau=1.5, alpha=0.5, steps=3,  # pylint: di
     return heat
 
 
+# slovesa/podstatná jména „tvorby" — v jejich okolí bývá titul díla
+_WORK_VERBS = {"napsat", "vydat", "natočit", "složit", "namalovat", "vytvořit",
+               "dokončit", "publikovat", "sepsat"}
+_WORK_NOUNS = {"hra", "dílo", "kniha", "román", "povídka", "obraz", "film",
+               "báseň", "sbírka", "drama", "text"}
+
+
+def entity_candidates(tokens, known, *, threshold=0.75, window=4):
+    """Role ②: horké spany (autoregresní spread), které v grafu CHYBÍ a vypadají
+    jako titul díla — kandidáti na doplnění entity.
+
+    Filtr: token je horký (≥ threshold), začíná velkým písmenem, není v `known`,
+    a nalevo (réma za slovesem) má v okně „work" sloveso/podstatné (napsal/hra…).
+    Tím se chytí i „R.U.R.", které NER minul. Autoregresní vážení (`back>fwd`)
+    réma na konci klauze rozehřeje.
+
+    Args:
+        tokens (list[dict]): Tokeny věty (form/lemma/upos, head).
+        known (set[str]): Id uzlů, které už v grafu jsou (ty přeskoč).
+        threshold (float): Minimální teplota kandidáta.
+        window (int): Kolik tokenů vlevo prohlédnout na „work" kontext.
+
+    Returns:
+        list[str]: Formy kandidátů na novou entitu (titul díla).
+    """
+    heat = spread_field(tokens, back=2.0, fwd=0.5)
+    out = []
+    for i, tok in enumerate(tokens):
+        form = tok.get("form", "")
+        if heat[i] < threshold or not form[:1].isupper() or form in known:
+            continue
+        left = {(t.get("lemma") or t.get("form", "")).lower()
+                for t in tokens[max(0, i - window):i]}
+        if left & _WORK_VERBS or left & _WORK_NOUNS:
+            out.append(form)
+    return out
+
+
 def heat_landscape(tokens, heat, width=24):
     """Textová „teplotní krajina" věty — token + proužek podle jasu (pro demo)."""
     lines = []
