@@ -25,15 +25,30 @@ class GraphAnswerer(Answerer):
         self.fallback = fallback
 
     def _resolve_topic(self, topic_terms):
-        """Najde uzel tématu (shoda lemmatu s id uzlu), s nejvyšší vahou."""
-        terms = [t.lower() for t in topic_terms if t]
-        best = None
+        """Najde uzel tématu otázky — nejlepší shodu s obsahovými lemmaty.
+
+        Shoda je **case-sensitive** (vlastní jméno „Babička" se nesmí splést
+        s obecným „babička"). Preferuje uzel, který pokrývá **víc témat** (aby
+        „Božena Němcová" přebila samotnou „Němcová"), pak delší (víceslovnou)
+        entitu, a teprve nakonec vyšší frekvenci.
+
+        Args:
+            topic_terms (list[str]): Obsahová lemmata otázky.
+
+        Returns:
+            str | None: Id uzlu tématu, nebo None když nic nesedí.
+        """
+        terms = [t for t in topic_terms if t]
+        best_id, best_score = None, None
         for node in self.graph.nodes.values():
-            nid = node.id.lower()
-            if any(term == nid or term in nid.split() for term in terms):
-                if best is None or node.weight > best.weight:
-                    best = node
-        return best.id if best else None
+            words = node.id.split()
+            hits = sum(1 for t in terms if t == node.id or t in words)
+            if hits == 0:
+                continue
+            score = (hits, len(words), node.weight)
+            if best_score is None or score > best_score:
+                best_id, best_score = node.id, score
+        return best_id
 
     def _pick(self, facts, role):
         """Z faktů vrátí účastníka cílové role z faktu s nejvyšší vahou."""

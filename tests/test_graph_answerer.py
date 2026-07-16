@@ -70,3 +70,21 @@ def test_missing_topic_falls_back():
     ])
     a = GraphAnswerer(_graph(), client, ExtractiveAnswerer(AnswererConfig()))
     assert a.answer(q, []).text != "Rossum"
+
+
+def test_topic_prefers_proper_noun_over_common():
+    # obecné 'babička' má vyšší váhu, ale téma 'Babička' (kniha) se nesmí splést
+    g = FactGraph()
+    for _ in range(9):   # obecné 'babička' hodně časté
+        g.add_fact(make_fact("péct", [Participant("subj", "babička", "concept"),
+                                      Participant("obj", "povídka", "concept")]))
+    g.add_fact(make_fact("napsat", [Participant("subj", "Božena Němcová", "person"),
+                                    Participant("obj", "Babička", "concept")]))
+    q = "kdo napsal Babičku?"
+    client = _client(q, [
+        {"form": "kdo", "lemma": "kdo", "upos": "PRON", "head": 2, "deprel": "nsubj", "start": 0, "end": 3},
+        {"form": "napsal", "lemma": "napsat", "upos": "VERB", "head": 0, "deprel": "root", "start": 4, "end": 10},
+        {"form": "Babičku", "lemma": "Babička", "upos": "PROPN", "head": 2, "deprel": "obj", "start": 11, "end": 18},
+    ])
+    a = GraphAnswerer(g, client, ExtractiveAnswerer(AnswererConfig()))
+    assert a.answer(q, []).text == "Božena Němcová"
