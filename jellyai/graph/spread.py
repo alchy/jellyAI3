@@ -29,7 +29,7 @@ def _base_heat(tokens):
     return heat
 
 
-def _neighbor_weights(tokens, window, tau, use_dep, back, fwd):
+def _neighbor_weights(tokens, window, tau, use_dep, back, fwd):  # pylint: disable=too-many-arguments,too-many-positional-arguments
     """Váhy sousedství: lineární okno (exp(−d/τ)) se **směrovým** faktorem — levý
     (předchozí) soused × `back`, pravý (následující) × `fwd` — plus symetrické
     hrany závislostí. `back==fwd==1` = symetrie; text je ale autoregresní, tak
