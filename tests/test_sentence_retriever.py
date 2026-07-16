@@ -1,0 +1,25 @@
+import numpy as np
+from config import RetrieverConfig
+from jellyai.loader import Document
+from jellyai.sentence_retriever import distance_activation, SentenceRetriever
+
+
+def test_distance_activation_decays_and_respects_file_boundary():
+    base = [0.0, 1.0, 0.0, 5.0]
+    sent_doc = ["a", "a", "a", "b"]
+    sent_local = [0, 1, 2, 0]
+    finals = distance_activation(base, sent_doc, sent_local, tau=1.0)
+    assert finals[1] == 1.0                          # vrchol si drží své
+    assert finals[0] == finals[2]                    # symetrie sever/jih
+    assert abs(finals[0] - np.exp(-1.0)) < 1e-9      # útlum o 1 krok
+    assert finals[3] == 5.0                           # jiný soubor: 5 nikam nezasáhne
+
+
+def test_build_indexes_sentences_per_document():
+    docs = [Document("da", "da", "Alfa jedna. Klíč je tady. Gama tři."),
+            Document("db", "db", "Delta prší. Epsilon svítí.")]
+    sr = SentenceRetriever(RetrieverConfig()).build(docs)
+    assert len(sr.sent_text) == 5
+    assert sr.sent_doc == ["da", "da", "da", "db", "db"]
+    assert sr.sent_local == [0, 1, 2, 0, 1]          # lokální index se resetuje per dokument
+    assert sr._bounds["da"] == (0, 3) and sr._bounds["db"] == (3, 5)
