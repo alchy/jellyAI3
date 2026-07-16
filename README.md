@@ -41,9 +41,16 @@ jelly.save_session("capkovi")     # JSON: váhy těžiště + historie
 ```
 
 Porty (rozhraní pro vlastní/NN implementace): `Tokenizer`, `QuestionAnalyzer`,
-`FactExtractor`, `Composer`, `CorpusPort` + existující `Retriever`/`Answerer`.
+`FactExtractor`, `Composer`, `CorpusPort`, `GraphView` + existující `Retriever`/`Answerer`.
+
+**Web vizualizace (viewBase):** `./jelly web` spustí prohlížeč s grafem nahoře a
+promptem dole; při dotazu se graf **živě rozsvěcuje** (těžiště) a **proletí trasa**
+(`ViewBaseView` = adaptér portu `GraphView`, volitelný `pip install viewbase`; jádro
+knihovny viewBase nepotřebuje). Terminál i web volají tutéž `ask`.
+
 Runnable ukázky jsou v `examples/` (01 retrieval, 02 graf, 03 korpus, 04 konverzace,
-05 injektování bloku). Návrh v `docs/superpowers/specs/2026-07-16-library-base-design.md`.
+05 injektování bloku, 06 web). Návrh v
+`docs/superpowers/specs/2026-07-16-library-base-design.md` a `…-phase2-viewbase-design.md`.
 
 ## Rychlý start (přes `./jelly`)
 

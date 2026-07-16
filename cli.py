@@ -262,6 +262,37 @@ def cmd_graph(config, view=False):
     return len(graph.nodes)
 
 
+def cmd_web(config, view=None):
+    """Spustí webovou vizualizaci: graf ve viewBase + prompt pro dotazy.
+
+    Terminál i web volají tutéž `answer`. Při dotazu se do grafu promítne aktivace
+    nodů (těžiště) a trasa (flow). `view` lze injektovat (testy/vlastní UI);
+    None = výchozí `ViewBaseView` nad uloženým grafem.
+
+    Args:
+        config (Config): Konfigurace (graf, služby).
+        view: Injektovaný GraphView (None = ViewBaseView).
+
+    Returns:
+        None: Interakce běží v prohlížeči.
+    """
+    from jellyai.tasks import make_graph_answerer, load_fact_graph
+    from jellyai.viz.reflect import reflect
+    answerer = make_graph_answerer(config)
+    if view is None:
+        from jellyai.viz.viewbase_view import ViewBaseView
+        view = ViewBaseView("jellyAI3").from_graph(load_fact_graph(config))
+
+    def on_query(question):
+        answer = answerer.answer(question, [])
+        reflect(view, answerer)          # rozsvítí nody + flow po trase
+        print(f"💬 {answer.text}")
+        return answer.text
+
+    view.on_prompt(on_query)
+    view.serve(open_browser=True)
+
+
 def _build_parser():
     """Sestaví argparse parser se všemi příkazy.
 
@@ -293,6 +324,7 @@ def _build_parser():
     sub.add_parser("annotate", parents=[common], help="offline anotace pasáží (entity+role) pro V3")
     p_graph = sub.add_parser("graph", parents=[common], help="postaví faktový graf z anotací")
     p_graph.add_argument("--view", action="store_true", help="export do viewBase")
+    sub.add_parser("web", parents=[common], help="webová vizualizace grafu + prompt (viewBase)")
     p_ask = sub.add_parser("ask", parents=[common], help="odpoví na jeden dotaz")
     p_ask.add_argument("question", help="otázka v češtině")
     p_explain = sub.add_parser("explain", parents=[common], help="popíše blok")
@@ -345,6 +377,8 @@ def main(argv=None):
         cmd_annotate(config)
     elif args.command == "graph":
         cmd_graph(config, view=args.view)
+    elif args.command == "web":
+        cmd_web(config)
     elif args.command == "ask":
         print(cmd_ask(config, args.question))
     elif args.command == "explain":
