@@ -2,9 +2,24 @@
 
 viewBase je force-graph (Three.js + d3-force-3d) a umí `Canvas.from_networkx(G)`.
 Do grafu jdou **entitní uzly i faktové uzly** (faktový uzel má typ `fact`, popisek =
-predikát); hrany jsou role-hrany fakt→účastník s vahou faktu. `to_networkx` je
-primární most (líný import), `to_json` je bezzávislostní alternativa.
+predikát); hrany jsou role-hrany fakt→účastník s vahou faktu. Osobní uzly nesou
+i morfologii (`gender` z tvaru jména, počet sloučených pádových tvarů) — viz je
+může obarvit/popsat. `to_networkx` je primární most (líný import), `to_json` je
+bezzávislostní alternativa.
 """
+
+from jellyai.graph.canon import name_gender
+
+
+def _node_attrs(node, graph):
+    """Atributy entitního uzlu pro export (osoby: rod + sloučené tvary)."""
+    attrs = {"type": node.type, "weight": node.weight, "label": node.id}
+    if node.type == "person":
+        attrs["gender"] = name_gender(node.id)
+        merged = getattr(graph, "aliases", {}).get(node.id)
+        if merged:
+            attrs["variants"] = len(merged)
+    return attrs
 
 
 def _fact_id(fact_node):
@@ -21,8 +36,7 @@ def to_json(graph):
     Returns:
         dict: {"nodes": [{id,type,weight,label}], "edges": [{src,dst,role,weight}]}.
     """
-    nodes = [{"id": n.id, "type": n.type, "weight": n.weight, "label": n.id}
-             for n in graph.nodes.values()]
+    nodes = [{"id": n.id, **_node_attrs(n, graph)} for n in graph.nodes.values()]
     edges = []
     for fact in graph.facts.values():
         fid = _fact_id(fact)
@@ -49,7 +63,7 @@ def to_networkx(graph):
     import networkx as nx
     g = nx.DiGraph()
     for n in graph.nodes.values():
-        g.add_node(n.id, type=n.type, weight=n.weight, label=n.id)
+        g.add_node(n.id, **_node_attrs(n, graph))
     for fact in graph.facts.values():
         fid = _fact_id(fact)
         g.add_node(fid, type="fact", weight=fact.weight, label=fact.predicate)

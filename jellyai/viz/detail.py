@@ -2,10 +2,13 @@
 
 Čistě z `FactGraph` (žádný viewBase) → hermeticky testovatelné. Řádky
 `(popisek, hodnota)` naplní ve viewBase detailní okno (metadata uzlu), aby klik
-na uzel ukázal jeho typ, váhu (opakování) a fakty — výukově cenné. Faktový uzel
-má vlastní řádky (predikát + účastníci). Agregace faktů podle predikátu drží
-popisky unikátní (klíč metadat) a čitelné.
+na uzel ukázal jeho typ, váhu (opakování), **morfologii** (rod z tvaru jména,
+kmenový klíč, sloučené pádové tvary z resolveru) a fakty — výukově cenné.
+Faktový uzel má vlastní řádky (predikát + účastníci). Agregace faktů podle
+predikátu drží popisky unikátní (klíč metadat) a čitelné.
 """
+
+from jellyai.graph.canon import cluster_key, name_gender
 
 _MAX_GROUPS = 5      # kolik spojení (predikátů) v detailu ukázat — jinak přeteče
 _MAX_PARTNERS = 4    # kolik partnerů na jeden řádek
@@ -43,6 +46,15 @@ def node_detail_rows(graph, node_id):
         return [("uzel", node_id)]
     rows = [("typ", _CZ_TYPE.get(node.type, node.type)),
             ("váha", str(node.weight))]
+    if node.type == "person":
+        # morfologie osoby: rod z tvaru jména, kmenový klíč clusteru a
+        # pádové tvary, které resolver sloučil do tohoto uzlu
+        rows.append(("rod (tvar jména)",
+                     "ženský" if name_gender(node_id) == "Fem" else "mužský"))
+        rows.append(("kmen", " ".join(cluster_key(node_id))))
+        merged = getattr(graph, "aliases", {}).get(node_id)
+        if merged:
+            rows.append(("sloučené tvary", ", ".join(merged)))
     groups = {}           # popisek → {partneři, váha (opakování), pořadí}
     for order, fact in enumerate(graph.facts_of(node_id)):
         is_subject = any(p.role == "subj" and p.node == node_id

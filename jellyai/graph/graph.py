@@ -81,10 +81,11 @@ class FactGraph:
     """Graf entitních a faktových uzlů propojených role-hranami."""
 
     def __init__(self):
-        """Prázdný graf (`nodes`, `facts`, index `_by_node`)."""
+        """Prázdný graf (`nodes`, `facts`, index `_by_node`, `aliases`)."""
         self.nodes = {}
         self.facts = {}
         self._by_node = {}
+        self.aliases = {}    # kanonické id → sloučené tvary (plní resolver)
 
     def add_fact(self, fact):
         """Přidá fakt: sloučí podle identity (`váha++`) nebo založí; udrží indexy.
@@ -165,7 +166,7 @@ class FactGraph:
             os.makedirs(directory, exist_ok=True)
         with open(path, "wb") as f:
             pickle.dump({"nodes": self.nodes, "facts": self.facts,
-                         "by_node": self._by_node}, f)
+                         "by_node": self._by_node, "aliases": self.aliases}, f)
         return path
 
     @classmethod
@@ -177,6 +178,7 @@ class FactGraph:
         g.nodes = state["nodes"]
         g.facts = state["facts"]
         g._by_node = state["by_node"]
+        g.aliases = state.get("aliases", {})
         return g
 
 
@@ -400,5 +402,20 @@ def resolve_entities(graph):
                                      moved.participants)
         else:
             existing.weight += fact.weight
+    _record_aliases(graph, node_map)
     graph.replace_facts(remapped)
     return graph
+
+
+def _record_aliases(graph, node_map):
+    """Zapamatuje sloučené tvary (kanonické id → aliasy) pro detail uzlu ve
+    vizualizaci a vysvětlitelnost kanonizace; opakovaný běh resolveru dřívější
+    aliasy přemapuje (idempotence)."""
+    aliases = {}
+    for old, new in node_map.items():
+        aliases.setdefault(new, set()).add(old)
+    for canonical, olds in graph.aliases.items():
+        target = node_map.get(canonical, canonical)
+        aliases.setdefault(target, set()).update(olds)
+    graph.aliases = {key: sorted(values)
+                     for key, values in sorted(aliases.items())}

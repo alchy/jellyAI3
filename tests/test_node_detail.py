@@ -55,7 +55,8 @@ def test_caps_to_five_most_frequent_connections():
     rows = node_detail_rows(g, "Autor")
     labels = [k for k, _ in rows]
     assert labels[:2] == ["typ", "váha"]
-    assert len(rows) == 2 + 5                    # typ, váha + top 5 spojení
+    # typ, váha + morfologie osoby (rod, kmen) + top 5 spojení
+    assert len(rows) == 2 + 2 + 5
     assert "pred0 →" in labels                   # nejčastější (3x) se vejde
     assert dict(rows)["pred0 →"] == "cíl0"
 
@@ -80,3 +81,19 @@ def test_fact_rows_predicate_weight_participants():
     assert rows["váha"] == "1"
     assert rows["subj"] == "Božena Němcová"
     assert rows["obj"] == "Babička"
+
+
+def test_person_rows_carry_morphology():
+    """Detail osoby nese morfologii: rod (z tvaru jména), kmenový klíč a
+    sloučené pádové tvary z resolveru (pokyn: rysy v popisu uzlů vizualizace)."""
+    from jellyai.graph.graph import resolve_entities
+    g = FactGraph()
+    g.add_fact(make_fact("napsat", [Participant("subj", "Božena Němcová", "person"),
+                                    Participant("obj", "Babička", "concept")]))
+    g.add_fact(make_fact("číst", [Participant("subj", "lid", "concept"),
+                                  Participant("obj", "Boženy Němcové", "person")]))
+    resolve_entities(g)
+    rows = dict(node_detail_rows(g, "Božena Němcová"))
+    assert rows["rod (tvar jména)"] == "ženský"
+    assert rows["kmen"] == "božn němc"
+    assert "Boženy Němcové" in rows["sloučené tvary"]

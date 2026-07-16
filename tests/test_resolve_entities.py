@@ -116,3 +116,15 @@ def test_resolve_is_idempotent_and_deterministic():
     g1, g2 = build(), build()
     assert list(g1.facts.keys()) == list(g2.facts.keys())
     assert list(resolve_entities(g1).facts.keys()) == list(g2.facts.keys())
+
+
+def test_resolver_records_aliases_of_merged_forms():
+    """Sloučené tvary se pamatují (graph.aliases) — pro detail uzlu ve viz
+    a pro vysvětlitelnost kanonizace."""
+    g = FactGraph()
+    g.add_fact(_narodit("Josef Čapek", "Hronově"))
+    g.add_fact(_bratr("Karel Antonín Čapek", "Josefa Čapka"))
+    resolve_entities(g)
+    assert "Josefa Čapka" in g.aliases.get("Josef Čapek", [])
+    again = resolve_entities(g)      # idempotence drží i aliasy
+    assert "Josefa Čapka" in again.aliases["Josef Čapek"]
