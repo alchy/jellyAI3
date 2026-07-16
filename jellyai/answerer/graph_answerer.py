@@ -12,6 +12,7 @@ from jellyai.answerer.question import analyze_question
 from jellyai.answerer.pattern import question_pattern, SubQuery
 from jellyai.answerer.template import _to_nominative
 from jellyai.graph.activation import ActivationField
+from jellyai.graph.canon import _stem
 
 _DATE_PARTS = {"rok", "měsíc", "den"}   # drill: „v kterém roce/měsíci…"
 
@@ -62,7 +63,10 @@ class GraphAnswerer(Answerer):
         **Přesná shoda velikosti má přednost**, case-insensitive je fallback:
         UDPipe někdy velikost zachová (PROPN „Babička" → lemma „Babička" — odliší
         knihu od obecné „babička"), jindy lemmatizuje na malá („Vějíř"→„vějíř" —
-        pak by kapitalizovaný uzel byl jinak jménem nedostupný). Dál preferuje uzel
+        pak by kapitalizovaný uzel byl jinak jménem nedostupný). Třetí patro je
+        **kmenová shoda** (`canon._stem` — týž mechanismus jako build-side
+        `resolve_entities`): skloněný termín („Galéna") tak dosáhne na kanonický
+        uzel („Galén"), aniž by kdy přebil přesnější shodu. Dál preferuje uzel
         pokrývající **víc témat** (aby „Božena Němcová" přebila „Němcová"), delší
         (víceslovnou) entitu a nakonec vyšší frekvenci.
 
@@ -74,17 +78,20 @@ class GraphAnswerer(Answerer):
         """
         terms = [t for t in topic_terms if t]
         low_terms = [t.lower() for t in terms]
+        stems = [_stem(t) for t in terms]
         best_id, best_score = None, None
         for node in self.graph.nodes.values():
             low_id = node.id.lower()
             low_words = low_id.split()
             ins_hits = sum(1 for t in low_terms if t == low_id or t in low_words)
-            if ins_hits == 0:
+            node_stems = {_stem(w) for w in low_words}
+            stem_hits = sum(1 for s in stems if s in node_stems)
+            if ins_hits == 0 and stem_hits == 0:
                 continue
-            words = node.id.split()
-            exact_hits = sum(1 for t in terms if t == node.id or t in words)
-            # přesná shoda velikosti > jen case-insensitive; pak témata, délka, váha
-            score = (exact_hits, ins_hits, len(low_words), node.weight)
+            exact_hits = sum(1 for t in terms
+                             if t == node.id or t in node.id.split())
+            # přesná > case-insensitive > kmenová; pak témata, délka, váha
+            score = (exact_hits, ins_hits, stem_hits, len(low_words), node.weight)
             if best_score is None or score > best_score:
                 best_id, best_score = node.id, score
         return best_id
