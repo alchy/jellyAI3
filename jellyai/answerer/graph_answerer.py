@@ -183,7 +183,7 @@ class GraphAnswerer(Answerer):
                 self._remember(qa, topic, value)
                 self._log_turn(question, topic, fact.predicate, value)
                 return Answer(text=value, sources=["graf"], score=1.0,
-                              alternatives=alternatives)
+                              alternatives=alternatives, trace=self.last_trace)
         self.context.step()
         self._log_turn(question, topic, None, None)
         return self.fallback.answer(question, retrieved)
