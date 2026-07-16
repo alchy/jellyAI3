@@ -6,5 +6,7 @@ data/processed/
 data/*.pkl
 data/qa/
 data/models/
+data/annotations.pkl
+model/udpipe*
 *.egg-info/
 .pytest_cache/

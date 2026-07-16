@@ -27,3 +27,11 @@ def test_config_has_qagen_defaults():
     assert cfg.qagen.min_tokens == 5
     assert cfg.qagen.max_answers_per_sentence == 2
     assert "Kdo" in cfg.qagen.types
+
+
+def test_config_has_v3_defaults():
+    cfg = Config()
+    assert cfg.answerer.mode == "extractive"
+    assert cfg.services.host == "127.0.0.1"
+    assert cfg.services.udpipe_port == 8082
+    assert cfg.services.annotations_path == "data/annotations.pkl"

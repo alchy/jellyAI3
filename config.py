@@ -73,9 +73,11 @@ class AnswererConfig:
     Atributy:
         max_sentences (int): Kolik vět nejvýš vrátit jako odpověď (V1: typicky 1).
         template (bool): Zda odpověď zabalit do šablony („Podle textu: …").
+        mode (str): Který answerer použít — "extractive" (V1) nebo "template" (V3).
     """
     max_sentences: int = 1
     template: bool = True
+    mode: str = "extractive"
 
 
 @dataclass
@@ -103,6 +105,31 @@ class QagenConfig:
 
 
 @dataclass
+class ServicesConfig:
+    """Nastavení ÚFAL služeb (V3 — každý nástroj jako vlastní localhost proces).
+
+    NameTag, UDPipe a MorphoDiTa se v jednom procesu perou (sdílený SWIG typ),
+    tak každý běží samostatně a mluví se s ním přes malé HTTP API na localhostu.
+
+    Atributy:
+        host (str): Adresa, kde služby poslouchají (jen localhost).
+        nametag_port, udpipe_port, morpho_port (int): Porty jednotlivých služeb.
+        nametag_model, morphodita_model, udpipe_model (str): Cesty k modelům.
+        startup_timeout (float): Max. čekání na naběhnutí služby (s).
+        annotations_path (str): Kam ukládat offline anotace pasáží.
+    """
+    host: str = "127.0.0.1"
+    nametag_port: int = 8081
+    udpipe_port: int = 8082
+    morpho_port: int = 8083
+    nametag_model: str = "data/models/czech-cnec.ner"
+    morphodita_model: str = "data/models/czech-morfflex.tagger"
+    udpipe_model: str = "data/models/udpipe-czech.model"
+    startup_timeout: float = 30.0
+    annotations_path: str = "data/annotations.pkl"
+
+
+@dataclass
 class Config:
     """Zastřešující konfigurace — jeden objekt vládne všem blokům.
 
@@ -112,9 +139,11 @@ class Config:
         retriever (RetrieverConfig): Nastavení vyhledávání.
         answerer (AnswererConfig): Nastavení skládání odpovědi.
         qagen (QagenConfig): Nastavení generování syntetických QA dat (V2).
+        services (ServicesConfig): Nastavení ÚFAL localhost služeb (V3).
     """
     data: DataConfig = field(default_factory=DataConfig)
     chunker: ChunkerConfig = field(default_factory=ChunkerConfig)
     retriever: RetrieverConfig = field(default_factory=RetrieverConfig)
     answerer: AnswererConfig = field(default_factory=AnswererConfig)
     qagen: QagenConfig = field(default_factory=QagenConfig)
+    services: ServicesConfig = field(default_factory=ServicesConfig)
