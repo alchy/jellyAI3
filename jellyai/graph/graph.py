@@ -238,6 +238,7 @@ def build_graph(annotations):
             _warm_persons(field, annotation, canon)
             field.step()
     _decompose_dates(graph)
+    resolve_entities(graph)
     return graph
 
 

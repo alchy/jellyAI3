@@ -101,6 +101,32 @@ def test_person_canonicalization_unifies_prodrop():
     assert not g.facts_of("Karel", role="subj", predicate="narodit")     # fragment nezůstal
 
 
+def test_build_graph_merges_case_variants_across_documents():
+    # d1: nominativ (malovat); d2: genitivní zmínka (bratr-relace) → po buildu 1 uzel
+    A = {
+        ("d1", 0): {"entities": [{"text": "Josef Čapek", "type": "P", "start": 0, "end": 11}],
+                    "sentences": [[
+            {"form": "Josef", "lemma": "Josef", "upos": "PROPN", "head": 3, "deprel": "nsubj", "start": 0, "end": 5},
+            {"form": "Čapek", "lemma": "Čapek", "upos": "PROPN", "head": 1, "deprel": "flat", "start": 6, "end": 11},
+            {"form": "maloval", "lemma": "malovat", "upos": "VERB", "head": 0, "deprel": "root", "start": 12, "end": 19},
+            {"form": "obrazy", "lemma": "obraz", "upos": "NOUN", "head": 3, "deprel": "obj", "start": 20, "end": 26},
+        ]]},
+        ("d2", 0): {"entities": [{"text": "Karel", "type": "P", "start": 0, "end": 5},
+                                 {"text": "Josefa Čapka", "type": "P", "start": 16, "end": 28}],
+                    "sentences": [[
+            {"form": "Karel", "lemma": "Karel", "upos": "PROPN", "head": 3, "deprel": "nsubj", "start": 0, "end": 5},
+            {"form": "byl", "lemma": "být", "upos": "AUX", "head": 3, "deprel": "cop", "start": 6, "end": 9},
+            {"form": "bratr", "lemma": "bratr", "upos": "NOUN", "head": 0, "deprel": "root", "start": 10, "end": 15},
+            {"form": "Josefa", "lemma": "Josef", "upos": "PROPN", "head": 3, "deprel": "nmod", "start": 16, "end": 22},
+            {"form": "Čapka", "lemma": "Čapek", "upos": "PROPN", "head": 4, "deprel": "flat", "start": 23, "end": 28},
+        ]]},
+    }
+    g = build_graph(A)
+    assert "Josefa Čapka" not in g.nodes
+    bratr = g.facts_of("Josef Čapek", role="obj", predicate="bratr")
+    assert bratr and g.participants(bratr[0], "subj") == ["Karel"]
+
+
 def _capek_birth_annotations():
     return {("d", 0): {"entities": [{"text": "Karel Čapek", "type": "P", "start": 0, "end": 11},
                                     {"text": "13. ledna 1890", "type": "T", "start": 24, "end": 37}],

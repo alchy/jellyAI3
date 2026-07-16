@@ -9,7 +9,7 @@ anotacemi (build/load grafu) jdou použít bez modelů.
 # pylint: disable=import-outside-toplevel
 from jellyai.loader import load_documents
 from jellyai.annotate import annotate_documents, save_annotations, load_annotations
-from jellyai.graph.graph import build_graph, FactGraph
+from jellyai.graph.graph import build_graph, resolve_entities, FactGraph
 
 
 def annotate_corpus(config, client=None):
@@ -49,6 +49,7 @@ def build_fact_graph(config):
     graph = build_graph(annotations)
     from jellyai.graph.recover import recover_entities
     recover_entities(annotations, graph)      # role ②: doplnit tituly, co NER minul
+    resolve_entities(graph)   # recover bere podměty ze surového povrchu → srovnat znovu
     graph.save(config.graph.graph_path)
     return graph
 
