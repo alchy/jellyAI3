@@ -1,19 +1,19 @@
 """Kanonizace entit clusteringem variant — robustní náhrada za lemma-normalizaci.
 
-⚠️ PARKOVÁNO: de-riskováno a otestováno (viz test_canon.py), ale ZATÍM NEZAPOJENO
-do `build_graph`. Prosté zapojení dělá „whack-a-mole" — přejmenování uzlů rozhýbe
-pro-drop koreferenci a fakty se stěhují (etalon zůstal 9/11, jen s jinou rozbitou
-dvojicí). Robustní nasazení chce **coreference-aware entity resolution** (sjednotit
-i fragmenty Karel↔Karel Antonín Čapek a query-side), ne jen tuto clustering vrstvu.
-Necháno jako otestovaný stavební kámen pro ten principiální krok.
-
+ZAPOJENO (2026-07-16): `cluster_key`/`_stem` pohání **post-build resolver**
+`graph.resolve_entities` (build-side sloučení pádových uzlů) a kmenový fallback
+v `_resolve_topic` (query-side) — týž mechanismus na obou stranách, takže se
+nerozejdou. Post-build pass obchází dřívější „whack-a-mole" (přejmenování uzlů
+za běhu buildu hýbalo pro-drop koreferencí): koreference doběhne nad povrchovými
+tvary a sjednocuje se až hotový graf. `build_entity_canon` zůstává nezapojený
+obecný nástroj (frekvenční kanonizace povrchových tvarů).
 
 Povrchový tvar tříští jednu entitu na víc uzlů podle pádu („Božena Němcová" /
 „Boženy Němcové" / „Boženu Němcovou"). Morfologie (UDPipe lemma i MorphoDiTa) je
 na česká vlastní jména nespolehlivá. Proto **neodvozujeme nominativ** — místo toho
-**shlukujeme varianty** podle kmene a za kanonické id bereme **nejčastější tvar**
-clusteru (nominativ bývá nejfrekventovanější). Jeden špatný tvar tak identitu
-nerozbije. Klíč = n-tice kmenů slov: pádové koncovky mění konec slova, kmen drží.
+**shlukujeme varianty** podle kmene. Klíč = n-tice kmenů slov: pádové koncovky
+mění konec slova, kmen drží. Pravidla kmenování jsou **data jazyka**
+(`jellyai/lang/<jazyk>.json`) — jazyk je zásuvný modul, ne kód.
 
 Souvisí s [[jellyai3-fact-graph]] (řeší tříštění entit — agentem označený #1 dopad).
 """

@@ -8,6 +8,8 @@
 {"q": "Co se stalo 2. května 1818?", "expect": ["Božena Němcová"], "cat": "reverzní"}
 {"q": "Kdo byl bratr Karla Čapka?", "expect": ["Josef"], "cat": "vztah"}
 {"q": "Kdo byl bratr Josefa Čapka?", "expect": ["Karel"], "cat": "vztah"}
+{"q": "Kde se narodil bratr Karla Čapka?", "expect": ["Hronov"], "cat": "rekurze"}
+{"q": "Kde se narodil bratr Josefa Čapka?", "expect": ["Svatoňovic"], "cat": "rekurze"}
 {"q": "Jaký je robot?", "expect": ["umělý", "člověku", "stroj"], "cat": "vlastnost"}
 {"q": "Kdo je Božena Němcová?", "expect": ["spisovatelka", "spisovatel"], "cat": "identita", "gap": "copula-profese (#5): vrací 'úřad'"}
 {"q": "Kdo napsal R.U.R.?", "expect": ["Čapek"], "cat": "autor", "gap": "tokenizace tečkované zkratky (#3)"}

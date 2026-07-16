@@ -1,5 +1,17 @@
 # Blocker: jednoznačná identifikace entity (genitiv ↔ nominativ)
 
+> ✅ **VYŘEŠENO (2026-07-16, větev `entity-resolution`)** cestou **A** — post-build
+> `resolve_entities(graph)` + query-side kmenový fallback v `_resolve_topic`.
+> Odchylka od návrhu níže: kanonický tvar clusteru **není** `argmax(subj_count,…)`
+> — sonda ukázala, že pro-drop koreference rozdává podměty i genitivním uzlům
+> (`Karla Čapka` subj=14, `Van Tocha` subj=7), takže subj_count vybírá genitiv.
+> Místo toho **lexikograficky nejmenší člen clusteru**: pádové koncovky nominativ
+> prodlužují, minimum = nominativ (ověřeno na všech 15 vícečlenných clusterech
+> grafu). Stemmer doplněn o dativ `-ovi`; pravidla kmenování přesunuta do
+> `jellyai/lang/cs.json` (jazyk = zásuvný modul). Výsledek: etalon **12/13 (92 %)**
+> — obě strany bratr-symetrie i obě rekurze („Kde se narodil bratr X?") v jádru.
+> Plán: `docs/superpowers/plans/2026-07-16-entity-resolution.md`.
+
 > **Handoff pro novou instanci.** Refaktor odpovídače je hotový a commitnutý
 > (`b9aee99`), etalon JÁDRO 9/11, 206 testů prochází. Tenhle dokument popisuje
 > **blocker, který drží další rozvoj**, s tvrdými daty z grafu a s **cestami ven**.
