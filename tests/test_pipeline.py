@@ -54,3 +54,19 @@ def test_build_retriever_picks_sentence_for_sentence_granularity():
 
     cfg_pass = Config(); cfg_pass.retriever = RetrieverConfig(granularity="passage")
     assert isinstance(_build_retriever(cfg_pass, docs), Retriever)
+
+
+def test_make_answerer_graph_mode(tmp_path):
+    from config import Config, GraphConfig, AnswererConfig
+    from jellyai.graph.graph import FactGraph
+    from jellyai.graph.extract import make_fact, Participant
+    from jellyai.pipeline import _make_answerer
+    from jellyai.answerer.graph_answerer import GraphAnswerer
+    g = FactGraph()
+    g.add_fact(make_fact("být", [Participant("subj", "A", "concept"),
+                                 Participant("pred", "B", "concept")]))
+    path = str(tmp_path / "graph.pkl"); g.save(path)
+    cfg = Config()
+    cfg.graph = GraphConfig(graph_path=path)
+    cfg.answerer = AnswererConfig(mode="graph")
+    assert isinstance(_make_answerer(cfg), GraphAnswerer)

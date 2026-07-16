@@ -79,7 +79,7 @@ class AnswererConfig:
     Atributy:
         max_sentences (int): Kolik vět nejvýš vrátit jako odpověď (V1: typicky 1).
         template (bool): Zda odpověď zabalit do šablony („Podle textu: …").
-        mode (str): Který answerer použít — "extractive" (V1) nebo "template" (V3).
+        mode (str): Který answerer — "extractive" (V1), "template" (V3), "graph".
     """
     max_sentences: int = 1
     template: bool = True
@@ -136,6 +136,16 @@ class ServicesConfig:
 
 
 @dataclass
+class GraphConfig:
+    """Nastavení faktového grafu.
+
+    Atributy:
+        graph_path (str): Cesta k uloženému faktovému grafu.
+    """
+    graph_path: str = "data/graph.pkl"
+
+
+@dataclass
 class Config:
     """Zastřešující konfigurace — jeden objekt vládne všem blokům.
 
@@ -146,6 +156,7 @@ class Config:
         answerer (AnswererConfig): Nastavení skládání odpovědi.
         qagen (QagenConfig): Nastavení generování syntetických QA dat (V2).
         services (ServicesConfig): Nastavení ÚFAL localhost služeb (V3).
+        graph (GraphConfig): Nastavení faktového grafu.
     """
     data: DataConfig = field(default_factory=DataConfig)
     chunker: ChunkerConfig = field(default_factory=ChunkerConfig)
@@ -153,3 +164,4 @@ class Config:
     answerer: AnswererConfig = field(default_factory=AnswererConfig)
     qagen: QagenConfig = field(default_factory=QagenConfig)
     services: ServicesConfig = field(default_factory=ServicesConfig)
+    graph: GraphConfig = field(default_factory=GraphConfig)
