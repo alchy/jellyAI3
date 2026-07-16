@@ -41,3 +41,37 @@ def test_graph_save_load_roundtrip(tmp_path):
     loaded = FactGraph.load(path)
     assert list(loaded.facts.keys()) == list(g.facts.keys())
     assert loaded.facts_of("Čapek", predicate="narodit")[0].weight == 1
+
+
+def test_prodrop_follows_active_subject():
+    # Karel byl spisovatel. Narodil se 1890. Josef byl malíř. Zemřel 1945.
+    # → narození patří Karlovi, smrt Josefovi (aktivace sleduje aktuální subjekt)
+    A = {
+        ("d", 0): {"entities": [{"text": "Karel Čapek", "type": "P", "start": 0, "end": 11}],
+                   "sentences": [[
+            {"form": "Karel", "lemma": "Karel", "upos": "PROPN", "head": 3, "deprel": "nsubj", "start": 0, "end": 5},
+            {"form": "Čapek", "lemma": "Čapek", "upos": "PROPN", "head": 1, "deprel": "flat", "start": 6, "end": 11},
+            {"form": "byl", "lemma": "být", "upos": "AUX", "head": 3, "deprel": "cop", "start": 12, "end": 15},
+            {"form": "spisovatel", "lemma": "spisovatel", "upos": "NOUN", "head": 0, "deprel": "root", "start": 16, "end": 26},
+        ]]},
+        ("d", 1): {"entities": [], "sentences": [[
+            {"form": "Narodil", "lemma": "narodit", "upos": "VERB", "head": 0, "deprel": "root", "start": 0, "end": 7},
+            {"form": "se", "lemma": "se", "upos": "PRON", "head": 1, "deprel": "expl", "start": 8, "end": 10},
+            {"form": "1890", "lemma": "1890", "upos": "NUM", "head": 1, "deprel": "obl", "start": 15, "end": 19},
+        ]]},
+        ("d", 2): {"entities": [{"text": "Josef Čapek", "type": "P", "start": 0, "end": 11}],
+                   "sentences": [[
+            {"form": "Josef", "lemma": "Josef", "upos": "PROPN", "head": 3, "deprel": "nsubj", "start": 0, "end": 5},
+            {"form": "Čapek", "lemma": "Čapek", "upos": "PROPN", "head": 1, "deprel": "flat", "start": 6, "end": 11},
+            {"form": "byl", "lemma": "být", "upos": "AUX", "head": 3, "deprel": "cop", "start": 12, "end": 15},
+            {"form": "malíř", "lemma": "malíř", "upos": "NOUN", "head": 0, "deprel": "root", "start": 16, "end": 21},
+        ]]},
+        ("d", 3): {"entities": [], "sentences": [[
+            {"form": "Zemřel", "lemma": "zemřít", "upos": "VERB", "head": 0, "deprel": "root", "start": 0, "end": 6},
+            {"form": "1945", "lemma": "1945", "upos": "NUM", "head": 1, "deprel": "obl", "start": 7, "end": 11},
+        ]]},
+    }
+    g = build_graph(A)
+    assert g.facts_of("Karel Čapek", role="subj", predicate="narodit")
+    assert g.facts_of("Josef Čapek", role="subj", predicate="zemřít")
+    assert not g.facts_of("Karel Čapek", role="subj", predicate="zemřít")

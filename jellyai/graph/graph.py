@@ -9,7 +9,8 @@ import os
 import pickle
 from dataclasses import dataclass
 
-from jellyai.graph.extract import extract_facts
+from jellyai.graph.extract import extract_facts, _SUBJ
+from jellyai.graph.activation import ActivationField
 
 
 @dataclass
@@ -124,8 +125,31 @@ class FactGraph:
         return g
 
 
+def _warm_persons(field, annotation):
+    """Rozsvítí osobní entity věty; podmětovou entitu silněji (aktuální subjekt).
+
+    Args:
+        field (ActivationField): Aktivační pole dokumentu.
+        annotation (dict): Anotace věty (entity + tokeny).
+    """
+    persons = [e for e in annotation.get("entities", [])
+               if e.get("type", "")[:1].lower() == "p"]
+    subj_spans = [(t["start"], t["end"])
+                  for sent in annotation.get("sentences", []) for t in sent
+                  if t.get("deprel") in _SUBJ and t.get("start") is not None]
+    for e in persons:
+        is_subject = (e.get("start") is not None
+                      and any(e["start"] <= s and en <= e["end"] for s, en in subj_spans))
+        field.warm((e["text"], "person"), 2.0 if is_subject else 1.0)
+
+
 def build_graph(annotations):
-    """Postaví faktový graf ze všech větných anotací.
+    """Postaví faktový graf ze všech větných anotací (s aktivační koreferencí).
+
+    Anotace se zpracují **po dokumentech v pořadí vět**; aktivační pole drží
+    „aktuální subjekt" (naposledy zmíněná osoba, s pohasínáním). Věty s elidovaným
+    podmětem (pro-drop) se přiřadí nejteplejší osobě — tím se zachytí biografická
+    fakta a správně se ošetří i přesun tématu (odstavec o jiné osobě).
 
     Args:
         annotations (dict): (doc_id, index věty) → anotace (viz `annotate_documents`).
@@ -133,8 +157,18 @@ def build_graph(annotations):
     Returns:
         FactGraph: Naplněný graf.
     """
+    by_doc = {}
+    for key, annotation in annotations.items():
+        doc_id, idx = key if isinstance(key, tuple) else (key, 0)
+        by_doc.setdefault(doc_id, []).append((idx, annotation))
     graph = FactGraph()
-    for annotation in annotations.values():
-        for fact in extract_facts(annotation):
-            graph.add_fact(fact)
+    for _, items in by_doc.items():
+        items.sort(key=lambda t: t[0])
+        field = ActivationField()
+        for _, annotation in items:
+            subject = field.hottest()          # (id, typ) nejteplejší osoby, nebo None
+            for fact in extract_facts(annotation, default_subject=subject):
+                graph.add_fact(fact)
+            _warm_persons(field, annotation)
+            field.step()
     return graph
