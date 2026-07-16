@@ -47,5 +47,25 @@ def test_template_answerer_falls_back_without_annotation():
     assert "Podle textu" in ans.text          # extraktivní fallback
 
 
+def test_to_nominative_fixes_multiword_agreement():
+    from jellyai.answerer.template import _to_nominative
+    client = FakeUfalClient(
+        analyze={"Boženy Němcové": [
+            {"form": "Boženy", "lemma": "Božena", "tag": "NNFS2-----A----"},
+            {"form": "Němcové", "lemma": "Němcová", "tag": "NNFS2-----A----"},
+        ]},
+        generate={
+            ("Božena", "NNFS1-----A----"): ["Božena"],
+            ("Němcová", "NNFS1-----A----"): ["Němcová"],
+        },
+    )
+    assert _to_nominative("Boženy Němcové", client) == "Božena Němcová"
+
+
+def test_to_nominative_without_data_returns_phrase():
+    from jellyai.answerer.template import _to_nominative
+    assert _to_nominative("cokoliv", FakeUfalClient()) == "cokoliv"
+
+
 def test_explain_nonempty():
     assert explain().strip()

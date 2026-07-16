@@ -36,6 +36,38 @@ def _analyze_question(question, client):
     return qtype, verb_lemma
 
 
+def _to_nominative(phrase, client):
+    """Převede odpovědní frázi do 1. pádu se zachováním rodu/čísla.
+
+    Naivní „vezmi lemma" rozbíjí u víceslovných jmen shodu („Božený Němcová").
+    Tady místo toho každé skloňovatelné slovo analyzujeme MorphoDiTou, vezmeme jeho
+    tag, přepneme pád na 1. a necháme MorphoDiTu vygenerovat správný tvar. Slova bez
+    pádu (slovesa, číslice…) necháme být.
+
+    Args:
+        phrase (str): Odpovědní fráze, jak stojí v textu (často v šikmém pádě).
+        client: ÚFAL klient (MorphoDiTa analyze + generate).
+
+    Returns:
+        str: Fráze v 1. pádě; při neúspěchu původní fráze.
+    """
+    tokens = client.analyze(phrase)
+    if not tokens:
+        return phrase
+    out = []
+    for tok in tokens:
+        tag = tok.get("tag", "")
+        lemma = tok.get("lemma", tok.get("form", ""))
+        # skloňovatelné slovo (podst./příd. jméno, zájmeno, číslovka) v šikmém pádě
+        if len(tag) >= 5 and tag[0] in "NAPC" and tag[4] in "234567":
+            nom_tag = tag[:4] + "1" + tag[5:]
+            forms = client.generate(lemma, nom_tag)
+            out.append(forms[0] if forms else tok.get("form", ""))
+        else:
+            out.append(tok.get("form", ""))
+    return " ".join(w for w in out if w).strip()
+
+
 class TemplateAnswerer(Answerer):
     """Answerer skládající odpověď pravidly (retrieval + role + šablona)."""
 
@@ -55,9 +87,12 @@ class TemplateAnswerer(Answerer):
         """Převede kandidáta do cílového tvaru a vloží do šablony."""
         case = templates.target_case(qtype)
         if case is None:
-            answer = candidate.form           # data/čísla beze změny
+            answer = candidate.form                       # data/čísla beze změny
+        elif case == "1":
+            # skloň celou frázi do 1. pádu se shodou; fallback na lemma-join
+            answer = _to_nominative(candidate.form, self.client) or candidate.lemma
         else:
-            answer = candidate.lemma          # nominativ = lemma (V1)
+            answer = candidate.lemma
         return templates.fill(qtype, answer)
 
     def answer(self, question, retrieved):
