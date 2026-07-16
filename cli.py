@@ -8,6 +8,9 @@ se dal projekt ovládat bez psaní jediného řádku Pythonu — a přes wrapper
 i bez ruční aktivace venv.
 """
 
+# Příkazy lazy-importují těžké bloky (rychlý start, volitelné závislosti jako
+# viewBase); to je záměr, ne chyba.
+# pylint: disable=import-outside-toplevel
 import argparse
 import os
 import shutil
@@ -280,16 +283,18 @@ def cmd_web(config, view=None):
     from jellyai.viz.reflect import reflect
     answerer = make_graph_answerer(config)
     if view is None:
+        # lazy import: viewBase je volitelný, jádro ho nepotřebuje
         from jellyai.viz.viewbase_view import ViewBaseView
         view = ViewBaseView("jellyAI3").from_graph(load_fact_graph(config))
 
     def on_query(question):
         answer = answerer.answer(question, [])
         reflect(view, answerer)          # rozsvítí nody + flow po trase
-        print(f"💬 {answer.text}")
+        view.write(f"❓ {question}\n💬 {answer.text}")   # odpověď v prohlížeči
+        print(f"💬 {answer.text}")       # i do logu serveru
         return answer.text
 
-    view.on_prompt(on_query)
+    view.open_terminal(on_query)         # konzole: vstup i výstup v prohlížeči
     view.serve(open_browser=True)
 
 
@@ -333,7 +338,7 @@ def _build_parser():
     return parser
 
 
-def main(argv=None):
+def main(argv=None):  # pylint: disable=too-many-branches
     """Vstupní bod CLI — rozparsuje argumenty a spustí zvolený příkaz.
 
     Args:

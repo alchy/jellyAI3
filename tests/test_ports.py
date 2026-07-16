@@ -21,6 +21,8 @@ def test_graphview_port_structural():
         def update_node(self, node_id, **attrs): pass
         def flow(self, path): pass
         def on_prompt(self, callback): pass
+        def open_terminal(self, on_input): pass
+        def write(self, text): pass
         def serve(self, open_browser=True): pass
         def stop(self): pass
     assert isinstance(FakeView(), GraphView)

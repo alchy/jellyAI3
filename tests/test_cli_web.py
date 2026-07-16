@@ -28,18 +28,21 @@ def test_cmd_web_wires_prompt_to_ask(tmp_path, monkeypatch):
             self.served = False
             self.updated = {}
             self.flows = []
+            self.written = []
 
         def from_graph(self, graph): return self
         def add_node(self, *a, **k): pass
         def add_edge(self, *a, **k): pass
         def update_node(self, node_id, **attrs): self.updated[node_id] = attrs
         def flow(self, path): self.flows.append(path)
-        def on_prompt(self, callback): self.cb = callback
+        def open_terminal(self, callback): self.cb = callback
+        def write(self, text): self.written.append(text)
         def serve(self, open_browser=True): self.served = True
         def stop(self): pass
 
     view = FakeView()
     cmd_web(cfg, view=view)
     assert view.served is True and view.cb is not None
-    view.cb(q)                                   # simuluj dotaz z promptu
+    view.cb(q)                                   # simuluj dotaz z konzole
     assert "Božena Němcová" in view.updated      # ask + reflect proběhly
+    assert any("Božena Němcová" in line for line in view.written)  # odpověď v konzoli
