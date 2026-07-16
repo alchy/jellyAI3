@@ -25,6 +25,7 @@ def _matches(answer, expect, reject=()):
 
 
 def main():
+    """Projede etalon proti aktuálnímu grafu a vypíše PASS/FAIL/gap + skóre."""
     with open(ETALON, encoding="utf-8") as fh:
         items = [json.loads(line) for line in fh if line.strip()]
     answerer = make_graph_answerer(Config())
