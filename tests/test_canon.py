@@ -9,6 +9,13 @@ def test_case_variants_share_key():
     assert cluster_key("Boženu Němcovou") == k
 
 
+def test_dative_ovi_variants_share_key():
+    """Dativ „-ovi" (Čapkovi) musí dát týž kmen jako ostatní pády (mezera stemmeru
+    z handoffu: klíč (josf, čapkov) ≠ (josf, čapk) držel Čapkovi mimo cluster)."""
+    assert cluster_key("Josefu Čapkovi") == cluster_key("Josef Čapek")
+    assert cluster_key("Karlu Čapkovi") == cluster_key("Karel Čapek")
+
+
 def test_distinct_people_differ():
     assert cluster_key("Karel Čapek") != cluster_key("Josef Čapek")
     assert cluster_key("Karel Čapek") != cluster_key("Karel Havlíček")

@@ -22,7 +22,7 @@ from collections import Counter
 
 _MIN_STEM = 3      # kmen nezkracuj pod 3 znaky
 # pádové koncovky českých jmen (nejdelší první) — ženská -ová, prostá -a/-y/-u…
-_SUFFIXES = ("ovými", "ových", "ovém", "ovou", "ové", "ová", "ovu", "ovy",
+_SUFFIXES = ("ovými", "ových", "ovém", "ovou", "ové", "ová", "ovi", "ovu", "ovy",
              "ými", "ých", "ém", "ům", "ách", "emi", "ami", "ou", "em", "ěm",
              "e", "ě", "y", "u", "a", "o", "i", "í", "é")
 _VOWELS = "aeiouyáéíóúýěů"
