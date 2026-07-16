@@ -5,12 +5,21 @@ predikátu) a z faktu s **nejvyšší vahou** vezme účastníka cílové role. 
 i „kdy" čerpají z téhož narozovacího faktu. Když nic nesedí, deleguje na fallback.
 """
 
+import re
+
 from jellyai.answerer.base import Answer, Answerer
 from jellyai.answerer.question import analyze_question
 from jellyai.answerer.template import _to_nominative
 from jellyai.graph.activation import ActivationField
 
 _DATE_PARTS = {"rok", "měsíc", "den"}   # drill: „v kterém roce/měsíci…"
+
+
+def _name_gender(name):
+    """Heuristický rod českého jména podle posledního slova: „-á/-a"→Fem
+    (Němcová, Božena), jinak Masc (Čapek, Karel, Josef). Jen orientační."""
+    last = name.split()[-1] if name else ""
+    return "Fem" if last.endswith(("á", "a")) else "Masc"
 
 
 class GraphAnswerer(Answerer):
@@ -21,24 +30,27 @@ class GraphAnswerer(Answerer):
     („Kdy se narodila?"), vezme se nejteplejší uzel z rozhovoru — dialog tak plyne.
     """
 
-    def __init__(self, graph, client, fallback):
+    def __init__(self, graph, client, fallback, *, context_decay=0.55):
         """Vytvoří answerer.
 
         Args:
             graph (FactGraph): Postavený faktový graf.
             client: ÚFAL klient (rozbor otázky).
             fallback (Answerer): Answerer pro neúspěch (extraktivní/template).
+            context_decay (float): Pohasínání konverzačního těžiště na dotaz
+                (viz `ActivationField.decay`; nižší = kratší paměť kontextu).
         """
         self.graph = graph
         self.client = client
         self.fallback = fallback
+        self.context_decay = context_decay
         self.last_trace = None   # trasa poslední odpovědi (téma → fakt → hodnota)
-        self.context = ActivationField()   # konverzační těžiště (id uzlu → jas)
+        self.context = ActivationField(decay=context_decay)   # těžiště (id uzlu → jas)
         self.history = []        # trajektorie konverzace (tahy s trasou a těžištěm)
 
     def reset(self):
         """Začne nový rozhovor — vymaže těžiště i historii."""
-        self.context = ActivationField()
+        self.context = ActivationField(decay=self.context_decay)
         self.history = []
         self.last_trace = None
 
@@ -68,6 +80,69 @@ class GraphAnswerer(Answerer):
                 best_id, best_score = node.id, score
         return best_id
 
+    def _attend(self, qa):
+        """Vybere téma a projde graf — 'attention' nad aktivačním polem.
+
+        Explicitní téma z otázky má přednost (dotaz je konkrétně o něm). Bez něj
+        (navazující dotaz) se **nezvolí slepě nejteplejší uzel**, ale projdou se
+        kandidáti kontextu **od nejteplejšího** a vezme se první, který na otázku
+        *umí odpovědět* (má odpovídající fakt) — relevance vážená aktivací.
+
+        Args:
+            qa (QuestionAnalysis): Rozbor otázky.
+
+        Returns:
+            tuple: (téma | None, hodnota | None, fakt | None).
+        """
+        explicit = self._resolve_topic(qa.topic_terms)
+        if explicit is not None:
+            value, fact = self._traverse(qa, explicit)
+            return explicit, value, fact
+        if qa.topic_terms:
+            # uživatel něco pojmenoval, ale v grafu to neznáme → nehádat z kontextu
+            return None, None, None
+        for candidate in self._context_candidates():
+            if not self._gender_ok(qa, candidate):
+                continue          # „narodil?" ≠ ženská entita (a naopak)
+            value, fact = self._traverse(qa, candidate)
+            if value is not None:
+                return candidate, value, fact
+        return self.context.hottest(), None, None   # nic neodpovědělo (pro log/step)
+
+    def _context_candidates(self):
+        """Uzly kontextu seřazené podle jasu (nejteplejší první)."""
+        return sorted(self.context.scores, key=self.context.scores.get, reverse=True)
+
+    def _gender_ok(self, qa, node_id):
+        """Shoda rodu otázky s (heuristickým) rodem osoby. U ne-osob vždy True."""
+        node = self.graph.nodes.get(node_id)
+        if qa.gender is None or node is None or node.type != "person":
+            return True
+        return _name_gender(node_id) == qa.gender
+
+    def _reverse_lookup(self, question):
+        """Reverzní dotaz: z roku v otázce najde událost (datum → podmět faktu).
+
+        Poslední záchrana pro „Co se stalo <datum>?" — `facts_of` indexuje po uzlu,
+        takže z časového uzlu s daným rokem vezmeme podmět jeho nejsilnějšího faktu.
+
+        Args:
+            question (str): Původní dotaz (hledá se v něm rok).
+
+        Returns:
+            tuple: (uzel data | None, podmět | None, fakt | None).
+        """
+        match = re.search(r"\b(1\d{3}|20\d{2})\b", question)
+        if not match:
+            return None, None, None
+        year = match.group(1)
+        for node in self.graph.nodes.values():
+            if node.type == "time" and year in node.id:
+                value, fact = self._pick(self.graph.facts_of(node.id, role="time"), "subj")
+                if value is not None:
+                    return node.id, value, fact
+        return None, None, None
+
     def _pick(self, facts, role):
         """Z faktů vrátí (hodnotu cílové role, fakt) z faktu s nejvyšší vahou."""
         best_weight, best_value, best_fact = -1, None, None
@@ -77,7 +152,7 @@ class GraphAnswerer(Answerer):
                 best_weight, best_value, best_fact = fact.weight, values[0], fact
         return best_value, best_fact
 
-    def _traverse(self, qa, topic):
+    def _traverse(self, qa, topic):  # pylint: disable=too-many-return-statements
         """Projde graf podle typu otázky; vrátí (hodnota, fakt) nebo (None, None).
 
         U „kdy/kde/kolik" **trvá na shodě slovesa** (žádná náhrada nesouvisející
@@ -166,24 +241,24 @@ class GraphAnswerer(Answerer):
         """
         self.last_trace = None
         qa = analyze_question(question, self.client)
-        # téma z otázky, jinak konverzační těžiště (navazující dotaz bez tématu)
-        topic = self._resolve_topic(qa.topic_terms) or self.context.hottest()
-        if topic is not None:
-            value, fact = self._traverse(qa, topic)
-            if value is not None:
-                if qa.qtype == "Kde":
-                    value = _to_nominative(value, self.client) or value   # „Slezsku"→„Slezsko"
-                alternatives = []
-                if temperature:
-                    facts, roles = self._candidate_facts_roles(qa, topic)
-                    alternatives = [v for v in self._rank_values(facts, roles, temperature)
-                                    if v != value]
-                self.last_trace = {"topic": topic, "predicate": fact.predicate,
-                                   "fact": fact.id, "answer": value}
-                self._remember(qa, topic, value)
-                self._log_turn(question, topic, fact.predicate, value)
-                return Answer(text=value, sources=["graf"], score=1.0,
-                              alternatives=alternatives, trace=self.last_trace)
+        topic, value, fact = self._attend(qa)
+        if value is None:
+            # poslední záchrana: „Co se stalo <datum>?" — datum → událost
+            topic, value, fact = self._reverse_lookup(question)
+        if value is not None:
+            if qa.qtype == "Kde":
+                value = _to_nominative(value, self.client) or value   # „Slezsku"→„Slezsko"
+            alternatives = []
+            if temperature:
+                facts, roles = self._candidate_facts_roles(qa, topic)
+                alternatives = [v for v in self._rank_values(facts, roles, temperature)
+                                if v != value]
+            self.last_trace = {"topic": topic, "predicate": fact.predicate,
+                               "fact": fact.id, "answer": value}
+            self._remember(qa, topic, value)
+            self._log_turn(question, topic, fact.predicate, value)
+            return Answer(text=value, sources=["graf"], score=1.0,
+                          alternatives=alternatives, trace=self.last_trace)
         self.context.step()
         self._log_turn(question, topic, None, None)
         return self.fallback.answer(question, retrieved)

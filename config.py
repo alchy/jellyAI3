@@ -141,8 +141,12 @@ class GraphConfig:
 
     Atributy:
         graph_path (str): Cesta k uloženému faktovému grafu.
+        context_decay (float): Pohasínání konverzačního těžiště na dotaz (0–1;
+            nižší = kratší „paměť" kontextu). Řídí, jak rychle aktivace uzlu
+            slábne s dalšími dotazy — a tím i řídnutí provozu ve vizualizaci.
     """
     graph_path: str = "data/graph.pkl"
+    context_decay: float = 0.8
 
 
 @dataclass

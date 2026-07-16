@@ -75,4 +75,5 @@ def make_graph_answerer(config):
     from jellyai.ufal_client import UfalClient
     graph = load_fact_graph(config)
     return GraphAnswerer(graph, UfalClient(config.services),
-                         ExtractiveAnswerer(config.answerer))
+                         ExtractiveAnswerer(config.answerer),
+                         context_decay=config.graph.context_decay)

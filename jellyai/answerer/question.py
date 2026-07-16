@@ -11,6 +11,17 @@ from dataclasses import dataclass, field
 
 from jellyai.answerer.selection import _clean_lemma
 
+
+def _verb_gender(form):
+    """Rod z tvaru slovesa v minulém čase (l-ové příčestí): „narodila"→„Fem",
+    „narodil"→„Masc". Přítomný čas („je") rod nenese → None."""
+    low = form.lower()
+    if low.endswith("la"):
+        return "Fem"
+    if low.endswith("l"):
+        return "Masc"
+    return None
+
 # lemma tázacího slova → typ otázky (varianty tvarů řeší lemmatizace)
 _QTYPE_BY_LEMMA = {
     "kdo": "Kdo", "co": "Co",
@@ -29,11 +40,14 @@ class QuestionAnalysis:
         verb_lemma (str | None): Lemma hlavního slovesa (pro výběr role).
         is_copula (bool): Zda je otázka sponová („X je/byl Y").
         topic_terms (list): Obsahová lemmata (pro budoucí konverzační aktivaci).
+        gender (str | None): Rod slovesa u minulého času („narodila"→„Fem",
+            „narodil"→„Masc") — pro shodu tématu s otázkou; None = neurčeno.
     """
     qtype: str = None
     verb_lemma: str = None
     is_copula: bool = False
     topic_terms: list = field(default_factory=list)
+    gender: str = None
 
 
 def analyze_question(question, client):
@@ -55,6 +69,7 @@ def analyze_question(question, client):
                 qa.qtype = _QTYPE_BY_LEMMA[lemma]
             if upos == "VERB" and qa.verb_lemma is None:
                 qa.verb_lemma = _clean_lemma(tok.get("lemma", ""))
+                qa.gender = _verb_gender(tok.get("form", ""))
             if lemma == "být" or tok.get("deprel") == "cop":
                 qa.is_copula = True
             if upos in ("NOUN", "PROPN", "ADJ") and lemma not in _QTYPE_BY_LEMMA:
