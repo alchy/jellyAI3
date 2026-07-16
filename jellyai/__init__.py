@@ -19,6 +19,7 @@ from jellyai.answerer.question import analyze_question
 from jellyai.explain import explain_block as explain, list_blocks
 from jellyai.ports import (Tokenizer, QuestionAnalyzer, FactExtractor, Composer,
                            CorpusPort)
+from jellyai.errors import JellyError
 
 __version__ = "0.1.0"
 
@@ -28,4 +29,5 @@ __all__ = [
     "Answer", "Answerer", "ExtractiveAnswerer", "GraphAnswerer", "analyze_question",
     "explain", "list_blocks",
     "Tokenizer", "QuestionAnalyzer", "FactExtractor", "Composer", "CorpusPort",
+    "JellyError",
 ]
