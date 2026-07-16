@@ -28,9 +28,10 @@ def train_tokenizer(corpus_path, prefix, vocab_size, character_coverage=1.0):
         vocab_size=vocab_size,
         model_type="bpe",
         character_coverage=character_coverage,
-        pad_id=3,               # zapneme <pad> (výchozí je vypnutý)
-        byte_fallback=True,     # ať nikdy neselže na neznámém znaku
-        hard_vocab_limit=False,  # menší korpus nesmí shodit trénink na vocab_size
+        pad_id=3,                    # zapneme <pad> (výchozí je vypnutý)
+        byte_fallback=True,          # ať nikdy neselže na neznámém znaku
+        hard_vocab_limit=False,      # menší korpus nesmí shodit trénink na vocab_size
+        max_sentence_length=100000,  # nepřeskakovat dlouhé řádky/odstavce (default 4192 B)
     )
     return prefix + ".model"
 
