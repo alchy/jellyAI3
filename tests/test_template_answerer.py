@@ -1,0 +1,51 @@
+from config import AnswererConfig
+from jellyai.chunker import Passage
+from jellyai.answerer.base import Answer
+from jellyai.answerer.extractive import ExtractiveAnswerer
+from jellyai.answerer.template import TemplateAnswerer, explain
+from jellyai.ufal_client import FakeUfalClient
+
+
+def _passage_annotation():
+    sent = [
+        {"form": "Božena", "lemma": "Božena", "upos": "PROPN", "head": 3, "deprel": "nsubj", "start": 0, "end": 6},
+        {"form": "Němcová", "lemma": "Němcová", "upos": "PROPN", "head": 1, "deprel": "flat", "start": 7, "end": 14},
+        {"form": "napsala", "lemma": "napsat", "upos": "VERB", "head": 0, "deprel": "root", "start": 15, "end": 22},
+        {"form": "Babičku", "lemma": "Babička", "upos": "PROPN", "head": 3, "deprel": "obj", "start": 23, "end": 30},
+    ]
+    return {"entities": [{"text": "Božena Němcová", "type": "P", "start": 0, "end": 14}],
+            "sentences": [sent]}
+
+
+def _question_client():
+    q = "kdo napsal Babičku?"
+    return q, FakeUfalClient(parse={q: [[
+        {"form": "kdo", "lemma": "kdo", "upos": "PRON", "head": 2, "deprel": "nsubj", "start": 0, "end": 3},
+        {"form": "napsal", "lemma": "napsat", "upos": "VERB", "head": 0, "deprel": "root", "start": 4, "end": 10},
+        {"form": "Babičku", "lemma": "Babička", "upos": "PROPN", "head": 2, "deprel": "obj", "start": 11, "end": 18},
+    ]]})
+
+
+def test_template_answerer_person():
+    q, client = _question_client()
+    passage = Passage("wiki_bn", 5, "Božena Němcová napsala Babičku.", 0, 1)
+    answerer = TemplateAnswerer(client, {("wiki_bn", 5): _passage_annotation()},
+                                ExtractiveAnswerer(AnswererConfig()))
+    ans = answerer.answer(q, [(passage, 1.0)])
+    assert isinstance(ans, Answer)
+    assert ans.text == "Božena Němcová"     # podmět v nominativu ze šablony
+    assert ans.sources == ["wiki_bn#5"]
+
+
+def test_template_answerer_falls_back_without_annotation():
+    q, client = _question_client()
+    passage = Passage("wiki_bn", 5, "Božena Němcová napsala Babičku.", 0, 1)
+    answerer = TemplateAnswerer(client, {},  # žádné anotace → fallback
+                                ExtractiveAnswerer(AnswererConfig()))
+    ans = answerer.answer(q, [(passage, 1.0)])
+    assert isinstance(ans, Answer)
+    assert "Podle textu" in ans.text          # extraktivní fallback
+
+
+def test_explain_nonempty():
+    assert explain().strip()
