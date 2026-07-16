@@ -37,3 +37,13 @@ def test_search_focuses_on_matching_sentence():
     assert "Klíč leží tady" in top_passage.text
     assert top_passage.start <= 1 < top_passage.end
     assert top_score > 0
+
+
+def test_save_load_roundtrip(tmp_path):
+    docs = [Document("da", "da", "Alfa jedna. Klíč leží tady. Gama tři.")]
+    sr = SentenceRetriever(RetrieverConfig(granularity="sentence")).build(docs)
+    path = str(tmp_path / "sent_index.pkl")
+    sr.save(path)
+    loaded = SentenceRetriever.load(path)
+    assert loaded.sent_text == sr.sent_text
+    assert loaded.search("klíč")[0][0].text == sr.search("klíč")[0][0].text

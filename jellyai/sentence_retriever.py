@@ -9,6 +9,8 @@ Znovu používá V1 `Retriever` jako vnitřní BM25 skórovač (přes `score_all
 se matematika neduplikuje a chování V1 zůstává nedotčené.
 """
 
+import os
+import pickle
 from collections import defaultdict
 
 import numpy as np
@@ -145,3 +147,47 @@ class SentenceRetriever:
             if len(results) >= top_k:
                 break
         return results
+
+    def save(self, path):
+        """Uloží postavený větný index na disk (pickle).
+
+        Args:
+            path (str): Cílová cesta.
+
+        Returns:
+            str: Cesta, kam byl index uložen.
+        """
+        directory = os.path.dirname(path)
+        if directory:
+            os.makedirs(directory, exist_ok=True)
+        state = {
+            "config": self.config,
+            "sent_doc": self.sent_doc,
+            "sent_local": self.sent_local,
+            "sent_text": self.sent_text,
+            "bounds": self._bounds,
+            "retriever": self._retriever,
+        }
+        with open(path, "wb") as f:
+            pickle.dump(state, f)
+        return path
+
+    @classmethod
+    def load(cls, path):
+        """Načte dříve uložený větný index z disku.
+
+        Args:
+            path (str): Cesta k souboru s indexem.
+
+        Returns:
+            SentenceRetriever: Připravený k `search`.
+        """
+        with open(path, "rb") as f:
+            state = pickle.load(f)
+        sr = cls(state["config"])
+        sr.sent_doc = state["sent_doc"]
+        sr.sent_local = state["sent_local"]
+        sr.sent_text = state["sent_text"]
+        sr._bounds = state["bounds"]
+        sr._retriever = state["retriever"]
+        return sr
