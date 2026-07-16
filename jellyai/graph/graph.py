@@ -9,7 +9,8 @@ import os
 import pickle
 from dataclasses import dataclass
 
-from jellyai.graph.extract import extract_facts
+from jellyai.graph.extract import extract_facts, _SUBJ
+from jellyai.graph.activation import ActivationField
 
 
 @dataclass
@@ -124,8 +125,61 @@ class FactGraph:
         return g
 
 
+def _canonical_persons(items):
+    """Sestaví mapu osobní jméno → nejdelší tvar téhož jména v dokumentu.
+
+    NameTag tvoří překrývající se jména („Karel", „Karel Čapek", „Karel Antonín
+    Čapek"). Aby se fakta téže osoby nerozpadla, sjednotíme každý fragment na
+    nejdelší jméno, které obsahuje všechna jeho slova.
+
+    Args:
+        items (list[tuple[int, dict]]): (index věty, anotace) dokumentu.
+
+    Returns:
+        dict: osobní jméno → kanonický (nejdelší) tvar.
+    """
+    persons = set()
+    for _, annotation in items:
+        for e in annotation.get("entities", []):
+            if e.get("type", "")[:1].lower() == "p":
+                persons.add(e["text"])
+    canon = {}
+    for p in persons:
+        words = set(p.split())
+        best = p
+        for q in persons:
+            if words <= set(q.split()) and len(q.split()) > len(best.split()):
+                best = q
+        canon[p] = best
+    return canon
+
+
+def _warm_persons(field, annotation, canon):
+    """Rozsvítí osobní entity věty (kanonicky); podmětovou entitu silněji.
+
+    Args:
+        field (ActivationField): Aktivační pole dokumentu.
+        annotation (dict): Anotace věty (entity + tokeny).
+        canon (dict): Kanonizace osobních jmen.
+    """
+    persons = [e for e in annotation.get("entities", [])
+               if e.get("type", "")[:1].lower() == "p"]
+    subj_spans = [(t["start"], t["end"])
+                  for sent in annotation.get("sentences", []) for t in sent
+                  if t.get("deprel") in _SUBJ and t.get("start") is not None]
+    for e in persons:
+        is_subject = (e.get("start") is not None
+                      and any(e["start"] <= s and en <= e["end"] for s, en in subj_spans))
+        field.warm((canon.get(e["text"], e["text"]), "person"), 2.0 if is_subject else 1.0)
+
+
 def build_graph(annotations):
-    """Postaví faktový graf ze všech větných anotací.
+    """Postaví faktový graf ze všech větných anotací (s aktivační koreferencí).
+
+    Anotace se zpracují **po dokumentech v pořadí vět**; aktivační pole drží
+    „aktuální subjekt" (naposledy zmíněná osoba, s pohasínáním). Věty s elidovaným
+    podmětem (pro-drop) se přiřadí nejteplejší osobě — tím se zachytí biografická
+    fakta a správně se ošetří i přesun tématu (odstavec o jiné osobě).
 
     Args:
         annotations (dict): (doc_id, index věty) → anotace (viz `annotate_documents`).
@@ -133,8 +187,19 @@ def build_graph(annotations):
     Returns:
         FactGraph: Naplněný graf.
     """
+    by_doc = {}
+    for key, annotation in annotations.items():
+        doc_id, idx = key if isinstance(key, tuple) else (key, 0)
+        by_doc.setdefault(doc_id, []).append((idx, annotation))
     graph = FactGraph()
-    for annotation in annotations.values():
-        for fact in extract_facts(annotation):
-            graph.add_fact(fact)
+    for _, items in by_doc.items():
+        items.sort(key=lambda t: t[0])
+        canon = _canonical_persons(items)
+        field = ActivationField()
+        for _, annotation in items:
+            subject = field.hottest()          # (id, typ) nejteplejší osoby, nebo None
+            for fact in extract_facts(annotation, default_subject=subject, canon=canon):
+                graph.add_fact(fact)
+            _warm_persons(field, annotation, canon)
+            field.step()
     return graph

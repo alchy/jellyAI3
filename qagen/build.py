@@ -1,5 +1,9 @@
 """Sestavení celého QA datasetu z korpusu.
 
+⚠️ ZAKONZERVOVÁNO (experimentální). Vzniklo pro trénink generátoru V2b (samostatná
+větev, datově limitovaný). Na `main` dataset nikdo nekonzumuje; kód i příkaz
+`gen-qa` zůstávají jako výukový blok. Hlavní směr je faktový graf.
+
 Spojí V1 bloky (loader → chunker → věty) s qagen logikou (výběr odpovědí →
 šablona otázky) a zapíše výsledek jako JSONL — jeden pár na řádek. Kontextem
 každého páru je celá pasáž, aby měl budoucí generátor z čeho čerpat. Duplicity

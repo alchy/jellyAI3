@@ -49,6 +49,39 @@ Další směr: filtr podmětů (preferovat entity, zahodit obecná jména/zájme
 navázání data/místa na sloveso, reflexiva, subsumpce částečných faktů, a normalizace
 tvarů. Teprve pak dává smysl uvažovat o *konsolidaci kódu k grafu* (nápad uživatele).
 
+## Zlepšení extrakce (2. kolo)
+
+Po prvním živém běhu (šum, chybějící fakta) přišly cílené fixy — všechny s
+hermetickými testy:
+
+- **Aktivační koreference** (`ActivationField`): dokument se čte po větách, drží se
+  „aktuální subjekt" (warm/decay). Elidovaný podmět (české pro-drop, „Narodil se…")
+  se přiřadí nejteplejší osobě — a **správně přežije přesun tématu** (odstavec
+  o bratrovi → jeho fakta jdou jemu). *Týž primitiv převezme cesta answereru
+  (trasa) i B2.*
+- **Kanonizace osobních entit**: „Karel" / „Karel Čapek" / „Karel Antonín Čapek" se
+  sjednotí na nejdelší tvar → fakta se nerozpadnou na víc uzlů.
+- **Filtr zájmenného balastu** (podmět/předmět PRON/DET se zahodí).
+- **Precizní answerer**: „kdy/kde" trvá na **shodě slovesa** — na „kdy se narodil"
+  už nevrátí datum svatby (dřív → 26. srpna 1935).
+- **Trasa odpovědi** (`GraphAnswerer.last_trace`): téma → fakt → hodnota, pro B2 a
+  vizualizaci tras.
+
+**Efekt živě:** „kde se narodil Karel Čapek?" → **Malých Svatoňovicích** (dřív
+fallback); „kdy se narodil Karel Čapek?" → poctivý **fallback** místo špatného 1935.
+
+**Zbývající limit (další kolo):** **rok narození Čapka** se nezachytí — v korpusu žije
+v úvodní závorce/infoboxu a data bývají **zanořená** (`nummod` pod měsícem, ne přímý
+`obl` slovesa). Řešení: brát NameTag časové entity kdekoli ve větě + rozlišit
+narození od jiných událostí. Také normalizace tvarů („Slezsku"→„Slezsko").
+
+## Konverzační vrstva (B2) — připraveno
+
+Atributy grafu (`id`, `type`, statická `weight`) jsou dobrý **prior**; konverzační
+aktivace patří mimo graf jako overlay (`ActivationField` už existuje). Cesta
+answereru vrací **trasu** → warming uzlů/faktů. „Těžiště" = argmax aktivace. Viz
+`jellyai/graph/activation.py`.
+
 ## Vizualizace
 
 Export `to_networkx`/`to_json` posílá do viewBase i **faktové uzly** (typ `fact`,

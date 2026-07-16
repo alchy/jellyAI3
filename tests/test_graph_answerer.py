@@ -88,3 +88,33 @@ def test_topic_prefers_proper_noun_over_common():
     ])
     a = GraphAnswerer(g, client, ExtractiveAnswerer(AnswererConfig()))
     assert a.answer(q, []).text == "Božena Němcová"
+
+
+def test_kdy_requires_verb_match_no_wrong_event():
+    # graf má jen svatbu (oženit), ne narození → 'kdy narodil' nesmí vrátit svatbu
+    g = FactGraph()
+    g.add_fact(make_fact("oženit", [Participant("subj", "Karel Čapek", "person"),
+                                    Participant("time", "26. srpna 1935", "time")]))
+    q = "kdy se narodil Karel Čapek?"
+    client = _client(q, [
+        {"form": "kdy", "lemma": "kdy", "upos": "ADV", "head": 3, "deprel": "advmod", "start": 0, "end": 3},
+        {"form": "se", "lemma": "se", "upos": "PRON", "head": 3, "deprel": "expl", "start": 4, "end": 6},
+        {"form": "narodil", "lemma": "narodit", "upos": "VERB", "head": 0, "deprel": "root", "start": 7, "end": 14},
+        {"form": "Karel", "lemma": "Karel", "upos": "PROPN", "head": 3, "deprel": "nsubj", "start": 15, "end": 20},
+        {"form": "Čapek", "lemma": "Čapek", "upos": "PROPN", "head": 4, "deprel": "flat", "start": 21, "end": 26},
+    ])
+    a = GraphAnswerer(g, client, ExtractiveAnswerer(AnswererConfig()))
+    assert a.answer(q, []).text != "26. srpna 1935"
+
+
+def test_answer_exposes_trace():
+    q = "kdo napsal Babičku?"
+    client = _client(q, [
+        {"form": "kdo", "lemma": "kdo", "upos": "PRON", "head": 2, "deprel": "nsubj", "start": 0, "end": 3},
+        {"form": "napsal", "lemma": "napsat", "upos": "VERB", "head": 0, "deprel": "root", "start": 4, "end": 10},
+        {"form": "Babičku", "lemma": "Babička", "upos": "PROPN", "head": 2, "deprel": "obj", "start": 11, "end": 18},
+    ])
+    a = GraphAnswerer(_graph(), client, ExtractiveAnswerer(AnswererConfig()))
+    a.answer(q, [])
+    assert a.last_trace["topic"] == "Babička"
+    assert a.last_trace["answer"] == "Božena Němcová"

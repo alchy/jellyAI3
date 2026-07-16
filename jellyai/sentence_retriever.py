@@ -1,5 +1,10 @@
 """Větný retriever se vzdálenostním útlumem (B1).
 
+⚠️ ZAKONZERVOVÁNO (experimentální, mimo hlavní cestu). Živě se neukázalo jako jasná
+výhra (viz `docs/superpowers/2026-07-16-vb1-results.md`); kód i testy zůstávají,
+default `granularity="passage"`. Hlavní směr je faktový graf. Znovu zapnout přes
+`RetrieverConfig.granularity="sentence"`.
+
 Místo pevných bloků skóruje na úrovni vět: nalezená věta vyzařuje své BM25 skóre
 do okolí s exponenciálním útlumem podle vzdálenosti (sever i jih), **soubor je
 tvrdá hranice**. Vrchol téhle aktivace je sémantický střed odpovědi; kolem něj se

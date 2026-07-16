@@ -14,6 +14,7 @@ _OBJ = {"obj", "iobj"}
 _ATTR = {"obl", "nmod"}
 _ENTITY_TYPE = {"p": "person", "g": "geo", "t": "time", "i": "institution"}
 _ATTR_ROLE = {"time": "time", "geo": "loc", "number": "num"}   # typ cíle → role
+_SKIP_UPOS = {"PRON", "DET"}   # zájmena/určovatele = balast (a záminka pro pro-drop)
 
 
 @dataclass(frozen=True)
@@ -60,12 +61,16 @@ def _entity_type(entity):
     return _ENTITY_TYPE.get(entity.get("type", "")[:1].lower(), "concept")
 
 
-def _node_for(token, entities):
+def _node_for(token, entities, canon=None):
     """Vrátí (id, typ) uzlu pro token: entita (kanonicky) nebo nominativní lemma.
+
+    U osobních entit se id sjednotí přes `canon` (fragment „Karel" → „Karel Čapek"),
+    aby se fakta téže osoby nerozpadla na víc uzlů.
 
     Args:
         token (dict): Token s start/end/lemma/upos.
         entities (list[dict]): Entity věty s offsety.
+        canon (dict | None): Mapa osobní jméno → kanonický (nejdelší) tvar.
 
     Returns:
         tuple[str, str] | None: (id, typ), nebo None když token nemá lemma.
@@ -74,7 +79,10 @@ def _node_for(token, entities):
     if start is not None and end is not None:
         for e in entities:
             if e.get("start") is not None and e["start"] <= start and end <= e["end"]:
-                return e["text"], _entity_type(e)
+                text, typ = e["text"], _entity_type(e)
+                if typ == "person" and canon:
+                    text = canon.get(text, text)
+                return text, typ
     lemma = _clean_lemma(token.get("lemma", ""))
     if not lemma:
         return None
@@ -91,14 +99,20 @@ def _first(tokens, deprels):
     return next((t for t in tokens if t.get("deprel") in deprels), None)
 
 
-def extract_facts(annotation):
+def extract_facts(annotation, default_subject=None, canon=None):
     """Vytáhne z anotace věty seznam reifikovaných faktů.
 
-    Pro každý sloveso-token s podmětem vznikne jeden n-ární fakt (podmět + předmět +
-    atributy). Fakt bez dalšího účastníka než podmět se zahazuje.
+    Pro každý sloveso-token vznikne jeden n-ární fakt (podmět + předmět + atributy).
+    Zájmenný podmět/předmět je balast a přeskočí se. České věty často **elidují
+    podmět** (pro-drop: „Narodil se 1890"); když podmět chybí (nebo je zájmeno) a je
+    dán `default_subject` (hlavní entita dokumentu), doplní se — tím se zachytí
+    biografická fakta, která by jinak zmizela. Fakt bez dalšího účastníka než podmět
+    se zahazuje.
 
     Args:
         annotation (dict): {"entities": [...], "sentences": [[token,...],...]}.
+        default_subject (tuple | None): (id, typ) náhradního podmětu pro pro-drop.
+        canon (dict | None): Kanonizace osobních jmen (sjednocení fragmentů).
 
     Returns:
         list[Fact]: Nalezené fakty (mohou se opakovat — agreguje graf).
@@ -109,37 +123,43 @@ def extract_facts(annotation):
         for head_id in range(1, len(sent) + 1):
             head = sent[head_id - 1]
             children = _children(sent, head_id)
-            subj = _first(children, _SUBJ)
-            if subj is None:
-                continue
-            subj_node = _node_for(subj, entities)
-            if subj_node is None:
-                continue
+            subj_tok = _first(children, _SUBJ)
+            # zájmenný podmět je balast; ponecháme prostor pro pro-drop náhradu
+            subj_node = None
+            if subj_tok is not None and subj_tok.get("upos") not in _SKIP_UPOS:
+                subj_node = _node_for(subj_tok, entities, canon)
+
             # sponová věta: (podmět)–být–(přísudek)
             if _first(children, {"cop"}):
-                pred = _node_for(head, entities)
-                if pred:
+                pred = _node_for(head, entities, canon)
+                subj = subj_node or default_subject
+                if pred and subj:
                     facts.append(make_fact("být", [
-                        Participant("subj", subj_node[0], subj_node[1]),
+                        Participant("subj", subj[0], subj[1]),
                         Participant("pred", pred[0], pred[1]),
                     ]))
                 continue
+
             if head.get("upos") != "VERB":
                 continue
             verb = _clean_lemma(head.get("lemma", ""))
-            parts = [Participant("subj", subj_node[0], subj_node[1])]
+            extra = []
             obj = _first(children, _OBJ)
-            if obj:
-                o = _node_for(obj, entities)
+            if obj is not None and obj.get("upos") not in _SKIP_UPOS:
+                o = _node_for(obj, entities, canon)
                 if o:
-                    parts.append(Participant("obj", o[0], o[1]))
+                    extra.append(Participant("obj", o[0], o[1]))
             for attr in children:
                 base = (attr.get("deprel") or "").split(":")[0]
                 if base not in _ATTR:
                     continue
-                a = _node_for(attr, entities)
+                a = _node_for(attr, entities, canon)
                 if a and a[1] in _ATTR_ROLE:
-                    parts.append(Participant(_ATTR_ROLE[a[1]], a[0], a[1]))
-            if len(parts) > 1:
-                facts.append(make_fact(verb, parts))
+                    extra.append(Participant(_ATTR_ROLE[a[1]], a[0], a[1]))
+            if not extra:
+                continue
+            subj = subj_node or default_subject
+            if subj is None:
+                continue
+            facts.append(make_fact(verb, [Participant("subj", subj[0], subj[1])] + extra))
     return facts
