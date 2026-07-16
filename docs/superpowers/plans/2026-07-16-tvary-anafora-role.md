@@ -1,5 +1,12 @@
 # Tvary, anafora, tematické role — Implementation Plan (arc 3)
 
+> ✅ **DOKONČENO (2026-07-16).** Výsledky (baseline → po arc 3):
+> coverage **41 % → 31 %** vět bez faktu (943 → 1102 vět s faktem); etalon
+> **15/15 drží** po celou dobu; graf 3510 → **4068 faktů** (+45 kvalitních
+> anafor, +433 theme, +150 koordinace, −šum falešných pro-drop faktů
+> demonstrativ); testů 240 → **252**. Navíc Task V: morfologie v popisu uzlů
+> vizualizace (rod, kmen, sloučené pádové tvary — `graph.aliases`).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: superpowers:executing-plans.
 > Navazuje na arc 2 (etalon 15/15). Pokyn: průběžně reportovat metriky.
 
