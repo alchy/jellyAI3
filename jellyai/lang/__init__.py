@@ -43,6 +43,10 @@ def load_rules(language="cs"):
             rules.get("metalanguage_nouns", ()))
         rules["generic_event_verbs"] = frozenset(
             rules.get("generic_event_verbs", ()))
+        rules["predicate_synonyms"] = {
+            lemma: tuple(group)
+            for group in rules.get("predicate_synonyms", ())
+            for lemma in group}
         _cache[path] = rules
     return _cache[path]
 

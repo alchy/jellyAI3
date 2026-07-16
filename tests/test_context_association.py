@@ -167,3 +167,20 @@ def test_elided_question_subject_inherits_conversation_person():
     a.answer(q1, [])                       # rozsvítí Karla i hru
     text = a.answer(q2, []).text
     assert text == "R.U.R."
+
+
+def test_predicate_synonyms_from_language_data():
+    """„Kde žili?" najde bydlet-fakt — synonymní predikáty jsou jazyková data
+    (bydlet/žít/sídlit), přesný predikát má přednost bonusem."""
+    g = FactGraph()
+    g.add_fact(make_fact("bydlet", [Participant("subj", "Karel Čapek", "person"),
+                                    Participant("loc", "Praze", "geo")]))
+    q = "Kde žil Karel Čapek?"
+    client = FakeUfalClient(parse={q: [[
+        {"form": "Kde", "lemma": "kde", "upos": "ADV", "head": 2, "deprel": "advmod"},
+        {"form": "žil", "lemma": "žít", "upos": "VERB", "head": 0, "deprel": "root"},
+        {"form": "Karel", "lemma": "Karel", "upos": "PROPN", "head": 2, "deprel": "nsubj"},
+        {"form": "Čapek", "lemma": "Čapek", "upos": "PROPN", "head": 3, "deprel": "flat"},
+    ]]})
+    a = GraphAnswerer(g, client, ExtractiveAnswerer(AnswererConfig()))
+    assert a.answer(q, []).text == "Praze"   # nominativizaci dělá živá morfologie

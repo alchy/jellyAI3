@@ -94,3 +94,43 @@ def test_elliptic_question_without_verb_is_copular():
     assert pat.predicate == "být"
     assert pat.known == [("subj", "rodina")]
     assert pat.hole_role == "attr"
+
+
+def _bydlel_parse():
+    """Reálný (quirky) parse: genitiv jako flat pod „bratr", komitativ jako
+    nmod s předložkou pod „bratr" — oba tvary nesou Case."""
+    return [[
+        {"form": "Bydlel", "lemma": "bydlet", "upos": "VERB", "head": 0,
+         "deprel": "root", "feats": {"Gender": "Masc"}},
+        {"form": "bratr", "lemma": "bratr", "upos": "NOUN", "head": 1,
+         "deprel": "nsubj", "feats": {"Case": "Nom"}},
+        {"form": "Karla", "lemma": "Karel", "upos": "PROPN", "head": 2,
+         "deprel": "flat", "feats": {"Case": "Gen"}},
+        {"form": "Čapka", "lemma": "Čapek", "upos": "PROPN", "head": 2,
+         "deprel": "flat", "feats": {"Case": "Gen"}},
+        {"form": "s", "lemma": "s", "upos": "ADP", "head": 6, "deprel": "case"},
+        {"form": "Karlem", "lemma": "Karel", "upos": "PROPN", "head": 2,
+         "deprel": "nmod", "feats": {"Case": "Ins"}},
+        {"form": "Čapkem", "lemma": "Čapek", "upos": "PROPN", "head": 6,
+         "deprel": "flat", "feats": {"Case": "Ins"}},
+    ]]
+
+
+def test_case_mismatched_flat_is_genitive_subquery():
+    """Flat dítě v genitivu pod nominativní hlavou = mis-tagged genitivní
+    vztah → SubQuery(bratr, obj=Karel Čapek), ne plochý termín."""
+    q = "Bydlel bratr Karla Čapka s Karlem Čapkem?"
+    client = FakeUfalClient(parse={q: _bydlel_parse()})
+    pat = question_pattern(q, client)
+    sub = next(k for role, k in pat.known if isinstance(k, SubQuery))
+    assert sub.predicate == "bratr"
+    assert sub.known == [("obj", "Karel Čapek")]
+
+
+def test_prepositional_nmod_under_known_becomes_participant():
+    """„…s Karlem Čapkem" (nmod s předložkou pod podmětem) je vlastní
+    účastník otázky — nesmí se ztratit."""
+    q = "Bydlel bratr Karla Čapka s Karlem Čapkem?"
+    client = FakeUfalClient(parse={q: _bydlel_parse()})
+    pat = question_pattern(q, client)
+    assert ("theme", "Karel Čapek") in pat.known

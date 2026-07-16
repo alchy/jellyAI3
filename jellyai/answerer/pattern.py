@@ -47,19 +47,28 @@ class Pattern:
 
 
 def _genitive_child(head_tok, sent):
-    """HOLÝ genitivní přívlastek (nmod) tokenu — pro „bratr **Karla Čapka**".
+    """HOLÝ genitivní přívlastek tokenu — pro „bratr **Karla Čapka**".
 
     nmod s předložkou („Válka **s mloky**", „drama **o robotech**") genitivní
     vztah NENÍ — je to fráze uvnitř termínu; poznáme ji podle `case` (ADP)
-    dítěte. Bez tohoto rozlišení by se víceslovný titul rozpadl na rekurzi.
+    dítěte. Parser navíc genitiv občas označkuje jako `flat` — prozradí ho
+    PÁDOVÁ NESHODA s hlavou („bratr[Nom] Karla[Gen]"): tvar rozhoduje.
     """
     hid = sent.index(head_tok) + 1
+    head_case = head_tok.get("feats", {}).get("Case")
     for i, tok in enumerate(sent):
-        if tok.get("head") == hid and str(tok.get("deprel", "")).startswith("nmod"):
-            has_adp = any(c.get("head") == i + 1 and c.get("upos") == "ADP"
-                          for c in sent)
-            if not has_adp:
-                return tok
+        if tok.get("head") != hid:
+            continue
+        deprel = str(tok.get("deprel", ""))
+        genitive_flat = (deprel.startswith("flat")
+                         and tok.get("feats", {}).get("Case") == "Gen"
+                         and head_case not in (None, "Gen"))
+        if not (deprel.startswith("nmod") or genitive_flat):
+            continue
+        has_adp = any(c.get("head") == i + 1 and c.get("upos") == "ADP"
+                      for c in sent)
+        if not has_adp:
+            return tok
     return None
 
 
@@ -103,12 +112,29 @@ def _known_of(token, sent):
 
 
 def _entity_term(head_tok, sent):
-    """Termín entity = hlavní token + jeho `flat`/`nmod` části („Karel"+„Čapek")."""
+    """Termín entity = hlavní token + `flat` části VE STEJNÉM PÁDU.
+
+    Pádová neshoda flat dítěte („bratr[Nom] Karla[Gen]") značí mis-tagged
+    genitiv — do termínu nepatří. Je-li hlava sama flat (genitivní člen),
+    přiberou se její flat sourozenci v témže pádu („Karla + Čapka").
+    """
     hid = sent.index(head_tok) + 1
+    own_case = head_tok.get("feats", {}).get("Case")
     words = [_clean_lemma(head_tok.get("lemma", ""))]
     for tok in sent:
         if tok.get("head") == hid and tok.get("deprel") in ("flat", "flat:name"):
+            case = tok.get("feats", {}).get("Case")
+            if own_case and case and case != own_case:
+                continue
             words.append(_clean_lemma(tok.get("lemma", "")))
+    if str(head_tok.get("deprel", "")).startswith("flat"):
+        pos = sent.index(head_tok)
+        for tok in sent:
+            if tok is not head_tok and tok.get("head") == head_tok.get("head") \
+                    and str(tok.get("deprel", "")).startswith("flat") \
+                    and sent.index(tok) > pos \
+                    and tok.get("feats", {}).get("Case") == own_case:
+                words.append(_clean_lemma(tok.get("lemma", "")))
     return " ".join(w for w in words if w)
 
 
@@ -172,4 +198,14 @@ def _parse_sent(sent):
         role = _DEPREL_ROLE.get(tok.get("deprel"))
         if role:
             known.append((role, _known_of(tok, sent)))   # rekurzivně (vnořené pod-dotazy)
+            tok_id = sent.index(tok) + 1
+            for child in sent:
+                # předložkové VLASTNÍ JMÉNO pod známým („bratr … S KARLEM
+                # ČAPKEM") je vlastní účastník; obecné jméno („Válku
+                # S MLOKY") je fráze titulu a zůstává uvnitř termínu
+                if child.get("head") == tok_id and child.get("upos") == "PROPN" \
+                        and str(child.get("deprel", "")).startswith("nmod") \
+                        and any(c.get("head") == sent.index(child) + 1
+                                and c.get("upos") == "ADP" for c in sent):
+                    known.append(("theme", _entity_term(child, sent)))
     return Pattern(verb, known, hole_role, hole_type, date_part)

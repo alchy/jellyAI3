@@ -18,6 +18,16 @@ _DATE_PARTS = {"rok", "měsíc", "den"}   # drill: „v kterém roce/měsíci…
 _MAX_ENUM = 5                           # strop výčtové odpovědi (čitelnost)
 
 
+def _synonym_ring(predicate):
+    """(predikát, exact) + jeho synonyma z jazykových dat — „Kde žili?" najde
+    bydlet-fakt; přesný predikát drží přednost bonusem."""
+    ring = [(predicate, True)]
+    for lemma in current()["predicate_synonyms"].get(predicate, ()):
+        if lemma != predicate:
+            ring.append((lemma, False))
+    return ring
+
+
 def _event_text(fact, exclude=()):
     """Děj jako odpověď: SLOVESO první, pak účastníci. „Co se stalo?" se ptá
     na děj — faktový uzel je děj reifikovaný, holý podmět odpovědí není."""
@@ -238,21 +248,23 @@ class GraphAnswerer(Answerer):
             return [], None
         node0 = next(iter(known_set))
         scored = []
-        for fact in self.graph.facts_of(node0, predicate=predicate):
-            if not known_set <= {p.node for p in fact.participants}:
-                continue
-            for part in fact.participants:
-                if part.node in known_set or len(part.node) < 2:
-                    continue                 # díra ≠ známé; 1-znak = artefakt NER
-                base = fact.weight
-                # „kdy" bere čas i rok-jako-číslo; jinak přesná role díry
-                if hole_role and (part.role == hole_role
-                                  or (hole_type == "time" and part.role in ("time", "num"))):
-                    base += 1000
-                if hole_type and part.type == hole_type:
-                    base += 100
-                scored.append((base, self.context.scores.get(part.node, 0.0),
-                               part.node, fact))
+        for pred, exact in _synonym_ring(predicate):
+            for fact in self.graph.facts_of(node0, predicate=pred):
+                if not known_set <= {p.node for p in fact.participants}:
+                    continue
+                for part in fact.participants:
+                    if part.node in known_set or len(part.node) < 2:
+                        continue             # díra ≠ známé; 1-znak = artefakt NER
+                    base = fact.weight + (10 if exact else 0)
+                    # „kdy" bere čas i rok-jako-číslo; jinak přesná role díry
+                    if hole_role and (part.role == hole_role
+                                      or (hole_type == "time"
+                                          and part.role in ("time", "num"))):
+                        base += 1000
+                    if hole_type and part.type == hole_type:
+                        base += 100
+                    scored.append((base, self.context.scores.get(part.node, 0.0),
+                                   part.node, fact))
         if not scored:
             return [], None
         # remíza se určuje ZÁKLADNÍM skóre (váha+role/typ) — aktivace remízu
@@ -319,10 +331,11 @@ class GraphAnswerer(Answerer):
         if predicate is None:
             return None, [], None
         node0 = next(iter(known_set))
-        for fact in self.graph.facts_of(node0, predicate=predicate):
-            if known_set <= {p.node for p in fact.participants}:
-                self.visited.extend(p.node for p in fact.participants)
-                return node0, ["Ano"], fact
+        for pred, _ in _synonym_ring(predicate):
+            for fact in self.graph.facts_of(node0, predicate=pred):
+                if known_set <= {p.node for p in fact.participants}:
+                    self.visited.extend(p.node for p in fact.participants)
+                    return node0, ["Ano"], fact
         return None, [], None
 
     def _typed_match(self, predicate, known_set):
