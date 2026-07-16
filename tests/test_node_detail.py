@@ -43,6 +43,34 @@ def test_unknown_node_is_graceful():
     assert rows == {"uzel": "Neexistuje"}
 
 
+def test_caps_to_five_most_frequent_connections():
+    """Uzel s mnoha spojeními → typ, váha + jen 5 nejfrekventovanějších."""
+    g = FactGraph()
+    # 7 různých predikátů; „psát" opakováno 3x → nejsilnější spojení
+    for i in range(7):
+        for _ in range(3 if i == 0 else 1):
+            g.add_fact(make_fact(f"pred{i}",
+                                 [Participant("subj", "Autor", "person"),
+                                  Participant("obj", f"cíl{i}", "concept")]))
+    rows = node_detail_rows(g, "Autor")
+    labels = [k for k, _ in rows]
+    assert labels[:2] == ["typ", "váha"]
+    assert len(rows) == 2 + 5                    # typ, váha + top 5 spojení
+    assert "pred0 →" in labels                   # nejčastější (3x) se vejde
+    assert dict(rows)["pred0 →"] == "cíl0"
+
+
+def test_caps_partners_per_row():
+    """Jeden predikát s mnoha partnery → řádek se ořízne a doplní '…'."""
+    g = FactGraph()
+    for i in range(8):
+        g.add_fact(make_fact("mít", [Participant("subj", "X", "person"),
+                                     Participant("obj", f"věc{i}", "concept")]))
+    value = dict(node_detail_rows(g, "X"))["mít →"]
+    assert value.endswith("…")
+    assert value.count(",") < 8                  # ne všech 8 partnerů
+
+
 def test_fact_rows_predicate_weight_participants():
     g = _graph()
     fact = next(f for f in g.facts.values() if f.predicate == "napsat")
