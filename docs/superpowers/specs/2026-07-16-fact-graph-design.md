@@ -1,117 +1,133 @@
 # Faktový graf — jádro (návrh)
 
 **Datum:** 2026-07-16 · **Větev:** `feature/fact-graph`
-**Status:** Schváleno (design), čeká na spec-review uživatelem
+**Status:** Schváleno (design v2 — reifikované n-ární fakty), čeká na spec-review
 
 ## 1. Cíl a kontext
 
 Retrieval (V1–B1) hledá pasáž a odpovídá z ní. To selhává, když je odpověď
 roztroušená nebo když jedna věta zavádí (B1: „kdy se narodil Karel Čapek? → 1915"
 místo 1890). Faktový graf jde jinou cestou: z celého korpusu poskládá **vážený graf
-faktů** (uzly = pojmy/entity, hrany = vztahy podmět–sloveso–předmět/atribut) a
-odpovídá **průchodem grafu**. Klíč: **váha hrany = kolikrát se fakt v korpusu
-opakuje**, takže opakovaně potvrzený fakt (1890) přebije jednorázový šum (1915).
+faktů** a odpovídá **průchodem**. Klíč: **váha faktu = kolikrát se opakuje**, takže
+opakovaně potvrzený fakt (1890) přebije jednorázový šum (1915).
 
-Materiál je hotový — pro každou větu už máme UD rozbor + NameTag entity (větné
-anotace z B1). Graf je jejich **agregace přes celý korpus**, ne nový model.
+**Vztah je uzel (reifikace).** Spoj mezi tématem a hodnotou není jen popisek hrany,
+ale samostatný **faktový uzel**. Důvod: k témuž tématu i téže hodnotě může vést víc
+různých faktů („Čapek se **narodil** 1890" vs „Čapku 1890 **začaly růst vlasy**"), a
+jeden fakt může být **n-ární** (podmět + předmět + **čas + místo** najednou:
+„narodil se v Praze 1890"). Reifikace to čistě odděluje, umožní na fakt pověsit
+váhu/zdroj a dělá z faktu waypoint pro vizualizaci tras ve viewBase. Volíme
+**maximální přesnost** (korpus poroste; výkon neřešíme).
 
-**Dělba práce:** *jellyAI3* postaví vážený graf a odpovídá; **viewBase** (grafový SW
-uživatele, Three.js + d3-force-3d) udělá force layout, shluky a později i konverzační
-„těžiště". Fyziku tedy nestavíme — exportujeme do viewBase.
+Materiál je hotový — pro každou větu máme UD rozbor + NameTag entity (větné anotace
+z B1). Graf je jejich **agregace**, ne nový model.
+
+**Dělba práce:** *jellyAI3* postaví graf a odpovídá; **viewBase** (grafový SW
+uživatele, Three.js + d3-force-3d) udělá force layout, shluky, animaci tras a později
+konverzační „těžiště".
 
 ## 2. Klíčová rozhodnutí (schválená)
 
-- **Uzly + hrany = trojice** podmět–sloveso–předmět, plus atributy (datum/číslo/místo
-  přes `obl`/`nmod`) a spona (`X být Y` = definice). Ne ko-okurence (mlhavá), ne
-  všechny závislosti (šum).
-- **Váha = opakování.** Shodné trojice se sloučí, `váha = počet výskytů`. To je
-  mechanismus „opakovaný fakt vyhrává".
-- **Vlastní graf od nuly** (edukační, bez závislostí) — prostá struktura uzlů/hran.
-- **Export do viewBase** tenkým adaptérem (`to_networkx`, líný import), ne přímá
-  závislost jádra.
-- **`GraphAnswerer`** jako nový `answerer.mode="graph"` s fallbackem na
-  template/extraktivní.
+- **Reifikovaný n-ární faktový uzel.** Každá slovesná událost = jeden faktový uzel
+  (nese `predicate`), k němu **role-hrany** na účastníky (podmět/předmět/čas/místo).
+  Spona = fakt s `predicate="být"` (podmět + přísudek).
+- **Váha = opakování na faktu.** Shodné fakty (týž predikát + titíž účastníci) se
+  sloučí do jednoho uzlu, `váha += 1`. Opakovaný fakt vyhrává konflikty.
+- **Vlastní graf od nuly** (edukační, bez závislostí).
+- **Export do viewBase** tenkým adaptérem (`to_networkx`/`to_json`, líný import).
+- **`GraphAnswerer`** (`answerer.mode="graph"`) — odpovídá **2-skokem** (téma → fakt →
+  hodnota); při neúspěchu fallback na extraktivní/template.
 
 ## 3. Architektura a datový tok
 
 ```
-větné anotace (B1)  ──►  extrakce trojic (per věta)  ──►  agregace + váhy
-   (doc_id, idx věty)         nsubj–verb–obj/atribut         sloučit shodné trojice
-                                                                   │
-dotaz ──► analyze_question (V4a) ──► GraphAnswerer ──────────────► graf
-              (typ, téma, sloveso)       průchod: hrana s max vahou
-                                              │
-                                    odpověď (uzel) / fallback
-                                              
-graf ──► to_networkx ──► viewBase (force layout, shluky, těžiště)
+větné anotace (B1) ─► extrakce faktů ─► agregace (sloučit shodné, váha++) ─► FactGraph
+   (doc_id, idx)        1 sloveso = 1 fakt        téma/hodnota = entita/lemma
+                        role: subj/obj/time/loc     fakt = uzel s predikátem+vahou
+
+dotaz ─► analyze_question (V4a) ─► GraphAnswerer ─► 2-skok: téma → fakt(max váha) → hodnota
+FactGraph ─► to_networkx ─► viewBase (force layout, shluky, animace tras, těžiště)
 ```
 
-## 4. Extrakce trojic (`jellyai/graph/extract.py`)
+Graf je (skoro) bipartitní: **entitní/hodnotové uzly** ↔ **faktové uzly**; hrany mají
+**roli** a spojují fakt s jeho účastníky.
 
-Vstup = jedna anotace věty (`{"entities": [...], "sentences": [[token,...]]}`).
-Pro každý sloveso-token `V` ve větě:
-- **podmět** `S` = potomek `V` s `deprel ∈ {nsubj, nsubj:pass}`.
-- **předmět** `O` = potomek `V` s `deprel ∈ {obj, iobj}`.
-- **atributy** `A` = potomci `V` s `deprel ∈ {obl, obl:*, nmod}`, které jsou datum/
-  číslo/místo (NameTag typ `t`/`g`, nebo UPOS `NUM`).
-- `S+O` → hrana `(node(S)) —lemma(V)→ (node(O))`.
-- `S+A` → hrana `(node(S)) —lemma(V)→ (node(A))` (zachytí „Čapek → narodit_se → 1890").
+## 4. Extrakce faktů (`jellyai/graph/extract.py`)
 
-**Spona:** kořen `R` s potomkem `cop` a podmětem `S` → hrana `(node(S)) —být→ (node(R))`.
+Vstup = anotace věty. Pro každý sloveso-token `V`, který má podmět:
+- **role účastníků**: `nsubj/nsubj:pass → subj`, `obj/iobj → obj`, a `obl/nmod`
+  podle typu cíle: čas → `time`, místo → `loc`, číslo → `num`.
+- vznikne **jeden `Fact`**: `predicate = lemma(V)`, `participants = {(role, uzel)…}`.
+- **spona**: kořen `R` s potomkem `cop` a podmětem `S` → `Fact("být", {(subj,S),(pred,R)})`.
 
-**`node(token)`** — pokud token leží uvnitř NameTag entity (podle offsetů), uzel =
-kanonický text entity + typ entity; jinak uzel = **nominativní lemma** tokenu
-(přes `selection._nominative`/`_clean_lemma`) + typ `concept` (číslo → `number`).
+**`node(token)`** (id, typ): uvnitř NameTag entity → kanonická entita + typ; jinak
+nominativní lemma (`selection._clean_lemma`), typ `number` pro NUM, jinak `concept`.
 
-Výstup = seznam trojic `(src, relation, dst)` s typy uzlů.
+**Identita faktu** (pro slučování/váhu) = `(predicate, seřazená n-tice (role, uzel))`.
+Tři věty „Čapek se narodil 1890" → jeden faktový uzel s vahou 3. „…v Praze 1890"
+(navíc `loc`) → jiný, bohatší fakt (samostatný uzel). Podřazení částečných faktů
+(subsumpce) je pozdější zpřesnění.
+
+Výstup = `list[Fact]`, kde `Fact(predicate, participants)`,
+`Participant(role, node_id, node_type)`.
 
 ## 5. Struktura grafu (`jellyai/graph/graph.py`)
 
-Vlastní, prostá:
-- `nodes: dict[str, Node]` — `Node(id, type, weight)`; `weight` = počet trojic, jichž se uzel účastní.
-- `edges: dict[(src_id, relation, dst_id), int]` — hodnota = **váha (opakování)**.
-- `build_graph(annotations) -> FactGraph` — projede všechny věty, extrahuje trojice,
-  sloučí a nasčítá váhy.
-- `neighbors(node_id, relation=None, incoming=False)` — hrany ven/dovnitř (pro průchod).
+- `nodes: dict[str, Node]` — entitní/hodnotové uzly; `Node(id, type, weight)`,
+  `weight` = v kolika faktech-výskytech figuruje.
+- `facts: dict[key, FactNode]` — `FactNode(id=key, predicate, weight, participants)`;
+  `key = (predicate, participants)`; `weight` = opakování faktu.
+- `_by_node: dict[node_id, list[(fact_key, role)]]` — index pro průchod (v jakých
+  faktech a roli uzel vystupuje).
+- `add_fact(fact)` — sloučí podle klíče (`váha++`) nebo založí; udržuje `_by_node` a
+  frekvence uzlů.
+- `facts_of(node_id, role=None, predicate=None) -> list[FactNode]` — fakty, v nichž
+  uzel figuruje (filtr role/predikát).
+- `participants(fact_node, role) -> list[str]` — účastníci faktu dané role.
 - `save`/`load` (pickle) → `data/graph.pkl`.
 
-## 6. Odpovídání průchodem (`jellyai/answerer/graph_answerer.py`)
+## 6. Odpovídání 2-skokem (`jellyai/answerer/graph_answerer.py`)
 
-`GraphAnswerer(graph, client, fallback)` — odpovídá z **globálního grafu** (ne z
-pasáží; `retrieved` se ignoruje, slouží jen fallbacku).
+`GraphAnswerer(graph, client, fallback)` — z **globálního grafu** (`retrieved` jen pro
+fallback).
 
 1. `qa = analyze_question(question, client)` → typ, `verb_lemma`, `topic_terms`, `is_copula`.
-2. **Téma → uzel:** `topic_terms` se namapují na `node.id` (normalizovaně); vybere se
-   uzel s nejvyšší vahou.
-3. Podle typu otázky průchod (hrana s **nejvyšší vahou** vyhrává konflikty):
-   - **Kdo/Co** (ne-spona): najdi hrany `(? —verb_lemma→ téma)` → vrať `src` s max vahou.
-   - **Kdy**: z tématu hrany `(téma —*→ dst)` s `dst.type=time` → `dst` s max vahou.
-   - **Kde**: totéž s `dst.type=geo`. **Kolik**: `dst.type=number`.
-   - **Kdo/Co spona, Jaký**: hrany `(téma —být→ Y)` → `Y` s max vahou (definice).
-4. Vrátí text uzlu jako odpověď; když nic nesedí → `fallback.answer(question, retrieved)`.
+2. **Téma → uzel** (`_resolve_topic`): `topic_terms` na `node.id`, uzel s max vahou.
+3. **2-skok** (fakt s **nejvyšší vahou** vyhrává):
+   - najdi fakty, kde téma vystupuje (role/predikát dle otázky),
+   - z faktu s nejvyšší vahou vezmi účastníka cílové role.
+   | Otázka | fakt (téma jako) | cílová role |
+   |---|---|---|
+   | Kdo/Co | obj (příp. subj), predikát = sloveso | subj (příp. obj) |
+   | Kdy | subj, predikát = sloveso (jinak libovolný) | time / num |
+   | Kde | subj | loc |
+   | Kolik | subj | num |
+   | Kdo/Co spona, Jaký | subj, predikát „být" | pred |
+4. Nic → `fallback.answer(question, retrieved)`.
 
-Reuse: `analyze_question` (V4a) a normalizace lemmat (`selection`).
+Příklady: „kde se narodil Karel Čapek?" a „kdy…?" vezmou **týž** narozovací fakt a
+z něj `loc` resp. `time` — n-arita v akci. `1890` vyhraje nad `1915`, protože jeho
+fakt má vyšší váhu.
 
 ## 7. Perzistence a CLI
 
-- CLI `graph` — postaví graf z `data/annotations.pkl` (větné anotace) a uloží
-  `data/graph.pkl`. Vypíše počty uzlů/hran.
-- CLI `graph --view` — exportuje do viewBase (viz §8).
-- `answerer.mode="graph"` → pipeline načte graf a použije `GraphAnswerer`.
+- CLI `graph` — postaví graf z `data/annotations.pkl`, uloží `data/graph.pkl`, vypíše
+  počty entitních/faktových uzlů a hran.
+- CLI `graph --view` — export do viewBase (§8).
+- `answerer.mode="graph"` (přepínač `--graph`) → pipeline použije `GraphAnswerer`.
 
 ## 8. Export do viewBase (`jellyai/graph/viewbase_export.py`)
 
-- `to_networkx(graph) -> nx.DiGraph` — uzly s atributy `type`, `weight`; hrany s
-  `relation`, `weight`. NetworkX **líný import** (jen při exportu), není závislost jádra.
-- CLI `graph --view` → `Canvas.from_networkx(G)` (viewBase), váha hrany → tloušťka,
-  typ uzlu → barva. viewBase spustí force layout a interakci.
-- Alternativně (bez viewBase/networkx): `to_json(graph)` → `{nodes, edges}` k ručnímu
-  načtení. (Jeden z obou; `to_networkx` je primární most.)
+- `to_json(graph)` → `{nodes, edges}`, kde **nodes** = entitní uzly *i faktové uzly*
+  (faktový uzel označen typem `fact`, popiskem = predikát), **edges** = role-hrany
+  `(fact, role, participant, weight)`.
+- `to_networkx(graph) -> nx.DiGraph` (líný import) — primární most; váha → tloušťka,
+  typ uzlu → barva, role → popisek hrany.
 
-**viewBase je repo uživatele — smíme ho upravovat** a případné rozšíření přispět do
-veřejného repa. Pro jádro stačí dnešní stav (frontend force layout). Rozšíření, které
-z viewBase udělá **backendovou fyzikální službu** (spočítá layout a vrátí ho jellyAI3),
-je plánováno až pro navazující vrstvu — viz §12.
+**viewBase je repo uživatele — smíme ho upravit** a rozšíření přispět do veřejného
+repa. Umí zobrazovat **trasy** (data flows po hranách) → dotaz může vizuálně proletět
+sítí přes faktové uzly (viz §12). Backendová fyzikální služba (spočítat layout a vrátit
+jej jellyAI3) je také navazující krok.
 
 ## 9. Konfigurace (`config.py`)
 
@@ -120,32 +136,34 @@ je plánováno až pro navazující vrstvu — viz §12.
 
 ## 10. Testy (hermetické, bez modelů)
 
-- **Extrakce:** z umělé anotace „Božena Němcová napsala Babičku." → trojice
-  `(Božena Němcová) —napsat→ (Babička)`. Spona „Rossum je vynálezce." → `—být→`.
-  Atribut „Čapek se narodil 1890." → `(Karel Čapek) —narodit→ (1890, number/time)`.
-- **Váhy = opakování:** tři věty s 1890 a jedna s 1915 → hrana na 1890 má vyšší váhu.
-- **Odpovídání:** „kdy se narodil Karel Čapek?" nad tímto grafem → **1890** (ne 1915).
-  „kdo napsal Babičku?" → „Božena Němcová". „kdo je Rossum?" bez spony → fallback.
-- **Export:** `to_networkx` vrátí graf se správným počtem uzlů/hran a atributy vah.
+- **Extrakce:** „Božena Němcová napsala Babičku." → `Fact("napsat", {(subj,Božena
+  Němcová),(obj,Babička)})`. Spona → `Fact("být", …)`. „Čapek se narodil v Praze 1890."
+  → jeden `Fact("narodit", {(subj,Čapek),(loc,Praha),(time/num,1890)})`.
+- **Váhy = opakování:** tři věty s narozením 1890, jedna se „životem" 1915 → narozovací
+  fakt má váhu 3.
+- **Odpovídání:** „kdy se narodil Karel Čapek?" → **1890**; „kde…?" z **téhož** faktu →
+  Praha; „kdo napsal Babičku?" → Božena Němcová; „kdo je Rossum?" bez faktu → fallback.
+- **Export:** `to_json` obsahuje faktové uzly (typ `fact`) i role-hrany s vahami.
 
 ## 11. Ošetření chyb a hraniční případy
 
-- Věta bez podmětu/slovesa → žádná trojice (přeskoč).
+- Věta bez podmětu/slovesa → žádný fakt.
 - Téma otázky není v grafu → `fallback`.
-- Více cílů se stejnou vahou → deterministicky první (stabilní řazení podle id).
-- Token mimo entitu i bez lemmatu → přeskoč uzel.
+- Více faktů se stejnou vahou → deterministicky první (stabilní řazení podle klíče).
+- Token bez lemmatu i entity → účastník se přeskočí (fakt může vzniknout z ostatních).
 - Prázdný graf → `GraphAnswerer` vždy `fallback`.
 
 ## 12. Mimo rozsah (YAGNI) — a navazující vrstva
 
-Jádro = graf + statické odpovídání + export k vizualizaci. Mimo něj (navazující fáze):
+Jádro = graf + statické odpovídání + export. Mimo něj:
 
-- **Force layout / dimenzionální rozložení** — dělá viewBase. Navazující krok:
-  rozšířit viewBase o **backendovou fyzikální službu**, která layout spočítá a vrátí
-  jellyAI3 (pozice, shluky) k programové konzumaci — dnes to viewBase neumí (fyzika je
-  ve frontendu). Uděláme to v repu uživatele a přispějeme do veřejného repa.
-- **Konverzační „těžiště"** (hmotnost témat, posun v rozhovoru) — postaví na vrácené
-  fyzice + na B2: aktivní téma dostane větší hmotnost, těžiště se posune, biasuje další
-  odpovědi.
-- Koreference (spojení „on/ona" s entitou), víceskoký průchod (A→B→C) — později.
-- Vektorové vážení uzlů/hran (hybrid) — až po ověření faktového jádra.
+- **Vizualizace trasy dotazu** *(nápad uživatele)*: `GraphAnswerer` už zná trasu
+  (téma → faktový uzel → hodnota). Malé rozšíření: vracet i trasu a předat ji viewBase
+  („trasy"), aby dotaz proletěl sítí. Blízký krok po ověření jádra.
+- **Force layout / dimenzionální rozložení** — dělá viewBase; navazující krok =
+  backendová fyzikální služba vracející layout jellyAI3 (přispět upstream).
+- **Konverzační „těžiště"** (hmotnost témat, posun v rozhovoru) — na vrácené fyzice + B2.
+- **Konsolidace kódu k grafu** *(nápad uživatele)*: když se graf osvědčí, zredukovat
+  stávající vrstvy tímto směrem. **Podmíněné ověřením jádra.**
+- Subsumpce částečných faktů, koreference, víceskoký průchod (A→B→C), vektorové vážení
+  (hybrid) — pozdější zpřesnění.
