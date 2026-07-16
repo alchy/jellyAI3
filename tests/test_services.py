@@ -52,5 +52,21 @@ def test_udpipe_service_parses_subject():
     try:
         sentences = client.parse("Karel Čapek napsal knihu.")
         assert sentences and any(t["deprel"] == "nsubj" for t in sentences[0])
+        # morfologické rysy (tvary!) jsou součást tokenu — pád/rod/negace
+        knihu = next(t for t in sentences[0] if t["form"] == "knihu")
+        assert knihu["feats"].get("Case") == "Acc"
     finally:
         client.close()
+
+
+def test_parse_conllu_extracts_feats():
+    """FEATS (sloupec 6 CoNLL-U) se parsuje do dictu — pád, rod, zájmenný typ."""
+    import sys
+    sys.path.insert(0, "services")
+    from udpipe_service import _parse_conllu
+    conllu = ("1\tji\ton\tPRON\tPP\tCase=Acc|Gender=Fem|PronType=Prs\t2\tobj\t_\t"
+              "TokenRange=0:2\n"
+              "2\tviděl\tvidět\tVERB\tVp\t_\t0\troot\t_\tTokenRange=3:8\n\n")
+    sent = _parse_conllu(conllu)[0]
+    assert sent[0]["feats"] == {"Case": "Acc", "Gender": "Fem", "PronType": "Prs"}
+    assert sent[1]["feats"] == {}

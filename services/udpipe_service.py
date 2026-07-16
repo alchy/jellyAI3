@@ -1,12 +1,24 @@
 """UDPipe služba — tokenizace, tagování a závislostní rozbor přes HTTP.
 
 Endpoint `POST /parse` přijme `{text}` a vrátí `{sentences: [[token, …], …]}`, kde
-token je `{form, lemma, upos, head, deprel, start, end}`. Právě `deprel`/`head`
-(podmět `nsubj`, předmět `obj`) umožní vybrat správnou odpovědní entitu — kdo co
-dělá, ne jen „nějaká osoba poblíž". UDPipe vydá CoNLL-U, který tu rozparsujeme.
+token je `{form, lemma, upos, feats, head, deprel, start, end}`. `deprel`/`head`
+(podmět `nsubj`, předmět `obj`) vybírá správnou odpovědní entitu; `feats`
+(morfologické rysy: pád, rod, typ zájmena, negace) nese **tvar** — signál pro
+anaforu, genitivní vztahy i polaritu. UDPipe vydá CoNLL-U, který tu rozparsujeme.
 """
 
 from _common import serve, parse_args
+
+
+def _parse_feats(column):
+    """FEATS sloupec CoNLL-U („Case=Gen|Gender=Masc") → dict; „_" → {}."""
+    feats = {}
+    if column not in ("_", ""):
+        for pair in column.split("|"):
+            if "=" in pair:
+                key, value = pair.split("=", 1)
+                feats[key] = value
+    return feats
 
 
 def _parse_conllu(conllu):
@@ -16,7 +28,8 @@ def _parse_conllu(conllu):
         conllu (str): Výstup UDPipe ve formátu CoNLL-U.
 
     Returns:
-        list[list[dict]]: Věty; token = {form, lemma, upos, head, deprel, start, end}.
+        list[list[dict]]: Věty; token = {form, lemma, upos, feats, head,
+            deprel, start, end}; feats = dict rysů (Case, Gender, PronType…).
     """
     sentences = []
     current = []
@@ -41,6 +54,7 @@ def _parse_conllu(conllu):
                         start, end = int(a), int(b)
         current.append({
             "form": cols[1], "lemma": cols[2], "upos": cols[3],
+            "feats": _parse_feats(cols[5]),
             "head": int(cols[6]) if cols[6].isdigit() else 0,
             "deprel": cols[7], "start": start, "end": end,
         })
