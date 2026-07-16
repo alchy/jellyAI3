@@ -1,6 +1,8 @@
 from jellyai.chunker import Passage
+from jellyai.loader import Document
 from jellyai.ufal_client import FakeUfalClient
-from jellyai.annotate import annotate_passages, save_annotations, load_annotations
+from jellyai.annotate import (annotate_passages, annotate_documents,
+                              save_annotations, load_annotations)
 
 
 def test_annotate_and_roundtrip(tmp_path):
@@ -20,3 +22,29 @@ def test_annotate_and_roundtrip(tmp_path):
     save_annotations(ann, path)
     loaded = load_annotations(path)
     assert loaded[("wiki", 2)]["sentences"][0][0]["deprel"] == "root"
+
+
+def test_annotate_documents_keys_per_sentence_and_shifts_offsets():
+    text = "Anna spí. Bere klobouk."
+    docs = [Document("d", "d", text)]
+    client = FakeUfalClient(
+        parse={
+            "Anna spí.": [[
+                {"form": "Anna", "lemma": "Anna", "upos": "PROPN", "head": 2, "deprel": "nsubj", "start": 0, "end": 4},
+                {"form": "spí", "lemma": "spát", "upos": "VERB", "head": 0, "deprel": "root", "start": 5, "end": 8},
+            ]],
+            "Bere klobouk.": [[
+                {"form": "Bere", "lemma": "brát", "upos": "VERB", "head": 0, "deprel": "root", "start": 0, "end": 4},
+                {"form": "klobouk", "lemma": "klobouk", "upos": "NOUN", "head": 1, "deprel": "obj", "start": 5, "end": 12},
+            ]],
+        },
+        entities={"Anna spí.": [{"text": "Anna", "type": "P", "start": 0, "end": 4}]},
+    )
+    ann = annotate_documents(docs, client)
+    assert set(ann.keys()) == {("d", 0), ("d", 1)}
+    # věta 0 beze změny (base 0)
+    assert ann[("d", 0)]["sentences"][0][0]["start"] == 0
+    assert ann[("d", 0)]["entities"][0]["start"] == 0
+    # věta 1 posunutá o base = len("Anna spí.") + 1 = 10 → disjunktní od věty 0
+    assert ann[("d", 1)]["sentences"][0][0]["start"] == 10
+    assert ann[("d", 1)]["sentences"][0][0]["form"] == "Bere"
