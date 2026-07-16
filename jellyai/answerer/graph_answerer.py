@@ -214,6 +214,20 @@ class GraphAnswerer(Answerer):
                 (g.facts_of(topic, role="subj", predicate=verb), ["obj"])
         return [], []
 
+    def _neighbor_context(self, node_id, exclude, limit=10):
+        """Širší kontext kolem uzlu: hodnoty faktů, kde uzel vystupuje jako podmět
+        (co ho graf spojuje — pro „Co se stalo <datum>?" tak z Boženy vyplyne i
+        „Babička" přes napsat). Bere **top-K podle váhy** (ne úzký práh), aby se
+        do kontextu dostaly i řidší, ale věcné vazby."""
+        weight_by_value = {}
+        for fact in self.graph.facts_of(node_id, role="subj"):
+            for participant in fact.participants:
+                if participant.node != node_id and participant.node not in exclude:
+                    if fact.weight > weight_by_value.get(participant.node, 0):
+                        weight_by_value[participant.node] = fact.weight
+        ranked = sorted(weight_by_value.items(), key=lambda kv: -kv[1])
+        return [v for v, _ in ranked[:limit]]
+
     def _rank_values(self, facts, roles, temperature):
         """Seřadí hodnoty cílových rolí dle váhy faktu; nechá ty nad prahem teploty."""
         weight_by_value = {}
@@ -263,6 +277,10 @@ class GraphAnswerer(Answerer):
                     facts, roles = self._candidate_facts_roles(qa, topic)
                 alternatives = [v for v in self._rank_values(facts, roles, temperature)
                                 if v != value]
+                # + širší kontext: okolí odpovědi v grafu (co ji spojuje)
+                for near in self._neighbor_context(value, {value, topic}):
+                    if near not in alternatives:
+                        alternatives.append(near)
             self.last_trace = {"topic": topic, "predicate": fact.predicate,
                                "fact": fact.id, "answer": value}
             self._remember(qa, topic, value)
