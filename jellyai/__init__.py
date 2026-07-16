@@ -28,6 +28,7 @@ from jellyai.tasks import (annotate_corpus, build_fact_graph, load_fact_graph,
                            make_graph_answerer)
 from jellyai.viz.reflect import reflect
 from jellyai.viz.detail import node_detail_rows, fact_detail_rows
+from jellyai.viz.pulse import TracePulse
 from jellyai.viz.viewbase_view import ViewBaseView
 
 __version__ = "0.1.0"
@@ -40,5 +41,5 @@ __all__ = [
     "Tokenizer", "QuestionAnalyzer", "FactExtractor", "Composer", "CorpusPort", "GraphView",
     "JellyError", "CorpusTools", "TemplateComposer", "Jelly", "demo",
     "annotate_corpus", "build_fact_graph", "load_fact_graph", "make_graph_answerer",
-    "reflect", "ViewBaseView", "node_detail_rows", "fact_detail_rows",
+    "reflect", "ViewBaseView", "node_detail_rows", "fact_detail_rows", "TracePulse",
 ]

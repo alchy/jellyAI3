@@ -83,13 +83,29 @@ class ViewBaseView:
         self._canvas.update_node(node_id, **attrs)
 
     def flow(self, path):
-        """Animuje světelné částice po cestě uzlů (trasa dotazu). Chyby nekritické."""
+        """Animuje světelné částice po trase (topic → answer). viewBase si cestu
+        mezi konci **sám najde** (BFS), takže stačí předat konce. Chyby nekritické."""
         if len(path) < 2:
             return
         try:
-            self._canvas.flow(path[0], path[-1], path=path)
+            self._canvas.flow(path[0], path[-1], count=3, speed=0.6)
         except Exception:  # pylint: disable=broad-exception-caught
-            pass          # když uzly nejsou hranou spojené, jen nic neanimujeme
+            pass          # když mezi konci nevede cesta, jen nic neanimujeme
+
+    def packet(self, path):
+        """Vyšle jeden „paket" (částici) po trase (topic→answer); viewBase si cestu
+        mezi konci sám najde (BFS). Diskrétní tok jako v packet-flow příkladu —
+        barvu/velikost bere z tématu (aditivní blending → burst na trase září)."""
+        if not path or len(path) < 2:
+            return
+        try:
+            self._canvas.flow(path[0], path[-1], count=1)
+        except Exception:  # pylint: disable=broad-exception-caught
+            pass          # když mezi konci nevede cesta, paket zahodíme
+
+    def every(self, seconds, callback):
+        """Zaregistruje periodickou úlohu (viewBase `every`) — volat před `serve`."""
+        self._canvas.every(seconds)(callback)
 
     def on_prompt(self, callback):
         """Napojí textový prompt (ControlWindow) na callback(text)."""

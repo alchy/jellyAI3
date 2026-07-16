@@ -25,16 +25,18 @@ def test_cmd_web_wires_prompt_to_ask(tmp_path, monkeypatch):
     class FakeView:
         def __init__(self):
             self.cb = None
+            self.tick = None
             self.served = False
             self.updated = {}
-            self.flows = []
+            self.packets = []
             self.written = []
 
         def from_graph(self, graph): return self
         def add_node(self, *a, **k): pass
         def add_edge(self, *a, **k): pass
         def update_node(self, node_id, **attrs): self.updated[node_id] = attrs
-        def flow(self, path): self.flows.append(path)
+        def packet(self, path): self.packets.append(path)
+        def every(self, seconds, callback): self.tick = callback
         def open_terminal(self, callback): self.cb = callback
         def write(self, text): self.written.append(text)
         def serve(self, open_browser=True): self.served = True
@@ -42,7 +44,10 @@ def test_cmd_web_wires_prompt_to_ask(tmp_path, monkeypatch):
 
     view = FakeView()
     cmd_web(cfg, view=view)
-    assert view.served is True and view.cb is not None
+    assert view.served is True and view.cb is not None and view.tick is not None
     view.cb(q)                                   # simuluj dotaz z konzole
-    assert "Božena Němcová" in view.updated      # ask + reflect proběhly
     assert any("Božena Němcová" in line for line in view.written)  # odpověď v konzoli
+    assert "Božena Němcová" in view.updated      # aktivace se promítla do velikosti
+    for _ in range(10):                          # pár animačních tiků
+        view.tick()
+    assert any(pkt for pkt in view.packets)      # provoz po trase se rozjel

@@ -258,8 +258,8 @@ def cmd_graph(config, view=False):
     if view:
         from jellyai.graph.viewbase_export import to_networkx
         try:
-            from viewbase import Canvas
-            Canvas.from_networkx(to_networkx(graph)).serve()
+            from viewbase import Canvas, serve
+            serve(Canvas.from_networkx(to_networkx(graph)))   # serve je modulová funkce
         except ImportError:
             print("viewBase/networkx není k dispozici — přeskočeno.")
     return len(graph.nodes)
@@ -280,21 +280,48 @@ def cmd_web(config, view=None):
         None: Interakce běží v prohlížeči.
     """
     from jellyai.tasks import make_graph_answerer, load_fact_graph
-    from jellyai.viz.reflect import reflect
+    from jellyai.viz.pulse import TracePulse
     answerer = make_graph_answerer(config)
     if view is None:
         # lazy import: viewBase je volitelný, jádro ho nepotřebuje
         from jellyai.viz.viewbase_view import ViewBaseView
         view = ViewBaseView("jellyAI3").from_graph(load_fact_graph(config))
 
+    pulse = TracePulse()             # aktivace („context window") → jas + provoz tras
+
     def on_query(question):
         answer = answerer.answer(question, [])
-        reflect(view, answerer)          # rozsvítí nody + flow po trase
+        context = getattr(answerer, "context", None)
+        scores = dict(context.scores) if context is not None else {}
+        trace = getattr(answerer, "last_trace", None)
+        path = [trace["topic"], trace["answer"]] if trace else []
+        # vizualizace zrcadlí stav aktivace po dotazu: rozsvítí pole, přidá trasu
+        state = pulse.ignite(scores, path)
+        for node_id, bright in state["sizes"].items():
+            view.update_node(node_id, size=1.0 + bright)
+        for node_id in state["extinguish"]:   # uzly mimo pole → zpět na základ
+            view.update_node(node_id, size=1.0)
         view.write(f"❓ {question}\n💬 {answer.text}")   # odpověď v prohlížeči
-        print(f"💬 {answer.text}")       # i do logu serveru
+        # --- debug výpis konverzace (do logu serveru; flush kvůli RT) ---
+        top = sorted(scores.items(), key=lambda kv: -kv[1])[:6]
+        trace_line = (f"{trace['topic']} ─[{trace['predicate']}]→ {trace['answer']}"
+                      if trace else "žádná (bez odpovědi v grafu → fallback)")
+        print(
+            f"\n❓ {question}"
+            f"\n💬 {answer.text}   (zdroj: {', '.join(answer.sources) or '—'})"
+            f"\n   trasa: {trace_line}"
+            f"\n   aktivace (kontext): "
+            f"{', '.join(f'{n}={v:.2f}' for n, v in top) or '—'}",
+            flush=True)
         return answer.text
 
-    view.open_terminal(on_query)         # konzole: vstup i výstup v prohlížeči
+    def animate():
+        # ~7×/s: každá aktivní trasa vyšle paket podle své hustoty (∝ aktivaci)
+        for packet_path in pulse.tick()["packets"]:
+            view.packet(packet_path)
+
+    view.every(0.15, animate)
+    view.open_terminal(on_query)     # konzole: vstup i výstup v prohlížeči
     view.serve(open_browser=True)
 
 
