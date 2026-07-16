@@ -55,6 +55,19 @@ def test_select_predicate_copula():
     assert c.form == "významná spisovatelka"
 
 
+def test_select_predicate_requires_subject_match():
+    from jellyai.answerer.selection import select_predicate
+    # spona je o „Čapkovi", ne o tématu otázky → nesmí se vzít (jinak „sporné")
+    sent = [
+        {"form": "Čapek", "lemma": "Čapek", "upos": "PROPN", "head": 3, "deprel": "nsubj", "start": 0, "end": 5},
+        {"form": "byl", "lemma": "být", "upos": "AUX", "head": 3, "deprel": "cop", "start": 6, "end": 9},
+        {"form": "spisovatel", "lemma": "spisovatel", "upos": "NOUN", "head": 0, "deprel": "root", "start": 10, "end": 20},
+    ]
+    ann = {"entities": [], "sentences": [sent]}
+    assert select_predicate(ann, "Jaký", topic_terms=["Němcová"]) is None
+    assert select_predicate(ann, "Jaký", topic_terms=["Čapek"]).form == "spisovatel"
+
+
 def test_co_skips_pronoun_object():
     # předmět-zájmeno „který" se přeskočí, vybere se podstatné jméno „knihu"
     sent = [

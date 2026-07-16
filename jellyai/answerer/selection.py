@@ -133,26 +133,40 @@ def _select_number(annotation, qtype):
     return None
 
 
-def select_predicate(annotation, qtype):
+def select_predicate(annotation, qtype, topic_terms=None):
     """Sponový přísudek: „X je/byl Y" → Y (nominální/adjektivní přísudek).
 
     V UD je u sponové věty přísudek kořenem a spona („být") jeho `cop` potomkem;
     např. „Němcová byla významná spisovatelka" → přísudek „spisovatelka" + přívlastek
-    „významná". To je odpověď na definiční/vlastnostní otázky.
+    „významná". Aby odpověď opravdu patřila k otázce, bere se přísudek **jen když
+    podmět té sponové věty sedí na téma otázky** (jinak by „Jaká byla Němcová?"
+    vzalo první nesouvisející sponu v pasáži).
 
     Args:
         annotation (dict): Anotace pasáže.
         qtype (str): Typ otázky.
+        topic_terms (list | None): Témata otázky (lemmata); přísudek se přijme,
+            jen když podmět odpovídá některému. None/prázdné = bez kontroly.
 
     Returns:
-        Candidate | None: Přísudková fráze, nebo None když věta není sponová.
+        Candidate | None: Přísudková fráze, nebo None když nic nesedí.
     """
+    topic = {t.lower() for t in (topic_terms or [])}
     for sent in annotation.get("sentences", []):
-        cop_heads = [t["head"] for t in sent if t.get("deprel") == "cop"]
-        for head_id in cop_heads:
+        for cop in [t for t in sent if t.get("deprel") == "cop"]:
+            head_id = cop.get("head", 0)
             if not 0 < head_id <= len(sent):
                 continue
             predicate = sent[head_id - 1]
+            if topic:
+                subj = next((t for t in sent if t.get("head") == head_id
+                             and t.get("deprel") in _SUBJECT), None)
+                if subj is None:
+                    continue
+                subj_key = {_clean_lemma(subj.get("lemma", "")).lower(),
+                            subj.get("form", "").lower()}
+                if not (subj_key & topic):
+                    continue  # spona je o něčem jiném než téma otázky
             phrase = [predicate] + [
                 t for t in sent
                 if t.get("head") == head_id and t.get("deprel") in _PREDICATE_MODIFIERS
@@ -163,10 +177,12 @@ def select_predicate(annotation, qtype):
     return None
 
 
-def select_answer(qtype, verb_lemma, annotation, is_copula=False):
+def select_answer(qtype, verb_lemma, annotation, is_copula=False, topic_terms=None):
     """Vybere kandidáta na odpověď podle typu otázky, spony a rolí v anotaci.
 
-    U sponových otázek a u „Jaký/Který" zkusí nejdřív přísudek; jinak entitu podle
+    U sponových otázek a u „Jaký/Který" je odpověď **jen** sponový přísudek téhož
+    tématu; když ho pasáž nemá, vrátí None (ať to spadne na extraktivní větu, ne na
+    tautologii typu „Kdo je Rossum? → Rossum"). Ostatní typy vyberou entitu podle
     typu a syntaktické role.
 
     Args:
@@ -174,14 +190,14 @@ def select_answer(qtype, verb_lemma, annotation, is_copula=False):
         verb_lemma (str | None): Lemma hlavního slovesa otázky (pro výběr role).
         annotation (dict): Anotace pasáže {"entities": ..., "sentences": ...}.
         is_copula (bool): Zda je otázka sponová (přednost přísudku).
+        topic_terms (list | None): Témata otázky — přísudek musí patřit k nim.
 
     Returns:
         Candidate | None: Vybraná odpověď, nebo None když nic nesedí.
     """
     if is_copula or qtype in ("Jaký", "Který"):
-        predicate = select_predicate(annotation, qtype)
-        if predicate:
-            return predicate
+        # definiční/vlastnostní otázka: buď přísudek téhož tématu, nebo nic
+        return select_predicate(annotation, qtype, topic_terms)
     if qtype in ("Kdo", "Čí"):
         return _select_subject_entity(annotation, verb_lemma, qtype)
     if qtype == "Co":

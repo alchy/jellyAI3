@@ -92,7 +92,7 @@ class TemplateAnswerer(Answerer):
             if not annotation:
                 continue
             candidate = select_answer(qa.qtype, qa.verb_lemma, annotation,
-                                      is_copula=qa.is_copula)
+                                      is_copula=qa.is_copula, topic_terms=qa.topic_terms)
             if candidate is None:
                 continue
             text = self._render(qa.qtype, candidate)
