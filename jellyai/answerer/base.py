@@ -22,6 +22,22 @@ class Answer:
     text: str
     sources: list = field(default_factory=list)
     score: float = 0.0
+    alternatives: list = field(default_factory=list)   # další kandidáti dle teploty
+    trace: dict = None                                 # trasa grafu (téma→fakt→hodnota)
+
+    def explain(self):
+        """Lidský popis, jak odpověď vznikla (trasa grafu), nebo prostý text.
+
+        Jádro výukovosti: ukázat *proč*, ne jen *co*. Když je odpověď z grafu, vrátí
+        trasu „téma ← predikát ← odpověď"; jinak samotný text.
+
+        Returns:
+            str: Vysvětlení odpovědi.
+        """
+        if not self.trace:
+            return self.text
+        t = self.trace
+        return f"{t.get('topic')} ← {t.get('predicate')} ← {t.get('answer')}"
 
 
 class Answerer:

@@ -110,21 +110,23 @@ class Retriever:
         self._tfidf_norm = tfidf / norms
         return self
 
-    def search(self, query, top_k=None):
+    def search(self, query, top_k=None, *, temperature=0.0):
         """Najde k dotazu nejrelevantnější pasáže.
 
         Dotaz se tokenizuje stejně jako pasáže, spočítá se skóre podle zvolené
-        metody a vrátí se `top_k` pasáží s nejvyšším **kladným** skóre. Pasáže
-        se skóre 0 (žádné společné slovo) se zahazují — je poctivější vrátit míň
-        (nebo nic) než nutit dovnitř nesouvisející text.
+        metody a vrátí se pasáže s nejvyšším **kladným** skóre (pasáže se skóre 0
+        se zahazují). **Teplota shody** `temperature ∈ [0,1]` řídí šířku výběru:
+        práh = `nejlepší_skóre × (1 − temperature)`. `0` = jen nejlepší (top_k);
+        `1` = široce (i slabší shody nad prahem) — vhodné, když z kandidátů skládá
+        odpověď kompozitor.
 
         Args:
             query (str): Dotaz v češtině.
             top_k (int | None): Kolik pasáží vrátit; None = hodnota z konfigurace.
+            temperature (float): Teplota shody (0 = nejlepší, 1 = široce).
 
         Returns:
-            list[tuple[Passage, float]]: Dvojice (pasáž, skóre) sestupně podle
-                skóre; prázdný seznam, když nic nesedí nebo je index prázdný.
+            list[tuple[Passage, float]]: Dvojice (pasáž, skóre) sestupně podle skóre.
         """
         if top_k is None:
             top_k = self.config.top_k
@@ -135,8 +137,14 @@ class Retriever:
             scores = self._tfidf_scores(tokens)
         else:
             scores = self._bm25_scores(tokens)
-        order = np.argsort(-scores)[:top_k]
-        return [(self.passages[i], float(scores[i])) for i in order if scores[i] > 0]
+        order = np.argsort(-scores)
+        ranked = [(self.passages[i], float(scores[i])) for i in order if scores[i] > 0]
+        if not ranked:
+            return []
+        if temperature and temperature > 0.0:
+            threshold = ranked[0][1] * (1.0 - temperature)
+            return [rs for rs in ranked if rs[1] >= threshold]
+        return ranked[:top_k]
 
     def __len__(self):
         """Počet zaindexovaných pasáží (jednotek vyhledávání)."""
