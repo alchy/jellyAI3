@@ -23,6 +23,7 @@ from jellyai.ports import (Tokenizer, QuestionAnalyzer, FactExtractor, Composer,
 from jellyai.errors import JellyError
 from jellyai.corpus import CorpusTools
 from jellyai.facade import Jelly
+from jellyai.demo import demo
 
 __version__ = "0.1.0"
 
@@ -32,5 +33,5 @@ __all__ = [
     "Answer", "Answerer", "ExtractiveAnswerer", "GraphAnswerer", "analyze_question",
     "explain", "list_blocks",
     "Tokenizer", "QuestionAnalyzer", "FactExtractor", "Composer", "CorpusPort",
-    "JellyError", "CorpusTools", "TemplateComposer", "Jelly",
+    "JellyError", "CorpusTools", "TemplateComposer", "Jelly", "demo",
 ]
