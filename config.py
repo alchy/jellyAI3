@@ -67,7 +67,7 @@ class RetrieverConfig:
     k1: float = 1.5
     b: float = 0.75
     use_stopwords: bool = True
-    granularity: str = "passage"   # "passage" (V1) nebo "sentence" (B1)
+    granularity: str = "passage"  # "passage" (V1) nebo "sentence" (B1)
     decay_tau: float = 1.6         # dosah exponenciálního útlumu (věty)
     focus_radius: int = 2          # poloměr ostřicího okna (vět na každou stranu)
 
