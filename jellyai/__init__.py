@@ -19,7 +19,7 @@ from jellyai.answerer.question import analyze_question
 from jellyai.answerer.composer import TemplateComposer
 from jellyai.explain import explain_block as explain, list_blocks
 from jellyai.ports import (Tokenizer, QuestionAnalyzer, FactExtractor, Composer,
-                           CorpusPort)
+                           CorpusPort, GraphView)
 from jellyai.errors import JellyError
 from jellyai.corpus import CorpusTools
 from jellyai.facade import Jelly
@@ -34,7 +34,7 @@ __all__ = [
     "Retriever", "build_graph", "FactGraph", "extract_facts", "Fact", "Participant",
     "Answer", "Answerer", "ExtractiveAnswerer", "GraphAnswerer", "analyze_question",
     "explain", "list_blocks",
-    "Tokenizer", "QuestionAnalyzer", "FactExtractor", "Composer", "CorpusPort",
+    "Tokenizer", "QuestionAnalyzer", "FactExtractor", "Composer", "CorpusPort", "GraphView",
     "JellyError", "CorpusTools", "TemplateComposer", "Jelly", "demo",
     "annotate_corpus", "build_fact_graph", "load_fact_graph", "make_graph_answerer",
 ]
