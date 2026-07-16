@@ -11,6 +11,7 @@ from jellyai.answerer.base import Answer, Answerer
 from jellyai.answerer.question import analyze_question
 from jellyai.answerer.template import _to_nominative
 from jellyai.graph.activation import ActivationField
+from jellyai.graph.extract import _REL_NOUNS
 
 _DATE_PARTS = {"rok", "měsíc", "den"}   # drill: „v kterém roce/měsíci…"
 
@@ -126,6 +127,32 @@ class GraphAnswerer(Answerer):
         if qa.gender is None or node is None or node.type != "person":
             return True
         return _name_gender(node_id) == qa.gender
+
+    def _relation_answer(self, qa):
+        """„Kdo je/byl bratr/sestra/… X?" → z relačního faktu druhý účastník.
+
+        V otázce je relační jméno (bratr…) + osoba; vztah je symetrický, takže
+        vrátí toho druhého z faktu, kde osoba vystupuje (v libovolné roli).
+
+        Args:
+            qa (QuestionAnalysis): Rozbor otázky.
+
+        Returns:
+            tuple: (osoba | None, druhý účastník | None, fakt | None).
+        """
+        relations = [t for t in qa.topic_terms if t.lower() in _REL_NOUNS]
+        if not relations:
+            return None, None, None
+        relation = relations[0].lower()
+        person_terms = [t for t in qa.topic_terms if t.lower() not in _REL_NOUNS]
+        person = self._resolve_topic(person_terms)
+        if person is None:
+            return None, None, None
+        for fact in self.graph.facts_of(person, predicate=relation):
+            others = [p.node for p in fact.participants if p.node != person]
+            if others:
+                return person, others[0], fact
+        return None, None, None
 
     def _reverse_lookup(self, question):
         """Reverzní dotaz: z roku v otázce najde událost (datum → podmět faktu).
@@ -266,7 +293,10 @@ class GraphAnswerer(Answerer):
         """
         self.last_trace = None
         qa = analyze_question(question, self.client)
-        topic, value, fact = self._attend(qa)
+        # vztahový dotaz („Kdo byl bratr X?") má přednost — jinak by ho přebila spona
+        topic, value, fact = self._relation_answer(qa)
+        if value is None:
+            topic, value, fact = self._attend(qa)
         reverse = False
         if value is None:
             # poslední záchrana: „Co se stalo <datum>?" — datum → událost

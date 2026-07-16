@@ -15,6 +15,10 @@ _ATTR = {"obl", "nmod"}
 _ENTITY_TYPE = {"p": "person", "g": "geo", "t": "time", "i": "institution"}
 _ATTR_ROLE = {"time": "time", "geo": "loc", "number": "num"}   # typ cíle → role
 _SKIP_UPOS = {"PRON", "DET"}   # zájmena/určovatele = balast (a záminka pro pro-drop)
+# relační podstatná jména: „bratr Karla Čapka" → hrana osoba–vztah–osoba
+_REL_NOUNS = {"bratr", "sestra", "matka", "otec", "syn", "dcera", "rodič",
+              "manžel", "manželka", "žena", "muž", "přítel", "přítelkyně",
+              "spolupracovník", "kolega", "žák", "učitel", "následovník"}
 
 
 @dataclass(frozen=True)
@@ -100,6 +104,16 @@ def _children(sent, head_id):
     return [t for t in sent if t.get("head") == head_id]
 
 
+def _relation_person(children, entities, canon):
+    """Osobní genitivní přívlastek relačního jména („bratr **Karla Čapka**")."""
+    for tok in children:
+        if tok.get("deprel", "").startswith("nmod") and tok.get("upos") not in _SKIP_UPOS:
+            node = _node_for(tok, entities, canon)
+            if node is not None and node[1] == "person":
+                return node
+    return None
+
+
 def _first(tokens, deprels):
     """První token s `deprel` z množiny, nebo None."""
     return next((t for t in tokens if t.get("deprel") in deprels), None)
@@ -180,8 +194,17 @@ def extract_facts(annotation, default_subject=None, canon=None):
             # stavu** (přídavné jméno → role „attr": „je nemocná") — „Kdo je"
             # čerpá z identity, „Jaký je" z vlastnosti, takže se nepletou.
             if _first(children, {"cop"}):
-                pred = _node_for(head, entities, canon)
                 subj = subj_node or default_subject
+                rel = _clean_lemma(head.get("lemma", ""))
+                other = _relation_person(children, entities, canon)
+                if subj and rel in _REL_NOUNS and other is not None:
+                    # „Josef byl bratr Karla Čapka" → bratr(Josef, Karel Čapek)
+                    facts.append(make_fact(rel, [
+                        Participant("subj", subj[0], subj[1]),
+                        Participant("obj", other[0], other[1]),
+                    ]))
+                    continue
+                pred = _node_for(head, entities, canon)
                 if pred and subj:
                     role = "attr" if head.get("upos") == "ADJ" else "pred"
                     facts.append(make_fact("být", [

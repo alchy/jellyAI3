@@ -1,0 +1,16 @@
+{"q": "Kdo napsal Babičku?", "expect": ["Božena Němcová"], "cat": "autor"}
+{"q": "Kdo napsal Vějíř?", "expect": ["Seifert"], "cat": "autor"}
+{"q": "Kdo je Karel Čapek?", "expect": ["spisovatel"], "cat": "identita"}
+{"q": "Kdo je Josef Čapek?", "expect": ["malíř"], "cat": "identita"}
+{"q": "Kdo byl robot?", "expect": ["stroj"], "cat": "identita"}
+{"q": "Kde se narodil Josef Čapek?", "expect": ["Hronov"], "cat": "místo"}
+{"q": "Kdy se narodila Božena Němcová?", "expect": ["1818"], "cat": "čas"}
+{"q": "Co se stalo 2. května 1818?", "expect": ["Božena Němcová"], "cat": "reverzní"}
+{"q": "Kdo byl bratr Karla Čapka?", "expect": ["Josef"], "cat": "vztah"}
+{"q": "Kdo byl bratr Josefa Čapka?", "expect": ["Karel"], "cat": "vztah"}
+{"q": "Jaký je robot?", "expect": ["umělý", "člověku", "stroj"], "cat": "vlastnost"}
+{"q": "Kdo je Božena Němcová?", "expect": ["spisovatelka", "spisovatel"], "cat": "identita", "gap": "copula-profese (#5): vrací 'úřad'"}
+{"q": "Kdo napsal R.U.R.?", "expect": ["Čapek"], "cat": "autor", "gap": "tokenizace tečkované zkratky (#3)"}
+{"q": "Kdo napsal Válku s mloky?", "expect": ["Čapek"], "cat": "autor", "gap": "titul nezachycen"}
+{"q": "Kolik měla dětí Božena Němcová?", "expect": ["čtyři", "4"], "cat": "počet", "gap": "coverage"}
+{"q": "Kde působila Božena Němcová?", "expect": ["Praha", "Domažlice"], "cat": "místo", "gap": "coverage"}
