@@ -13,8 +13,11 @@ _TAIL_ORDER = ("obj", "num", "time", "loc", "pred")
 class TemplateComposer:
     """Výchozí kompozitor — spojí fakty do vět bez modelu."""
 
-    def compose(self, question, facts):
+    def compose(self, question, facts):  # pylint: disable=unused-argument
         """Složí čitelný text ze sady faktů.
+
+        `question` výchozí šablona nepoužije — je součástí portu pro budoucí NN
+        (která ho k formulaci potřebuje).
 
         Args:
             question (str): Původní otázka (pro budoucí kontext; zde neužito).
