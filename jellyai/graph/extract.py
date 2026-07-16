@@ -115,6 +115,15 @@ def extract_facts(annotation):
             subj_node = _node_for(subj, entities)
             if subj_node is None:
                 continue
+            # sponová věta: (podmět)–být–(přísudek)
+            if _first(children, {"cop"}):
+                pred = _node_for(head, entities)
+                if pred:
+                    facts.append(make_fact("být", [
+                        Participant("subj", subj_node[0], subj_node[1]),
+                        Participant("pred", pred[0], pred[1]),
+                    ]))
+                continue
             if head.get("upos") != "VERB":
                 continue
             verb = _clean_lemma(head.get("lemma", ""))
@@ -124,6 +133,13 @@ def extract_facts(annotation):
                 o = _node_for(obj, entities)
                 if o:
                     parts.append(Participant("obj", o[0], o[1]))
+            for attr in children:
+                base = (attr.get("deprel") or "").split(":")[0]
+                if base not in _ATTR:
+                    continue
+                a = _node_for(attr, entities)
+                if a and a[1] in _ATTR_ROLE:
+                    parts.append(Participant(_ATTR_ROLE[a[1]], a[0], a[1]))
             if len(parts) > 1:
                 facts.append(make_fact(verb, parts))
     return facts
