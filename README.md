@@ -160,13 +160,32 @@ dává čisté správné odpovědi, u víceslovných jmen zatím ustřeluje shod
 zapojit MorphoDiTa skloňování celé fráze). Detaily v
 `docs/superpowers/2026-07-16-v3-results.md`.
 
+## V4a — bohatá analýza otázky + sponové odpovědi (experimentální)
+
+Rozšíření pravidlového jádra V3. Otázka se rozebere **podle lemmatu** (`Jaká/Jaké`
+→ `Jaký`, přibyly `Který`/`Čí`), takže tvary tázacích slov přestaly padat na
+extraktivní. U otázek „X je/byl Y" a u `Jaký/Který` vezme **přísudek sponové věty**
+(„Němcová byla významná spisovatelka" → „významná spisovatelka"), ale jen když
+podmět té věty **sedí na téma otázky**. U definice bez vhodného přísudku už
+answerer nevrací podmět (žádné „Kdo je Rossum? → Rossum"), ale spadne na
+extraktivní větu. Bez změny dat (anotace z V3 stačí).
+
+```bash
+./jelly template "kdo je Rossum?"          # → věta o Rossumovi (ne tautologie)
+./jelly template "Jaká byla Božena Němcová?"
+```
+
+Poctivé omezení: čistou jednoslovnou definici složí, jen když retrieval vytáhne
+definiční větu nahoru — což je přesně to, co má zlepšit fáze B (konverzační
+aktivace). Detaily v `docs/superpowers/2026-07-16-v4a-results.md`.
+
 ## Roadmapa
 
 - **Hotovo:** V1 (retrieval + extraktivní QA), V2a (syntetická QA data),
-  V3 (pravidlové odpovědi — služby + role + šablony). V2b (generátor od nuly) je
-  na samostatné větvi.
-- **Další:** zapojit MorphoDiTa skloňování celé fráze (shoda), predikátové otázky,
-  hierarchický retrieval; obecné znalosti mimo korpus.
+  V3 (pravidlové odpovědi — služby + role + šablony), V4a fáze A (bohatá analýza
+  otázky + sponové odpovědi). V2b (generátor od nuly) je na samostatné větvi.
+- **Další (V4a fáze B):** konverzační aktivace / pseudo-attention se vzdálenostním
+  útlumem (přiblížit definiční větu nahoru), pak obecné znalosti mimo korpus.
 
 Detaily v `docs/superpowers/specs/2026-07-15-cesky-gpt-design.md` a
 `docs/superpowers/plans/2026-07-15-cesky-qa-v1.md`.
