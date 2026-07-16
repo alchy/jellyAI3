@@ -57,10 +57,12 @@ class GraphAnswerer(Answerer):
     def _resolve_topic(self, topic_terms):
         """Najde uzel tématu otázky — nejlepší shodu s obsahovými lemmaty.
 
-        Shoda je **case-sensitive** (vlastní jméno „Babička" se nesmí splést
-        s obecným „babička"). Preferuje uzel, který pokrývá **víc témat** (aby
-        „Božena Němcová" přebila samotnou „Němcová"), pak delší (víceslovnou)
-        entitu, a teprve nakonec vyšší frekvenci.
+        **Přesná shoda velikosti má přednost**, case-insensitive je fallback:
+        UDPipe někdy velikost zachová (PROPN „Babička" → lemma „Babička" — odliší
+        knihu od obecné „babička"), jindy lemmatizuje na malá („Vějíř"→„vějíř" —
+        pak by kapitalizovaný uzel byl jinak jménem nedostupný). Dál preferuje uzel
+        pokrývající **víc témat** (aby „Božena Němcová" přebila „Němcová"), delší
+        (víceslovnou) entitu a nakonec vyšší frekvenci.
 
         Args:
             topic_terms (list[str]): Obsahová lemmata otázky.
@@ -69,13 +71,18 @@ class GraphAnswerer(Answerer):
             str | None: Id uzlu tématu, nebo None když nic nesedí.
         """
         terms = [t for t in topic_terms if t]
+        low_terms = [t.lower() for t in terms]
         best_id, best_score = None, None
         for node in self.graph.nodes.values():
-            words = node.id.split()
-            hits = sum(1 for t in terms if t == node.id or t in words)
-            if hits == 0:
+            low_id = node.id.lower()
+            low_words = low_id.split()
+            ins_hits = sum(1 for t in low_terms if t == low_id or t in low_words)
+            if ins_hits == 0:
                 continue
-            score = (hits, len(words), node.weight)
+            words = node.id.split()
+            exact_hits = sum(1 for t in terms if t == node.id or t in words)
+            # přesná shoda velikosti > jen case-insensitive; pak témata, délka, váha
+            score = (exact_hits, ins_hits, len(low_words), node.weight)
             if best_score is None or score > best_score:
                 best_id, best_score = node.id, score
         return best_id
