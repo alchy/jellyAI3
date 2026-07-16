@@ -179,7 +179,11 @@ Poctivé omezení: čistou jednoslovnou definici složí, jen když retrieval vy
 definiční větu nahoru — což měla zlepšit fáze B. Detaily v
 `docs/superpowers/2026-07-16-v4a-results.md`.
 
-## B1 — vzdálenostní jádro (experimentální opt-in)
+## B1 — vzdálenostní jádro (⚠️ zakonzervováno)
+
+> Neukázalo se jako jasná výhra → **zakonzervováno** (kód i testy zůstávají, default
+> `passage`). Hlavní směr je faktový graf. Viz `docs/superpowers/conserved-components.md`.
+
 
 Větný retrieval: skóruje po **větách**, nalezená věta vyzařuje skóre do okolí
 s útlumem podle vzdálenosti (`exp(−d/τ)`, soubor = tvrdá hranice), vrchol → ostřicí
@@ -214,10 +218,12 @@ n-ární fakt odpoví na „kdy" i „kde" z jedné události.
 ./jelly graph --view        # export do viewBase (force-graph; potřebuje networkx)
 ```
 
-**Výsledek:** mechanismus i n-arita fungují (Němcová: „kdy"→1818 a „kde"→Slezsku
-z téhož faktu; „kdo napsal Babičku"→Božena Němcová). Slabina je **kvalita extrakce
-z reálných rozborů** (u některých faktů šum, např. Čapkovo narození). Default `mode`
-zůstává `extractive` → nulová regrese. Detaily v
+**Výsledek:** funguje mechanismus i n-arita (Němcová: „kdy"→1818 a „kde"→Slezsku
+z téhož faktu; „kdo napsal Babičku"→Božena Němcová; „kde se narodil Karel Čapek"→
+Malých Svatoňovicích). Extrakce má **aktivační koreferenci** (pro-drop podmět +
+přesun tématu), **kanonizaci osobních jmen** a **precizní answerer** (žádná špatná
+odpověď). Zbývá zachytávání zanořených dat (rok narození). Default `mode` zůstává
+`extractive` → nulová regrese. Detaily v
 `docs/superpowers/2026-07-16-fact-graph-results.md`.
 
 ## Roadmapa
