@@ -175,11 +175,13 @@ def _canonical_persons(items):
         for e in annotation.get("entities", []):
             if e.get("type", "")[:1].lower() == "p":
                 persons.add(e["text"])
+    # deterministicky (set má náhodné pořadí → jinak nereprodukovatelný graf)
+    ordered = sorted(persons)
     canon = {}
-    for p in persons:
+    for p in ordered:
         words = set(p.split())
         best = p
-        for q in persons:
+        for q in ordered:
             if words <= set(q.split()) and len(q.split()) > len(best.split()):
                 best = q
         canon[p] = best
