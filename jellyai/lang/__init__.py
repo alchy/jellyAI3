@@ -1,10 +1,11 @@
 """Jazyková pravidla jako data — jazyk je zásuvný modul (JSON), ne kód.
 
-Kmenování (pádové koncovky, epenteze, minimální kmen) je jazykově specifické;
-core je jazykově agnostický a pravidla načítá z `jellyai/lang/<jazyk>.json`,
-případně z libovolné cesty. Nový jazyk = nový JSON soubor, přepnutí = config
-(`graph.language`) — bez zásahu do kódu. Stejný vzor je připraven i pro další
-jazykové tabulky (relační jména, „work" slovesa, měsíce), až se sem přestěhují.
+Kmenování (pádové koncovky, epenteze, minimální kmen) i lexikální tabulky
+(autorská podstatná jména/slovesa) jsou jazykově specifické; core je jazykově
+agnostický a čte je z `jellyai/lang/<jazyk>.json`, případně z libovolné cesty.
+Nový jazyk = nový JSON soubor, přepnutí = config (`graph.language`) — bez
+zásahu do kódu. **Aktivní jazyk je stav tohoto modulu** (`set_language`/
+`current`) — jediný zdroj pro canon, extract i spread, aby se strany nerozešly.
 """
 
 import json
@@ -12,6 +13,7 @@ import os
 
 _DIR = os.path.dirname(__file__)
 _cache = {}
+_active = {}
 
 
 def load_rules(language="cs"):
@@ -33,5 +35,20 @@ def load_rules(language="cs"):
             rules = json.load(fh)
         rules["suffixes"] = tuple(sorted(rules.get("suffixes", ()),
                                          key=len, reverse=True))
+        rules["work_nouns"] = frozenset(rules.get("work_nouns", ()))
+        rules["work_verbs"] = frozenset(rules.get("work_verbs", ()))
         _cache[path] = rules
     return _cache[path]
+
+
+def set_language(language="cs"):
+    """Aktivuje jazyk procesu (kód jazyka nebo cesta k JSON). Vrátí pravidla."""
+    _active["rules"] = load_rules(language)
+    return _active["rules"]
+
+
+def current():
+    """Aktivní jazyková pravidla (výchozí „cs", když nikdo nepřepnul)."""
+    if "rules" not in _active:
+        set_language("cs")
+    return _active["rules"]

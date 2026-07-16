@@ -20,22 +20,7 @@ Souvisí s [[jellyai3-fact-graph]] (řeší tříštění entit — agentem ozna
 
 from collections import Counter
 
-from jellyai.lang import load_rules
-
-_RULES = load_rules("cs")      # výchozí jazyk; přepíná `set_language` (config)
-
-
-def set_language(language):
-    """Přepne jazyk kmenování — kód jazyka („cs") nebo cesta k JSON s pravidly.
-
-    Jazyk je zásuvný datový modul (`jellyai/lang/`): core zůstává agnostický,
-    pravidla se mění bez zásahu do kódu.
-
-    Args:
-        language (str): Kód jazyka nebo cesta k `.json` souboru.
-    """
-    global _RULES   # pylint: disable=global-statement
-    _RULES = load_rules(language)
+from jellyai.lang import current
 
 
 def _stem(word):
@@ -47,7 +32,7 @@ def _stem(word):
     → „karl"; Čap-ek/-ka → „čapk". Záměrně hrubé (drobné přeříznutí nevadí,
     když je konzistentní).
     """
-    rules = _RULES
+    rules = current()
     low = word.lower()
     for suffix in rules["suffixes"]:
         if low.endswith(suffix) and len(low) - len(suffix) >= rules["min_stem"]:

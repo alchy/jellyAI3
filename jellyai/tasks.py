@@ -10,7 +10,7 @@ anotacemi (build/load grafu) jdou použít bez modelů.
 from jellyai.loader import load_documents
 from jellyai.annotate import annotate_documents, save_annotations, load_annotations
 from jellyai.graph.graph import build_graph, resolve_entities, FactGraph
-from jellyai.graph.canon import set_language
+from jellyai.lang import set_language
 
 
 def annotate_corpus(config, client=None):

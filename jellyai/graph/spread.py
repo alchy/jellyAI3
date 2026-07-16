@@ -13,6 +13,8 @@ místo nad uzly grafu. Čisté, bez UFAL (tokeny se předají hotové).
 
 import math
 
+from jellyai.lang import current
+
 # obsahové slovní druhy dostanou vyšší základní jas než funkční (spojky, předložky…)
 _CONTENT = {"NOUN", "PROPN", "VERB", "ADJ", "NUM", "ADV"}
 
@@ -81,11 +83,8 @@ def spread_field(tokens, *, window=2, tau=1.5, alpha=0.5, steps=3,  # pylint: di
     return heat
 
 
-# slovesa/podstatná jména „tvorby" — v jejich okolí bývá titul díla
-_WORK_VERBS = {"napsat", "vydat", "natočit", "složit", "namalovat", "vytvořit",
-               "dokončit", "publikovat", "sepsat"}
-_WORK_NOUNS = {"hra", "dílo", "kniha", "román", "povídka", "obraz", "film",
-               "báseň", "sbírka", "drama", "text"}
+# slovesa/podstatná jména „tvorby" (v jejich okolí bývá titul díla) jsou
+# jazyková data — viz `jellyai/lang/<jazyk>.json` (work_verbs/work_nouns)
 
 
 def _title_like(form):
@@ -123,7 +122,7 @@ def entity_candidates(tokens, known, *, threshold=0.75, window=4):
             continue
         left = {(t.get("lemma") or t.get("form", "")).lower()
                 for t in tokens[max(0, i - window):i]}
-        if left & _WORK_VERBS or left & _WORK_NOUNS:
+        if left & current()["work_verbs"] or left & current()["work_nouns"]:
             out.append(form)
     return out
 

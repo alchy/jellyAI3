@@ -1,14 +1,15 @@
-"""Jazyk jako zásuvný modul — pravidla kmenování žijí v JSON, ne v kódu.
+"""Jazyk jako zásuvný modul — pravidla a tabulky žijí v JSON, ne v kódu.
 
-Core (canon._stem) je jazykově agnostický algoritmus; koncovky, epenteze a
-minimální kmen jsou data z `jellyai/lang/<jazyk>.json`. Nový jazyk = nový JSON,
-přepnutí = config — bez zásahu do kódu.
+Core (canon._stem, extract, spread) je jazykově agnostický; koncovky, epenteze,
+minimální kmen i lexikální tabulky (work_nouns/work_verbs) jsou data
+z `jellyai/lang/<jazyk>.json`. Nový jazyk = nový JSON, přepnutí = config —
+bez zásahu do kódu. Aktivní jazyk je stav modulu `jellyai.lang` (jediný zdroj).
 """
 
 import json
 
-from jellyai.lang import load_rules
-from jellyai.graph.canon import cluster_key, set_language
+from jellyai.lang import load_rules, set_language, current
+from jellyai.graph.canon import cluster_key
 
 
 def test_czech_rules_load_from_json():
@@ -17,6 +18,13 @@ def test_czech_rules_load_from_json():
     # loader řadí nejdelší první — v JSON může být pořadí libovolné (doplňování
     # koncovek nesmí vyžadovat znalost matching pořadí)
     assert list(rules["suffixes"]) == sorted(rules["suffixes"], key=len, reverse=True)
+
+
+def test_current_exposes_lexical_tables():
+    """Lexikální tabulky (autorská jména/slovesa) jsou jazyková data, ne kód."""
+    rules = current()
+    assert "drama" in rules["work_nouns"] and "román" in rules["work_nouns"]
+    assert "napsat" in rules["work_verbs"]
 
 
 def test_custom_language_json_changes_stemming(tmp_path):

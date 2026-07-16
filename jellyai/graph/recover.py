@@ -7,7 +7,8 @@ i titul, který tokenizace/NER neustála — a otázka „Kdo napsal <titul>?" p
 najde autora. Běží jako **post-pass** po `build_graph` (nezasahuje do extrakce).
 """
 
-from jellyai.graph.spread import entity_candidates, _WORK_VERBS
+from jellyai.lang import current
+from jellyai.graph.spread import entity_candidates
 from jellyai.graph.extract import (make_fact, Participant, _SUBJ, _SKIP_UPOS,
                                    _node_for, _clean_lemma)
 
@@ -33,7 +34,7 @@ def _work_verb(sent, before_index):
         if i >= before_index:
             break
         lemma = _clean_lemma(tok.get("lemma", ""))
-        if tok.get("upos") == "VERB" and lemma in _WORK_VERBS:
+        if tok.get("upos") == "VERB" and lemma in current()["work_verbs"]:
             verb = lemma
     return verb
 
