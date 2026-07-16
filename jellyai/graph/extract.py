@@ -61,12 +61,16 @@ def _entity_type(entity):
     return _ENTITY_TYPE.get(entity.get("type", "")[:1].lower(), "concept")
 
 
-def _node_for(token, entities):
+def _node_for(token, entities, canon=None):
     """Vrátí (id, typ) uzlu pro token: entita (kanonicky) nebo nominativní lemma.
+
+    U osobních entit se id sjednotí přes `canon` (fragment „Karel" → „Karel Čapek"),
+    aby se fakta téže osoby nerozpadla na víc uzlů.
 
     Args:
         token (dict): Token s start/end/lemma/upos.
         entities (list[dict]): Entity věty s offsety.
+        canon (dict | None): Mapa osobní jméno → kanonický (nejdelší) tvar.
 
     Returns:
         tuple[str, str] | None: (id, typ), nebo None když token nemá lemma.
@@ -75,7 +79,10 @@ def _node_for(token, entities):
     if start is not None and end is not None:
         for e in entities:
             if e.get("start") is not None and e["start"] <= start and end <= e["end"]:
-                return e["text"], _entity_type(e)
+                text, typ = e["text"], _entity_type(e)
+                if typ == "person" and canon:
+                    text = canon.get(text, text)
+                return text, typ
     lemma = _clean_lemma(token.get("lemma", ""))
     if not lemma:
         return None
@@ -92,7 +99,7 @@ def _first(tokens, deprels):
     return next((t for t in tokens if t.get("deprel") in deprels), None)
 
 
-def extract_facts(annotation, default_subject=None):
+def extract_facts(annotation, default_subject=None, canon=None):
     """Vytáhne z anotace věty seznam reifikovaných faktů.
 
     Pro každý sloveso-token vznikne jeden n-ární fakt (podmět + předmět + atributy).
@@ -105,6 +112,7 @@ def extract_facts(annotation, default_subject=None):
     Args:
         annotation (dict): {"entities": [...], "sentences": [[token,...],...]}.
         default_subject (tuple | None): (id, typ) náhradního podmětu pro pro-drop.
+        canon (dict | None): Kanonizace osobních jmen (sjednocení fragmentů).
 
     Returns:
         list[Fact]: Nalezené fakty (mohou se opakovat — agreguje graf).
@@ -119,11 +127,11 @@ def extract_facts(annotation, default_subject=None):
             # zájmenný podmět je balast; ponecháme prostor pro pro-drop náhradu
             subj_node = None
             if subj_tok is not None and subj_tok.get("upos") not in _SKIP_UPOS:
-                subj_node = _node_for(subj_tok, entities)
+                subj_node = _node_for(subj_tok, entities, canon)
 
             # sponová věta: (podmět)–být–(přísudek)
             if _first(children, {"cop"}):
-                pred = _node_for(head, entities)
+                pred = _node_for(head, entities, canon)
                 subj = subj_node or default_subject
                 if pred and subj:
                     facts.append(make_fact("být", [
@@ -138,14 +146,14 @@ def extract_facts(annotation, default_subject=None):
             extra = []
             obj = _first(children, _OBJ)
             if obj is not None and obj.get("upos") not in _SKIP_UPOS:
-                o = _node_for(obj, entities)
+                o = _node_for(obj, entities, canon)
                 if o:
                     extra.append(Participant("obj", o[0], o[1]))
             for attr in children:
                 base = (attr.get("deprel") or "").split(":")[0]
                 if base not in _ATTR:
                     continue
-                a = _node_for(attr, entities)
+                a = _node_for(attr, entities, canon)
                 if a and a[1] in _ATTR_ROLE:
                     extra.append(Participant(_ATTR_ROLE[a[1]], a[0], a[1]))
             if not extra:

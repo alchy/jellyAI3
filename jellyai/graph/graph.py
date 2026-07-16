@@ -125,12 +125,42 @@ class FactGraph:
         return g
 
 
-def _warm_persons(field, annotation):
-    """Rozsvítí osobní entity věty; podmětovou entitu silněji (aktuální subjekt).
+def _canonical_persons(items):
+    """Sestaví mapu osobní jméno → nejdelší tvar téhož jména v dokumentu.
+
+    NameTag tvoří překrývající se jména („Karel", „Karel Čapek", „Karel Antonín
+    Čapek"). Aby se fakta téže osoby nerozpadla, sjednotíme každý fragment na
+    nejdelší jméno, které obsahuje všechna jeho slova.
+
+    Args:
+        items (list[tuple[int, dict]]): (index věty, anotace) dokumentu.
+
+    Returns:
+        dict: osobní jméno → kanonický (nejdelší) tvar.
+    """
+    persons = set()
+    for _, annotation in items:
+        for e in annotation.get("entities", []):
+            if e.get("type", "")[:1].lower() == "p":
+                persons.add(e["text"])
+    canon = {}
+    for p in persons:
+        words = set(p.split())
+        best = p
+        for q in persons:
+            if words <= set(q.split()) and len(q.split()) > len(best.split()):
+                best = q
+        canon[p] = best
+    return canon
+
+
+def _warm_persons(field, annotation, canon):
+    """Rozsvítí osobní entity věty (kanonicky); podmětovou entitu silněji.
 
     Args:
         field (ActivationField): Aktivační pole dokumentu.
         annotation (dict): Anotace věty (entity + tokeny).
+        canon (dict): Kanonizace osobních jmen.
     """
     persons = [e for e in annotation.get("entities", [])
                if e.get("type", "")[:1].lower() == "p"]
@@ -140,7 +170,7 @@ def _warm_persons(field, annotation):
     for e in persons:
         is_subject = (e.get("start") is not None
                       and any(e["start"] <= s and en <= e["end"] for s, en in subj_spans))
-        field.warm((e["text"], "person"), 2.0 if is_subject else 1.0)
+        field.warm((canon.get(e["text"], e["text"]), "person"), 2.0 if is_subject else 1.0)
 
 
 def build_graph(annotations):
@@ -164,11 +194,12 @@ def build_graph(annotations):
     graph = FactGraph()
     for _, items in by_doc.items():
         items.sort(key=lambda t: t[0])
+        canon = _canonical_persons(items)
         field = ActivationField()
         for _, annotation in items:
             subject = field.hottest()          # (id, typ) nejteplejší osoby, nebo None
-            for fact in extract_facts(annotation, default_subject=subject):
+            for fact in extract_facts(annotation, default_subject=subject, canon=canon):
                 graph.add_fact(fact)
-            _warm_persons(field, annotation)
+            _warm_persons(field, annotation, canon)
             field.step()
     return graph

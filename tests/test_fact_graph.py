@@ -75,3 +75,27 @@ def test_prodrop_follows_active_subject():
     assert g.facts_of("Karel Čapek", role="subj", predicate="narodit")
     assert g.facts_of("Josef Čapek", role="subj", predicate="zemřít")
     assert not g.facts_of("Karel Čapek", role="subj", predicate="zemřít")
+
+
+def test_person_canonicalization_unifies_prodrop():
+    # #0: 'Karel Čapek byl spisovatel' (entity i fragment 'Karel'); #1 pro-drop narození
+    A = {
+        ("d", 0): {"entities": [{"text": "Karel Čapek", "type": "P", "start": 0, "end": 11},
+                                {"text": "Karel", "type": "P", "start": 0, "end": 5}],
+                   "sentences": [[
+            {"form": "Karel", "lemma": "Karel", "upos": "PROPN", "head": 3, "deprel": "nsubj", "start": 0, "end": 5},
+            {"form": "Čapek", "lemma": "Čapek", "upos": "PROPN", "head": 1, "deprel": "flat", "start": 6, "end": 11},
+            {"form": "byl", "lemma": "být", "upos": "AUX", "head": 3, "deprel": "cop", "start": 12, "end": 15},
+            {"form": "spisovatel", "lemma": "spisovatel", "upos": "NOUN", "head": 0, "deprel": "root", "start": 16, "end": 26},
+        ]]},
+        ("d", 1): {"entities": [{"text": "Praze", "type": "G", "start": 15, "end": 20}],
+                   "sentences": [[
+            {"form": "Narodil", "lemma": "narodit", "upos": "VERB", "head": 0, "deprel": "root", "start": 0, "end": 7},
+            {"form": "se", "lemma": "se", "upos": "PRON", "head": 1, "deprel": "expl", "start": 8, "end": 10},
+            {"form": "v", "lemma": "v", "upos": "ADP", "head": 4, "deprel": "case", "start": 11, "end": 12},
+            {"form": "Praze", "lemma": "Praha", "upos": "PROPN", "head": 1, "deprel": "obl", "start": 15, "end": 20},
+        ]]},
+    }
+    g = build_graph(A)
+    assert g.facts_of("Karel Čapek", role="subj", predicate="narodit")   # sjednoceno
+    assert not g.facts_of("Karel", role="subj", predicate="narodit")     # fragment nezůstal
