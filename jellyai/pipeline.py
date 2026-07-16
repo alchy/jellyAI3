@@ -13,6 +13,32 @@ from jellyai.retriever import Retriever
 from jellyai.answerer.extractive import ExtractiveAnswerer
 
 
+def _make_answerer(config):
+    """Vybere answerer podle `config.answerer.mode` (pluggable blok).
+
+    Pro "template" (V3) sestaví TemplateAnswerer s ÚFAL klientem, načtenými
+    anotacemi a extraktivním fallbackem. Importy V3 jsou líné, aby extraktivní
+    cesta (V1) nezáležela na ÚFAL/HTTP vrstvě.
+
+    Args:
+        config (Config): Konfigurace s `answerer.mode`, `services`.
+
+    Returns:
+        Answerer: ExtractiveAnswerer, nebo TemplateAnswerer pro mode="template".
+    """
+    if config.answerer.mode == "template":
+        import os
+        from jellyai.answerer.template import TemplateAnswerer
+        from jellyai.ufal_client import UfalClient
+        from jellyai.annotate import load_annotations
+        annotations = {}
+        if os.path.exists(config.services.annotations_path):
+            annotations = load_annotations(config.services.annotations_path)
+        return TemplateAnswerer(UfalClient(config.services), annotations,
+                                ExtractiveAnswerer(config.answerer))
+    return ExtractiveAnswerer(config.answerer)
+
+
 class QAPipeline:
     """Spojí Retriever a Answerer do jednoho QA celku."""
 
@@ -58,7 +84,7 @@ class QAPipeline:
         for doc in docs:
             passages.extend(chunk(doc, config.chunker))
         retriever = Retriever(config.retriever).build(passages)
-        answerer = ExtractiveAnswerer(config.answerer)
+        answerer = _make_answerer(config)
         return cls(retriever, answerer)
 
     @classmethod
@@ -78,7 +104,7 @@ class QAPipeline:
             QAPipeline: Připravená pipeline s načteným indexem.
         """
         retriever = Retriever.load(index_path)
-        answerer = ExtractiveAnswerer(config.answerer)
+        answerer = _make_answerer(config)
         return cls(retriever, answerer)
 
 

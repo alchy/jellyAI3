@@ -7,7 +7,7 @@ exponátu řekne pár vět — jen bez toho nudného hlasu.
 """
 
 from jellyai import loader, chunker, retriever, pipeline
-from jellyai.answerer import extractive
+from jellyai.answerer import extractive, template
 
 # Mapa název bloku -> funkce, která vrátí jeho popis. Přidat nový blok = přidat
 # sem jeden řádek.
@@ -16,6 +16,7 @@ _BLOCKS = {
     "chunker": chunker.explain,
     "retriever": retriever.explain,
     "answerer": extractive.explain,
+    "template": template.explain,
     "pipeline": pipeline.explain,
 }
 

@@ -4,7 +4,8 @@ from jellyai.explain import explain_block, list_blocks
 
 
 def test_list_blocks():
-    assert list_blocks() == ["answerer", "chunker", "loader", "pipeline", "retriever"]
+    assert list_blocks() == ["answerer", "chunker", "loader", "pipeline",
+                             "retriever", "template"]
 
 
 def test_explain_block_returns_text():

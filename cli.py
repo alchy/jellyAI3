@@ -261,6 +261,8 @@ def _build_parser():
     common = argparse.ArgumentParser(add_help=False)
     common.add_argument("--processed-dir", default=None,
                         help="adresář s vyčištěnými texty (výchozí data/processed)")
+    common.add_argument("--template", action="store_true",
+                        help="použít pravidlový (template) answerer V3 místo extraktivního")
 
     parser = argparse.ArgumentParser(prog="cli", description="Český QA nad texty (V1)")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -301,6 +303,8 @@ def main(argv=None):
             processed_dir=args.processed_dir,
             index_path=os.path.join(args.processed_dir, "index.pkl"),
         ))
+    if getattr(args, "template", False):
+        config.answerer.mode = "template"  # přepnout na pravidlový answerer (V3)
 
     if args.command == "prepare-data":
         cmd_prepare_data(config)
