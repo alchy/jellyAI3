@@ -39,3 +39,18 @@ def test_pipeline_from_index(tmp_path):
 
 def test_explain_nonempty():
     assert explain().strip()
+
+
+def test_build_retriever_picks_sentence_for_sentence_granularity():
+    from config import Config, RetrieverConfig
+    from jellyai.loader import Document
+    from jellyai.pipeline import _build_retriever
+    from jellyai.sentence_retriever import SentenceRetriever
+    from jellyai.retriever import Retriever
+    docs = [Document("d", "d", "Alfa jedna. Klíč leží tady. Gama tři.")]
+
+    cfg_sent = Config(); cfg_sent.retriever = RetrieverConfig(granularity="sentence")
+    assert isinstance(_build_retriever(cfg_sent, docs), SentenceRetriever)
+
+    cfg_pass = Config(); cfg_pass.retriever = RetrieverConfig(granularity="passage")
+    assert isinstance(_build_retriever(cfg_pass, docs), Retriever)
