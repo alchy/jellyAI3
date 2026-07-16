@@ -13,6 +13,24 @@ from jellyai.retriever import Retriever
 from jellyai.answerer.extractive import ExtractiveAnswerer
 
 
+def _make_answerer(config):
+    """Vybere answerer podle `config.answerer.mode` (pluggable blok).
+
+    Import generativního answereru je líný, aby extraktivní cesta (V1) nezáležela
+    na torchi.
+
+    Args:
+        config (Config): Konfigurace s `answerer.mode` a `generator`.
+
+    Returns:
+        Answerer: ExtractiveAnswerer, nebo GenerativeAnswerer pro mode="generative".
+    """
+    if config.answerer.mode == "generative":
+        from jellyai.answerer.generative import GenerativeAnswerer
+        return GenerativeAnswerer(config.generator)
+    return ExtractiveAnswerer(config.answerer)
+
+
 class QAPipeline:
     """Spojí Retriever a Answerer do jednoho QA celku."""
 
@@ -58,7 +76,7 @@ class QAPipeline:
         for doc in docs:
             passages.extend(chunk(doc, config.chunker))
         retriever = Retriever(config.retriever).build(passages)
-        answerer = ExtractiveAnswerer(config.answerer)
+        answerer = _make_answerer(config)
         return cls(retriever, answerer)
 
     @classmethod
@@ -78,7 +96,7 @@ class QAPipeline:
             QAPipeline: Připravená pipeline s načteným indexem.
         """
         retriever = Retriever.load(index_path)
-        answerer = ExtractiveAnswerer(config.answerer)
+        answerer = _make_answerer(config)
         return cls(retriever, answerer)
 
 

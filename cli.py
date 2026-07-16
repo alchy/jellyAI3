@@ -213,6 +213,32 @@ def cmd_gen_qa(config, tagger=None):
     return len(pairs)
 
 
+def cmd_train_gen(config):
+    """Natrénuje generativní model odpovědí (V2b) na QA datech.
+
+    Sestaví korpus pro tokenizer z vyčištěných textů, pak natrénuje transformer
+    na qapairs.jsonl a uloží checkpoint. Vyžaduje torch (requirements-v2.txt).
+
+    Args:
+        config (Config): Konfigurace (processed_dir, qagen.qa_path, generator).
+
+    Returns:
+        str: Cesta k uloženému checkpointu.
+    """
+    from jellyai.loader import load_documents
+    from model.train import train
+    docs = load_documents(config.data.processed_dir)
+    corpus_dir = os.path.dirname(config.qagen.qa_path) or "."
+    os.makedirs(corpus_dir, exist_ok=True)
+    corpus_path = os.path.join(corpus_dir, "corpus.txt")
+    with open(corpus_path, "w", encoding="utf-8") as f:
+        for doc in docs:
+            f.write(doc.text + "\n")
+    path, history = train(config, config.qagen.qa_path, corpus_path)
+    print(f"Generátor natrénován: {path} (loss {history[0]:.3f} → {history[-1]:.3f})")
+    return path
+
+
 def _build_parser():
     """Sestaví argparse parser se všemi příkazy.
 
@@ -227,6 +253,8 @@ def _build_parser():
     common = argparse.ArgumentParser(add_help=False)
     common.add_argument("--processed-dir", default=None,
                         help="adresář s vyčištěnými texty (výchozí data/processed)")
+    common.add_argument("--gen", action="store_true",
+                        help="použít generativní answerer (V2b) místo extraktivního")
 
     parser = argparse.ArgumentParser(prog="cli", description="Český QA nad texty (V1)")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -237,6 +265,7 @@ def _build_parser():
     sub.add_parser("qa-models", parents=[common], help="stáhne ÚFAL modely (MorphoDiTa+NameTag)")
     sub.add_parser("wiki", parents=[common], help="stáhne české wiki články do data/raw")
     sub.add_parser("gen-qa", parents=[common], help="vygeneruje syntetický QA dataset z korpusu")
+    sub.add_parser("train-gen", parents=[common], help="natrénuje generativní model (V2b)")
     p_ask = sub.add_parser("ask", parents=[common], help="odpoví na jeden dotaz")
     p_ask.add_argument("question", help="otázka v češtině")
     p_explain = sub.add_parser("explain", parents=[common], help="popíše blok")
@@ -266,6 +295,8 @@ def main(argv=None):
             processed_dir=args.processed_dir,
             index_path=os.path.join(args.processed_dir, "index.pkl"),
         ))
+    if getattr(args, "gen", False):
+        config.answerer.mode = "generative"  # přepnout na generativní answerer
 
     if args.command == "prepare-data":
         cmd_prepare_data(config)
@@ -281,6 +312,8 @@ def main(argv=None):
         cmd_wiki(config)
     elif args.command == "gen-qa":
         cmd_gen_qa(config)
+    elif args.command == "train-gen":
+        cmd_train_gen(config)
     elif args.command == "ask":
         print(cmd_ask(config, args.question))
     elif args.command == "explain":
