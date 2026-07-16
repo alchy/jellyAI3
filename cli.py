@@ -213,6 +213,40 @@ def cmd_gen_qa(config, tagger=None):
     return len(pairs)
 
 
+def cmd_annotate(config, client=None):
+    """Offline anotace pasáží (entity + syntaktický rozbor) k indexu (V3).
+
+    Načte pasáže z indexu, přes ÚFAL služby je obohatí o entity a role a uloží do
+    sidecaru. Dotazování v režimu "template" pak jen čte.
+
+    Args:
+        config (Config): Konfigurace (index_path, services).
+        client: ÚFAL klient; None = vytvoří UfalClient (injektování usnadňuje testy).
+
+    Returns:
+        int: Počet anotovaných pasáží.
+    """
+    from jellyai.retriever import Retriever
+    from jellyai.annotate import annotate_passages, save_annotations
+    if not os.path.exists(config.data.index_path):
+        raise FileNotFoundError(
+            f"Chybí index {config.data.index_path} — spusť nejdřív `index`."
+        )
+    passages = Retriever.load(config.data.index_path).passages
+    own = client is None
+    if own:
+        from jellyai.ufal_client import UfalClient
+        client = UfalClient(config.services)
+    try:
+        annotations = annotate_passages(passages, client)
+    finally:
+        if own:
+            client.close()
+    save_annotations(annotations, config.services.annotations_path)
+    print(f"Anotováno {len(annotations)} pasáží → {config.services.annotations_path}")
+    return len(annotations)
+
+
 def _build_parser():
     """Sestaví argparse parser se všemi příkazy.
 
@@ -237,6 +271,7 @@ def _build_parser():
     sub.add_parser("qa-models", parents=[common], help="stáhne ÚFAL modely (MorphoDiTa+NameTag)")
     sub.add_parser("wiki", parents=[common], help="stáhne české wiki články do data/raw")
     sub.add_parser("gen-qa", parents=[common], help="vygeneruje syntetický QA dataset z korpusu")
+    sub.add_parser("annotate", parents=[common], help="offline anotace pasáží (entity+role) pro V3")
     p_ask = sub.add_parser("ask", parents=[common], help="odpoví na jeden dotaz")
     p_ask.add_argument("question", help="otázka v češtině")
     p_explain = sub.add_parser("explain", parents=[common], help="popíše blok")
@@ -281,6 +316,8 @@ def main(argv=None):
         cmd_wiki(config)
     elif args.command == "gen-qa":
         cmd_gen_qa(config)
+    elif args.command == "annotate":
+        cmd_annotate(config)
     elif args.command == "ask":
         print(cmd_ask(config, args.question))
     elif args.command == "explain":
