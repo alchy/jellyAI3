@@ -53,5 +53,7 @@ class GraphView(Protocol):
     def update_node(self, node_id, **attrs): ...   # barva/velikost/label živě
     def flow(self, path): ...                       # animace po hranách (trasa)
     def on_prompt(self, callback): ...              # prompt(text) → callback
+    def open_terminal(self, on_input): ...          # konzole: on_input(řádek)
+    def write(self, text): ...                      # zápis do konzole (odpověď)
     def serve(self, open_browser=True): ...         # nastartuje webserver
     def stop(self): ...                             # složí webserver

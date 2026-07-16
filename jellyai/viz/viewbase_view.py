@@ -42,6 +42,7 @@ class ViewBaseView:
         self._vb = vb
         self._canvas = vb.Canvas(title=title)
         self._handle = None
+        self._terminal_id = None
 
     def from_graph(self, graph):
         """Naplní plátno uzly a hranami faktového grafu (entity + faktové uzly).
@@ -94,6 +95,22 @@ class ViewBaseView:
         window.string("dotaz", "Dotaz", maxlength=200)
         self._canvas.open_window(
             window, on_submit=lambda values: callback(values.get("dotaz", "")))
+
+    def open_terminal(self, on_input):
+        """Otevře konzolové okno; on_input(řádek) dostane, co uživatel napsal.
+
+        Odpověď se do konzole píše přes `write` — uživatel ji vidí v prohlížeči
+        (ne na stdoutu serveru).
+        """
+        window = self._vb.TerminalWindow("konzole", title="Dotaz", prompt="❓ ")
+        self._terminal_id = window.window_id
+        self._canvas.open_terminal(
+            window, on_input=lambda event: on_input(getattr(event, "line", "")))
+
+    def write(self, text):
+        """Připíše text do konzolového okna (musí být otevřené přes open_terminal)."""
+        if self._terminal_id is not None:
+            self._canvas.terminal_write(self._terminal_id, text)
 
     def serve(self, open_browser=True, block=True):
         """Nastartuje webserver. `block=True` drží proces (standalone), jinak handle.
