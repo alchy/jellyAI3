@@ -1,5 +1,15 @@
 # Výtěžnost: univerzální reifikace + normalizace — Implementation Plan
 
+> ✅ **DOKONČENO (2026-07-16).** Výsledek: etalon **15/15 (100 %)** + GAP-FIXED
+> „Kdo napsal R.U.R.?" i „Kdo napsal Válku s mloky?"; vlajková rekurze „Kdo byl
+> bratr autora, který napsal R.U.R.?" → Josef Čapek je normativní případ.
+> Odchylka od plánu (pokyn uživatele — univerzální datový model, ne SELECT
+> vzory): místo worklist extraktoru vznikla **kontextová asociace** (role ③
+> aktivačního pole — fakt `kontext` váže entity věty na aktuální subjekt
+> dokumentu) + **predikát jako preference** (přesný fakt → asociační patro)
+> + **enumerativní odpovědi** (_match vrací všechny rovnocenné díry). Navíc:
+> overtní zájmenný podmět blokuje pro-drop (čistí šum sponových vět).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: superpowers:executing-plans.
 > Navazuje na `2026-07-16-entity-resolution.md` (blocker vyřešen, etalon 12/13).
 
