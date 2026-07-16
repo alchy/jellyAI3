@@ -9,9 +9,9 @@ import re
 
 from jellyai.answerer.base import Answer, Answerer
 from jellyai.answerer.question import analyze_question
+from jellyai.answerer.pattern import question_pattern, SubQuery
 from jellyai.answerer.template import _to_nominative
 from jellyai.graph.activation import ActivationField
-from jellyai.graph.extract import _REL_NOUNS
 
 _DATE_PARTS = {"rok", "měsíc", "den"}   # drill: „v kterém roce/měsíci…"
 
@@ -128,31 +128,88 @@ class GraphAnswerer(Answerer):
             return True
         return _name_gender(node_id) == qa.gender
 
-    def _relation_answer(self, qa):
-        """„Kdo je/byl bratr/sestra/… X?" → z relačního faktu druhý účastník.
+    def _pattern_answer(self, question):
+        """Univerzální match: otázka → neúplný fakt → najdi shodný v grafu → díra.
 
-        V otázce je relační jméno (bratr…) + osoba; vztah je symetrický, takže
-        vrátí toho druhého z faktu, kde osoba vystupuje (v libovolné roli).
+        Nahrazuje ruční qtype/relační pravidla: predikát + známé role musí sedět,
+        vrátí se účastník v roli díry, seřazený vahou faktu + aktivací (těžiště).
 
         Args:
-            qa (QuestionAnalysis): Rozbor otázky.
+            question (str): Dotaz uživatele.
 
         Returns:
-            tuple: (osoba | None, druhý účastník | None, fakt | None).
+            tuple: (téma | None, hodnota | None, fakt | None).
         """
-        relations = [t for t in qa.topic_terms if t.lower() in _REL_NOUNS]
-        if not relations:
+        pat = question_pattern(question, self.client)
+        if not pat.known:
             return None, None, None
-        relation = relations[0].lower()
-        person_terms = [t for t in qa.topic_terms if t.lower() not in _REL_NOUNS]
-        person = self._resolve_topic(person_terms)
-        if person is None:
-            return None, None, None
-        for fact in self.graph.facts_of(person, predicate=relation):
-            others = [p.node for p in fact.participants if p.node != person]
-            if others:
-                return person, others[0], fact
-        return None, None, None
+        known_set = set()
+        for _, known in pat.known:
+            node = self._solve(known)        # rekurzivně (i vnořené pod-dotazy)
+            if node is None:
+                return None, None, None      # pojmenované, ale neznámé → nehádat
+            known_set.add(node)
+        node0 = next(iter(known_set))
+        if pat.date_part:
+            # 2-SKOK (rekurze): událost → datum (uzel) → jeho pod-fakt rok/měsíc/den
+            date_node, _ = self._match(pat.predicate, known_set, "time", "time")
+            if date_node is None:
+                return None, None, None
+            value, fact = self._match(pat.date_part, {date_node}, "val", "number")
+            return (date_node, value, fact) if value is not None else (None, None, None)
+        value, fact = self._match(pat.predicate, known_set, pat.hole_role, pat.hole_type)
+        return (node0, value, fact) if value is not None else (None, None, None)
+
+    def _solve(self, known):
+        """Rekurzivně vyřeší `known` na uzel: list = přímá entita; `SubQuery` =
+        vnořený pod-dotaz (vyřeš jeho známé rekurzivně, pak `_match`). **Samo-
+        rozbalování/zabalování**: hloubka = zanoření otázky, auto-trigger struktura.
+
+        Args:
+            known (str | SubQuery): Termín entity nebo vnořený pod-dotaz.
+
+        Returns:
+            str | None: Id uzlu, nebo None když nejde vyřešit.
+        """
+        if not isinstance(known, SubQuery):
+            return self._resolve_topic(known.split())
+        sub = set()
+        for _, inner in known.known:
+            node = self._solve(inner)        # rekurze do hloubky
+            if node is None:
+                return None
+            sub.add(node)
+        value, _ = self._match(known.predicate, sub, known.hole_role, None)
+        return value
+
+    def _match(self, predicate, known_set, hole_role, hole_type):
+        """Jeden skok matche: najdi fakt s `predicate` obsahující všechny `known_set`
+        a vrať nejlepší **díru** (jiný účastník) — role/typ díry je preference (ne
+        filtr), ranking dělá váha faktu + aktivace. Znovupoužitelné pro rekurzi.
+
+        Returns:
+            tuple: (hodnota | None, fakt | None).
+        """
+        if not known_set:
+            return None, None
+        node0 = next(iter(known_set))
+        best = None
+        for fact in self.graph.facts_of(node0, predicate=predicate):
+            if not known_set <= {p.node for p in fact.participants}:
+                continue
+            for part in fact.participants:
+                if part.node in known_set:
+                    continue                 # díra = jiný než známé (i symetrie vztahů)
+                score = fact.weight + self.context.scores.get(part.node, 0.0)
+                # „kdy" bere čas i rok-jako-číslo; jinak přesná role díry
+                if hole_role and (part.role == hole_role
+                                  or (hole_type == "time" and part.role in ("time", "num"))):
+                    score += 1000
+                if hole_type and part.type == hole_type:
+                    score += 100
+                if best is None or score > best[0]:   # pylint: disable=unsubscriptable-object
+                    best = (score, part.node, fact)
+        return (best[1], best[2]) if best is not None else (None, None)
 
     def _reverse_lookup(self, question):
         """Reverzní dotaz: z roku v otázce najde událost (datum → podmět faktu).
@@ -293,8 +350,8 @@ class GraphAnswerer(Answerer):
         """
         self.last_trace = None
         qa = analyze_question(question, self.client)
-        # vztahový dotaz („Kdo byl bratr X?") má přednost — jinak by ho přebila spona
-        topic, value, fact = self._relation_answer(qa)
+        # UNIVERZÁLNÍ princip: otázka→neúplný fakt→match→díra (nahrazuje qtype pravidla)
+        topic, value, fact = self._pattern_answer(question)
         if value is None:
             topic, value, fact = self._attend(qa)
         reverse = False
