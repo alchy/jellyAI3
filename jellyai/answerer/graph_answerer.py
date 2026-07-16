@@ -34,6 +34,13 @@ class GraphAnswerer(Answerer):
         self.fallback = fallback
         self.last_trace = None   # trasa poslední odpovědi (téma → fakt → hodnota)
         self.context = ActivationField()   # konverzační těžiště (id uzlu → jas)
+        self.history = []        # trajektorie konverzace (tahy s trasou a těžištěm)
+
+    def reset(self):
+        """Začne nový rozhovor — vymaže těžiště i historii."""
+        self.context = ActivationField()
+        self.history = []
+        self.last_trace = None
 
     def _resolve_topic(self, topic_terms):
         """Najde uzel tématu otázky — nejlepší shodu s obsahovými lemmaty.
@@ -139,9 +146,24 @@ class GraphAnswerer(Answerer):
                 self.last_trace = {"topic": topic, "predicate": fact.predicate,
                                    "fact": fact.id, "answer": value}
                 self._remember(qa, topic, value)
+                self._log_turn(question, topic, fact.predicate, value)
                 return Answer(text=value, sources=["graf"], score=1.0)
         self.context.step()
+        self._log_turn(question, topic, None, None)
         return self.fallback.answer(question, retrieved)
+
+    def _log_turn(self, question, topic, predicate, answer):
+        """Zapíše tah do historie (trajektorie těžiště přes graf).
+
+        Args:
+            question (str): Otázka tahu.
+            topic (str | None): Rozřešené téma (i z těžiště).
+            predicate (str | None): Predikát použitého faktu (None u fallbacku).
+            answer (str | None): Odpověď z grafu (None u fallbacku).
+        """
+        self.history.append({"question": question, "topic": topic,
+                             "predicate": predicate, "answer": answer,
+                             "gravity": self.context.hottest()})
 
     def _remember(self, qa, topic, value):
         """Zapíše tah do konverzačního těžiště a pohasí ho.

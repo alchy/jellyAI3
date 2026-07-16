@@ -181,3 +181,34 @@ def test_conversational_followup_resolves_topic():
     a = GraphAnswerer(g, client, ExtractiveAnswerer(AnswererConfig()))
     assert a.answer(q1, []).text == "Božena Němcová"
     assert a.answer(q2, []).text == "2. května 1818"     # navázalo na téma z minulého tahu
+
+
+def test_conversation_history_records_trajectory():
+    g = FactGraph()
+    g.add_fact(make_fact("napsat", [Participant("subj", "Božena Němcová", "person"),
+                                    Participant("obj", "Babička", "concept")]))
+    g.add_fact(make_fact("narodit", [Participant("subj", "Božena Němcová", "person"),
+                                     Participant("time", "2. května 1818", "time")]))
+    q1, q2 = "kdo napsal Babičku?", "kdy se narodila?"
+    client = FakeUfalClient(parse={
+        q1: [[
+            {"form": "kdo", "lemma": "kdo", "upos": "PRON", "head": 2, "deprel": "nsubj", "start": 0, "end": 3},
+            {"form": "napsal", "lemma": "napsat", "upos": "VERB", "head": 0, "deprel": "root", "start": 4, "end": 10},
+            {"form": "Babičku", "lemma": "Babička", "upos": "PROPN", "head": 2, "deprel": "obj", "start": 11, "end": 18},
+        ]],
+        q2: [[
+            {"form": "kdy", "lemma": "kdy", "upos": "ADV", "head": 3, "deprel": "advmod", "start": 0, "end": 3},
+            {"form": "se", "lemma": "se", "upos": "PRON", "head": 3, "deprel": "expl", "start": 4, "end": 6},
+            {"form": "narodila", "lemma": "narodit", "upos": "VERB", "head": 0, "deprel": "root", "start": 7, "end": 15},
+        ]],
+    })
+    a = GraphAnswerer(g, client, ExtractiveAnswerer(AnswererConfig()))
+    a.answer(q1, [])
+    a.answer(q2, [])
+    assert len(a.history) == 2
+    assert a.history[0]["answer"] == "Božena Němcová"
+    assert a.history[1]["topic"] == "Božena Němcová"      # navázalo přes těžiště
+    assert a.history[1]["answer"] == "2. května 1818"
+    assert a.history[1]["gravity"] == "Božena Němcová"    # trajektorie těžiště
+    a.reset()
+    assert a.history == [] and a.context.hottest() is None
