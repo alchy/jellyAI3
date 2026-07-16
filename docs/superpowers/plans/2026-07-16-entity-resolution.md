@@ -390,6 +390,22 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 
 ---
 
+### Task 3b: Jazyk jako zásuvný JSON modul (doplněno za běhu — pokyn uživatele)
+
+Preference: **univerzálnost/modularita** — jazyková pravidla (koncovky, epenteze,
+min. kmen) žijí v `jellyai/lang/<jazyk>.json`, core je jazykově agnostický; nový
+jazyk = nový JSON, přepnutí = `config.graph.language`, bez zásahu do kódu. Zpětná
+kompatibilita není požadavek (staré konstanty smazány). Verifikace každé změny:
+testy + **pylint** + **etalon**.
+
+- [x] `jellyai/lang/__init__.py` (`load_rules`, cache, řazení koncovek nejdelší
+  první — pořadí v JSON libovolné) + `jellyai/lang/cs.json`
+- [x] `canon.py`: `set_language()`, `_stem` čte pravidla; konstanty odstraněny
+- [x] `config.py`: `GraphConfig.language = "cs"`; `tasks.py`: `set_language` v
+  `build_fact_graph` i `make_graph_answerer`; `pyproject.toml`: package + data
+- [x] `tests/test_lang.py` (3 testy: cs z JSON, vlastní jazyk z tmp JSON, config)
+- [x] Suita 218 passed; etalon 9/11 beze změny; pylint čistý na nových modulech
+
 ### Task 4: Query-side kmenový fallback v `_resolve_topic`
 
 Mantinel 5 (build i query týž mechanismus): termín dotazu, jehož lemma zůstane skloňované („Galéna"), musí najít kanonický uzel („Galén"). Kmenová shoda je **fallback dimenze skóre** — nikdy nepřebije přesnou/case-insensitive shodu, jen zachrání uzly, které by jinak vypadly.

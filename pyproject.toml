@@ -10,5 +10,8 @@ requires-python = ">=3.11"
 dependencies = ["numpy"]
 
 [tool.setuptools]
-packages = ["jellyai", "jellyai.answerer", "jellyai.graph"]
+packages = ["jellyai", "jellyai.answerer", "jellyai.graph", "jellyai.lang"]
 py-modules = ["config"]
+
+[tool.setuptools.package-data]
+"jellyai.lang" = ["*.json"]

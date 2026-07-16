@@ -1,0 +1,9 @@
+{
+  "language": "cs",
+  "min_stem": 3,
+  "suffixes": ["ovými", "ových", "ovém", "ovou", "ové", "ová", "ovi", "ovu", "ovy",
+               "ými", "ých", "ém", "ům", "ách", "emi", "ami", "ou", "em", "ěm",
+               "e", "ě", "y", "u", "a", "o", "i", "í", "é"],
+  "vowels": "aeiouyáéíóúýěů",
+  "epenthesis_vowel": "e"
+}

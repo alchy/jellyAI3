@@ -20,28 +20,43 @@ Souvisí s [[jellyai3-fact-graph]] (řeší tříštění entit — agentem ozna
 
 from collections import Counter
 
-_MIN_STEM = 3      # kmen nezkracuj pod 3 znaky
-# pádové koncovky českých jmen (nejdelší první) — ženská -ová, prostá -a/-y/-u…
-_SUFFIXES = ("ovými", "ových", "ovém", "ovou", "ové", "ová", "ovi", "ovu", "ovy",
-             "ými", "ých", "ém", "ům", "ách", "emi", "ami", "ou", "em", "ěm",
-             "e", "ě", "y", "u", "a", "o", "i", "í", "é")
-_VOWELS = "aeiouyáéíóúýěů"
+from jellyai.lang import load_rules
+
+_RULES = load_rules("cs")      # výchozí jazyk; přepíná `set_language` (config)
+
+
+def set_language(language):
+    """Přepne jazyk kmenování — kód jazyka („cs") nebo cesta k JSON s pravidly.
+
+    Jazyk je zásuvný datový modul (`jellyai/lang/`): core zůstává agnostický,
+    pravidla se mění bez zásahu do kódu.
+
+    Args:
+        language (str): Kód jazyka nebo cesta k `.json` souboru.
+    """
+    global _RULES   # pylint: disable=global-statement
+    _RULES = load_rules(language)
 
 
 def _stem(word):
-    """Kmen jména: odstraní pádovou koncovku a **epentetické -e-** (Karel/Karla,
-    Čapek/Čapka), aby všechny pády daly stejný kmen. Bez morfologie — jen pravidla.
+    """Kmen jména: odstraní pádovou koncovku a **epentetickou samohlásku**
+    (Karel/Karla, Čapek/Čapka), aby všechny pády daly stejný kmen. Bez
+    morfologie — jen pravidla, a ta jsou **data jazyka** (`jellyai/lang/`).
 
-    Božen-a/-y/-u/-ě → „bož(e)n"; Němcov-á/-é/-ou → „němc"; Karel/Karl-a → „karl";
-    Čap-ek/-ka → „čapk". Záměrně hrubé (drobné přeříznutí nevadí, když je konzistentní).
+    Česky: Božen-a/-y/-u/-ě → „bož(e)n"; Němcov-á/-é/-ou → „němc"; Karel/Karl-a
+    → „karl"; Čap-ek/-ka → „čapk". Záměrně hrubé (drobné přeříznutí nevadí,
+    když je konzistentní).
     """
+    rules = _RULES
     low = word.lower()
-    for suffix in _SUFFIXES:
-        if low.endswith(suffix) and len(low) - len(suffix) >= _MIN_STEM:
+    for suffix in rules["suffixes"]:
+        if low.endswith(suffix) and len(low) - len(suffix) >= rules["min_stem"]:
             low = low[:-len(suffix)]
             break
-    # epenteze: koncové „e+souhláska" → jen souhláska (karel→karl, čapek→čapk)
-    if len(low) >= _MIN_STEM and low[-2] == "e" and low[-1] not in _VOWELS:
+    # epenteze: koncová „samohláska+souhláska" → jen souhláska (karel→karl)
+    vowel = rules["epenthesis_vowel"]
+    if vowel and len(low) >= max(rules["min_stem"], 2) \
+            and low[-2] == vowel and low[-1] not in rules["vowels"]:
         low = low[:-2] + low[-1]
     return low
 

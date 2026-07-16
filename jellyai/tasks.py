@@ -10,6 +10,7 @@ anotacemi (build/load grafu) jdou použít bez modelů.
 from jellyai.loader import load_documents
 from jellyai.annotate import annotate_documents, save_annotations, load_annotations
 from jellyai.graph.graph import build_graph, resolve_entities, FactGraph
+from jellyai.graph.canon import set_language
 
 
 def annotate_corpus(config, client=None):
@@ -45,6 +46,7 @@ def build_fact_graph(config):
     Returns:
         FactGraph: Postavený graf.
     """
+    set_language(config.graph.language)       # jazyk kanonizace = zásuvný modul
     annotations = load_annotations(config.services.annotations_path)
     graph = build_graph(annotations)
     from jellyai.graph.recover import recover_entities
@@ -78,6 +80,7 @@ def make_graph_answerer(config):
     from jellyai.answerer.graph_answerer import GraphAnswerer
     from jellyai.answerer.extractive import ExtractiveAnswerer
     from jellyai.ufal_client import UfalClient
+    set_language(config.graph.language)       # query-side kmenování týmž jazykem
     graph = load_fact_graph(config)
     return GraphAnswerer(graph, UfalClient(config.services),
                          ExtractiveAnswerer(config.answerer),

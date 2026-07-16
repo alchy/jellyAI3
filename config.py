@@ -144,9 +144,12 @@ class GraphConfig:
         context_decay (float): Pohasínání konverzačního těžiště na dotaz (0–1;
             nižší = kratší „paměť" kontextu). Řídí, jak rychle aktivace uzlu
             slábne s dalšími dotazy — a tím i řídnutí provozu ve vizualizaci.
+        language (str): Jazyk kmenování/kanonizace entit — kód souboru
+            `jellyai/lang/<jazyk>.json`, nebo cesta k vlastnímu JSON s pravidly.
     """
     graph_path: str = "data/graph.pkl"
     context_decay: float = 0.8
+    language: str = "cs"
 
 
 @dataclass
