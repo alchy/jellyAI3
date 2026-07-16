@@ -58,3 +58,23 @@ def test_prepositional_nmod_stays_inside_term():
     role, term = pat.known[0]
     assert role == "obj" and not isinstance(term, SubQuery)
     assert term == "válka"
+
+
+def test_oblique_participant_becomes_known():
+    """„Jak to souviselo s Karlem Čapkem?" — obl osoba je known účastník
+    (dřív se zahazovala a pattern zůstal prázdný)."""
+    q = "Jak to souviselo s Karlem Čapkem?"
+    client = FakeUfalClient(parse={q: [[
+        {"form": "Jak", "lemma": "jak", "upos": "ADV", "head": 3, "deprel": "advmod"},
+        {"form": "to", "lemma": "ten", "upos": "DET", "head": 3, "deprel": "nsubj",
+         "feats": {"PronType": "Dem"}},
+        {"form": "souviselo", "lemma": "souviset", "upos": "VERB", "head": 0,
+         "deprel": "root"},
+        {"form": "s", "lemma": "s", "upos": "ADP", "head": 5, "deprel": "case"},
+        {"form": "Karlem", "lemma": "Karel", "upos": "PROPN", "head": 3,
+         "deprel": "obl"},
+        {"form": "Čapkem", "lemma": "Čapek", "upos": "PROPN", "head": 5,
+         "deprel": "flat"},
+    ]]})
+    pat = question_pattern(q, client)
+    assert ("theme", "Karel Čapek") in pat.known

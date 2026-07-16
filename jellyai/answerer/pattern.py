@@ -19,7 +19,8 @@ _HOLE = {
     "kdy": ("time", "time"), "kde": ("loc", "geo"), "kam": ("loc", "geo"),
     "kolik": ("num", "number"), "jaký": ("attr", None), "který": ("attr", None),
 }
-_DEPREL_ROLE = {"nsubj": "subj", "nsubj:pass": "subj", "obj": "obj", "iobj": "obj"}
+_DEPREL_ROLE = {"nsubj": "subj", "nsubj:pass": "subj", "obj": "obj", "iobj": "obj",
+                "obl": "theme", "obl:arg": "theme"}   # obl účastník („s Karlem")
 _CONTENT = {"NOUN", "PROPN", "NUM", "ADJ"}
 
 
@@ -162,8 +163,8 @@ def _parse_sent(sent):
 
     for tok in sent:                       # známí účastníci ze slovesné věty
         low = _clean_lemma(tok.get("lemma", "")).lower()
-        if low in _HOLE or tok.get("upos") not in _CONTENT:
-            continue
+        if low in _HOLE or low in _DATE_PARTS or tok.get("upos") not in _CONTENT:
+            continue                       # „v kterém ROCE" je drill, ne účastník
         if tok.get("deprel") in ("flat", "flat:name"):
             continue                       # část víceslovné entity, řeší _entity_term
         role = _DEPREL_ROLE.get(tok.get("deprel"))

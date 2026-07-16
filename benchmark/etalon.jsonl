@@ -17,6 +17,8 @@
 {"q": "Co je robot?", "expect": ["stroj"], "reject": ["Čapek"], "cat": "identita"}
 {"q": "Kdo je Ludvík Němec?", "expect": ["nenašel"], "reject": ["Čapek"], "cat": "poctivost"}
 {"q": "Kdo byl Svatopluk Machar?", "expect": ["nenašel"], "reject": ["Morgenpost"], "cat": "poctivost"}
+{"q": "Napsal Karel Čapek Válku s mloky?", "expect": ["Ano"], "cat": "ano-ne"}
+{"q": "Publikoval Karel v tomto časopisu?", "expect": ["nenašel"], "reject": ["Josef"], "cat": "ano-ne"}
 {"q": "Kdo je Božena Němcová?", "expect": ["spisovatelka", "spisovatel"], "cat": "identita", "gap": "copula-profese (#5): vrací 'úřad'"}
 {"q": "Kdo napsal R.U.R.?", "expect": ["Čapek"], "cat": "autor", "gap": "tokenizace tečkované zkratky (#3)"}
 {"q": "Kdo napsal Válku s mloky?", "expect": ["Čapek"], "cat": "autor", "gap": "titul nezachycen"}

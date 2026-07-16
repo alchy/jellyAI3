@@ -125,6 +125,9 @@ class GraphAnswerer(Answerer):
                 if node is None:
                     return None, [], None    # pojmenované, ale neznámé → nehádat
                 known_set.add(node)
+            if qa.qtype is None and pat.hole_role is None:
+                # zjišťovací otázka („Napsal X Y?") — existence, ne díra
+                return self._existence(pat.predicate, known_set)
             return self._answer_from(pat, known_set)
         if pat.predicate is None or qa.topic_terms:
             # bez predikátu nelze; pojmenoval-li něco, co pattern nezachytil (RUR),
@@ -232,6 +235,23 @@ class GraphAnswerer(Answerer):
         # zapamatuj všechny účastníky použitého faktu → rozsvítí se celá cesta
         self.visited.extend(p.node for p in scored[0][3].participants)
         return values, scored[0][3]
+
+    def _existence(self, predicate, known_set):
+        """Zjišťovací (ano/ne) otázka: existuje fakt s predikátem a všemi
+        známými účastníky? → „Ano"; jinak nic (fallback „nenašel" čte se jako
+        nevím). Kontextem se u zjišťovací otázky NEhádá.
+
+        Returns:
+            tuple: (téma | None, ["Ano"] | [], fakt | None).
+        """
+        if predicate is None:
+            return None, [], None
+        node0 = next(iter(known_set))
+        for fact in self.graph.facts_of(node0, predicate=predicate):
+            if known_set <= {p.node for p in fact.participants}:
+                self.visited.extend(p.node for p in fact.participants)
+                return node0, ["Ano"], fact
+        return None, [], None
 
     def _typed_match(self, predicate, known_set):
         """Join výběrové otázky: koncepty z `known_set` se stanou typovým
