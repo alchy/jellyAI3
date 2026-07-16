@@ -138,6 +138,10 @@ class Retriever:
         order = np.argsort(-scores)[:top_k]
         return [(self.passages[i], float(scores[i])) for i in order if scores[i] > 0]
 
+    def __len__(self):
+        """Počet zaindexovaných pasáží (jednotek vyhledávání)."""
+        return len(self.passages)
+
     def score_all(self, query):
         """Vrátí skóre **všech** pasáží k dotazu — bez ořezu na top_k.
 

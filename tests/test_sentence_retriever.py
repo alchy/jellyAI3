@@ -47,3 +47,12 @@ def test_save_load_roundtrip(tmp_path):
     loaded = SentenceRetriever.load(path)
     assert loaded.sent_text == sr.sent_text
     assert loaded.search("klíč")[0][0].text == sr.search("klíč")[0][0].text
+
+
+def test_len_counts_indexed_units():
+    from jellyai.chunker import Passage
+    from jellyai.retriever import Retriever
+    docs = [Document("d", "d", "Alfa jedna. Klíč leží tady. Gama tři.")]
+    assert len(SentenceRetriever(RetrieverConfig()).build(docs)) == 3
+    r = Retriever(RetrieverConfig()).build([Passage("d", 0, "text sem", 0, 1)])
+    assert len(r) == 1

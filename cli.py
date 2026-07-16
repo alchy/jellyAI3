@@ -39,8 +39,8 @@ def _build_and_save_index(config):
     """
     pipe = QAPipeline.from_corpus(config.data.processed_dir, config)
     pipe.retriever.save(config.data.index_path)
-    n = len(pipe.retriever.passages)
-    print(f"Index postaven a uložen: {n} pasáží → {config.data.index_path}")
+    n = len(pipe.retriever)
+    print(f"Index postaven a uložen: {n} jednotek → {config.data.index_path}")
     return n
 
 

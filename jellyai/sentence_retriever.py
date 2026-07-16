@@ -70,6 +70,10 @@ class SentenceRetriever:
         self._bounds = {}
         self._retriever = None
 
+    def __len__(self):
+        """Počet zaindexovaných vět (jednotek vyhledávání)."""
+        return len(self.sent_text)
+
     def build(self, documents):
         """Rozdělí dokumenty na věty a postaví nad nimi vnitřní BM25 index.
 
