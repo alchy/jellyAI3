@@ -46,6 +46,7 @@ class GraphAnswerer(Answerer):
         self.fallback = fallback
         self.context_decay = context_decay
         self.last_trace = None   # trasa poslední odpovědi (téma → fakt → hodnota)
+        self.visited = []        # uzly protnuté (rekurzivním) matchem → rozsvícení
         self.context = ActivationField(decay=context_decay)   # těžiště (id uzlu → jas)
         self.history = []        # trajektorie konverzace (tahy s trasou a těžištěm)
 
@@ -88,35 +89,6 @@ class GraphAnswerer(Answerer):
                 best_id, best_score = node.id, score
         return best_id
 
-    def _attend(self, qa):
-        """Vybere téma a projde graf — 'attention' nad aktivačním polem.
-
-        Explicitní téma z otázky má přednost (dotaz je konkrétně o něm). Bez něj
-        (navazující dotaz) se **nezvolí slepě nejteplejší uzel**, ale projdou se
-        kandidáti kontextu **od nejteplejšího** a vezme se první, který na otázku
-        *umí odpovědět* (má odpovídající fakt) — relevance vážená aktivací.
-
-        Args:
-            qa (QuestionAnalysis): Rozbor otázky.
-
-        Returns:
-            tuple: (téma | None, hodnota | None, fakt | None).
-        """
-        explicit = self._resolve_topic(qa.topic_terms)
-        if explicit is not None:
-            value, fact = self._traverse(qa, explicit)
-            return explicit, value, fact
-        if qa.topic_terms:
-            # uživatel něco pojmenoval, ale v grafu to neznáme → nehádat z kontextu
-            return None, None, None
-        for candidate in self._context_candidates():
-            if not self._gender_ok(qa, candidate):
-                continue          # „narodil?" ≠ ženská entita (a naopak)
-            value, fact = self._traverse(qa, candidate)
-            if value is not None:
-                return candidate, value, fact
-        return self.context.hottest(), None, None   # nic neodpovědělo (pro log/step)
-
     def _context_candidates(self):
         """Uzly kontextu seřazené podle jasu (nejteplejší první)."""
         return sorted(self.context.scores, key=self.context.scores.get, reverse=True)
@@ -128,27 +100,45 @@ class GraphAnswerer(Answerer):
             return True
         return _name_gender(node_id) == qa.gender
 
-    def _pattern_answer(self, question):
+    def _pattern_answer(self, question, qa):
         """Univerzální match: otázka → neúplný fakt → najdi shodný v grafu → díra.
 
-        Nahrazuje ruční qtype/relační pravidla: predikát + známé role musí sedět,
-        vrátí se účastník v roli díry, seřazený vahou faktu + aktivací (těžiště).
+        Nahrazuje ruční qtype/relační pravidla i attention: predikát + známé role
+        musí sedět, vrátí se účastník v roli díry (ranking váhou + aktivací). Bez
+        explicitní entity (**navazující dotaz**) se téma vezme z **kontextu** —
+        projdou se kandidáti od nejteplejšího (gender-filtr) a vezme první, co odpoví.
 
         Args:
             question (str): Dotaz uživatele.
+            qa (QuestionAnalysis): Rozbor (rod pro shodu kontextového tématu).
 
         Returns:
             tuple: (téma | None, hodnota | None, fakt | None).
         """
+        self.visited = []                    # uzly protnuté (i)rekurzí → rozsvítit
         pat = question_pattern(question, self.client)
-        if not pat.known:
+        if pat.known:
+            known_set = set()
+            for _, known in pat.known:
+                node = self._solve(known)    # rekurzivně (i vnořené pod-dotazy)
+                if node is None:
+                    return None, None, None  # pojmenované, ale neznámé → nehádat
+                known_set.add(node)
+            return self._answer_from(pat, known_set)
+        if pat.predicate is None or qa.topic_terms:
+            # bez predikátu nelze; pojmenoval-li něco, co pattern nezachytil (RUR),
+            # NEhádat z kontextu — kontext je jen pro skutečně navazující dotaz
             return None, None, None
-        known_set = set()
-        for _, known in pat.known:
-            node = self._solve(known)        # rekurzivně (i vnořené pod-dotazy)
-            if node is None:
-                return None, None, None      # pojmenované, ale neznámé → nehádat
-            known_set.add(node)
+        for candidate in self._context_candidates():   # navazující dotaz → z těžiště
+            if not self._gender_ok(qa, candidate):
+                continue                     # „narodil?" ≠ ženská entita (a naopak)
+            topic, value, fact = self._answer_from(pat, {candidate})
+            if value is not None:
+                return topic, value, fact
+        return None, None, None
+
+    def _answer_from(self, pat, known_set):
+        """Z množiny známých uzlů dořeší díru patternu (vč. 2-skokového drillu)."""
         node0 = next(iter(known_set))
         if pat.date_part:
             # 2-SKOK (rekurze): událost → datum (uzel) → jeho pod-fakt rok/měsíc/den
@@ -209,7 +199,11 @@ class GraphAnswerer(Answerer):
                     score += 100
                 if best is None or score > best[0]:   # pylint: disable=unsubscriptable-object
                     best = (score, part.node, fact)
-        return (best[1], best[2]) if best is not None else (None, None)
+        if best is not None:
+            # zapamatuj všechny účastníky použitého faktu → rozsvítí se celá cesta
+            self.visited.extend(p.node for p in best[2].participants)
+            return best[1], best[2]
+        return None, None
 
     def _reverse_lookup(self, question):
         """Reverzní dotaz: z roku v otázce najde událost (datum → podmět faktu).
@@ -242,50 +236,6 @@ class GraphAnswerer(Answerer):
             if values and fact.weight > best_weight:
                 best_weight, best_value, best_fact = fact.weight, values[0], fact
         return best_value, best_fact
-
-    def _traverse(self, qa, topic):  # pylint: disable=too-many-return-statements
-        """Projde graf podle typu otázky; vrátí (hodnota, fakt) nebo (None, None).
-
-        U „kdy/kde/kolik" **trvá na shodě slovesa** (žádná náhrada nesouvisející
-        událostí — na „kdy se narodil" nesmí odpovědět datem svatby). N-arita: „kdy"
-        i „kde" čerpají z téhož faktu.
-
-        Args:
-            qa (QuestionAnalysis): Rozbor otázky.
-            topic (str): Id uzlu tématu.
-
-        Returns:
-            tuple: (hodnota | None, fakt | None).
-        """
-        g, verb = self.graph, qa.verb_lemma
-        # drill „v kterém roce se narodil X": událost → datum (uzel) → pod-fakt rok
-        date_part = next((t for t in qa.topic_terms if t in _DATE_PARTS), None)
-        if date_part:
-            facts = (g.facts_of(topic, role="subj", predicate=verb) if verb
-                     else g.facts_of(topic, role="subj"))
-            time_value, _ = self._pick(facts, "time")
-            if time_value is None:
-                return None, None
-            return self._pick(g.facts_of(time_value, role="subj", predicate=date_part), "val")
-        if qa.qtype in ("Jaký", "Který"):     # vlastnost/stav (přídavné jméno)
-            return self._pick(g.facts_of(topic, role="subj", predicate="být"), "attr")
-        if qa.is_copula:                        # identita (podstatné jméno)
-            return self._pick(g.facts_of(topic, role="subj", predicate="být"), "pred")
-        if qa.qtype in ("Kdy", "Kde", "Kolik"):
-            facts = (g.facts_of(topic, role="subj", predicate=verb) if verb
-                     else g.facts_of(topic, role="subj"))
-            if qa.qtype == "Kdy":
-                value, fact = self._pick(facts, "time")
-                return (value, fact) if value is not None else self._pick(facts, "num")
-            if qa.qtype == "Kde":
-                return self._pick(facts, "loc")
-            return self._pick(facts, "num")
-        if qa.qtype in ("Kdo", "Co"):
-            value, fact = self._pick(g.facts_of(topic, role="obj", predicate=verb), "subj")
-            if value is not None:
-                return value, fact
-            return self._pick(g.facts_of(topic, role="subj", predicate=verb), "obj")
-        return None, None
 
     def _candidate_facts_roles(self, qa, topic):
         """Vrátí (fakty, cílové role) pro daný typ otázky (zdroj pro alternativy)."""
@@ -350,10 +300,9 @@ class GraphAnswerer(Answerer):
         """
         self.last_trace = None
         qa = analyze_question(question, self.client)
-        # UNIVERZÁLNÍ princip: otázka→neúplný fakt→match→díra (nahrazuje qtype pravidla)
-        topic, value, fact = self._pattern_answer(question)
-        if value is None:
-            topic, value, fact = self._attend(qa)
+        # UNIVERZÁLNÍ princip: otázka→neúplný fakt→match→díra (nahrazuje qtype pravidla
+        # i attention — kontextově navazující dotaz řeší tatáž cesta)
+        topic, value, fact = self._pattern_answer(question, qa)
         reverse = False
         if value is None:
             # poslední záchrana: „Co se stalo <datum>?" — datum → událost
@@ -377,6 +326,8 @@ class GraphAnswerer(Answerer):
                         alternatives.append(near)
             self.last_trace = {"topic": topic, "predicate": fact.predicate,
                                "fact": fact.id, "answer": value}
+            for node in self.visited:        # rozsvítí celou (rekurzivní) cestu, ne jen konce
+                self.context.warm(node, 0.7)
             self._remember(qa, topic, value)
             self._log_turn(question, topic, fact.predicate, value)
             return Answer(text=value, sources=["graf"], score=1.0,
