@@ -45,6 +45,10 @@ def load_rules(language="cs"):
             rules.get("generic_event_verbs", ()))
         rules["interrogative_adverbs"] = frozenset(
             rules.get("interrogative_adverbs", ()))
+        rules["interrogative_pronouns"] = frozenset(
+            rules.get("interrogative_pronouns", ()))
+        rules["relational_nouns"] = frozenset(
+            rules.get("relational_nouns", ()))
         rules["predicate_synonyms"] = {
             lemma: tuple(group)
             for group in rules.get("predicate_synonyms", ())

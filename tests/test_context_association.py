@@ -207,3 +207,28 @@ def test_bare_interrogative_drills_last_fact():
     a = GraphAnswerer(g, client, ExtractiveAnswerer(AnswererConfig()))
     assert a.answer(q1, []).text == "Praze"
     assert a.answer(q2, []).text == "1890"
+
+
+def test_relation_noun_resolves_via_identity_join():
+    """„Kdo byla matka Karla Čapka?" bez matka-faktu → osoba z okolí, která
+    matkou JE (apozice „Matka Božena Čapková" + kontext) — ne top-asociát."""
+    g = FactGraph()
+    for _ in range(5):
+        g.add_fact(make_fact("kontext", [Participant("subj", "Karel Čapek", "person"),
+                                         Participant("obj", "Josef Čapek", "person")]))
+    g.add_fact(make_fact("kontext", [Participant("subj", "Karel Čapek", "person"),
+                                     Participant("obj", "Božena Čapková", "person")]))
+    g.add_fact(make_fact("být", [Participant("subj", "Božena Čapková", "person"),
+                                 Participant("pred", "matka", "concept")]))
+    q = "Kdo byla matka Karla Čapka?"
+    client = FakeUfalClient(parse={q: [[
+        {"form": "Kdo", "lemma": "kdo", "upos": "PRON", "head": 3, "deprel": "nsubj"},
+        {"form": "byla", "lemma": "být", "upos": "AUX", "head": 3, "deprel": "cop"},
+        {"form": "matka", "lemma": "matka", "upos": "NOUN", "head": 0, "deprel": "root"},
+        {"form": "Karla", "lemma": "Karel", "upos": "PROPN", "head": 3, "deprel": "nmod",
+         "feats": {"Case": "Gen"}},
+        {"form": "Čapka", "lemma": "Čapek", "upos": "PROPN", "head": 4, "deprel": "flat",
+         "feats": {"Case": "Gen"}},
+    ]]})
+    a = GraphAnswerer(g, client, ExtractiveAnswerer(AnswererConfig()))
+    assert a.answer(q, []).text == "Božena Čapková"

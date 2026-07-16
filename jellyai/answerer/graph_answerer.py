@@ -69,7 +69,7 @@ class GraphAnswerer(Answerer):
         self.history = []
         self.last_trace = None
 
-    def _resolve_topic(self, topic_terms):
+    def _resolve_topic(self, topic_terms, predicate=None):
         """Najde uzel tématu otázky — nejlepší shodu s obsahovými lemmaty.
 
         **Přesná shoda velikosti má přednost**, case-insensitive je fallback:
@@ -92,6 +92,7 @@ class GraphAnswerer(Answerer):
         low_terms = [t.lower() for t in terms]
         stems = [_stem(t) for t in terms]
         best_id, best_score = None, None
+        ring = _synonym_ring(predicate) if predicate else ()
         for node in self.graph.nodes.values():
             low_id = node.id.lower()
             low_words = low_id.split()
@@ -100,10 +101,19 @@ class GraphAnswerer(Answerer):
             stem_hits = sum(1 for s in stems if s in node_stems)
             if ins_hits == 0 and stem_hits == 0:
                 continue
+            # přesná shoda velikosti má smysl jen u termů NESOUCÍCH velké
+            # písmeno (lowercase lemma „vějíř" nerozliší pojem od titulu)
             exact_hits = sum(1 for t in terms
-                             if t == node.id or t in node.id.split())
-            # přesná > case-insensitive > kmenová; pak témata, délka, váha
-            score = (exact_hits, ins_hits, stem_hits, len(low_words), node.weight)
+                             if any(ch.isupper() for ch in t)
+                             and (t == node.id or t in node.id.split()))
+            # PREDIKÁTOVÁ AFINITA: mezi rovnocennými jmennými shodami vyhrává
+            # uzel, o němž se predikát otázky dá vypovědět („Vějíř" s napsat
+            # faktem) — ale jmenné shody nikdy nepřebije (Ludvík Němec ≠
+            # „Němec" s být-faktem jiné osoby)
+            affinity = int(any(self.graph.facts_of(node.id, predicate=pred)
+                               for pred, _ in ring))
+            score = (exact_hits, ins_hits, stem_hits, affinity,
+                     len(low_words), node.weight)
             if best_score is None or score > best_score:
                 best_id, best_score = node.id, score
         return best_id
@@ -139,7 +149,7 @@ class GraphAnswerer(Answerer):
         if pat.known:
             known_set = set()
             for _, known in pat.known:
-                node = self._solve(known)    # rekurzivně (i vnořené pod-dotazy)
+                node = self._solve(known, pat.predicate)   # rekurzivně (i vnořené)
                 if node is None:
                     return None, [], None    # pojmenované, ale neznámé → nehádat
                 known_set.add(node)
@@ -203,6 +213,19 @@ class GraphAnswerer(Answerer):
         if pat.predicate is None:
             return None, [], None            # bez predikátu se nehádá (žádný wildcard)
         values, fact = self._match(pat.predicate, known_set, pat.hole_role, pat.hole_type)
+        if not values and pat.hole_role in ("pred", "attr"):
+            # druhové zařazení (apozice) je slabší evidence než spona „být" —
+            # čte se, až když spona mlčí („Co je R.U.R.?" → druh drama)
+            values, fact = self._match("druh", known_set, pat.hole_role,
+                                       pat.hole_type)
+        if not values and pat.hole_role in ("subj", "obj") \
+                and self.graph.nodes.get(pat.predicate) is not None \
+                and self.graph.nodes[pat.predicate].type == "concept":
+            # relační jméno bez vlastního faktu („matka Karla Čapka") → osoba
+            # z okolí, která tím druhem JE (apoziční identita + kontext join)
+            # — má přednost před holým nejtěžším asociátem
+            values, fact = self._typed_match(pat.predicate,
+                                             known_set | {pat.predicate})
         if not values and pat.hole_role in ("subj", "obj"):
             # kontextové patro jen pro ENTITNÍ díry (kdo napsal X…); identita/
             # vlastnost (pred/attr) ani zjišťovací otázka (díra None) kontextem
@@ -220,7 +243,7 @@ class GraphAnswerer(Answerer):
             values, fact = self._match("kontext", known_set, "subj", None)
         return (node0, values, fact) if values else (None, [], None)
 
-    def _solve(self, known):
+    def _solve(self, known, predicate=None):
         """Rekurzivně vyřeší `known` na uzel: list = přímá entita; `SubQuery` =
         vnořený pod-dotaz (vyřeš jeho známé rekurzivně, pak `_match`). **Samo-
         rozbalování/zabalování**: hloubka = zanoření otázky, auto-trigger struktura.
@@ -232,10 +255,10 @@ class GraphAnswerer(Answerer):
             str | None: Id uzlu, nebo None když nejde vyřešit.
         """
         if not isinstance(known, SubQuery):
-            return self._resolve_topic(known.split())
+            return self._resolve_topic(known.split(), predicate)
         sub = set()
         for _, inner in known.known:
-            node = self._solve(inner)        # rekurze do hloubky
+            node = self._solve(inner, known.predicate)   # rekurze do hloubky
             if node is None:
                 return None
             sub.add(node)
@@ -267,21 +290,36 @@ class GraphAnswerer(Answerer):
                 for part in fact.participants:
                     if part.node in known_set or len(part.node) < 2:
                         continue             # díra ≠ známé; 1-znak = artefakt NER
-                    if pred in ("být", "kontext") \
+                    if pred in ("být", "druh", "kontext") \
                             and any(part.node.lower() in k.lower().split()
                                     for k in known_set):
                         # identitní echo slova tématu („Adam stvořitel" →
                         # „stvořitel") = tautologie; dekompoziční predikáty
                         # (rok z „13. ledna 1890") echo naopak CHTĚJÍ
                         continue
+                    if hole_role in ("pred", "attr") and pred in ("být", "druh") \
+                            and (part.node in current()["relational_nouns"]
+                                 or part.node in current()["interrogative_pronouns"]):
+                        # vztahové jméno („bratr") není identita osoby bez
+                        # protistrany — profese/druh ano
+                        continue
                     base = fact.weight + (10 if exact else 0)
-                    # „kdy" bere čas i rok-jako-číslo; jinak přesná role díry
+                    # „kdy" bere čas i rok-jako-číslo; „jaký" bere i druh
+                    # (pred) — druh je vlastnost; jinak přesná role díry
+                    matched = False
                     if hole_role and (part.role == hole_role
                                       or (hole_type == "time"
-                                          and part.role in ("time", "num"))):
+                                          and part.role in ("time", "num"))
+                                      or (hole_role == "attr"
+                                          and part.role == "pred")):
                         base += 1000
+                        matched = True
                     if hole_type and part.type == hole_type:
                         base += 100
+                        matched = True
+                    if hole_role in ("loc", "time", "num") and not matched:
+                        continue    # sémantická díra bez shody role/typu mlčí
+                        #               („Kdy zemřel?" nesmí vrátit téma faktu)
                     scored.append((base, self.context.scores.get(part.node, 0.0),
                                    part.node, fact))
         if not scored:
@@ -328,7 +366,7 @@ class GraphAnswerer(Answerer):
         node0 = next(iter(known_set))
         best = None
         for fact in self.graph.facts_of(node0):
-            if fact.predicate in ("být", "kontext"):
+            if fact.predicate in ("být", "druh", "kontext"):
                 continue
             score = fact.weight + sum(self.context.scores.get(p.node, 0.0)
                                       for p in fact.participants)
@@ -391,11 +429,13 @@ class GraphAnswerer(Answerer):
         return [], None
 
     def _is_a(self, node_id, kinds):
-        """Instance ↔ druh přes identitní fakty: být(node, pred ∈ kinds)."""
-        for fact in self.graph.facts_of(node_id, role="subj", predicate="být"):
-            if any(p.role == "pred" and p.node in kinds
-                   for p in fact.participants):
-                return True
+        """Instance ↔ druh přes identitní fakty (spona „být" i apoziční „druh")."""
+        for predicate in ("být", "druh"):
+            for fact in self.graph.facts_of(node_id, role="subj",
+                                            predicate=predicate):
+                if any(p.role == "pred" and p.node in kinds
+                       for p in fact.participants):
+                    return True
         return False
 
     def _reverse_lookup(self, question):

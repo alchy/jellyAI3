@@ -48,3 +48,15 @@ def test_no_work_verb_no_recovery():
                                       "start": 0, "end": 5}], "sentences": [sent]}}
     g = FactGraph()
     assert recover_entities(ann, g) == []
+
+
+def test_recover_adds_authorship_even_if_node_exists():
+    """Uzel titulu může existovat z apoziční identity — autorský fakt se
+    přesto doplní (filtr kouká na autorská fakta, ne na existenci uzlu)."""
+    from jellyai.graph.extract import make_fact as mf, Participant as P
+    g = FactGraph()
+    g.add_fact(mf("být", [P("subj", "R.U.R.", "dílo"),
+                          P("pred", "hra", "concept")]))
+    added = recover_entities(_annotation(), g)
+    assert "R.U.R." in added
+    assert g.facts_of("R.U.R.", role="obj", predicate="napsat")

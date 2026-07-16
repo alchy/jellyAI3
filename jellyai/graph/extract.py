@@ -102,17 +102,20 @@ def _children(sent, head_id):
     return [t for t in sent if t.get("head") == head_id]
 
 
-def _default_if_agrees(default_subject, tok):
+def _default_if_agrees(default_subject, tok, strict=False):
     """Pro-drop dosazení jen při shodě rodu slovesného tvaru se jménem osoby.
 
     „**Byla** válka" (Fem) při nejteplejším Čapkovi (Masc) je existenciál,
     ne elize — dosazení by vyrobilo šum být(Čapek, válka). Tvary bez rodu
-    (prézens „je") dosazení nechávají.
+    (prézens „je") dosazení nechávají — až na `strict` režim SPONY: prézentní
+    bezpodmětá spona („je vyjadřována obava") je existenciál, rod je nutný.
     """
     if default_subject is None:
         return None
     gender = tok.get("feats", {}).get("Gender")
-    if gender is not None and gender != name_gender(default_subject[0]):
+    if gender is None:
+        return None if strict else default_subject
+    if gender != name_gender(default_subject[0]):
         return None
     return default_subject
 
@@ -253,8 +256,17 @@ def _copular_facts(sent, head_id, subj_tok, subj, entities, canon):  # pylint: d
                 Participant("subj", other[0], other[1]),
                 Participant("obj", subj[0], subj[1]),
             ]))
-    if rel_head.get("feats", {}).get("PronType") in ("Int", "Rel"):
+    if rel_head.get("feats", {}).get("PronType") in ("Int", "Rel") \
+            or _clean_lemma(rel_head.get("lemma", "")).lower() \
+            in current()["interrogative_pronouns"]:
         return facts                       # tázací/vztažný kořen („jaký") ≠ identita
+    rel_pos = sent.index(rel_head) + 1
+    if any(c.get("head") == rel_pos
+           and str(c.get("deprel", "")).startswith(("acl", "csubj"))
+           for c in sent):
+        # přísudek s vedlejší větou („je OBAVA, že…") je postoj/existenciál,
+        # ne identita podmětu
+        return facts
     rel_id = sent.index(rel_head) + 1
     if any(c.get("head") == rel_id and c.get("upos") == "DET"
            and c.get("feats", {}).get("PronType") == "Dem" for c in sent):
@@ -284,7 +296,7 @@ def _subject_group(subj, subj_tok, sent, entities, canon):
     return deduped or [subj]
 
 
-_INSTANCE_DEPRELS = ("appos", "nmod", "amod")
+_INSTANCE_DEPRELS = ("appos", "nmod", "amod", "flat")
 
 
 def _surface_node(tok, entities, canon):
@@ -309,20 +321,31 @@ def _apposition_identities(sent, entities, canon):
     facts = []
     for i, tok in enumerate(sent):
         if tok.get("upos") != "PROPN" \
-                or not str(tok.get("deprel", "")).startswith(_INSTANCE_DEPRELS) \
-                or tok.get("feats", {}).get("Case") == "Gen":
+                or not str(tok.get("deprel", "")).startswith(_INSTANCE_DEPRELS):
             continue
         if any(c.get("head") == i + 1 and c.get("upos") == "ADP" for c in sent):
             continue
         head_id = tok.get("head", 0)
         if not head_id or sent[head_id - 1].get("upos") != "NOUN":
             continue
+        case = tok.get("feats", {}).get("Case")
+        head_case = sent[head_id - 1].get("feats", {}).get("Case")
+        if case == "Gen" and head_case not in (None, "Gen"):
+            continue          # přivlastňovací genitiv („bratr Karla"), ne instance
+        if case and head_case and case != head_case:
+            continue          # pádová neshoda = mis-tagged vztah, ne titul+jméno
+        if case == "Gen" and \
+                _clean_lemma(sent[head_id - 1].get("lemma", "")) \
+                not in current()["relational_nouns"]:
+            continue          # Gen-Gen: „bratra Josefa" je instance, „díla
+            #                    Josefa" přivlastnění — rozhodne vztahovost
         kind = _node_for(sent[head_id - 1], entities, canon)
         instance = _surface_node(tok, entities, canon)
         if instance and kind and kind[1] == "concept" \
                 and kind[0] not in current()["metalanguage_nouns"] \
                 and instance[0] != kind[0]:
-            facts.append(make_fact("být", [
+            # apozice = DRUHOVÉ zařazení (slabší evidence než spona „být")
+            facts.append(make_fact("druh", [
                 Participant("subj", instance[0], instance[1]),
                 Participant("pred", kind[0], kind[1]),
             ]))
@@ -433,7 +456,8 @@ def extract_facts(annotation, default_subject=None, canon=None, context=None):
                 # anaforou (on/ona), nebo („Je TO lepra") osobu nedědí vůbec;
                 # pro-drop navíc vyžaduje rodovou shodu spony („Byla válka")
                 subj = subj_node or (None if pronoun_subj else
-                                     _default_if_agrees(default_subject, cop_tok))
+                                     _default_if_agrees(default_subject,
+                                                        cop_tok, strict=True))
                 facts.extend(_copular_facts(sent, head_id, subj_tok, subj,
                                             entities, canon))
                 continue

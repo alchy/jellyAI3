@@ -54,8 +54,13 @@ def recover_entities(annotations, graph):
         entities = annotation.get("entities", [])
         person_spans = [(e.get("start"), e.get("end")) for e in entities
                         if e.get("type", "")[:1].lower() == "p"]
+        work_objs = {p.node for fact in graph.facts.values()
+                     if fact.predicate in current()["work_verbs"]
+                     for p in fact.participants if p.role == "obj"}
         for sent in annotation.get("sentences", []):
-            cands = entity_candidates(sent, set(graph.nodes))
+            # „známé" jsou jen tituly s autorským faktem — uzel může existovat
+            # i z apoziční identity (být(Vějíř, sbírka)) a autorství chybět
+            cands = entity_candidates(sent, work_objs)
             if not cands:
                 continue
             subject = _sentence_subject(sent, entities)

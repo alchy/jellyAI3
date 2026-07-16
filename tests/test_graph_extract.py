@@ -250,7 +250,7 @@ def test_nominal_apposition_creates_identity_fact():
     ]
     facts = extract_facts({"entities": [], "sentences": [sent]},
                           default_subject=("Zdeněk Blažek", "person"))
-    byt = next(f for f in facts if f.predicate == "být")
+    byt = next(f for f in facts if f.predicate == "druh")
     roles = [(p.role, p.node) for p in byt.participants]
     assert ("subj", "R.U.R.") in roles and ("pred", "hra") in roles
 
@@ -270,3 +270,26 @@ def test_metalanguage_noun_is_not_identity_kind():
     ]
     facts = extract_facts({"entities": [], "sentences": [sent]})
     assert not any(f.predicate == "být" for f in facts)
+
+
+def test_common_noun_with_flat_propn_is_instance_identity():
+    """„MATKA Božena Čapková sbírala…" — PROPN flat pod obecným substantivem
+    je instance (titul+jméno): být(Božena Čapková, matka). Totéž „prezident
+    Masaryk". Pádová shoda nutná (mis-tagged genitiv řeší pattern)."""
+    sent = [
+        {"form": "Matka", "lemma": "matka", "upos": "NOUN", "head": 4,
+         "deprel": "nsubj", "start": 0, "end": 5, "feats": {"Case": "Nom"}},
+        {"form": "Božena", "lemma": "Božena", "upos": "PROPN", "head": 1,
+         "deprel": "flat", "start": 6, "end": 12, "feats": {"Case": "Nom"}},
+        {"form": "Čapková", "lemma": "Čapková", "upos": "PROPN", "head": 2,
+         "deprel": "flat", "start": 13, "end": 20, "feats": {"Case": "Nom"}},
+        {"form": "sbírala", "lemma": "sbírat", "upos": "VERB", "head": 0,
+         "deprel": "root", "start": 21, "end": 28},
+        {"form": "folklor", "lemma": "folklor", "upos": "NOUN", "head": 4,
+         "deprel": "obj", "start": 29, "end": 36},
+    ]
+    entities = [{"text": "Božena Čapková", "type": "P", "start": 6, "end": 20}]
+    facts = extract_facts({"entities": entities, "sentences": [sent]})
+    byt = next(f for f in facts if f.predicate == "druh")
+    roles = [(p.role, p.node) for p in byt.participants]
+    assert ("subj", "Božena Čapková") in roles and ("pred", "matka") in roles

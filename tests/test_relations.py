@@ -155,10 +155,11 @@ def test_overt_pronoun_subject_blocks_prodrop():
 
 
 def test_true_prodrop_copula_still_inherits_subject():
-    """„Byl spisovatel." bez podmětu = skutečný pro-drop → osoba se dosadí."""
+    """„Byl spisovatel." bez podmětu = skutečný pro-drop → osoba se dosadí
+    (préteritum nese rod; prézentní bezpodmětá spona je existenciál)."""
     sent = [
         {"form": "Byl", "lemma": "být", "upos": "AUX", "head": 2,
-         "deprel": "cop", "start": 0, "end": 3},
+         "deprel": "cop", "start": 0, "end": 3, "feats": {"Gender": "Masc"}},
         {"form": "spisovatel", "lemma": "spisovatel", "upos": "NOUN", "head": 0,
          "deprel": "root", "start": 4, "end": 14},
     ]
@@ -257,3 +258,19 @@ def test_demonstrative_determiner_blocks_identity():
     facts = extract_facts(_ann(sent, []),
                           default_subject=("Karel Čapek", "person"))
     assert not any(f.predicate == "být" for f in facts)
+
+
+def test_present_tense_subjectless_copula_is_not_prodrop():
+    """„Je (zde) vyjadřována obava…" — prézentní spona bez podmětu a bez rodu
+    je existenciál; pro-drop identita vyžaduje rodový tvar (préteritum)."""
+    sent = [
+        {"form": "Je", "lemma": "být", "upos": "AUX", "head": 3,
+         "deprel": "cop", "start": 0, "end": 2, "feats": {}},
+        {"form": "vyjadřována", "lemma": "vyjadřovaný", "upos": "ADJ", "head": 3,
+         "deprel": "amod", "start": 3, "end": 14, "feats": {"Gender": "Fem"}},
+        {"form": "obava", "lemma": "obava", "upos": "NOUN", "head": 0,
+         "deprel": "root", "start": 15, "end": 20},
+    ]
+    facts = extract_facts(_ann(sent, []),
+                          default_subject=("Karel Čapek", "person"))
+    assert not any(p.node == "Karel Čapek" for f in facts for p in f.participants)

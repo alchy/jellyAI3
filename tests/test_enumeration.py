@@ -106,3 +106,40 @@ def test_identity_never_echoes_topic_word():
     ]]})
     a = GraphAnswerer(g, client, ExtractiveAnswerer(AnswererConfig()))
     assert a.answer(q, []).text == "hra"
+
+
+def test_semantic_hole_requires_role_or_type_match():
+    """„Kdy zemřel X?" nesmí odpovědět tématem faktu bez času — sémantická
+    díra (time/loc/num) vyžaduje shodu role nebo typu, jinak mlčí."""
+    g = FactGraph()
+    g.add_fact(make_fact("zemřít", [Participant("subj", "Karel Čapek", "person"),
+                                    Participant("theme", "náznak", "concept")]))
+    q = "Kdy zemřel Karel Čapek?"
+    client = FakeUfalClient(parse={q: [[
+        {"form": "Kdy", "lemma": "kdy", "upos": "ADV", "head": 2, "deprel": "advmod"},
+        {"form": "zemřel", "lemma": "zemřít", "upos": "VERB", "head": 0, "deprel": "root"},
+        {"form": "Karel", "lemma": "Karel", "upos": "PROPN", "head": 2, "deprel": "nsubj"},
+        {"form": "Čapek", "lemma": "Čapek", "upos": "PROPN", "head": 3, "deprel": "flat"},
+    ]]})
+    a = GraphAnswerer(g, client, ExtractiveAnswerer(AnswererConfig()))
+    assert "náznak" not in a.answer(q, []).text
+
+
+def test_relational_noun_is_not_identity_answer():
+    """„Kdo je Josef Čapek?" nesmí odpovědět „bratr" — vztahové jméno
+    (jazyková tabulka) není identita osoby bez protistrany; profese ano."""
+    g = FactGraph()
+    for _ in range(3):
+        g.add_fact(make_fact("být", [Participant("subj", "Josef Čapek", "person"),
+                                     Participant("pred", "bratr", "concept")]))
+    g.add_fact(make_fact("být", [Participant("subj", "Josef Čapek", "person"),
+                                 Participant("pred", "malíř", "concept")]))
+    q = "Kdo je Josef Čapek?"
+    client = FakeUfalClient(parse={q: [[
+        {"form": "Kdo", "lemma": "kdo", "upos": "PRON", "head": 3, "deprel": "nsubj"},
+        {"form": "je", "lemma": "být", "upos": "AUX", "head": 3, "deprel": "cop"},
+        {"form": "Josef", "lemma": "Josef", "upos": "PROPN", "head": 0, "deprel": "root"},
+        {"form": "Čapek", "lemma": "Čapek", "upos": "PROPN", "head": 3, "deprel": "flat"},
+    ]]})
+    a = GraphAnswerer(g, client, ExtractiveAnswerer(AnswererConfig()))
+    assert a.answer(q, []).text == "malíř"
