@@ -12,6 +12,7 @@ from dataclasses import dataclass
 
 from jellyai.graph.extract import extract_facts, make_fact, Participant, _SUBJ
 from jellyai.graph.activation import ActivationField
+from jellyai.graph.canon import cluster_key
 
 _MONTHS = {
     "ledna": "leden", "února": "únor", "března": "březen", "dubna": "duben",
@@ -256,3 +257,60 @@ def _decompose_dates(graph):
             vtype = "number" if part in ("rok", "den") else "concept"
             graph.add_fact(make_fact(part, [Participant("subj", node.id, "time"),
                                             Participant("val", value, vtype)]))
+
+
+def resolve_entities(graph):
+    """Post-build entity resolution: sloučí pádové varianty osob do jednoho uzlu.
+
+    Osoby se shluknou kmenovým klíčem (`cluster_key`); kanonické id clusteru je
+    **lexikograficky nejmenší člen** — pádové koncovky nominativ prodlužují
+    („Josef Čapek" < „Josefa Čapka" < „Josefem Čapkem"), takže minimum bývá
+    nominativ. (Subj-count jako proxy nominativu nefunguje: pro-drop koreference
+    rozdává podměty i genitivním uzlům.) Fakty se přepíšou s přemapovanými
+    účastníky (kolize identity → součet vah), uzly a index `_by_node` se přestaví.
+    Jen person↔person; fragmenty s jiným počtem slov mají jiný klíč, takže se
+    nedotknou (žádné hladové subset-slučování). Idempotentní a deterministické —
+    smí běžet i opakovaně (po `recover_entities`).
+
+    Args:
+        graph (FactGraph): Graf k přepsání (in-place).
+
+    Returns:
+        FactGraph: Týž graf (pro řetězení).
+    """
+    clusters = {}
+    for node in graph.nodes.values():
+        if node.type == "person":
+            clusters.setdefault(cluster_key(node.id), []).append(node.id)
+    node_map = {}
+    for members in clusters.values():
+        canonical = min(members)
+        for name in members:
+            if name != canonical:
+                node_map[name] = canonical
+    if not node_map:
+        return graph
+    remapped = {}
+    for fact in graph.facts.values():
+        moved = make_fact(fact.predicate,
+                          [Participant(p.role, node_map.get(p.node, p.node), p.type)
+                           for p in fact.participants])
+        key = (moved.predicate, moved.participants)
+        existing = remapped.get(key)
+        if existing is None:
+            remapped[key] = FactNode(key, moved.predicate, fact.weight,
+                                     moved.participants)
+        else:
+            existing.weight += fact.weight
+    graph.facts = remapped
+    graph.nodes = {}
+    graph._by_node = {}
+    for key, fact in remapped.items():
+        for p in fact.participants:
+            node = graph.nodes.get(p.node)
+            if node is None:
+                graph.nodes[p.node] = Node(p.node, p.type, fact.weight)
+            else:
+                node.weight += fact.weight
+            graph._by_node.setdefault(p.node, []).append((key, p.role))
+    return graph
