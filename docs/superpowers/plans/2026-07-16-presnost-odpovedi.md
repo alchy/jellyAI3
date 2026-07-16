@@ -1,5 +1,14 @@
 # Přesnost odpovědí (arc 4) — Implementation Plan
 
+> ✅ **DOKONČENO (2026-07-16).** Etalon 15 → **21 normativních případů, 21/21
+> (100 %)** vč. negativních (`reject`) a ano/ne; GAP 2/3 drží. Opraveno všech
+> 6 chybových módů z dialogu: identita nehádá z kontextu, copular otázky
+> s tázacím kořenem, apoziční identity + typový join („Jakou hru napsal KČ?"
+> → R.U.R.), stabilní výčty se stropem, rodová shoda pro-dropu (−313 šumových
+> faktů), zjišťovací otázky. Viz: kontextové hrany kind=context/„souvislost".
+> Nová budoucí témata: polarita faktů (negace), cesta-v-grafu („jak souvisí
+> X s Y"), demonstrativní kotva.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: superpowers:executing-plans.
 > Podklad: analytický rozbor dialogu z webu (16 otázek) — každý task odkazuje
 > na dialogy, které opravuje. Metriky (etalon + coverage) po každém tasku.

@@ -27,6 +27,24 @@ def _fact_id(fact_node):
     return "fact:" + fact_node.predicate + ":" + str(abs(hash(fact_node.id)) % 100000)
 
 
+def _fact_attrs(fact):
+    """Atributy faktového uzlu; kontextová asociace je odlišená (label
+    „souvislost", kind=context) — není to přímý vztah, viz ji kreslí slabě."""
+    attrs = {"type": "fact", "weight": fact.weight, "label": fact.predicate}
+    if fact.predicate == "kontext":
+        attrs["label"] = "souvislost"
+        attrs["kind"] = "context"
+    return attrs
+
+
+def _edge_attrs(fact, participant):
+    """Atributy role-hrany; hrany kontextových faktů nesou kind=context."""
+    attrs = {"role": participant.role, "weight": fact.weight}
+    if fact.predicate == "kontext":
+        attrs["kind"] = "context"
+    return attrs
+
+
 def to_json(graph):
     """Serializuje graf do {nodes, edges} (entitní i faktové uzly, role-hrany).
 
@@ -40,11 +58,9 @@ def to_json(graph):
     edges = []
     for fact in graph.facts.values():
         fid = _fact_id(fact)
-        nodes.append({"id": fid, "type": "fact", "weight": fact.weight,
-                      "label": fact.predicate})
+        nodes.append({"id": fid, **_fact_attrs(fact)})
         for p in fact.participants:
-            edges.append({"src": fid, "dst": p.node, "role": p.role,
-                          "weight": fact.weight})
+            edges.append({"src": fid, "dst": p.node, **_edge_attrs(fact, p)})
     return {"nodes": nodes, "edges": edges}
 
 
@@ -66,7 +82,7 @@ def to_networkx(graph):
         g.add_node(n.id, **_node_attrs(n, graph))
     for fact in graph.facts.values():
         fid = _fact_id(fact)
-        g.add_node(fid, type="fact", weight=fact.weight, label=fact.predicate)
+        g.add_node(fid, **_fact_attrs(fact))
         for p in fact.participants:
-            g.add_edge(fid, p.node, role=p.role, weight=fact.weight)
+            g.add_edge(fid, p.node, **_edge_attrs(fact, p))
     return g
