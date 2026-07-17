@@ -221,6 +221,22 @@ def test_semantics_keeps_mistyped_inanimate_subject():
     assert scrub_semantics(g, votes) == 0
 
 
+def test_scrub_drops_adverb_identity():
+    """být(Jan, brzy) — příslovce identitou není (mis-parse spony);
+    adjektivum v pred/attr naopak zůstává (vlastnost)."""
+    g = FactGraph()
+    g.add_fact(make_fact("být", [Participant("subj", "Jan", "person"),
+                                 Participant("pred", "brzy", "concept")]))
+    g.add_fact(make_fact("být", [Participant("subj", "Jan", "person"),
+                                 Participant("attr", "hořící", "concept")]))
+    votes = lemma_upos_votes(_annotations([[("brzy", "ADV")] * 3
+                                           + [("hořící", "ADJ")] * 3]))
+    dropped_p, dropped_f = scrub(g, votes)
+    assert dropped_f == 1                        # brzy-fakt bez protistrany padá
+    kept = {p.node for f in g.facts.values() for p in f.participants}
+    assert "hořící" in kept and "brzy" not in kept
+
+
 def test_semantics_drops_relation_without_object():
     """Reifikovaný vztah („žena") bez obj protistrany je troska parseru —
     fakt jen s časy nic nenese; vztah s obj zůstává."""

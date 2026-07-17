@@ -58,6 +58,8 @@
                       "den": "den", "dne": "den", "dni": "den"},
   "name_case_agreement": true,
   "name_predicate": "jmenovat",
+  "relation_query_nouns": ["vztah", "vztahu", "vztahy", "vazba", "vazbu",
+                           "spojeni", "souvislost"],
   "alias_participles": ["řečený", "řečená", "řečené", "řečeného",
                         "zvaný", "zvaná", "zvané", "zvaného"],
   "first_person": ["jsem", "sem", "jsme"],

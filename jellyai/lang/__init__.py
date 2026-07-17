@@ -76,6 +76,8 @@ def load_rules(language="cs"):
         rules["name_predicate"] = rules.get("name_predicate", "jmenovat")
         rules["alias_participles"] = frozenset(
             rules.get("alias_participles", ()))
+        rules["relation_query_nouns"] = frozenset(
+            rules.get("relation_query_nouns", ()))
         _cache[path] = rules
     return _cache[path]
 

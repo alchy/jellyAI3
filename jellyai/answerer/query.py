@@ -183,6 +183,28 @@ def build_query(question, predicates, is_node=None, is_word=None):  # pylint: di
             break
 
     relational = lang["relational_nouns"]
+    if hole_role is not None \
+            and any(_norm(t) in lang["relation_query_nouns"] for t in tokens):
+        # VZTAHOVÁ OTÁZKA („Jaký měl vztah k Janovi?"): „vztah" není entita,
+        # ale OPERÁTOR spojení — odpovědí jsou fakty sdílené oběma uzly;
+        # elidovaného druhého účastníka doplní answerer z těžiště. Sloveso
+        # otázky (l-příčestí, které není uzlem) tu nenese nic — pryč s ním,
+        # jinak je vedoucím sirotkem běhu
+        # skip-slova (předložky) pryč: „k Janovi" je DRUHÝ účastník, ne
+        # pokračování titulu prvního — pravidlo polykání tu neplatí.
+        # Veto l-tvaru je DOSLOVNÉ (is_word) — volná shoda by sloveso
+        # nechala žít jako šumový uzel („měl"≈„mle")
+        rest = [t for t in tokens
+                if _norm(t) not in lang["relation_query_nouns"]
+                and _norm(t) not in lang["query_skip_words"]
+                and not (t[:1].islower()               # sloveso je malými —
+                         and t.rstrip("aioy").endswith("l")  # „Křtiteli" ne!
+                         and not (is_word is not None and is_word(t)))]
+        known = _collect_known(rest, predicates, relational, is_node)
+        if known:
+            known = [("obj", term) for _, term in known]
+            return Query(Pattern(None, known, "relation", None),
+                         qtype=qtype)
     if hole_role is None:
         # zjišťovací (ano/ne) otázka (spec 4.5): bez tázacího slova, věta
         # začíná slovesem spárovaným s predikátem grafu; díra žádná —

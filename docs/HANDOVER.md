@@ -31,8 +31,8 @@ model). Čti ho CELÝ před první změnou kódu. Doplňuje `docs/BACKLOG.md`
 
 ## 2. Stav (2026-07-18, commit 5e825a5)
 
-- **Metriky:** 429 testů, etalon 27/27 (+5 gap řádků), focus 12/12,
-  dialog 16/16 — vše 100 %. Graf: 7459 uzlů / 19117 faktů.
+- **Metriky:** 431 testů, etalon 28/28 (+5 gap řádků), focus 12/12,
+  dialog 18/18 — vše 100 %. Graf: 7459 uzlů / 19117 faktů.
 - **Hotovo:** faktový graf; pseudo-QL šablony (hybrid, UDPipe jen fallback);
   Iris karty + QueryAssurance; Chronos; Mnemos (deník `data/memory.jsonl`,
   připsané fakty s elidovaným subjektem); hygiena (upos/pád/životnost/
@@ -48,9 +48,9 @@ model). Čti ho CELÝ před první změnou kódu. Doplňuje `docs/BACKLOG.md`
 
 ```bash
 .venv/bin/python -m pytest -q                     # musí: N passed, 0 failed
-.venv/bin/python benchmark/run_etalon.py          # musí: JÁDRO 27/27 (100 %)
+.venv/bin/python benchmark/run_etalon.py          # musí: JÁDRO 28/28 (100 %)
 .venv/bin/python benchmark/run_focus.py           # musí: 12/12
-.venv/bin/python benchmark/run_dialog.py          # musí: 16/16
+.venv/bin/python benchmark/run_dialog.py          # musí: 18/18
 .venv/bin/python benchmark/run_coverage.py        # diagnostika (sleduj trend)
 ```
 
@@ -148,7 +148,7 @@ všechny benchmarky.
   intervalů → containment míst), tabulky v cs.json ne natvrdo.
 - #7: NEBEZPEČNÉ (kvalita/konflikty) — deník verzovat, zdroj=uživatel,
   fakty od uživatele nikdy nesmí tiše přepsat korpus. Kriticky promysli.
-- #14: UDPipe pryč z query strany — gate splněn (etalon 27/27 v režimu
+- #14: UDPipe pryč z query strany — gate splněn (etalon 28/28 v režimu
   `--mode templates`); smaž fallback větev v answer(), `question_pattern`/
   `analyze_question` přesuň do `conserved_`, run_etalon --mode udpipe zruš.
 

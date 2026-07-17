@@ -101,8 +101,8 @@ curl -s localhost:8084/schema     # na co se lze ptát (predikáty, role, karty)
 
 ## Benchmarky — objektivní řízení změn
 
-Každá změna se měří; normativy neklesají (guardrail). Stav: **429 testů,
-etalon 27/27 (+5 sledovaných gapů), focus 12/12, dialog 16/16 — vše 100 %.**
+Každá změna se měří; normativy neklesají (guardrail). Stav: **431 testů,
+etalon 28/28 (+5 sledovaných gapů), focus 12/12, dialog 18/18 — vše 100 %.**
 
 ```bash
 .venv/bin/python -m pytest -q               # jednotkové testy

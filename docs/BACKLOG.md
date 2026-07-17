@@ -1,7 +1,7 @@
 # BACKLOG — otevřené body (živý dokument)
 
 > Aktualizuj při každém uzavření/přidání bodu. Stav ke commitu: viz git log.
-> Metriky teď: **429 testů, etalon 27/27 (+5 gap), focus 12/12, dialog 16/16 — 100 %.**
+> Metriky teď: **431 testů, etalon 28/28 (+5 gap), focus 12/12, dialog 18/18 — 100 %.**
 >
 > **➡️ PŘEDÁNÍ PRÁCE: čti nejdřív `docs/HANDOVER.md`** — zákony projektu,
 > testovací smyčka, implementační tipy ke každému otevřenému bodu, pasti.
@@ -20,7 +20,7 @@
 | 8 | Graf — koncept | **Jméno není entita — fáze 2** (spec `2026-07-18-jmenny-uzel-instance.md`): instance per odstavec, rozpuštění dvou-osobových slepenců („Áronovi Mojžíš"), jmenovka jako uzel typu jméno; Toyota s #7. | VELKÉ. Čti spec + měření (otisk identitu nerozliší!); pozor na vakuovou kompatibilitu (případ „Le"). Pozn. (user): extrakční parser by měl mít mírný kontext okolí. | 8 |
 | 13 | Sharpener | Cross-distribuce + vyzařování focusu po hranách (kontext hrany slabší); váhy v configu; K-křivka run_focus. | — | 9 |
 | 12 | Topos | Hierarchie míst (Praha ⊂ Čechy), containment, „tady/poblíž". | Paralela Chronosu; tabulky v cs.json. | 10 |
-| 14 | Čistý řez | UDPipe pryč z query (gate splněn: etalon 27/27 v `--mode templates`), answerer → Iris pluginy, pohrobci → `conserved_`. | Mechanické; po něm zmizí závislost dotazů na ÚFAL službách. | 11 |
+| 14 | Čistý řez | UDPipe pryč z query (gate splněn: etalon 28/28 v `--mode templates`), answerer → Iris pluginy, pohrobci → `conserved_`. | Mechanické; po něm zmizí závislost dotazů na ÚFAL službách. | 11 |
 | 2 | Hygiena dat | **Zbytek**: uzel „mle" (NOUN mangle — lemma↔form konzistence), kapitalizované slovesné predikáty (Chvalte), „dovoleno" v pred/attr. | Vzor: hlasování v hygiene.py. | 12 |
 | 15 | Coverage | Anaforický kbelík (~2 100 vět se zájmenným podmětem). | — | 13 |
 | 16 | Etalon gapy | BN copula-profese; Kolik dětí (→ #11); Kde působila; „Jaka babicka?". | Průběžně s příslušnými body. | 14 |

@@ -307,6 +307,8 @@ class GraphAnswerer(Answerer):
             tuple: (téma | None, hodnota | None, fakt | None).
         """
         self.visited = []                    # uzly protnuté (i)rekurzí → rozsvítit
+        if pat.hole_role == "relation":
+            return self._relation_answer(pat)
         if pat.known:
             known_set, first_res = set(), None
             for _, known in pat.known:
@@ -612,6 +614,56 @@ class GraphAnswerer(Answerer):
         values = list(dict.fromkeys(_event_text(f, (node0,))
                                     for _, _, f in scored))[:_MAX_ENUM]
         return node0, values, best_fact
+
+    def _relation_answer(self, pat):
+        """Vztahová otázka: fakty SDÍLENÉ dvěma uzly („Jaký měl vztah
+        k Janovi?"). Slovesné děje jsou silnější evidence než asociace
+        (kontext) a zařazení (být/druh) — čtou se první; elidovaného
+        druhého účastníka („Jaký MĚL vztah…") doplní nejteplejší osoba
+        těžiště různá od explicitní entity.
+
+        Returns:
+            tuple: (téma | None, texty dějů, fakt nejsilnější | None).
+        """
+        known_set, first_res = set(), None
+        for _, known in pat.known:
+            node = self._solve(known)
+            if node is None:
+                return None, [], None
+            known_set.add(node)
+            if first_res is None:
+                first_res = self.last_resolution
+        if first_res is not None:
+            self.last_resolution = first_res
+        self._resolved_knowns = set(known_set)
+        if len(known_set) == 1:
+            anchor = next(iter(known_set))
+            other = next((c for c in self._context_candidates()
+                          if c != anchor
+                          and self.graph.nodes.get(c) is not None
+                          and self.graph.nodes[c].type == "person"), None)
+            if other is None:
+                return None, [], None
+            known_set.add(other)
+        node0 = next(iter(known_set))
+        shared = [f for f in self.graph.facts_of(node0)
+                  if known_set <= {p.node for p in f.participants}]
+        verbal = [f for f in shared
+                  if f.predicate not in ("kontext", "být", "druh")]
+        ranked = sorted(verbal or shared, key=lambda f: -f.weight)
+        chosen, seen = [], set()
+        for fact in ranked:                    # subj/obj zrcadla = týž vztah
+            key = (fact.predicate,
+                   frozenset(p.node for p in fact.participants))
+            if key not in seen:
+                seen.add(key)
+                chosen.append(fact)
+            if len(chosen) == 3:
+                break
+        if not chosen:
+            return None, [], None
+        self.visited.extend(p.node for f in chosen for p in f.participants)
+        return node0, [_event_text(f) for f in chosen], chosen[0]
 
     def _existence(self, predicate, known_set):
         """Zjišťovací (ano/ne) otázka: existuje fakt s predikátem a všemi

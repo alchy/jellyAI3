@@ -382,6 +382,12 @@ def scrub(graph, votes):
                     and _dominant(votes, p.node, ("VERB", "AUX", "ADJ")):
                 dropped_participants += 1
                 continue
+            if p.role in ("pred", "attr") and " " not in p.node \
+                    and _dominant(votes, p.node, ("ADV",)):
+                # příslovce identitou není („být(Jan, brzy)" — mis-parse
+                # spony); adjektiva v pred/attr naopak PATŘÍ (vlastnosti)
+                dropped_participants += 1
+                continue
             participants.append(p)
         if len(participants) < 2:
             dropped_facts += 1                # bez protistrany fakt nenese nic

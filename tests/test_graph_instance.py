@@ -70,6 +70,32 @@ def test_assertion_without_corroboration_does_not_merge():
     assert "Ježíše Krista" in g.nodes
 
 
+def test_relation_answer_enumerates_shared_facts():
+    """Vztahová otázka vyjmenuje fakty sdílené oběma uzly — slovesný děj
+    (poslat) je silnější evidence než kontext; elidovaný druhý účastník
+    se doplní z konverzačního těžiště (žhavý Ježíš)."""
+    from config import AnswererConfig
+    from jellyai.answerer.extractive import ExtractiveAnswerer
+    from jellyai.answerer.graph_answerer import GraphAnswerer
+    from jellyai.ufal_client import FakeUfalClient
+    g = FactGraph()
+    g.add_fact(_fact("poslat", ("subj", "Jan Křtitel", "person"),
+                     ("theme", "Ježíš", "person"),
+                     ("theme", "otázka", "concept")))
+    g.add_fact(_fact("kontext", ("subj", "Ježíš", "person"),
+                     ("obj", "Jan Křtitel", "person")))
+    g.add_fact(_fact("být", ("subj", "Ježíš", "person"),
+                     ("pred", "Mesiáš", "concept")))
+    a = GraphAnswerer(g, FakeUfalClient(), ExtractiveAnswerer(AnswererConfig()),
+                      query_mode="templates")
+    out = a.answer("Jaký měl Ježíš vztah k Janu Křtiteli?", [])
+    assert "poslat" in out.text                  # děj, ne kontext
+    a.reset()
+    a.answer("Kdo je Ježíš?", [])                # rozsvítí Ježíše
+    out = a.answer("Jaký měl vztah k Janu Křtiteli?", [])
+    assert "poslat" in out.text                  # pro-drop z těžiště
+
+
 def test_alias_extraction_reads_recene():
     """Mt 1,16: „narodil se Ježíš řečený Kristus" → jmenovat(Ježíš, Kristus)."""
     sent = [
