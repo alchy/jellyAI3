@@ -53,6 +53,8 @@
   "date_part_forms": {"rok": "rok", "roku": "rok", "roce": "rok", "letech": "rok",
                       "mesic": "měsíc", "mesici": "měsíc",
                       "den": "den", "dne": "den", "dni": "den"},
+  "first_person": ["jsem", "sem", "jsme"],
+  "user_entity": "uživatel",
   "temporal": {
     "now_words": ["ted", "nyni", "prave"],
     "now_window_minutes": 15,

@@ -116,6 +116,7 @@ Cíl: existuje knihovna `jellyai/iris/` (automaton/state/patterns/assurance/pres
 ## FÁZE 2 — dialogové zaostřování + Chronos (obrys; detailní tasky po Fázi 1)
 
 - Karty: `clarify-person`, `clarify-relation`, `clarify-period` („v jakém roce/století?"), `data-overflow` („Co řekl Ježíš?" → nabídka oblastí aktivace), `data-empty` + rekurzivní ostření (nejistota v SubQuery nese cestu).
+- **Kartový audit (ZÁKON §2.4b)**: sweep VŠECH natvrdo udělaných logických stavů v kódu Iris — větvení `turn()` (kdy answer/dialog/terminál), prahy, potvrzovací texty, výběr akcí — a migrace rozhodnutí do karet; v kódu smí zbýt jen mechanismy (rysy, aritmetika, matching). Iris je stavový automat ŘÍZENÝ json kartami.
 - **Výběr karty benefitem (spec §2.6b)**: `PatternDeck.best(event, context)` — kandidátky se skórují (specificita: kolik trigger podmínek sedí a jak těsně; priorita; případně simulovaný zisk zaostření) a vyhrává největší benefit; first-match zůstává fallback pro jednoduché balíčky. Testy: karta s těsnějším triggerem přebije obecnou i s nižší prioritou.
 - Datová hygiena (nález z /schema): šum v predikátech grafu („Chvalte", „Izaiáš" — velká písmena/jména jako predikáty) → guard v extrakci, měřit coverage.
 - Dialogové scénáře ze spec §1.1 do etalonu jako `dialog` řádky (runner umí); expecty po změření.

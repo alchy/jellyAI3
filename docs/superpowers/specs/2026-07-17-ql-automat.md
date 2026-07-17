@@ -55,6 +55,11 @@ QL:   Specifikuj období zaostření — mám tato období: (aktivační okno)
 4. **Automat v kódu neřeší specifika jazyka** — chování řídí JSON
    pattern-karty. Přidání karty = rozšíření komunikačních schopností,
    bez zásahu do kódu.
+4b. **ZÁKON: logika se NIKDY nestaví fixně programově** (uživatel). Kód
+    obsahuje jen mechanismy (výpočet rysů výroku, aritmetiku, matching
+    engine); KAŽDÉ rozhodnutí o chování — klasifikace konstatování,
+    dialogová reakce, priorita — je karta/JSON. Karty mají rysové triggery
+    (`requires`/`forbids` nad rysy tahu: first_person, copula, l_verb…).
 5. **Jedna karta = jeden vzor**: obsahuje (a) **trigger** — při jaké události
    ji automat vytáhne (např. flag `focus-attention-query`, událost
    `resolve.ambiguous`, práh assurance), (b) **dialog** — šablona textu
@@ -143,6 +148,16 @@ Taxonomie událostí (výchozí, roste testováním): `resolve.ambiguous`
      karet (časové razítko zisků), (e) výhledově recency vážení faktů
      u časovaných bází. Automat dostává `clock` injektovaně (testy fixují,
      živý běh = systémové hodiny).
+
+## 3c. Souhra subsystémů — Topos × Chronos × Metron (ukázka uživatele)
+
+10h. Cílové dotazy nad pamětí (Mnemos ukládá „Dnes pršelo v Praze." s časovou
+     kotvou): **„Pršelo tento měsíc v Praze?"** — Chronos (interval „tento
+     měsíc") × místo (Praha) × existence → Ano/nenašel. **„Kolikrát letos
+     pršelo v Čechách?"** — Chronos („letos") × **Topos** (hierarchie míst:
+     Praha ⊂ Čechy — containment jako u časových intervalů) × **Metron**
+     („kolikrát" = počítání VÝSKYTŮ faktů, nová díra typu počet, ne num
+     účastník). Subsystémy jsou kotvy os a skládají se v jednom dotazu.
 
 ## 4. Dialogové UX — tři okna (web)
 

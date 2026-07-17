@@ -63,6 +63,8 @@ def load_rules(language="cs"):
         for key in ("event_verb_forms", "date_part_forms"):
             rules[key] = dict(rules.get(key, {}))
         rules["temporal"] = dict(rules.get("temporal", {}))
+        rules["first_person"] = frozenset(rules.get("first_person", ()))
+        rules["user_entity"] = rules.get("user_entity", "user")
         _cache[path] = rules
     return _cache[path]
 

@@ -1,0 +1,152 @@
+"""Mnemos — paměť Iris: časově vázaná komunikace uživatele v grafu.
+
+Uživatel nemluví jen v otázkách. Konstatování („Dnes jsem měl knedlíky.")
+je sdělení do PAMĚTI — Mnemos ho uloží jako běžný fakt grafu, kde:
+
+* **uživatel je entita** (uzel `user_entity` z jazykových dat) — jeho výroky
+  se vážou na jeho identitu jako u kterékoli jiné osoby grafu;
+* **čas se ukotvuje HNED** (Chronos): „dnes" se přeloží na absolutní datum
+  v okamžiku uložení — paměť nesmí držet relativní slovo, zítra by
+  znamenalo jiný den;
+* fakt žije v TÉMŽE grafu jako korpus — otázka „Kdy jsem měl v tomto roce
+  knedlíky?" pak jede běžnou cestou (pseudo-QL → match → díra time)
+  a Mnemos s Chronosem jen pomohly správné aktivaci.
+
+První osoba se pozná podle pomocného slovesa („jsem/sem/jsme" — tabulka
+`first_person`); predikát je l-ové příčestí věty (uložené v kmenovém tvaru
+bez koncovky rodu/čísla, aby se „měl/měla/měli" potkaly).
+"""
+
+import re
+
+from jellyai.graph.canon import deaccent
+from jellyai.graph.extract import make_fact, Participant
+from jellyai.iris.chronos import resolve_temporal
+from jellyai.lang import current
+
+
+def _l_form(token):
+    """Kmen l-ového příčestí („měl"/„měla"/„měli" → „měl"); jinak None."""
+    low = token.lower()
+    stripped = low.rstrip("aioy")
+    return stripped if stripped.endswith("l") and len(stripped) >= 3 else None
+
+
+def _date_label(interval):
+    """Interval → povrch časového uzlu grafu („17. července 2026").
+
+    Genitivy měsíců jsou jazyková data; formát odpovídá datům z korpusu,
+    takže `parse_date` i dekompozice fungují nad pamětí stejně jako nad texty.
+    """
+    start = interval.start
+    month = current()["temporal"]["month_genitives"][start.month - 1]
+    return f"{start.day}. {month} {start.year}"
+
+
+def utterance_features(tokens, norms):
+    """RYSY výroku pro kartové triggery — kód nerozhoduje, jen měří.
+
+    Returns:
+        set[str]: Podmnožina {"first_person", "copula", "l_verb"}.
+    """
+    lang = current()
+    features = set()
+    if any(n in lang["first_person"] for n in norms):
+        features.add("first_person")
+    if any(n in lang["copula_forms"] for n in norms):
+        features.add("copula")
+    if any(_l_form(t) for t in tokens):
+        features.add("l_verb")
+    return features
+
+
+def parse_statement(text, now, deck=None):
+    """Rozpozná konstatování a rozloží ho na časově ukotvený fakt paměti.
+
+    O DRUHU konstatování nerozhoduje kód, ale **karty** (ZÁKON: logika se
+    nestaví fixně programově): kód spočítá rysy výroku (1. osoba, spona,
+    l-příčestí) a balíček karet vybere vzor události `utterance.statement`
+    — jeho akce určí druh (`memorize`), predikát i filtrování objektů.
+    Přidání karty = nový rozpoznávaný tvar konstatování, bez zásahu do kódu.
+
+    Timestamp se přidává VŽDY — i bez časového slova platí čas výroku
+    (interakce je časově vázaná); explicitní primitivum kotvu posune.
+
+    Args:
+        text (str): Vstup uživatele.
+        now (datetime): Okamžik „teď" (Chronos kotva — zvenku).
+        deck (PatternDeck | None): Karty; None = vestavěné karty jazyka.
+
+    Returns:
+        dict | None: {"kind", "predicate", "objects", "time", "card"};
+        None když žádná karta výrok nerozpozná (dotaz, holá entita…).
+    """
+    if "?" in text:
+        return None
+    if deck is None:
+        from jellyai.iris.patterns import PatternDeck
+        deck = PatternDeck.for_language("cs")
+        deck.load()
+    lang = current()
+    # koncová větná tečka pryč; tečkované zkratky (R.U.R.) zůstávají
+    tokens = [t.rstrip(".") if "." not in t[:-1] else t
+              for t in re.findall(r"[\w.]+", text)]
+    tokens = [t for t in tokens if t]
+    norms = [deaccent(t.lower()) for t in tokens]
+    card = deck.match("utterance.statement",
+                      {"features": utterance_features(tokens, norms)})
+    if card is None or "memorize" not in card.action:
+        return None
+    kind = card.action["memorize"]
+    if card.action.get("predicate_from") == "l_verb":
+        predicate = next((_l_form(t) for t in tokens if _l_form(t)), None)
+    else:
+        predicate = card.action.get("predicate")
+    if predicate is None:
+        return None
+    interval = resolve_temporal(text, now)
+    if interval is None:
+        interval = resolve_temporal("dnes", now)   # čas výroku = dnešek
+    temporal_words = (set(lang["temporal"].get("day_words", ()))
+                      | set(lang["temporal"].get("units", ()))
+                      | set(lang["temporal"].get("now_words", ())))
+    exclude_l = card.action.get("exclude_l_forms", False)
+    objects = [tok for tok, norm in zip(tokens, norms)
+               if norm not in lang["first_person"]
+               and norm not in lang["copula_forms"]
+               and norm not in lang["query_skip_words"]
+               and norm not in temporal_words
+               and not (exclude_l and _l_form(tok) is not None)
+               and len(tok) > 1]
+    if not objects or (kind == "observation" and len(objects) < 2):
+        return None
+    return {"kind": kind, "predicate": predicate, "objects": objects,
+            "time": _date_label(interval), "card": card.name}
+
+
+def remember(graph, statement, user_entity):
+    """Uloží rozložené konstatování do grafu jako časově ukotvený fakt.
+
+    Epizoda: subj = uživatel, předměty obj. Pozorování: subj = první obsahové
+    slovo, zbytek pred (sponová sémantika), uživatel jako pozorovatel (theme).
+
+    Args:
+        graph (FactGraph): Cílový graf (týž jako korpusový).
+        statement (dict): Výstup `parse_statement`.
+        user_entity (str): Id uzlu identity uživatele.
+
+    Returns:
+        str: Lidský popis uloženého faktu (pro potvrzení v dialogu).
+    """
+    objects = statement["objects"]
+    if statement["kind"] == "episode":
+        participants = [Participant("subj", user_entity, "person")]
+        participants += [Participant("obj", obj, "concept") for obj in objects]
+    else:
+        participants = [Participant("subj", objects[0], "concept")]
+        participants += [Participant("pred", obj, "concept")
+                         for obj in objects[1:]]
+        participants.append(Participant("theme", user_entity, "person"))
+    participants.append(Participant("time", statement["time"], "time"))
+    graph.add_fact(make_fact(statement["predicate"], participants))
+    return f"{statement['predicate']}: {', '.join(objects)} ({statement['time']})"

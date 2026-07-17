@@ -95,6 +95,7 @@ class PatternDeck:
         Returns:
             PatternCard | None: Vítězná karta, nebo None (žádný vzor nesedí).
         """
+        features = frozenset(context.get("features", ()))
         for card in self.cards:
             trig = card.trigger
             if trig.get("event") != event:
@@ -105,6 +106,12 @@ class PatternDeck:
             minimum = trig.get("min_candidates")
             if minimum is not None \
                     and len(context.get("candidates", ())) < minimum:
+                continue
+            # rysové triggery: karta žádá rysy tahu (requires) a zakazuje
+            # jiné (forbids) — klasifikaci dělají KARTY, kód jen počítá rysy
+            if not set(trig.get("requires", ())) <= features:
+                continue
+            if features & set(trig.get("forbids", ())):
                 continue
             return card
         return None

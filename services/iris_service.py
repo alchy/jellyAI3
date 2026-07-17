@@ -60,6 +60,14 @@ def make_routes(automaton, deck):
         """`/query` {question, temperature?} → odpověď/dialog + metadata tahu."""
         r = automaton.turn(payload["question"],
                            temperature=payload.get("temperature", 0.0))
+        # VŠECHNA API volání se zrcadlí do konzole služby — i externí
+        # (testy, curl) jsou vidět: otázka, odpověď, jistota, komponenty
+        top = ", ".join(f"{n}={j:.2f}" for n, j in r.activation_window[:5])
+        print(f"\n❓ {payload['question']}"
+              f"\n💬 [{r.kind}, assurance {r.assurance:.2f}] {r.text}"
+              f"\n   komponenty: {', '.join(r.used.get('components', []))}"
+              f"   karty: {', '.join(r.used.get('patterns', [])) or '—'}"
+              f"\n   aktivace: {top or '—'}", flush=True)
         return {"answer": r.text, "kind": r.kind, "assurance": r.assurance,
                 "clarify": r.clarify, "trace": _trace_json(r.trace),
                 "sources": r.sources, "alternatives": r.alternatives,

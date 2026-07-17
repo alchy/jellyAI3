@@ -27,9 +27,11 @@ from datetime import datetime
 from jellyai.graph.canon import deaccent
 from jellyai.iris.assurance import assurance
 from jellyai.iris.chronos import clock_answer
+from jellyai.iris.mnemos import parse_statement, remember
 from jellyai.iris.patterns import PatternDeck
 from jellyai.iris.presenter import activation_window, docs_window
 from jellyai.iris.state import FocusState, PendingFocus
+from jellyai.lang import current
 
 _PICK_WARMTH = 2.0        # jas vybraného kandidáta (volba = silné zaostření)
 
@@ -120,6 +122,12 @@ class IrisAutomaton:
             used_patterns.append(self.state.pending.card)
             self.state.pending = None
             self.answerer.context.warm(chosen, _PICK_WARMTH)
+        elif "?" not in text:
+            # KONSTATOVÁNÍ (ne dotaz, ne volba) → Mnemos: timestamp + graf;
+            # DRUH výroku rozhodují karty (utterance.statement), ne kód
+            statement = parse_statement(text, self.clock(), self.deck)
+            if statement is not None:
+                return self._memorize(text, statement)
         # jas PŘED tahem: „zaostřil už uživatel?" — tah sám si téma rozsvítí,
         # takže čtení po odpovědi by jistotu falešně zvedlo
         before = dict(self.answerer.context.scores)
@@ -150,6 +158,30 @@ class IrisAutomaton:
                 return self._dialog(card, context, text, used_patterns,
                                     await_pick=False)
         return self._respond(answer, "answer", assur, used_patterns)
+
+    def _memorize(self, text, statement):
+        """Uloží konstatování do grafu (Mnemos) a rozsvítí jeho uzly.
+
+        Uložení JE zaostření: nové téma svítí, takže navazující otázka
+        („Kdy jsem měl…?") jede po zahřáté aktivaci.
+        """
+        detail = remember(self.answerer.graph, statement,
+                          current()["user_entity"])
+        # nový fakt = nový slovník: predikát musí znát i pseudo-QL parser
+        self.answerer._predicates.add(statement["predicate"])  # pylint: disable=protected-access
+        for node in statement["objects"]:
+            self.answerer.context.warm(node, 0.7)
+        card = self.deck.match("memory.stored", {})
+        message = card.dialog.format(fact=detail) if card else detail
+        patterns = [statement["card"]] + ([card.name] if card else [])
+        response = IrisResponse(
+            text=message, kind="answer", assurance=1.0,
+            activation_window=activation_window(self.answerer),
+            docs_window=docs_window(self.answerer),
+            used={"components": ["mnemos", "chronos"],
+                  "patterns": patterns})
+        self.state.remember(text, response)
+        return response
 
     def _resume_pick(self, text):
         """Rozpozná volbu kandidáta z rozpracovaného dialogu.
