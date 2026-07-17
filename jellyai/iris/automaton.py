@@ -643,8 +643,12 @@ class IrisAutomaton:
         Záměrně bez kmenových pater — volná shoda by vetovala i slovesa
         („prší"≈„prsa"). Cache se doplňuje při zápisu paměti."""
         if self._words is None:
-            self._words = {word for node_id in self.answerer.graph.nodes
-                           for word in node_id.lower().split()}
+            # bez výrokových uzlů — obsah řeči jsou celé věty („bydlí"
+            # ve výroku nesmí vetovat sloveso); táž sémantika jako
+            # answerer._node_word
+            self._words = {word for node in self.answerer.graph.nodes.values()
+                           if node.type != "výrok"
+                           for word in node.id.lower().split()}
         return token.lower() in self._words
 
     def _memorize(self, text, statement):
