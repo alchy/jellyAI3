@@ -101,8 +101,14 @@ class ViewBaseView:
         self._canvas.ensure_edge(src, dst, **meta)
 
     def update_node(self, node_id, **attrs):
-        """Živě změní uzel (velikost/barva/label) — push přes WebSocket."""
-        self._canvas.update_node(node_id, **attrs)
+        """Živě změní uzel (push přes WebSocket). Uzel, který plátno ještě
+        nezná (Mnemos ho přidal za běhu — „uživatel", nová vzpomínka, čas),
+        se rovnou PŘIDÁ: paměť uživatele roste do grafu i vizuálně."""
+        try:
+            self._canvas.update_node(node_id, **attrs)
+        except ValueError:
+            self._canvas.ensure_node(node_id, label=node_id, type="concept",
+                                     **attrs)
 
     def flow(self, path):
         """Animuje světelné částice po trase (topic → answer). viewBase si cestu

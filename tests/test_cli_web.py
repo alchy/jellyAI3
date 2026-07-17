@@ -87,6 +87,20 @@ def test_docs_panel_writes_ranked_documents():
     assert out.index("bible_matous") < out.index("bible_genesis")   # sestupně
 
 
+def test_update_node_adds_unknown_runtime_node():
+    """Uzel přidaný za běhu (Mnemos) plátno nezná — update ho rovnou přidá."""
+    class FakeCanvas:
+        def __init__(self): self.ensured = []
+        def update_node(self, node_id, **attrs):
+            raise ValueError(f"Uzel '{node_id}' neexistuje")
+        def ensure_node(self, node_id, **meta): self.ensured.append(node_id)
+    from jellyai.viz.viewbase_view import ViewBaseView
+    v = ViewBaseView.__new__(ViewBaseView)
+    v._canvas = FakeCanvas()
+    v.update_node("uživatel", size=1.5)
+    assert v._canvas.ensured == ["uživatel"]
+
+
 def test_nodes_panel_writes_ranked_activation():
     """⚡ Aktivační okno: uzly podle jasu, největší nahoře, žádný dialog."""
     class FakeCanvas:
