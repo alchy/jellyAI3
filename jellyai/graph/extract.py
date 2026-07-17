@@ -479,10 +479,14 @@ def extract_facts(annotation, default_subject=None, canon=None, context=None):
                 continue
             role = _ATTR_ROLE.get(node[1])
             if role is None:
-                # konceptové příslovečné určení („uvažovat o souvislosti")
-                # se nezahazuje — role „theme"; jen obl substantiva
+                # konceptové příslovečné určení („uvažovat o literatuře")
+                # se nezahazuje — role „theme"; jen obl substantiva. Funkční
+                # substantiva („v souvislosti s…") jsou spojovací vata, ne
+                # obsah — theme nedostanou (šumové uzly v grafu)
                 if node[1] == "concept" and tok.get("upos") in ("NOUN", "PROPN") \
-                        and str(tok.get("deprel", "")).startswith("obl"):
+                        and str(tok.get("deprel", "")).startswith("obl") \
+                        and _clean_lemma(tok.get("lemma", "")).lower() \
+                            not in current()["function_nouns"]:
                     role = "theme"
                 else:
                     continue

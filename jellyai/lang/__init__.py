@@ -42,6 +42,8 @@ def load_rules(language="cs"):
         rules["vowel_fold"] = rules.get("vowel_fold", {})
         rules["metalanguage_nouns"] = frozenset(
             rules.get("metalanguage_nouns", ()))
+        rules["function_nouns"] = frozenset(
+            rules.get("function_nouns", ()))
         rules["generic_event_verbs"] = frozenset(
             rules.get("generic_event_verbs", ()))
         rules["interrogative_adverbs"] = frozenset(

@@ -141,8 +141,25 @@ def test_attribute_goes_to_its_own_clause_verb():
 
 
 def test_concept_oblique_becomes_theme_participant():
-    """„Uvažoval o souvislosti." → uvažovat(osoba, theme=souvislost) —
+    """„Uvažoval o literatuře." → uvažovat(osoba, theme=literatura) —
     konceptové obl se už nezahazuje (největší kbelík coverage auditu)."""
+    sent = [
+        {"form": "Uvažoval", "lemma": "uvažovat", "upos": "VERB", "head": 0,
+         "deprel": "root", "start": 0, "end": 8},
+        {"form": "o", "lemma": "o", "upos": "ADP", "head": 3, "deprel": "case",
+         "start": 9, "end": 10},
+        {"form": "literatuře", "lemma": "literatura", "upos": "NOUN", "head": 1,
+         "deprel": "obl", "start": 11, "end": 21},
+    ]
+    facts = extract_facts({"entities": [], "sentences": [sent]},
+                          default_subject=("Karel Čapek", "person"))
+    fact = next(f for f in facts if f.predicate == "uvažovat")
+    assert ("theme", "literatura") in [(p.role, p.node) for p in fact.participants]
+
+
+def test_function_noun_oblique_is_not_theme():
+    """Funkční substantivum („v souvislosti s…") theme účastníka NEvytvoří —
+    je to spojovací vata, ne obsah; do grafu by nesla šumové uzly."""
     sent = [
         {"form": "Uvažoval", "lemma": "uvažovat", "upos": "VERB", "head": 0,
          "deprel": "root", "start": 0, "end": 8},
@@ -150,11 +167,13 @@ def test_concept_oblique_becomes_theme_participant():
          "start": 9, "end": 10},
         {"form": "souvislosti", "lemma": "souvislost", "upos": "NOUN", "head": 1,
          "deprel": "obl", "start": 11, "end": 22},
+        {"form": "díla", "lemma": "dílo", "upos": "NOUN", "head": 1,
+         "deprel": "obj", "start": 23, "end": 27},
     ]
     facts = extract_facts({"entities": [], "sentences": [sent]},
                           default_subject=("Karel Čapek", "person"))
     fact = next(f for f in facts if f.predicate == "uvažovat")
-    assert ("theme", "souvislost") in [(p.role, p.node) for p in fact.participants]
+    assert not any(p.node == "souvislost" for p in fact.participants)
 
 
 def test_adverb_is_not_theme():
