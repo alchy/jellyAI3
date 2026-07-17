@@ -143,6 +143,29 @@ class ViewBaseView:
         if self._terminal_id is not None:
             self._canvas.terminal_write(self._terminal_id, text)
 
+    def open_docs_panel(self):
+        """Otevře druhé konzolové okno — živý panel nejaktivnějších dokumentů
+        (attention nad soubory). Aktualizuje se `write_docs` po každém dotazu."""
+        window = self._vb.TerminalWindow("dokumenty", title="📄 Aktivní dokumenty",
+                                         prompt="")
+        self._docs_id = window.window_id
+        self._canvas.open_terminal(window, on_input=lambda event: None)
+
+    def write_docs(self, ranked):
+        """Vypíše do panelu top dokumenty s jejich aktivací (attention).
+
+        Args:
+            ranked (list[tuple[str, float]]): (dokument, jas) seřazené sestupně.
+        """
+        if getattr(self, "_docs_id", None) is None:
+            return
+        if not ranked:
+            self._canvas.terminal_write(self._docs_id, "— (žádná aktivace)")
+            return
+        lines = [f"{i}. {doc:24} {'█' * round(score) or '·'} {score:.2f}"
+                 for i, (doc, score) in enumerate(ranked, 1)]
+        self._canvas.terminal_write(self._docs_id, "\n".join(lines))
+
     def serve(self, open_browser=True, block=True):
         """Nastartuje webserver. `block=True` drží proces (standalone), jinak handle.
 

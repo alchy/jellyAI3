@@ -51,3 +51,18 @@ def test_cmd_web_wires_prompt_to_ask(tmp_path, monkeypatch):
     for _ in range(10):                          # pár animačních tiků
         view.tick()
     assert any(pkt for pkt in view.packets)      # provoz po trase se rozjel
+
+
+def test_docs_panel_writes_ranked_documents():
+    """Panel dokumentů vypíše top zdroje dle aktivace (attention nad soubory)."""
+    class FakeCanvas:
+        def __init__(self): self.written = []
+        def terminal_write(self, wid, text): self.written.append(text)
+    from jellyai.viz.viewbase_view import ViewBaseView
+    v = ViewBaseView.__new__(ViewBaseView)
+    v._canvas = FakeCanvas()
+    v._docs_id = "dokumenty"
+    v.write_docs([("bible_matous", 2.4), ("bible_genesis", 0.84)])
+    out = v._canvas.written[0]
+    assert "bible_matous" in out and "2.40" in out
+    assert out.index("bible_matous") < out.index("bible_genesis")   # sestupně

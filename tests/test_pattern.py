@@ -134,3 +134,16 @@ def test_prepositional_nmod_under_known_becomes_participant():
     client = FakeUfalClient(parse={q: _bydlel_parse()})
     pat = question_pattern(q, client)
     assert ("theme", "Karel Čapek") in pat.known
+
+
+def test_lowercase_entity_mistagged_as_adj_still_resolves():
+    """„Kdo je jezis?" — malé/bezdiakritické jméno UDPipe splete na ADJ; u
+    identitní otázky (kdo/co, ne „jaký") se přesto vezme jako entita."""
+    q = "Kdo je jezis?"
+    client = FakeUfalClient(parse={q: [[
+        {"form": "Kdo", "lemma": "kdo", "upos": "PRON", "head": 3, "deprel": "nsubj"},
+        {"form": "je", "lemma": "být", "upos": "AUX", "head": 3, "deprel": "cop"},
+        {"form": "jezis", "lemma": "jezis", "upos": "ADJ", "head": 0, "deprel": "root"},
+    ]]})
+    pat = question_pattern(q, client)
+    assert pat.predicate == "být" and pat.known == [("subj", "jezis")]

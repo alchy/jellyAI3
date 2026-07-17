@@ -324,6 +324,11 @@ def cmd_web(config, view=None):
         if state["sizes"] and hasattr(view, "focus"):
             hottest = max(state["sizes"], key=state["sizes"].get)
             view.focus(hottest)
+        # živý panel: 5 nejaktivnějších dokumentů (attention nad soubory)
+        src = getattr(answerer, "source_context", None)
+        if src is not None and hasattr(view, "write_docs"):
+            ranked = sorted(src.scores.items(), key=lambda kv: -kv[1])[:5]
+            view.write_docs(ranked)
         reply = f"❓ {question}\n💬 {answer.text}"
         if answer.alternatives:      # souvislosti (krmivo pro budoucí kompozitor/NN)
             reply += f"\n   souvislosti: {', '.join(answer.alternatives[:4])}"
@@ -349,6 +354,8 @@ def cmd_web(config, view=None):
 
     view.every(0.15, animate)
     view.open_terminal(on_query)     # konzole: vstup i výstup v prohlížeči
+    if hasattr(view, "open_docs_panel"):
+        view.open_docs_panel()       # panel nejaktivnějších dokumentů
     view.serve(open_browser=True)
 
 

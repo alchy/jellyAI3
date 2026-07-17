@@ -184,6 +184,14 @@ def _parse_sent(sent):
             root = next((t for t in sent if t.get("upos") in ("NOUN", "PROPN")
                          and _clean_lemma(t.get("lemma", "")).lower() not in _HOLE),
                         None)
+        if root is None and hole_role != "attr":
+            # entita mis-taggovaná jako ADJ („Kdo je jezis?" — malé/bez
+            # diakritiky UDPipe splete na ADJ); u identity (kdo/co, ne „jaký")
+            # vezmi kořenový obsah jako entitu
+            root = next((t for t in sent
+                         if t.get("deprel") == "root" and t.get("upos") != "VERB"
+                         and _clean_lemma(t.get("lemma", "")).lower() not in _HOLE),
+                        None)
         if root is not None:
             gen = _genitive_child(root, sent)
             if gen is not None and gen.get("upos") in ("PROPN", "NOUN"):
