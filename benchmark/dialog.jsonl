@@ -1,0 +1,5 @@
+{"name": "capek-focus", "turns": [{"u": "Kdo je Čapek?", "kind": "dialog", "expect": ["Karel", "Josef"]}, {"u": "Josef Čapek", "kind": "answer", "expect": ["malíř"]}, {"u": "Kde se narodil?", "kind": "answer", "expect": ["Hronov"]}]}
+{"name": "knedliky-mnemos", "turns": [{"u": "Dnes jsem měl knedlíky.", "expect": ["Zapamatováno", "17. července 2026"]}, {"u": "Kdy jsem měl v tomto roce knedlíky?", "kind": "answer", "expect": ["17. července 2026"]}]}
+{"name": "poctivost", "turns": [{"u": "Kdo je Ludvík Němec?", "kind": "dialog", "expect": ["Nepodařilo se mi zaostřit"], "reject": ["Čapek"]}]}
+{"name": "hodiny-chronos", "turns": [{"u": "Kolik je hodin?", "kind": "answer", "expect": ["12:00"]}, {"u": "Co je za den?", "expect": ["pátek", "17. července 2026"]}]}
+{"name": "pozorovani", "turns": [{"u": "Venku je teplo.", "expect": ["Zapamatováno", "teplo"]}]}
