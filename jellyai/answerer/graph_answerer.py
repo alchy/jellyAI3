@@ -235,10 +235,15 @@ class GraphAnswerer(Answerer):
                            default=0.0) for t in best_terms)
             quality = min(1.0, (base + 0.2 * best_exact) / max(1, len(terms)))
             best_cand = next(c for c in candidates if c[0] == best_id)
+            # AFINITA FILTRUJE SOUPEŘE: má-li vítěz fakt predikátu otázky
+            # a soupeř ne, soupeř není skutečná alternativa („Kde se narodil
+            # Ježíš?" — narodit-fakt má jen jeden) → volba není hádání.
+            # U identity (fakt mají oba Čapkové) soupeři zůstávají → dialog.
             rivals = [c[0] for c in candidates
                       if c[0] != best_id and c[5] == best_cand[5]
                       and c[3] != best_cand[3]
-                      and (domain_lit is None or c[0] in domain_lit)]
+                      and (domain_lit is None or c[0] in domain_lit)
+                      and (not best_cand[4] or c[4])]
             self.last_resolution = {"term": " ".join(terms), "winner": best_id,
                                     "quality": quality, "rivals": rivals}
             # nejednoznačné jméno rozsvítí VŠECHNY kandidáty se stejnou

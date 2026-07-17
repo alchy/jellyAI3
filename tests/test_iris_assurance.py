@@ -35,6 +35,23 @@ def test_activation_raises_confidence():
     assert boosted > low and boosted >= 0.6
 
 
+def test_affinity_filters_rivals():
+    """Soupeř bez faktu predikátu není skutečná alternativa: „Kde se narodil
+    Ježíš?" — narodit-fakt má jen jeden kandidát → volba není hádání
+    (rivals prázdné). U identity („Kdo je Čapek?") mají fakt oba → dialog."""
+    g = FactGraph()
+    g.add_fact(make_fact("narodit", [Participant("subj", "Ježíš", "person"),
+                                     Participant("loc", "Betlémě", "geo")]))
+    g.add_fact(make_fact("kontext", [Participant("subj", "Ježíš Martu", "person"),
+                                     Participant("obj", "dům", "concept")]))
+    a = GraphAnswerer(g, FakeUfalClient(), ExtractiveAnswerer(AnswererConfig()))
+    a._resolve_topic(["Ježíš"], "narodit")
+    assert a.last_resolution["winner"] == "Ježíš"
+    assert a.last_resolution["rivals"] == []          # Martu narodit-fakt nemá
+    a._resolve_topic(["Ježíš"])                       # bez predikátu — beze změny
+    assert "Ježíš Martu" in a.last_resolution["rivals"]
+
+
 def test_resolver_records_resolution_evidence():
     """_resolve_topic po ostrém rozlišení zapíše evidenci (kvalitu, soupeře)
     do last_resolution — vstup pro assurance; sondy is_node nezapisují."""
