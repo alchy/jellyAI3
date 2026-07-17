@@ -9,7 +9,7 @@ from jellyai.answerer.base import Answer, Answerer
 from jellyai.graph.graph import parse_date
 from jellyai.lang import current
 from jellyai.answerer.question import analyze_question
-from jellyai.answerer.pattern import question_pattern, SubQuery
+from jellyai.answerer.pattern import question_pattern, SubQuery, Pattern
 from jellyai.answerer.query import build_query
 from jellyai.answerer.template import _to_nominative
 from jellyai.graph.activation import ActivationField
@@ -45,7 +45,7 @@ class GraphAnswerer(Answerer):
     """
 
     def __init__(self, graph, client, fallback, *, context_decay=0.55,
-                 spread_depth=2, spread_falloff=0.35, use_templates=False):
+                 spread_depth=2, spread_falloff=0.35, query_mode="udpipe"):
         """Vytvoří answerer.
 
         Args:
@@ -67,7 +67,7 @@ class GraphAnswerer(Answerer):
         self.context = ActivationField(decay=context_decay)   # těžiště (id uzlu → jas)
         self.source_context = ActivationField(decay=context_decay)  # attention nad ZDROJI
         self._predicates = {f.predicate for f in graph.facts.values()}  # slovník QL
-        self.use_templates = use_templates   # šablonový parser jako primární
+        self.query_mode = query_mode  # "udpipe" | "hybrid" | "templates" (pseudo-QL)
         self.history = []        # trajektorie konverzace (tahy s trasou a těžištěm)
 
     def reset(self):
@@ -172,13 +172,15 @@ class GraphAnswerer(Answerer):
             tuple: (téma | None, hodnota | None, fakt | None).
         """
         self.visited = []                    # uzly protnuté (i)rekurzí → rozsvítit
-        # ŠABLONOVÝ PARSER (pseudo-QL nad slovníkem grafu) — primární pro otázky,
-        # když je zapnutý (odolný vůči diakritice i mis-taggingu); jinak/při
-        # nesestaveném vzoru ML rozbor UDPipe
+        # ŠABLONOVÝ PARSER (pseudo-QL nad slovníkem grafu) — primární pro otázky
+        # v režimech hybrid/templates (odolný vůči diakritice i mis-taggingu);
+        # UDPipe rozbor jen mimo templates režim (fallback/primární dle režimu)
         pat = None
-        if self.use_templates:
+        if self.query_mode in ("hybrid", "templates"):
             pat = build_query(question, self._predicates)
-        pat = pat or question_pattern(question, self.client)
+        if pat is None and self.query_mode != "templates":
+            pat = question_pattern(question, self.client)
+        pat = pat or Pattern()
         if pat.known:
             known_set = set()
             for _, known in pat.known:
