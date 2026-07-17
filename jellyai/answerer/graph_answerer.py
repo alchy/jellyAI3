@@ -21,8 +21,11 @@ _MAX_ENUM = 5                           # strop výčtové odpovědi (čitelnost
 
 def _loose(word):
     """Nejvolnější porovnávací klíč: kmen → bez diakritiky → bez koncové
-    samohlásky (floor 2). „hru"≡„hra"≡„hr", „jezis"≡„Ježíš". Nejslabší patro
-    rozlišení — nikdy nepřebije přesnější shodu."""
+    samohlásky (floor 2). „hru"≡„hra"≡„hr", „jezis"≡„Ježíš", „Čapka"≡„Čapek"
+    (epenteze kmene je pro jména nutná). Daň: krátká slova se občas potkají
+    se šumem („měl"→„ml" ≡ vadný uzel „mle") — to ale řeší upřímný dialog
+    (nízká assurance), ne ticho; šum patří vyčistit v datech. Nejslabší
+    patro — nikdy nepřebije přesnější shodu."""
     s = deaccent(_stem(word))
     return s[:-1] if len(s) > 2 and s[-1] in "aeiouy" else s
 

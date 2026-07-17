@@ -154,6 +154,8 @@ class GraphConfig:
         query_mode (str): Cesta rozboru otázky — "udpipe" (ML rozbor),
             "hybrid" (šablony pseudo-QL první, UDPipe fallback),
             "templates" (šablony jediná cesta, bez UDPipe).
+        memory_path (str): Deník paměti Mnemos (JSONL) — konstatování
+            uživatele; přežívá restart služby i přestavbu grafu.
     """
     graph_path: str = "data/graph.pkl"
     context_decay: float = 0.8
@@ -161,6 +163,7 @@ class GraphConfig:
     spread_depth: int = 2
     spread_falloff: float = 0.35
     query_mode: str = "hybrid"
+    memory_path: str = "data/memory.jsonl"
 
 
 @dataclass

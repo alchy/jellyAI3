@@ -17,6 +17,8 @@ První osoba se pozná podle pomocného slovesa („jsem/sem/jsme" — tabulka
 bez koncovky rodu/čísla, aby se „měl/měla/měli" potkaly).
 """
 
+import json
+import os
 import re
 
 from jellyai.graph.canon import deaccent
@@ -150,3 +152,41 @@ def remember(graph, statement, user_entity):
     participants.append(Participant("time", statement["time"], "time"))
     graph.add_fact(make_fact(statement["predicate"], participants))
     return f"{statement['predicate']}: {', '.join(objects)} ({statement['time']})"
+
+
+def persist(statement, path):
+    """Připíše konstatování do DENÍKU paměti (JSONL, append-only).
+
+    Deník je zdroj pravdy paměti uživatele: přežije restart služby i
+    přestavbu korpusového grafu (fakta uživatele v anotacích nejsou) a je
+    auditovatelný — každý řádek = jedno zapamatované konstatování.
+    """
+    directory = os.path.dirname(path)
+    if directory:
+        os.makedirs(directory, exist_ok=True)
+    with open(path, "a", encoding="utf-8") as fh:
+        fh.write(json.dumps(statement, ensure_ascii=False) + "\n")
+
+
+def replay(graph, path, user_entity):
+    """Přehraje deník paměti do (čerstvě načteného) grafu.
+
+    Args:
+        graph (FactGraph): Graf, do kterého se vzpomínky obnoví.
+        path (str): Cesta k deníku (memory.jsonl); chybějící = prázdná paměť.
+        user_entity (str): Id uzlu identity uživatele.
+
+    Returns:
+        set[str]: Predikáty obnovených faktů (doplní slovník parseru).
+    """
+    predicates = set()
+    if not path or not os.path.exists(path):
+        return predicates
+    with open(path, encoding="utf-8") as fh:
+        for line in fh:
+            if not line.strip():
+                continue
+            statement = json.loads(line)
+            remember(graph, statement, user_entity)
+            predicates.add(statement["predicate"])
+    return predicates

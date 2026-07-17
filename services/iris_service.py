@@ -116,7 +116,8 @@ def main():
     answerer = make_graph_answerer(config)
     deck = PatternDeck.for_language(config.graph.language)
     deck.load()
-    automaton = IrisAutomaton(answerer, deck)   # prahy nesou karty (ZÁKON)
+    automaton = IrisAutomaton(answerer, deck,   # prahy nesou karty (ZÁKON)
+                              memory_path=config.graph.memory_path)
     posts, gets = make_routes(automaton, deck)
     serve(args.host, args.port, posts, gets)
 

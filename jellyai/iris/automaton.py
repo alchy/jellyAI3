@@ -28,7 +28,7 @@ from jellyai.graph.canon import deaccent
 from jellyai.graph.graph import parse_date
 from jellyai.iris.assurance import assurance
 from jellyai.iris.chronos import clock_answer, resolve_temporal
-from jellyai.iris.mnemos import parse_statement, remember
+from jellyai.iris.mnemos import parse_statement, persist, remember, replay
 from jellyai.iris.patterns import PatternDeck
 from jellyai.iris.presenter import activation_window, docs_window
 from jellyai.iris.state import FocusState, PendingFocus
@@ -70,7 +70,7 @@ class IrisResponse:
 class IrisAutomaton:
     """Stavový automat zaostření nad jedním answererem (jedna konverzace)."""
 
-    def __init__(self, answerer, deck=None, clock=None):
+    def __init__(self, answerer, deck=None, clock=None, memory_path=None):
         """Vytvoří automat.
 
         ZÁKON: žádné prahy ani rozhodnutí v kódu — kdy se vede dialog a kdy
@@ -83,6 +83,9 @@ class IrisAutomaton:
                 karty češtiny (`patterns/cs/`).
             clock (callable | None): Zdroj „teď" (Chronos — časová kotva);
                 None = systémové hodiny, testy vstřikují fixní čas.
+            memory_path (str | None): Deník paměti Mnemos (memory.jsonl) —
+                při startu se PŘEHRAJE do grafu (paměť přežívá restart);
+                None = paměť jen v RAM (testy).
         """
         self.answerer = answerer
         if deck is None:
@@ -90,7 +93,12 @@ class IrisAutomaton:
             deck.load()
         self.deck = deck
         self.clock = clock or datetime.now
+        self.memory_path = memory_path
         self.state = FocusState()
+        if memory_path:
+            restored = replay(answerer.graph, memory_path,
+                              current()["user_entity"])
+            answerer._predicates |= restored  # pylint: disable=protected-access
 
     def reset(self):
         """Nový rozhovor: vymaže rozpracovaný dialog i pole answereru."""
@@ -191,6 +199,8 @@ class IrisAutomaton:
         """
         detail = remember(self.answerer.graph, statement,
                           current()["user_entity"])
+        if self.memory_path:
+            persist(statement, self.memory_path)   # paměť přežije restart
         # nový fakt = nový slovník: predikát musí znát i pseudo-QL parser
         self.answerer._predicates.add(statement["predicate"])  # pylint: disable=protected-access
         for node in statement["objects"]:
