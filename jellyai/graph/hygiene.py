@@ -18,6 +18,7 @@ nenese. Prahy jsou konzervativní (převaha ≥ 80 %, aspoň 3 hlasy), takže
 
 from collections import Counter, defaultdict
 
+from jellyai.answerer.selection import _clean_lemma
 from jellyai.graph.graph import FactNode
 from jellyai.lang import current
 
@@ -109,13 +110,13 @@ def _dominant_case(votes, form):
 
 
 def _span_cases(tokens, start, end, votes):
-    """Pády slov jmenného rozpětí: lokální jistý pád tokenu (PROPN,
-    jednoznačný Case), jinak dominantní pád TVARU z korpusu.
+    """Pády slov jmenného rozpětí: KORPUS PRVNÍ (dominantní pád tvaru),
+    lokální jistý pád tokenu jen pro řídké tvary bez korpusového verdiktu.
 
-    Korpusový fallback kryje mis-tagy uvnitř věty — v „Ježíš Martu ...
-    miloval" (Jan 11,5) je „Ježíš" otagován jako VERB bez pádu, ale 400
-    nominativních výskytů jinde ví lépe. Bez jistoty (víceznačný pád,
-    řídký tvar) se slovo nesoudí.
+    Lokální tag jediné věty je nejslabší evidence — slepenec „Izák Jákoba"
+    prošel na lokálním mis-tagu Nom+Nom, ač „Jákoba" je korpusově Gen;
+    „Ježíš Martu" měl „Ježíš" jako VERB bez pádu, ale 400 nominativů jinde
+    ví lépe. Bez jistoty (víceznačný pád, řídký tvar) se slovo nesoudí.
     """
     cases = []
     for token in tokens:
@@ -126,13 +127,13 @@ def _span_cases(tokens, start, end, votes):
         form = token.get("form") or ""
         if not form[:1].isalpha():
             continue
+        corpus = _dominant_case(votes, form)
+        if corpus is not None:
+            cases.append(corpus)
+            continue
         case = (token.get("feats") or {}).get("Case", "")
         if token.get("upos") == "PROPN" and case and "," not in case:
             cases.append(case)
-            continue
-        fallback = _dominant_case(votes, form)
-        if fallback is not None:
-            cases.append(fallback)
     return cases
 
 
@@ -251,6 +252,87 @@ def scrub_semantics(graph, animacy_votes):
         kept[key] = fact
     graph.replace_facts(kept)
     return dropped
+
+
+def propn_lemma_votes(annotations):
+    """Hlasy o LEMMATU jmenných tvarů: tvar (lower) → Counter({lemma}).
+
+    Lemma PROPN tokenu JE nominativ jména („Betlémě"→„Betlém", „Boha"→
+    „Bůh") — korpus tak nese nominativizaci zdarma, bez morfo služby.
+    Hlasuje se jen při shodě kapitalizace tvaru a lemmatu (lemma malými
+    by z vlastního jména udělalo obecné slovo); mis-lemmata rozštěpí
+    dominanci a tvar zůstane nesouzený.
+    """
+    votes = defaultdict(Counter)
+    for annotation in annotations.values():
+        for sent in annotation.get("sentences", []):
+            for i, token in enumerate(sent):
+                upos = token.get("upos")
+                form = token.get("form") or ""
+                if upos == "NOUN":
+                    # jméno v lexikonu taggeru („Boha" → NOUN, lemma bůh)
+                    # hlasuje jen KAPITALIZOVANÉ uvnitř věty — začátek věty
+                    # kapitalizuje i obecná slova
+                    if i == 0 or not form[:1].isupper():
+                        continue
+                elif upos != "PROPN":
+                    continue
+                lemma = _clean_lemma(token.get("lemma") or "")
+                if not form or not lemma:
+                    continue
+                if form[:1].isupper() and lemma[:1].islower():
+                    # lemma jména malými („Boha"→„bůh") — jméno zůstává
+                    # jménem, nominativ se kapitalizuje („Bůh")
+                    lemma = lemma[0].upper() + lemma[1:]
+                elif form[:1].islower() and lemma[:1].isupper():
+                    continue          # malý tvar s velkým lemmatem — nesoudit
+                votes[form.lower()][lemma] += 1
+    return votes
+
+
+def _dominant_lemma(votes, word):
+    """Dominantní lemma tvaru z korpusu (≥2 hlasy, ≥80 %); jinak None."""
+    counter = votes.get(word.lower())
+    if not counter:
+        return None
+    total = sum(counter.values())
+    if total < _MIN_CASE_VOTES:
+        return None
+    lemma, count = counter.most_common(1)[0]
+    if len(lemma) < 3:
+        return None       # zmrzačené lemma cizího jména („Lea" → „Le")
+    return lemma if count / total >= _DOMINANCE else None
+
+
+_NOMINATIVE_TYPES = ("person", "geo", "dílo", "institution")
+
+
+def nominativize(graph, lemma_votes):
+    """Id pojmenovaných uzlů NOMINATIVEM (in-place; backlog #1v2).
+
+    Skloněný povrch v id fragmentuje fakty („Betlémě" 6 vedle „Betlém" 2;
+    „Boha" 429 vedle „Bůh" 1175) a prosakuje do odpovědí („Kdo je Ježíš?"
+    → „Boha"). Každé slovo id se nahradí dominantním lemmatem z korpusu;
+    slovo bez verdiktu zůstává (cizí nesklonná jména). Kolize s existujícím
+    nominativním uzlem = žádoucí SLOUČENÍ (součet vah, aliasy); typy se
+    nemění. Časové uzly se nedotýkají (genitivní formát dat čte parse_date).
+
+    Returns:
+        int: Počet přemapovaných uzlů.
+    """
+    node_map = {}
+    for node in graph.nodes.values():
+        if node.type not in _NOMINATIVE_TYPES:
+            continue
+        words = node.id.split()
+        renamed = [(_dominant_lemma(lemma_votes, w) or w) for w in words]
+        new_id = " ".join(renamed)
+        if new_id and new_id != node.id:
+            node_map[node.id] = new_id
+    if node_map:
+        from jellyai.graph.graph import remap_nodes
+        remap_nodes(graph, node_map, force_person=False)
+    return len(node_map)
 
 
 def _dominant(votes, lemma, kinds):

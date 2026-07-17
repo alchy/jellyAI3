@@ -5,4 +5,4 @@
 {"name": "pozorovani", "turns": [{"u": "Venku je teplo.", "expect": ["Zapamatováno", "teplo"]}]}
 {"name": "jezis-affinity", "turns": [{"u": "Kde se narodil Jezis?", "kind": "answer", "expect": ["Betlém"]}]}
 {"name": "prsi-event", "turns": [{"u": "Venku prší.", "expect": ["Zapamatováno", "prší"]}, {"u": "Prší venku?", "kind": "answer", "expect": ["Ano"]}]}
-{"name": "jezis-overflow", "turns": [{"u": "Kdo je Ježíš?", "kind": "dialog", "expect": ["Ježíš"]}, {"u": "Ježíš", "kind": "answer", "expect": ["Boha"]}, {"u": "Co řekl Ježíš?", "kind": "dialog", "expect": ["více dat", "celník"]}, {"u": "celník", "kind": "answer", "expect": ["celník"]}]}
+{"name": "jezis-overflow", "turns": [{"u": "Kdo je Ježíš?", "kind": "dialog", "expect": ["Ježíš"]}, {"u": "Ježíš", "kind": "answer", "expect": ["Bůh"]}, {"u": "Co řekl Ježíš?", "kind": "dialog", "expect": ["více dat", "celník"]}, {"u": "celník", "kind": "answer", "expect": ["celník"]}]}

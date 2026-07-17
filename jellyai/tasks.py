@@ -63,6 +63,10 @@ def build_fact_graph(config):
     dropped_s = scrub_semantics(graph, noun_animacy_votes(annotations))
     print(f"Hygiena sémantiky: −{dropped_s} faktů "
           f"(osoba pod neživotným druhem, vztah bez protistrany)")
+    from jellyai.graph.hygiene import nominativize, propn_lemma_votes
+    renamed = nominativize(graph, propn_lemma_votes(annotations))
+    print(f"Nominativizace: {renamed} skloněných id → lemma "
+          f"(Betlémě→Betlém, Boha→Bůh)")
     from jellyai.graph.instance import resolve_instances
     merged = resolve_instances(graph)
     print(f"Instance: {merged} jmenných střepů srostlo (tvrzené aliasy), "

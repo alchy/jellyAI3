@@ -270,6 +270,61 @@ def test_clean_lemma_strips_glued_quotes():
     assert _clean_lemma("R.U.R.") == "R.U.R."
 
 
+def _lemma_votes(spec):
+    """Fake anotace pro hlasování lemmat: [(form, lemma), …] jako PROPN."""
+    from jellyai.graph.hygiene import propn_lemma_votes
+    sent = [{"form": f, "lemma": l, "upos": "PROPN"} for f, l in spec]
+    return propn_lemma_votes({("doc", 0): {"sentences": [sent]}})
+
+
+def test_nominativize_merges_inflected_id_into_lemma_node():
+    """„Betlémě" (geo) → „Betlém": skloněné id fragmentuje fakty — po
+    nominativizaci uzly splynou (součet vah), typ zůstává geo, starý
+    povrch je alias. Časový uzel se nedotýká (genitivní formát dat)."""
+    from jellyai.graph.hygiene import nominativize
+    g = FactGraph()
+    g.add_fact(make_fact("narodit", [Participant("subj", "Ježíš", "person"),
+                                     Participant("loc", "Betlémě", "geo")]))
+    g.add_fact(make_fact("ležet", [Participant("subj", "Betlém", "geo"),
+                                   Participant("loc", "Judsko", "geo")]))
+    g.add_fact(make_fact("stát", [Participant("subj", "Bůh", "person"),
+                                  Participant("time", "17. července 2026",
+                                              "time")]))
+    votes = _lemma_votes([("Betlémě", "Betlém")] * 2
+                         + [("července", "červenec")] * 3)
+    assert nominativize(g, votes) == 1
+    assert "Betlémě" not in g.nodes
+    assert g.nodes["Betlém"].type == "geo"
+    assert "17. července 2026" in g.nodes          # čas nedotčen
+    assert "Betlémě" in g.aliases.get("Betlém", [])
+    locs = {p.node for f in g.facts_of("Ježíš") for p in f.participants
+            if p.role == "loc"}
+    assert locs == {"Betlém"}
+
+
+def test_nominativize_capitalizes_lemma_and_respects_dominance():
+    """Lemma jména malými písmeny se kapitalizuje („Boha"→bůh→„Bůh",
+    „Válku"→„Válka" — jméno zůstává jménem); rozštěpené hlasy (homograf)
+    tvar nechají být; zmrzačené krátké lemma („Lea"→„Le") nesoudí."""
+    from jellyai.graph.hygiene import nominativize, propn_lemma_votes
+    g = FactGraph()
+    g.add_fact(make_fact("napsat", [Participant("subj", "Karel", "person"),
+                                    Participant("obj", "Válku", "dílo")]))
+    g.add_fact(make_fact("vidět", [Participant("subj", "Lea", "person"),
+                                   Participant("obj", "Boha", "person")]))
+    sent = [{"form": "Válku", "lemma": "válka", "upos": "PROPN"}] * 3 \
+        + [{"form": "Boha", "lemma": "bůh", "upos": "PROPN"}] * 3 \
+        + [{"form": "Lea", "lemma": "Le", "upos": "PROPN"}] * 3 \
+        + [{"form": "Karel", "lemma": "Karel", "upos": "PROPN"},
+           {"form": "Karel", "lemma": "Karla", "upos": "PROPN"}]
+    votes = propn_lemma_votes({("doc", 0): {"sentences": [sent]}})
+    assert nominativize(g, votes) == 2
+    assert "Válka" in g.nodes and g.nodes["Válka"].type == "dílo"
+    assert "Bůh" in g.nodes and g.nodes["Bůh"].type == "person"
+    assert "Lea" in g.nodes                        # krátké lemma nesoudí
+    assert "Karel" in g.nodes                      # homograf rozštěpen
+
+
 def test_scrub_drops_fact_left_without_partner():
     """Když po vyřazení účastníka zbude faktu jediný účastník, fakt padá
     (fakt bez protistrany nic nenese)."""

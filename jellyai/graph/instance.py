@@ -83,7 +83,11 @@ def resolve_instances(graph):
         for shard in sorted(persons):
             if shard == bearer or shard in node_map:
                 continue
-            if not all(_compatible(s, pool) for s in _stems(shard)):
+            shard_stems = _stems(shard)
+            if not shard_stems:
+                continue      # bezkmenné id („Le") je slučitelné vakuově —
+                #               nesmí pohltit svět (Ježíš→Le)
+            if not all(_compatible(s, pool) for s in shard_stems):
                 continue
             if len(anchor & _fingerprint(graph, shard)) \
                     < _MIN_CORROBORATION:

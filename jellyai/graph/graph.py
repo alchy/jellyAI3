@@ -460,13 +460,15 @@ def resolve_entities(graph):
     return graph
 
 
-def remap_nodes(graph, node_map):
+def remap_nodes(graph, node_map, force_person=True):
     """Přemapuje uzly faktů podle `node_map` (in-place, sdílená mechanika
-    kanonizace i instanční vrstvy). Členové mapy jsou osoby — typ se
-    VYNUTÍ person (koncept „Ježíš" nesmí po sloučení vnutit typ concept);
-    kolize identity faktů → součet vah; aliasy se zaznamenají.
+    kanonizace, instanční vrstvy i nominativizace). S `force_person` se
+    členům mapy VYNUTÍ typ person (koncept „Ježíš" nesmí po sloučení
+    vnutit typ concept); nominativizace typy NEmění (geo zůstává geo).
+    Kolize identity faktů → součet vah; aliasy se zaznamenají.
     """
-    person_ids = set(node_map) | set(node_map.values())
+    person_ids = (set(node_map) | set(node_map.values())) if force_person \
+        else set()
     remapped = {}
     for fact in graph.facts.values():
         moved = make_fact(fact.predicate,

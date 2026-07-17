@@ -1,12 +1,12 @@
 {"q": "Kdo napsal Babičku?", "expect_nodes": ["Božena Němcová", "Babička"], "k": 5}
 {"q": "Kdo byl bratr Karla Čapka?", "expect_nodes": ["Karel Antonín Čapek", "Josef Čapek"], "k": 5}
-{"q": "Kde se narodil Josef Čapek?", "expect_nodes": ["Josef Čapek", "Hronově"], "k": 5}
+{"q": "Kde se narodil Josef Čapek?", "expect_nodes": ["Josef Čapek", "Hronov"], "k": 5}
 {"q": "Kdy se narodila Božena Němcová?", "expect_nodes": ["Božena Němcová", "1818"], "k": 5}
 {"q": "Jakou hru napsal Karel Čapek?", "expect_nodes": ["Karel Antonín Čapek", "R.U.R."], "k": 5}
 {"q": "Co je robot?", "expect_nodes": ["robot", "stroj"], "k": 5}
 {"q": "Kdo je Karel Čapek?", "expect_nodes": ["Karel Antonín Čapek", "spisovatel"], "k": 5}
 {"q": "Kdo je jezis?", "expect_nodes": ["Ježíš"], "k": 5}
-{"q": "Kde se narodil Jezis?", "expect_nodes": ["Ježíš", "Betlémě"], "k": 5}
-{"q": "Kde se narodil bratr Karla Čapka?", "expect_nodes": ["Josef Čapek", "Hronově"], "k": 5}
+{"q": "Kde se narodil Jezis?", "expect_nodes": ["Ježíš", "Betlém"], "k": 5}
+{"q": "Kde se narodil bratr Karla Čapka?", "expect_nodes": ["Josef Čapek", "Hronov"], "k": 5}
 {"q": "Kdo byl bratr autora, který napsal R.U.R.?", "expect_nodes": ["Josef Čapek", "Karel Antonín Čapek", "R.U.R."], "k": 5}
 {"dialog": ["Co napsal Karel Čapek?", "Jakou hru napsal?"], "expect_nodes": ["Karel Antonín Čapek", "R.U.R."], "k": 5}
