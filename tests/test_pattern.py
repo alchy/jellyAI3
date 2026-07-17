@@ -147,3 +147,24 @@ def test_lowercase_entity_mistagged_as_adj_still_resolves():
     ]]})
     pat = question_pattern(q, client)
     assert pat.predicate == "být" and pat.known == [("subj", "jezis")]
+
+
+def test_pattern_json_roundtrip_nested():
+    from jellyai.answerer.pattern import (Pattern, SubQuery,
+                                          pattern_to_json, pattern_from_json)
+    pat = Pattern("bratr", [("obj", SubQuery("napsat", [("obj", "R.U.R.")],
+                                             "subj"))], "subj", "person")
+    data = pattern_to_json(pat)
+    assert data["predicate"] == "bratr" and data["hole"] == "subj"
+    assert data["known"][0][1]["subquery"]["predicate"] == "napsat"
+    back = pattern_from_json(data)
+    assert isinstance(back.known[0][1], SubQuery)
+    assert back.known[0][1].known == [("obj", "R.U.R.")]
+
+
+def test_pattern_from_json_accepts_flat_form():
+    from jellyai.answerer.pattern import pattern_from_json
+    pat = pattern_from_json({"predicate": "napsat",
+                             "known": [["obj", "R.U.R."]], "hole": "subj"})
+    assert pat.predicate == "napsat" and pat.hole_role == "subj"
+    assert pat.known == [("obj", "R.U.R.")]

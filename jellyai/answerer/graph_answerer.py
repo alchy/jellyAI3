@@ -281,6 +281,27 @@ class GraphAnswerer(Answerer):
                 return topic, values, fact
         return None, [], None
 
+    def run_pattern(self, pat):
+        """Vykoná pseudo-QL `Pattern` přímo (API `/graphql` — jazyk je
+        testovatelný bez parseru). Sémantika = jádro `_pattern_answer`:
+        rozřeš known → díra/existence; bez kontextových pater.
+
+        Returns:
+            tuple: (téma | None, list hodnot, fakt | None).
+        """
+        self.visited = []
+        known_set = set()
+        for _, known in pat.known:
+            node = self._solve(known, pat.predicate)
+            if node is None:
+                return None, [], None
+            known_set.add(node)
+        if not known_set:
+            return None, [], None
+        if pat.hole_role is None and pat.date_part is None:
+            return self._existence(pat.predicate, known_set)
+        return self._answer_from(pat, known_set)
+
     def _answer_from(self, pat, known_set):
         """Z množiny známých uzlů dořeší díru patternu (vč. 2-skokového drillu).
 
