@@ -19,6 +19,14 @@ _DATE_PARTS = {"rok", "měsíc", "den"}   # drill: „v kterém roce/měsíci…
 _MAX_ENUM = 5                           # strop výčtové odpovědi (čitelnost)
 
 
+def _loose(word):
+    """Nejvolnější porovnávací klíč: kmen → bez diakritiky → bez koncové
+    samohlásky (floor 2). „hru"≡„hra"≡„hr", „jezis"≡„Ježíš". Nejslabší patro
+    rozlišení — nikdy nepřebije přesnější shodu."""
+    s = deaccent(_stem(word))
+    return s[:-1] if len(s) > 2 and s[-1] in "aeiouy" else s
+
+
 def _synonym_ring(predicate):
     """(predikát, exact) + jeho synonyma z jazykových dat — „Kde žili?" najde
     bydlet-fakt; přesný predikát drží přednost bonusem."""
@@ -98,25 +106,38 @@ class GraphAnswerer(Answerer):
         Returns:
             str | None: Id uzlu tématu, nebo None když nic nesedí.
         """
-        terms = [t for t in topic_terms if t]
+        lang = current()
+        terms = [t for t in topic_terms
+                 if t and len(t) > 1
+                 and deaccent(t.lower()) not in lang["query_skip_words"]]
         low_terms = [t.lower() for t in terms]
         stems = [_stem(t) for t in terms]
         da_stems = [deaccent(s) for s in stems]   # bezdiakritický alias dotazu
+        loose = [_loose(t) for t in terms]
         best_id, best_score = None, None
-        candidates = []          # (id, stem_hits, váha) — homonymní vějíř
+        candidates = []   # (id, stem_hits, váha, loose klíč, afinita) — vějíř
         ring = _synonym_ring(predicate) if predicate else ()
         for node in self.graph.nodes.values():
             if node.type == "výrok":
                 continue                  # obsah řeči je hodnota, ne téma
             low_id = node.id.lower()
             low_words = low_id.split()
-            ins_hits = sum(1 for t in low_terms if t == low_id or t in low_words)
             node_stems = {_stem(w) for w in low_words}
-            stem_hits = sum(1 for s in stems if s in node_stems)
             da_node = {deaccent(s) for s in node_stems}
-            da_hits = sum(1 for s in da_stems if s in da_node)
-            if ins_hits == 0 and stem_hits == 0 and da_hits == 0:
+            loose_node = frozenset(_loose(w) for w in low_words)
+            per_term = [(t == low_id or t in low_words, s in node_stems,
+                         d in da_node, l in loose_node)
+                        for t, s, d, l in zip(low_terms, stems, da_stems, loose)]
+            # POKRYTÍ TERMŮ je primární patro: uzel trefený víc slovy dotazu
+            # (jakýmkoli patrem) přebije jediný povrchový hit („Karla Čapka"
+            # → „Karel Antonín Čapek", ne zbytkový uzel „Antonína Čapka")
+            coverage = sum(1 for hit in per_term if any(hit))
+            if coverage == 0:
                 continue
+            ins_hits = sum(1 for hit in per_term if hit[0])
+            stem_hits = sum(1 for hit in per_term if hit[1])
+            da_hits = sum(1 for hit in per_term if hit[2])
+            loose_hits = sum(1 for hit in per_term if hit[3])
             # přesná shoda velikosti má smysl jen u termů NESOUCÍCH velké
             # písmeno (lowercase lemma „vějíř" nerozliší pojem od titulu)
             exact_hits = sum(1 for t in terms
@@ -128,22 +149,35 @@ class GraphAnswerer(Answerer):
             # „Němec" s být-faktem jiné osoby)
             affinity = int(any(self.graph.facts_of(node.id, predicate=pred)
                                for pred, _ in ring))
-            # bezdiakritická shoda je nejslabší patro (pod kmenovou), aby
-            # „cestina" dosáhla na uzel, ale nikdy nepřebila přesnější shodu
-            score = (exact_hits, ins_hits, stem_hits, da_hits, affinity,
-                     len(low_words), node.weight)
-            candidates.append((node.id, stem_hits, node.weight))
+            # bezdiakritická a volná shoda jsou nejslabší patra (pod kmenovou),
+            # aby „cestina"/„hru" dosáhly na uzel a nikdy nepřebily přesnější;
+            # POKRYTÍ stojí i nad exact — skloněný povrchový uzel („Čapka")
+            # nesmí jedinou přesnou shodou přebít plnější jméno
+            score = (coverage, exact_hits, ins_hits, stem_hits, da_hits,
+                     loose_hits, affinity, len(low_words), node.weight)
+            candidates.append((node.id, stem_hits, node.weight,
+                               loose_node, affinity))
             if best_score is None or score > best_score:
                 best_id, best_score = node.id, score
+        if best_id is not None and ring:
+            # CLUSTER-AFINITA: varianty TÉHOŽ jména (stejný volný klíč) arbitruje
+            # predikát — zbytkový skloněný uzel („Babičku", exact hit) nepřebije
+            # variantu s faktem otázky („Babička" s napsat); cizí jména nemění
+            best = next(c for c in candidates if c[0] == best_id)
+            if not best[4]:
+                same = [c for c in candidates
+                        if c[3] == best[3] and c[4] and c[0] != best_id]
+                if same:
+                    best_id = max(same, key=lambda c: c[2])[0]
         if best_id is not None:
             # nejednoznačné jméno rozsvítí VŠECHNY kandidáty se stejnou
             # kmenovou shodou (homonymní vějíř „Marie" → i biblická Maria) —
             # attention nese nejistotu rozřešení, vítěz svítí nejvíc
-            top_stem = best_score[2]
+            top_stem = best_score[3]
             fan = sorted((c for c in candidates
                           if c[0] != best_id and c[1] == top_stem and c[1] > 0),
                          key=lambda c: -c[2])[:5]
-            for node_id, _, _ in fan:
+            for node_id, _, _, _, _ in fan:
                 self.context.warm(node_id, 0.3)
         return best_id
 
