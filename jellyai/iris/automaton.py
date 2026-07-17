@@ -32,7 +32,8 @@ from jellyai.graph.graph import parse_date
 from jellyai.iris.assurance import assurance
 from jellyai.iris.subsystems.chronos import (TimeInterval, clock_answer,
                                              format_due, resolve_due,
-                                             resolve_temporal)
+                                             resolve_temporal,
+                                             resolve_weekday)
 from jellyai.iris.subsystems.mnemos import parse_statement, persist, remember, replay
 from jellyai.iris.patterns import PatternDeck
 from jellyai.iris.presenter import activation_window, docs_window
@@ -174,6 +175,9 @@ class IrisAutomaton:
                         return self._set_reminder(pending["task"], due, text,
                                                   record=pending)
                     return self._set_reminder(pending, due, text)
+            managed = self._plan_manage(text)
+            if managed is not None:
+                return managed
             low = deaccent(text.lower())
             phrase = next((p for p in current()["reminder_phrases"]
                            if p in low), None)
@@ -333,6 +337,113 @@ class IrisAutomaton:
             return None
         self._note_card(card.name)
         message = card.dialog.format(tasks="\n".join(tasks))
+        response = IrisResponse(
+            text=message, kind="answer", assurance=1.0,
+            activation_window=activation_window(self.answerer),
+            docs_window=docs_window(self.answerer),
+            used={"components": ["chronos"], "patterns": [card.name]})
+        self.state.remember(text, response)
+        return response
+
+    def _plan_manage(self, text):  # pylint: disable=too-many-locals,too-many-branches
+        """SPRÁVA PLÁNU dialogem: „zruš všechno na zítra", „posuň všechny
+        ze zítra na čtvrtek", „přeplánuj to ze 17 na 20".
+
+        Mechanismus: ZDROJ vybírá interval (ze zítra), hodina (ze 17) nebo
+        shoda textu úkolu; bez selektoru je nutné slovo typu „všechno".
+        CÍL posunu je den v týdnu (drží se čas dne záznamu), hodina, nebo
+        plný termín. Slova nesou tabulky plan_cancel/move/all_words,
+        texty karty reminder.cancel/move/manage-miss.
+
+        Returns:
+            IrisResponse | None: Potvrzení/miss, nebo None (není správa).
+        """
+        lang = current()
+        low = deaccent(text.lower())
+        tokens = [t.rstrip(".") or "." for t in re.findall(r"[\w:.]+", low)]
+        cancel = any(t in lang["plan_cancel_words"] for t in tokens)
+        move = any(t in lang["plan_move_words"] for t in tokens)
+        if not (cancel or move):
+            return None
+        now = self.clock()
+        source_text = low.split(" na ")[0] if move and " na " in low else low
+        interval = resolve_temporal(source_text, now)
+        hour_match = re.search(r"\bze? (\d{1,2})\b", source_text)
+        src_hour = int(hour_match.group(1)) if hour_match else None
+        take_all = any(t in lang["plan_all_words"] for t in tokens)
+        skip = (lang["plan_cancel_words"] | lang["plan_move_words"]
+                | lang["plan_all_words"] | lang["query_skip_words"])
+        content = [t for t in tokens
+                   if t not in skip and not t.replace(":", "").isdigit()
+                   and t not in lang["temporal"].get("day_words", {})
+                   and t not in lang["temporal"].get("weekday_forms", {})
+                   and t not in lang["temporal"].get("units", {})]
+
+        def selected(record):
+            due = datetime.fromisoformat(record["due"])
+            if interval is not None and not interval.contains(due):
+                return False
+            if src_hour is not None and due.hour != src_hour:
+                return False
+            if interval is None and src_hour is None and not take_all:
+                task = deaccent(record["task"].lower())
+                return any(w in task for w in content)
+            return True
+
+        with self._reminder_lock:
+            targets = [r for r in self.reminders if selected(r)]
+        if not targets:
+            card = self.deck.best("reminder.manage-miss", {})
+            if card is None:
+                return None
+            return self._plan_response(card, card.dialog, text)
+        if cancel:
+            with self._reminder_lock:
+                self.reminders = [r for r in self.reminders
+                                  if r not in targets]
+                self._save_reminders()
+            card = self.deck.best(
+                "reminder.cancel", {"candidates": [r["task"] for r in targets]})
+            if card is None:
+                return None
+            tasks = ", ".join(r["task"] for r in targets)
+            return self._plan_response(card, card.dialog.format(tasks=tasks),
+                                       text)
+        target_text = low.split(" na ", 1)[1] if " na " in low else low
+        day = resolve_weekday(target_text, now)
+        hour_target = next((int(t.rstrip("."))
+                            for t in re.findall(r"[\w:.]+", target_text)
+                            if t.rstrip(".").isdigit()
+                            and int(t.rstrip(".")) < 24), None)
+        with self._reminder_lock:
+            for record in targets:
+                due = datetime.fromisoformat(record["due"])
+                if day is not None:        # den v týdnu — čas dne se drží
+                    due = day.replace(hour=due.hour, minute=due.minute)
+                elif hour_target is not None:
+                    due = due.replace(hour=hour_target, minute=0)
+                    if due <= now:
+                        due += timedelta(days=1)
+                else:
+                    resolved = resolve_due(target_text, now)
+                    if resolved is None:
+                        return None
+                    due = resolved
+                record["due"] = due.isoformat()
+            self.reminders.sort(key=lambda item: item["due"])
+            self._save_reminders()
+        card = self.deck.best(
+            "reminder.move", {"candidates": [r["task"] for r in targets]})
+        if card is None:
+            return None
+        tasks = ", ".join(
+            f"{format_due(datetime.fromisoformat(r['due']), now)} — "
+            f"{r['task']}" for r in targets)
+        return self._plan_response(card, card.dialog.format(tasks=tasks), text)
+
+    def _plan_response(self, card, message, text):
+        """Odpověď správy plánu (potvrzení/miss) + telemetrie karty."""
+        self._note_card(card.name)
         response = IrisResponse(
             text=message, kind="answer", assurance=1.0,
             activation_window=activation_window(self.answerer),

@@ -155,7 +155,9 @@ def resolve_temporal(text, now):  # pylint: disable=too-many-branches,too-many-r
     lang = current()["temporal"]
     if not lang:
         return None
-    tokens = [deaccent(t.lower()) for t in re.findall(r"[\w.]+", text)]
+    # koncová větná tečka nesmí zamaskovat slovo („zítra." ≠ „zítra")
+    tokens = [deaccent(t.lower()).rstrip(".") or "."
+              for t in re.findall(r"[\w.]+", text)]
     units = lang.get("units", {})
     numerals = lang.get("numerals", {})
 
@@ -273,7 +275,8 @@ def resolve_due(text, now):  # pylint: disable=too-many-branches,too-many-locals
     lang = current()["temporal"]
     if not lang:
         return None
-    tokens = [deaccent(t.lower()) for t in re.findall(r"[\w:.]+", text)]
+    tokens = [deaccent(t.lower()).rstrip(".") or "."
+              for t in re.findall(r"[\w:.]+", text)]
     units = lang.get("units", {})
     numerals = lang.get("numerals", {})
     due = None
@@ -385,6 +388,21 @@ def resolve_due(text, now):  # pylint: disable=too-many-branches,too-many-locals
         due = _shift(due, unit, -count)
         break
     return due
+
+
+def resolve_weekday(text, now):
+    """„na čtvrtek" → datum nejbližšího BUDOUCÍHO takového dne (00:00).
+
+    Jména dnů (i akuzativy) nese tabulka `weekday_forms`; týž den příští
+    týden (dnes je čtvrtek → za 7 dní).
+    """
+    forms = current()["temporal"].get("weekday_forms", {})
+    for tok in (deaccent(t.lower()).rstrip(".")
+                for t in re.findall(r"[\w:.]+", text)):
+        if tok in forms:
+            ahead = (forms[tok] - now.weekday()) % 7 or 7
+            return _floor(now, "day") + timedelta(days=ahead)
+    return None
 
 
 def format_due(due, now):

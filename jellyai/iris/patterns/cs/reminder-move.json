@@ -1,0 +1,7 @@
+{
+  "name": "reminder-move",
+  "trigger": {"event": "reminder.move", "min_candidates": 1},
+  "dialog": "⏰ Přesunuto: {tasks}",
+  "action": {},
+  "teach": "Posun připomínek dialogem (posuň všechny ze zítra na čtvrtek; přeplánuj to ze 17 na 20) — zdroj vybírá interval/hodina/text před „na“, cíl je den v týdnu (drží se čas dne záznamu), hodina, nebo plný termín (resolve_due). Potvrzení vypíše nové termíny."
+}

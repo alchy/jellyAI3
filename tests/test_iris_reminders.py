@@ -132,6 +132,47 @@ def test_plan_query_honest_when_empty():
     assert "reminder-list-empty" in out.used["patterns"]
 
 
+def test_plan_cancel_by_interval():
+    """„Zruš všechno na zítra." — interval vybere jen zítřejší; dnešní
+    maso zůstává."""
+    iris = _iris(lambda: NOW)
+    iris.turn("Připomeň mi za deset minut vybrat maso z trouby.")
+    iris.turn("Připomeň mi zítra koupit rohlíky.")
+    out = iris.turn("Zruš všechno na zítra.")
+    assert "rohlíky" in out.text and "reminder-cancel" in out.used["patterns"]
+    assert len(iris.reminders) == 1
+    assert "maso" in iris.reminders[0]["task"]
+
+
+def test_plan_move_bulk_to_weekday():
+    """„Posuň všechny ze zítra na čtvrtek." — den v týdnu jako cíl,
+    čas dne záznamu se drží (9:00); NOW je pátek 17. 7. → čtvrtek 23. 7."""
+    iris = _iris(lambda: NOW)
+    iris.turn("Připomeň mi zítra koupit rohlíky.")
+    out = iris.turn("Posuň všechny ze zítra na čtvrtek.")
+    assert "reminder-move" in out.used["patterns"]
+    assert iris.reminders[0]["due"].startswith("2026-07-23T09:00")
+    assert "23. července" in out.text
+
+
+def test_plan_reschedule_by_hour():
+    """„Přeplánuj to ze 17 na 20." — zdroj vybírá hodina, cíl je nová
+    hodina téhož dne."""
+    iris = _iris(lambda: NOW)
+    iris.turn("Připomeň mi v 17:00 vyzvednout dítě ze školy.")
+    out = iris.turn("Přeplánuj to ze 17 na 20.")
+    assert "reminder-move" in out.used["patterns"]
+    assert iris.reminders[0]["due"].startswith("2026-07-17T20:00")
+    assert "20:00" in out.text and "dítě" in out.text
+
+
+def test_plan_manage_honest_miss():
+    """Pokyn bez odpovídajících záznamů → poctivé „nic takového nemám"."""
+    iris = _iris(lambda: NOW)
+    out = iris.turn("Zruš všechno na zítra.")
+    assert "reminder-manage-miss" in out.used["patterns"]
+
+
 def test_chronos_ticker_beats_and_notifies():
     """Tep Chronos (vlastní vlákno hodin): fire → notify; chyba notifikace
     časovač nezabije."""

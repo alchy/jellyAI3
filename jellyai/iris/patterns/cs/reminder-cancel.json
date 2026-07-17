@@ -1,0 +1,7 @@
+{
+  "name": "reminder-cancel",
+  "trigger": {"event": "reminder.cancel", "min_candidates": 1},
+  "dialog": "🗑️ Zrušeno: {tasks}",
+  "action": {},
+  "teach": "Zrušení připomínek dialogem (zruš všechno na zítra) — cíle vybírá interval otázky (na zítra), hodina (ze 17) nebo shoda textu úkolu; bez selektoru je nutné slovo typu všechno. Zrušené záznamy mizí ze skladu (krátkodobá paměť)."
+}

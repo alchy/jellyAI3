@@ -81,6 +81,8 @@ def load_rules(language="cs"):
         rules["reminder_phrases"] = tuple(rules.get("reminder_phrases", ()))
         rules["plan_query_phrases"] = tuple(
             rules.get("plan_query_phrases", ()))
+        for key in ("plan_cancel_words", "plan_move_words", "plan_all_words"):
+            rules[key] = frozenset(rules.get(key, ()))
         rules["reminder_strip"] = frozenset(rules.get("reminder_strip", ()))
         _cache[path] = rules
     return _cache[path]

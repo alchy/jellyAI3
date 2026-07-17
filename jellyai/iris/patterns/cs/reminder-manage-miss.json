@@ -1,0 +1,7 @@
+{
+  "name": "reminder-manage-miss",
+  "trigger": {"event": "reminder.manage-miss"},
+  "dialog": "V plánu nic takového nemám.",
+  "action": {},
+  "teach": "Pokyn ke správě plánu (zruš/posuň/přeplánuj), kterému neodpovídá žádný záznam skladu — poctivá odpověď místo tichého nic."
+}
