@@ -186,6 +186,26 @@ def test_predicate_synonym_from_language_table():
     assert q.pattern.hole_role == "loc"
 
 
+def test_diacritic_free_identity():
+    q = build_query("Kdo je jezis?", set(), _nodes("jezis"))
+    assert q.pattern.predicate == "být"
+    assert ("subj", "jezis") in q.pattern.known
+
+
+def test_diacritic_free_verb_and_entity():
+    q = build_query("Kde se narodil Jezis?", {"narodit"}, _nodes("Jezis"))
+    assert q.pattern.predicate == "narodit" and q.pattern.hole_role == "loc"
+    assert ("subj", "Jezis") in q.pattern.known
+
+
+def test_diacritic_free_nested_subquery():
+    is_node = _nodes("autora", "R.U.R.")
+    q = build_query("Kdo byl bratr autora, ktery napsal R.U.R.?",
+                    {"bratr", "napsat"}, is_node)
+    sub = next(k for _, k in q.pattern.known if isinstance(k, SubQuery))
+    assert sub.predicate == "napsat" and ("obj", "R.U.R.") in sub.known
+
+
 def test_query_gender_from_verb_form():
     q = build_query("Kdy se narodila Božena Němcová?", {"narodit"})
     assert q.gender == "Fem" and q.qtype == "Kdy"
