@@ -96,5 +96,5 @@ def test_person_rows_carry_morphology():
     resolve_entities(g)
     rows = dict(node_detail_rows(g, "Božena Němcová"))
     assert rows["rod (tvar jména)"] == "ženský"
-    assert rows["kmen"] == "božn němc"
+    assert rows["kmen"] == "božn nemc"
     assert "Boženy Němcové" in rows["sloučené tvary"]

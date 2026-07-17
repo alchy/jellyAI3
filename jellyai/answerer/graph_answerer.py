@@ -12,7 +12,7 @@ from jellyai.answerer.question import analyze_question
 from jellyai.answerer.pattern import question_pattern, SubQuery
 from jellyai.answerer.template import _to_nominative
 from jellyai.graph.activation import ActivationField
-from jellyai.graph.canon import _stem, name_gender
+from jellyai.graph.canon import _stem, name_gender, deaccent
 
 _DATE_PARTS = {"rok", "měsíc", "den"}   # drill: „v kterém roce/měsíci…"
 _MAX_ENUM = 5                           # strop výčtové odpovědi (čitelnost)
@@ -91,7 +91,9 @@ class GraphAnswerer(Answerer):
         terms = [t for t in topic_terms if t]
         low_terms = [t.lower() for t in terms]
         stems = [_stem(t) for t in terms]
+        da_stems = [deaccent(s) for s in stems]   # bezdiakritický alias dotazu
         best_id, best_score = None, None
+        candidates = []          # (id, stem_hits, váha) — homonymní vějíř
         ring = _synonym_ring(predicate) if predicate else ()
         for node in self.graph.nodes.values():
             if node.type == "výrok":
@@ -101,7 +103,9 @@ class GraphAnswerer(Answerer):
             ins_hits = sum(1 for t in low_terms if t == low_id or t in low_words)
             node_stems = {_stem(w) for w in low_words}
             stem_hits = sum(1 for s in stems if s in node_stems)
-            if ins_hits == 0 and stem_hits == 0:
+            da_node = {deaccent(s) for s in node_stems}
+            da_hits = sum(1 for s in da_stems if s in da_node)
+            if ins_hits == 0 and stem_hits == 0 and da_hits == 0:
                 continue
             # přesná shoda velikosti má smysl jen u termů NESOUCÍCH velké
             # písmeno (lowercase lemma „vějíř" nerozliší pojem od titulu)
@@ -114,10 +118,23 @@ class GraphAnswerer(Answerer):
             # „Němec" s být-faktem jiné osoby)
             affinity = int(any(self.graph.facts_of(node.id, predicate=pred)
                                for pred, _ in ring))
-            score = (exact_hits, ins_hits, stem_hits, affinity,
+            # bezdiakritická shoda je nejslabší patro (pod kmenovou), aby
+            # „cestina" dosáhla na uzel, ale nikdy nepřebila přesnější shodu
+            score = (exact_hits, ins_hits, stem_hits, da_hits, affinity,
                      len(low_words), node.weight)
+            candidates.append((node.id, stem_hits, node.weight))
             if best_score is None or score > best_score:
                 best_id, best_score = node.id, score
+        if best_id is not None:
+            # nejednoznačné jméno rozsvítí VŠECHNY kandidáty se stejnou
+            # kmenovou shodou (homonymní vějíř „Marie" → i biblická Maria) —
+            # attention nese nejistotu rozřešení, vítěz svítí nejvíc
+            top_stem = best_score[2]
+            fan = sorted((c for c in candidates
+                          if c[0] != best_id and c[1] == top_stem and c[1] > 0),
+                         key=lambda c: -c[2])[:5]
+            for node_id, _, _ in fan:
+                self.context.warm(node_id, 0.3)
         return best_id
 
     def _context_candidates(self):
@@ -165,10 +182,11 @@ class GraphAnswerer(Answerer):
                     return topic, values, fact
             if pat.predicate in current()["generic_event_verbs"] \
                     and "rok" not in parse_date(question):
-                # „Co se stalo s X?" — lehké sloveso: odpověď je DĚJ tématu.
-                # Otázky s datem nechává reverznímu lookupu (přesné párování
-                # složek data > fuzzy rozřešení termínu „května")
-                topic, values, fact = self._event_answer(known_set)
+                # „Co se stalo s X?" = děje tématu (hloubka 1); „Co víme o X?"
+                # (vědět) = okolní agregace do hloubky 2 (pseudo-n-gramy).
+                # Otázky s datem nechává reverznímu lookupu (přesné párování).
+                depth = 2 if pat.predicate == "vědět" else 1
+                topic, values, fact = self._event_answer(known_set, depth)
                 if values:
                     return topic, values, fact
             if qa.qtype is None and pat.hole_role is None:
@@ -361,26 +379,45 @@ class GraphAnswerer(Answerer):
                 return candidate
         return None
 
-    def _event_answer(self, known_set):
-        """Nejsilnější UDÁLOST tématu (váha + aktivace účastníků) jako děj —
-        slovesné fakty; identita (být) a asociace (kontext) děj nejsou.
+    def _event_answer(self, known_set, depth=1):
+        """Salientní DĚJE z OKOLÍ tématu do `depth` skoků (pseudo-n-gramy
+        aktivace): bounded BFS po faktech, ranking váha × decay^hloubka.
+        Hloubka 1 = přímé fakty („Co se stalo s X?"); hloubka 2 = i sousedé
+        („Co víme o X?" — Maria → Ježíš → pokřtěn). Identita/asociace nejsou děj.
 
         Returns:
-            tuple: (téma | None, [děj sloveso-první] | [], fakt | None).
+            tuple: (téma | None, [děje sloveso-první] | [], nejlepší fakt | None).
         """
         node0 = next(iter(known_set))
-        best = None
-        for fact in self.graph.facts_of(node0):
-            if fact.predicate in ("být", "druh", "kontext"):
-                continue
-            score = fact.weight + sum(self.context.scores.get(p.node, 0.0)
-                                      for p in fact.participants)
-            if best is None or score > best[0]:  # pylint: disable=unsubscriptable-object
-                best = (score, fact)
-        if best is None:
+        seen_nodes, seen_facts, scored = {node0}, set(), []
+        frontier = [(node0, 0)]
+        while frontier:
+            node, dist = frontier.pop(0)
+            for fact in self.graph.facts_of(node):
+                if fact.predicate in ("být", "druh", "kontext"):
+                    continue
+                if fact.id not in seen_facts:
+                    seen_facts.add(fact.id)
+                    weight = fact.weight * (0.4 ** dist)
+                    # aktivace VŠECH účastníků faktu disambiguuje sdílený uzel
+                    # („rodina" Bible × Boženy): v navazujícím tahu vyhraje
+                    # fakt, jehož okolí svítí z minulé odpovědi
+                    warmth = sum(self.context.scores.get(p.node, 0.0)
+                                 for p in fact.participants)
+                    scored.append((weight + 3.0 * warmth, dist, fact))
+                if dist < depth:
+                    for p in fact.participants:
+                        if p.node not in seen_nodes and p.type == "person":
+                            seen_nodes.add(p.node)
+                            frontier.append((p.node, dist + 1))
+        if not scored:
             return None, [], None
-        self.visited.extend(p.node for p in best[1].participants)
-        return node0, [_event_text(best[1])], best[1]
+        scored.sort(key=lambda t: (t[1], -t[0]))   # blízké a silné první
+        best_fact = scored[0][2]
+        self.visited.extend(p.node for p in best_fact.participants)
+        values = list(dict.fromkeys(_event_text(f, (node0,))
+                                    for _, _, f in scored))[:_MAX_ENUM]
+        return node0, values, best_fact
 
     def _existence(self, predicate, known_set):
         """Zjišťovací (ano/ne) otázka: existuje fakt s predikátem a všemi

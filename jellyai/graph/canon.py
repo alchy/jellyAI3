@@ -18,6 +18,8 @@ mění konec slova, kmen drží. Pravidla kmenování jsou **data jazyka**
 Souvisí s [[jellyai3-fact-graph]] (řeší tříštění entit — agentem označený #1 dopad).
 """
 
+import unicodedata
+
 from collections import Counter
 
 from jellyai.lang import current
@@ -38,12 +40,24 @@ def _stem(word):
         if low.endswith(suffix) and len(low) - len(suffix) >= rules["min_stem"]:
             low = low[:-len(suffix)]
             break
+    # fold délky samohlásek PŘED epentezí: „magdalén"≡„magdalen", aby pak obojí
+    # epentezovalo stejně (souhlásky drží identitu jména)
+    fold = rules["vowel_fold"]
+    low = "".join(fold.get(ch, ch) for ch in low)
     # epenteze: koncová „samohláska+souhláska" → jen souhláska (karel→karl)
     vowel = rules["epenthesis_vowel"]
     if vowel and len(low) >= max(rules["min_stem"], 2) \
             and low[-2] == vowel and low[-1] not in rules["vowels"]:
         low = low[:-2] + low[-1]
     return low
+
+
+def deaccent(text):
+    """Fold do „češtiny bez diakritiky": ž→z, š→s, č→c, ří→ri, é→e… Univerzální
+    (NFKD, ne jazyková data) — pro bezdiakritické DOTAZY na query-straně. Buildu
+    se netýká (klastrování zůstává diakritické, aby se nepřeslučovalo)."""
+    return "".join(ch for ch in unicodedata.normalize("NFKD", text.lower())
+                   if not unicodedata.combining(ch))
 
 
 def name_gender(name):

@@ -252,3 +252,46 @@ def test_activation_spreads_to_graph_neighbors():
     a.answer(q, [])
     assert a.context.scores.get("Ježíš", 0) > 0
     assert a.context.scores["Maria"] > a.context.scores["Ježíš"]
+
+
+def test_ambiguous_name_lights_all_candidates():
+    """„Kdo je Marie?" — vítěz odpovídá, ale attention rozsvítí i homonymní
+    kandidáty (biblická Maria), slaběji: nejistota rozřešení je vidět."""
+    g = FactGraph()
+    g.add_fact(make_fact("druh", [Participant("subj", "Marie Magdalena Novotná", "person"),
+                                  Participant("pred", "babička", "concept")]))
+    g.add_fact(make_fact("druh", [Participant("subj", "Maria", "person"),
+                                  Participant("pred", "matka", "concept")]))
+    q = "Kdo je Marie?"
+    client = FakeUfalClient(parse={q: [[
+        {"form": "Kdo", "lemma": "kdo", "upos": "PRON", "head": 3, "deprel": "nsubj"},
+        {"form": "je", "lemma": "být", "upos": "AUX", "head": 3, "deprel": "cop"},
+        {"form": "Marie", "lemma": "Marie", "upos": "PROPN", "head": 0, "deprel": "root"},
+    ]]})
+    a = GraphAnswerer(g, client, ExtractiveAnswerer(AnswererConfig()))
+    a.answer(q, [])
+    assert a.context.scores.get("Maria", 0) > 0
+    assert a.context.scores["Marie Magdalena Novotná"] > a.context.scores["Maria"]
+
+
+def test_knowledge_query_aggregates_neighborhood():
+    """„Co víme o X?" agreguje fakty z OKOLÍ tématu do hloubky (pseudo-n-gramy
+    aktivace) — ne jen jeden fakt, ale více salientních dějů sousedů."""
+    g = FactGraph()
+    g.add_fact(make_fact("porodit", [Participant("subj", "Maria", "person"),
+                                     Participant("obj", "Ježíš", "person")]))
+    g.add_fact(make_fact("pokřtít", [Participant("subj", "Jan", "person"),
+                                     Participant("obj", "Ježíš", "person")]))
+    g.add_fact(make_fact("učit", [Participant("subj", "Ježíš", "person"),
+                                  Participant("obj", "zástup", "concept")]))
+    q = "Co víme o Marii?"
+    client = FakeUfalClient(parse={q: [[
+        {"form": "Co", "lemma": "co", "upos": "PRON", "head": 3, "deprel": "obj"},
+        {"form": "víme", "lemma": "vědět", "upos": "VERB", "head": 0, "deprel": "root"},
+        {"form": "o", "lemma": "o", "upos": "ADP", "head": 4, "deprel": "case"},
+        {"form": "Marii", "lemma": "Maria", "upos": "PROPN", "head": 2, "deprel": "obl"},
+    ]]})
+    a = GraphAnswerer(g, client, ExtractiveAnswerer(AnswererConfig()))
+    text = a.answer(q, []).text
+    assert "porodit" in text                 # přímý fakt Marie
+    assert "pokřtít" in text or "učit" in text   # soused Ježíš (hloubka 2)

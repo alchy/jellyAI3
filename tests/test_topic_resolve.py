@@ -57,3 +57,21 @@ def test_exact_case_still_distinguishes_book_from_common():
     ]]})
     a = GraphAnswerer(g, client, ExtractiveAnswerer(AnswererConfig()))
     assert a.answer(q, []).text == "Božena Němcová"    # přesná shoda „Babička" > častá „babička"
+
+
+def test_diacritic_insensitive_resolution():
+    """Dotaz „cestinou" bez diakritiky se přes fold trefí do uzlu s diakritikou
+    („Jezis"→„Ježíš", „capek"→„Čapek") — nese kontext přes aktivaci."""
+    g = FactGraph()
+    g.add_fact(make_fact("být", [Participant("subj", "Ježíš", "person"),
+                                 Participant("pred", "prorok", "concept")]))
+    g.add_fact(make_fact("napsat", [Participant("subj", "Karel Čapek", "person"),
+                                    Participant("obj", "R.U.R.", "dílo")]))
+    q = "Kdo je Jezis?"
+    client = FakeUfalClient(parse={q: [[
+        {"form": "Kdo", "lemma": "kdo", "upos": "PRON", "head": 3, "deprel": "nsubj"},
+        {"form": "je", "lemma": "být", "upos": "AUX", "head": 3, "deprel": "cop"},
+        {"form": "Jezis", "lemma": "Jezis", "upos": "PROPN", "head": 0, "deprel": "root"},
+    ]]})
+    a = GraphAnswerer(g, client, ExtractiveAnswerer(AnswererConfig()))
+    assert a.answer(q, []).text == "prorok"

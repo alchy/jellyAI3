@@ -44,3 +44,11 @@ def test_deterministic_tie_break():
     """Při shodné četnosti je kanonické id v clusteru deterministické."""
     canon = build_entity_canon({"Praha": 1, "Prahy": 1})   # stejný cluster „prah"
     assert canon["Praha"] == canon["Prahy"]     # jeden reprezentant pro obě
+
+
+def test_feminine_surname_and_vowel_length_merge():
+    """Tři varianty téhož jména (miss-artefakt z Písma): ženské „-á" i délka
+    samohlásky v kmeni se srovnají → jeden cluster."""
+    k = cluster_key("Marie Magdalena Novotná")
+    assert cluster_key("Marie Magdaleny Novotné") == k
+    assert cluster_key("Marie Magdaléna Novotná") == k
