@@ -10,3 +10,4 @@ data/annotations.pkl
 model/udpipe*
 *.egg-info/
 .pytest_cache/
+data/reminders.jsonl
