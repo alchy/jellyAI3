@@ -1,0 +1,8 @@
+{
+  "name": "focus-offer-homonym",
+  "trigger": {"event": "resolve.ambiguous", "min_candidates": 2,
+              "assurance_below": 0.5, "priority": 10},
+  "dialog": "Mám možnost se věnovat tématu: {candidates} — kam mám zaostřit?",
+  "action": {"warm_candidates": 0.5, "await": "user-pick"},
+  "teach": "Více rovnocenných kandidátů jména (Kdo je Čapek? → Karel i Josef) a nízká jistota zaostření: místo tichého rozhodnutí vahou automat nabídne témata a rozsvítí kandidáty — volba uživatele pak zaostří aktivační pole."
+}

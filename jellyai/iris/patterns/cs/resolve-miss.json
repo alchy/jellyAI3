@@ -1,0 +1,7 @@
+{
+  "name": "resolve-miss",
+  "trigger": {"event": "resolve.miss", "min_candidates": 1, "priority": 5},
+  "dialog": "V dokumentech jsem „{term}\" nenašel. Nejblíž je: {candidates} — mám zaostřit tam?",
+  "action": {"warm_candidates": 0.3, "await": "user-pick"},
+  "teach": "Dotaz míří na něco, co graf přesně nezná, ale existují blízcí kandidáti (kmenová/bezdiakritická shoda): automat poctivě řekne, že nenašel, a nabídne nejbližší uzly k zaostření."
+}
