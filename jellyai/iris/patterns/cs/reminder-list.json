@@ -1,0 +1,7 @@
+{
+  "name": "reminder-list",
+  "trigger": {"event": "reminder.list", "min_candidates": 1},
+  "dialog": "⏰ Naplánováno:\n{tasks}",
+  "action": {},
+  "teach": "Dotaz na plán (Mám nějaké naplánované úkoly? Nezapomněl jsem na něco? Mám něco zítra udělat?) — Iris předá aktivaci Chronosu: vypíší se čekající připomínky ze skladu, zúžené časovým primitivem otázky (zítra, dnes večer). Fráze nese jazyková tabulka plan_query_phrases."
+}

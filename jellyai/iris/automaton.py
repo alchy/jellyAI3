@@ -30,8 +30,9 @@ from datetime import datetime, timedelta
 from jellyai.graph.canon import deaccent
 from jellyai.graph.graph import parse_date
 from jellyai.iris.assurance import assurance
-from jellyai.iris.subsystems.chronos import (clock_answer, format_due, resolve_due,
-                                  resolve_temporal)
+from jellyai.iris.subsystems.chronos import (TimeInterval, clock_answer,
+                                             format_due, resolve_due,
+                                             resolve_temporal)
 from jellyai.iris.subsystems.mnemos import parse_statement, persist, remember, replay
 from jellyai.iris.patterns import PatternDeck
 from jellyai.iris.presenter import activation_window, docs_window
@@ -198,6 +199,11 @@ class IrisAutomaton:
                     statement["objects"] = rest
             if statement is not None:
                 return self._memorize(text, statement)
+        # DOTAZ NA PLÁN („Mám nějaké naplánované úkoly?") — aktivace jde
+        # Chronosu: čekající připomínky, zúžené intervalem otázky
+        plans = self._plan_query(text)
+        if plans is not None:
+            return plans
         # ČASOVÁ OSA ZAOSTŘENÍ: primitivum v otázce („tento měsíc", „včera")
         # rozsvítí časové uzly grafu ležící v intervalu JEŠTĚ PŘED odpovědí —
         # ranking answereru pak remízy řadí i podle této aktivace
@@ -291,6 +297,49 @@ class IrisAutomaton:
                 self._note_card(card.name)
         return [card.dialog.format(task=item["task"]) if card
                 else item["task"] for item in due]
+
+    def _plan_query(self, text):
+        """Dotaz na PLÁN („Mám nějaké naplánované úkoly?", „Nezapomněl jsem
+        na něco?") — Iris předá aktivaci Chronosu: vypíší se čekající
+        připomínky ze skladu, zúžené časovým primitivem otázky („zítra",
+        „dnes večer" — denní část posouvá začátek intervalu). Fráze nese
+        tabulka `plan_query_phrases`, texty karty `reminder.list`.
+
+        Returns:
+            IrisResponse | None: Výpis plánu, nebo None (není dotaz na plán).
+        """
+        low = deaccent(text.lower())
+        if not any(p in low for p in current()["plan_query_phrases"]):
+            return None
+        now = self.clock()
+        interval = resolve_temporal(text, now)
+        day_parts = current()["temporal"].get("day_parts", {})
+        part = next((day_parts[t] for t in re.findall(r"[\w:.]+", low)
+                     if t in day_parts), None)
+        if interval is not None and part is not None:
+            hour, minute = (int(x) for x in part.split(":"))
+            start = interval.start.replace(hour=hour, minute=minute)
+            interval = TimeInterval(start, interval.end,
+                                    interval.granularity)
+        with self._reminder_lock:
+            pending = [dict(item) for item in self.reminders]
+        if interval is not None:
+            pending = [r for r in pending
+                       if interval.contains(datetime.fromisoformat(r["due"]))]
+        tasks = [f"{format_due(datetime.fromisoformat(r['due']), now)} — "
+                 f"{r['task']}" for r in pending]
+        card = self.deck.best("reminder.list", {"candidates": tasks})
+        if card is None:
+            return None
+        self._note_card(card.name)
+        message = card.dialog.format(tasks="\n".join(tasks))
+        response = IrisResponse(
+            text=message, kind="answer", assurance=1.0,
+            activation_window=activation_window(self.answerer),
+            docs_window=docs_window(self.answerer),
+            used={"components": ["chronos"], "patterns": [card.name]})
+        self.state.remember(text, response)
+        return response
 
     def _reminder(self, text, phrase):
         """Žádost o připomenutí: úkol + termín (Chronos `resolve_due`).

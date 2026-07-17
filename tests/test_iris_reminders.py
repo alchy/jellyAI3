@@ -98,6 +98,40 @@ def test_reminder_persists_across_instances(tmp_path):
     assert later.fire_due() == []                    # jednou a dost
 
 
+def test_plan_query_lists_filters_and_narrows():
+    """„Mám nějaké naplánované úkoly?" vypíše sklad; „zítra" zúží intervalem;
+    „dnes večer" posune začátek na denní část — maso z 12:10 vypadne."""
+    iris = _iris(lambda: NOW)
+    iris.turn("Připomeň mi za deset minut vybrat maso z trouby.")
+    iris.turn("Připomeň mi zítra koupit rohlíky.")
+    out = iris.turn("Mám nějaké naplánované úkoly?")
+    assert "maso" in out.text and "rohlíky" in out.text
+    assert "reminder-list" in out.used["patterns"]
+    out = iris.turn("Mám něco zítra udělat?")
+    assert "rohlíky" in out.text and "maso" not in out.text
+    out = iris.turn("Mám v plánu ještě něco dnes večer?")
+    assert "reminder-list-empty" in out.used["patterns"]
+
+
+def test_plan_query_next_week_and_future_phrases():
+    """„Co mám v plánu příští týden?" — interval NÁSLEDUJÍCÍHO týdne
+    (po 17. 7. 2026 = 20.–26. 7.); „Co budu dělat zítra?" — poctivě nic."""
+    iris = _iris(lambda: NOW)
+    iris.turn("Připomeň mi 22. července zubaře.")
+    out = iris.turn("Co mám v plánu příští týden?")
+    assert "zubaře" in out.text and "22. července" in out.text
+    out = iris.turn("Co budu dělat zítra?")
+    assert "reminder-list-empty" in out.used["patterns"]
+
+
+def test_plan_query_honest_when_empty():
+    """„Nezapomněl jsem na něco?" s prázdným skladem → poctivé nic nečeká."""
+    iris = _iris(lambda: NOW)
+    out = iris.turn("Nezapomněl jsem na něco?")
+    assert "nezapomněl" in out.text
+    assert "reminder-list-empty" in out.used["patterns"]
+
+
 def test_chronos_ticker_beats_and_notifies():
     """Tep Chronos (vlastní vlákno hodin): fire → notify; chyba notifikace
     časovač nezabije."""

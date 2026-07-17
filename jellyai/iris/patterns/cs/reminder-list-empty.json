@@ -1,0 +1,7 @@
+{
+  "name": "reminder-list-empty",
+  "trigger": {"event": "reminder.list"},
+  "dialog": "Nemám nic naplánovaného — na nic jsi nezapomněl.",
+  "action": {},
+  "teach": "Dotaz na plán s prázdným (případně intervalem vyprázdněným) skladem připomínek — poctivá odpověď, že nic nečeká."
+}

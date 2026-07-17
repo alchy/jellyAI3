@@ -227,6 +227,16 @@ def resolve_temporal(text, now):  # pylint: disable=too-many-branches,too-many-r
         start = _floor(shifted, gran)
         return TimeInterval(start, _shift(start, gran, 1), gran)
 
+    # 4a) „příští týden/měsíc/rok" — NÁSLEDUJÍCÍ kalendářní interval
+    nexts = frozenset(lang.get("next_words", ()))
+    for i, tok in enumerate(tokens):
+        if tok in nexts:
+            unit = next((units[f] for f in tokens[i + 1:i + 3]
+                         if f in units and units[f] != "century"), None)
+            if unit:
+                start = _shift(_floor(now, unit), unit, 1)
+                return TimeInterval(start, _shift(start, unit, 1), unit)
+
     # 4) „tento týden/měsíc/rok", „letos" — aktuální interval jednotky
     currents = frozenset(lang.get("current_words", ()))
     for i, tok in enumerate(tokens):
