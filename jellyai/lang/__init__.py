@@ -67,6 +67,8 @@ def load_rules(language="cs"):
         rules["user_entity"] = rules.get("user_entity", "user")
         rules["focus_shift_phrases"] = tuple(
             rules.get("focus_shift_phrases", ()))
+        rules["present_verb_endings"] = tuple(
+            rules.get("present_verb_endings", ()))
         _cache[path] = rules
     return _cache[path]
 

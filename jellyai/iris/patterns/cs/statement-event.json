@@ -1,0 +1,9 @@
+{
+  "name": "statement-event",
+  "trigger": {"event": "utterance.statement", "priority": 3,
+              "requires": ["finite_verb"],
+              "forbids": ["first_person", "copula", "l_verb"]},
+  "dialog": "Zapamatováno: {fact}",
+  "action": {"memorize": "event", "predicate_from": "finite_verb"},
+  "teach": "Prézentní pozorování (Venku prší): sloveso v přítomném čase bez spony i 1. osoby. Predikátem faktu je slovesný tvar sám (do slovníku parseru se přidá, takže zjišťovací Prší venku? odpoví Ano), uživatel je pozorovatel, Chronos přidá čas výroku."
+}

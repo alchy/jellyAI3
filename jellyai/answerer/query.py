@@ -181,7 +181,8 @@ def build_query(question, predicates, is_node=None):  # pylint: disable=too-many
         # začíná slovesem spárovaným s predikátem grafu; díra žádná —
         # answerer ji vykoná jako existenční test („Ano"/nenašel)
         verb = _verb_match(tokens[0], predicates, first=True)
-        if verb is None or (is_node is not None and is_node(tokens[0])):
+        if verb is None or (is_node is not None and is_node(tokens[0])
+                            and not _exact_predicate(tokens[0], predicates)):
             return None
         known = _collect_known(tokens[1:], predicates, relational, is_node)
         if not known:                     # None (sirotek) i [] (bez entit)

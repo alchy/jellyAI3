@@ -66,6 +66,29 @@ def test_remember_writes_user_fact_into_graph():
     assert ("time", "17. července 2026") in parts
 
 
+def test_present_tense_observation_is_recognized():
+    """„Venku prší." — pozorování s prézentním slovesem (bez spony i 1. osoby):
+    rys finite_verb + karta statement-event; timestamp jako vždy."""
+    fact = parse_statement("Venku prší.", NOW)
+    assert fact is not None and fact["kind"] == "event"
+    assert fact["predicate"] == "prší"
+    assert "Venku" in fact["objects"]
+    assert fact["time"] == "17. července 2026"
+
+
+def test_present_event_round_trip_via_iris():
+    """Uložené prézentní pozorování jde dotázat zjišťovací otázkou."""
+    g = FactGraph()
+    answerer = GraphAnswerer(g, FakeUfalClient(),
+                             ExtractiveAnswerer(AnswererConfig()),
+                             query_mode="templates")
+    iris = IrisAutomaton(answerer, clock=lambda: NOW)
+    stored = iris.turn("Venku prší.")
+    assert "Zapamatováno" in stored.text
+    out = iris.turn("Prší venku?")
+    assert out.text == "Ano"
+
+
 def test_new_card_extends_recognition_without_code(tmp_path):
     """ZÁKON: logika se nestaví fixně programově — nová karta v adresáři
     naučí Mnemos nový tvar konstatování („Pršelo." — holé l-příčestí)."""

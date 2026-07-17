@@ -45,11 +45,36 @@ def _date_label(interval):
     return f"{start.day}. {month} {start.year}"
 
 
-def utterance_features(tokens, norms):
+def _finite_verb(tokens, norms, is_node=None):
+    """Prézentní sloveso výroku („prší") — koncovky z jazykové tabulky.
+
+    ENTITY-FIRST: tvar, který se rozřeší na uzel grafu („nádraží" končí -í,
+    ale je to věc, ne děj), slovesem není. Funkční slova se přeskakují.
+
+    Returns:
+        str | None: Slovesný tvar (povrch), nebo None.
+    """
+    lang = current()
+    endings = lang["present_verb_endings"]
+    for tok, norm in zip(tokens, norms):
+        if len(tok) < 3 or norm in lang["first_person"] \
+                or norm in lang["copula_forms"] \
+                or norm in lang["query_skip_words"]:
+            continue
+        if not tok.lower().endswith(endings):
+            continue
+        if is_node is not None and is_node(tok):
+            continue
+        return tok
+    return None
+
+
+def utterance_features(tokens, norms, is_node=None):
     """RYSY výroku pro kartové triggery — kód nerozhoduje, jen měří.
 
     Returns:
-        set[str]: Podmnožina {"first_person", "copula", "l_verb"}.
+        set[str]: Podmnožina {"first_person", "copula", "l_verb",
+        "finite_verb"}.
     """
     lang = current()
     features = set()
@@ -59,10 +84,12 @@ def utterance_features(tokens, norms):
         features.add("copula")
     if any(_l_form(t) for t in tokens):
         features.add("l_verb")
+    if _finite_verb(tokens, norms, is_node) is not None:
+        features.add("finite_verb")
     return features
 
 
-def parse_statement(text, now, deck=None):
+def parse_statement(text, now, deck=None, is_node=None):
     """Rozpozná konstatování a rozloží ho na časově ukotvený fakt paměti.
 
     O DRUHU konstatování nerozhoduje kód, ale **karty** (ZÁKON: logika se
@@ -96,12 +123,15 @@ def parse_statement(text, now, deck=None):
     tokens = [t for t in tokens if t]
     norms = [deaccent(t.lower()) for t in tokens]
     card = deck.match("utterance.statement",
-                      {"features": utterance_features(tokens, norms)})
+                      {"features": utterance_features(tokens, norms, is_node)})
     if card is None or "memorize" not in card.action:
         return None
     kind = card.action["memorize"]
-    if card.action.get("predicate_from") == "l_verb":
+    source = card.action.get("predicate_from")
+    if source == "l_verb":
         predicate = next((_l_form(t) for t in tokens if _l_form(t)), None)
+    elif source == "finite_verb":
+        predicate = _finite_verb(tokens, norms, is_node)
     else:
         predicate = card.action.get("predicate")
     if predicate is None:
@@ -119,6 +149,7 @@ def parse_statement(text, now, deck=None):
                and norm not in lang["query_skip_words"]
                and norm not in temporal_words
                and not (exclude_l and _l_form(tok) is not None)
+               and tok != predicate            # sloveso není účastník
                and len(tok) > 1]
     if not objects or (kind == "observation" and len(objects) < 2):
         return None
@@ -144,6 +175,11 @@ def remember(graph, statement, user_entity):
     if statement["kind"] == "episode":
         participants = [Participant("subj", user_entity, "person")]
         participants += [Participant("obj", obj, "concept") for obj in objects]
+    elif statement["kind"] == "event":
+        # prézentní děj („Venku prší"): účastníci jsou obsahová slova,
+        # uživatel je pozorovatel — zjišťovací „Prší venku?" pak sedí
+        participants = [Participant("obj", obj, "concept") for obj in objects]
+        participants.append(Participant("theme", user_entity, "person"))
     else:
         participants = [Participant("subj", objects[0], "concept")]
         participants += [Participant("pred", obj, "concept")

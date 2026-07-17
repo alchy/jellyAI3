@@ -95,6 +95,7 @@ class IrisAutomaton:
         self.clock = clock or datetime.now
         self.memory_path = memory_path
         self.state = FocusState()
+        self._words = None       # cache doslovných slov uzlů (veto sloves)
         if memory_path:
             restored = replay(answerer.graph, memory_path,
                               current()["user_entity"])
@@ -141,7 +142,8 @@ class IrisAutomaton:
                 return shift
             # KONSTATOVÁNÍ (ne dotaz, ne volba) → Mnemos: timestamp + graf;
             # DRUH výroku rozhodují karty (utterance.statement), ne kód
-            statement = parse_statement(text, self.clock(), self.deck)
+            statement = parse_statement(text, self.clock(), self.deck,
+                                        is_node=self._known_word)
             if statement is not None:
                 return self._memorize(text, statement)
         # ČASOVÁ OSA ZAOSTŘENÍ: primitivum v otázce („tento měsíc", „včera")
@@ -191,6 +193,16 @@ class IrisAutomaton:
                     and interval.contains_date(parse_date(node.id)):
                 self.answerer.context.warm(node.id, warmth)
 
+    def _known_word(self, token):
+        """DOSLOVNÉ slovo uzlu grafu? Veto pro detekci slovesa v Mnemos:
+        „nádraží" (věc) sloveso není, „prší" (v grafu nefiguruje) ano.
+        Záměrně bez kmenových pater — volná shoda by vetovala i slovesa
+        („prší"≈„prsa"). Cache se doplňuje při zápisu paměti."""
+        if self._words is None:
+            self._words = {word for node_id in self.answerer.graph.nodes
+                           for word in node_id.lower().split()}
+        return token.lower() in self._words
+
     def _memorize(self, text, statement):
         """Uloží konstatování do grafu (Mnemos) a rozsvítí jeho uzly.
 
@@ -203,6 +215,9 @@ class IrisAutomaton:
             persist(statement, self.memory_path)   # paměť přežije restart
         # nový fakt = nový slovník: predikát musí znát i pseudo-QL parser
         self.answerer._predicates.add(statement["predicate"])  # pylint: disable=protected-access
+        if self._words is not None:      # nové uzly paměti do veto cache
+            for obj in statement["objects"]:
+                self._words.update(obj.lower().split())
         for node in statement["objects"]:
             self.answerer.context.warm(node, 0.7)
         card = self.deck.match("memory.stored", {})

@@ -4,3 +4,4 @@
 {"name": "hodiny-chronos", "turns": [{"u": "Kolik je hodin?", "kind": "answer", "expect": ["12:00"]}, {"u": "Co je za den?", "expect": ["pátek", "17. července 2026"]}]}
 {"name": "pozorovani", "turns": [{"u": "Venku je teplo.", "expect": ["Zapamatováno", "teplo"]}]}
 {"name": "jezis-affinity", "turns": [{"u": "Kde se narodil Jezis?", "kind": "answer", "expect": ["Betlém"]}]}
+{"name": "prsi-event", "turns": [{"u": "Venku prší.", "expect": ["Zapamatováno", "prší"]}, {"u": "Prší venku?", "kind": "answer", "expect": ["Ano"]}]}

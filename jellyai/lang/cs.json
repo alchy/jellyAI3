@@ -55,6 +55,8 @@
                       "mesic": "měsíc", "mesici": "měsíc",
                       "den": "den", "dne": "den", "dni": "den"},
   "first_person": ["jsem", "sem", "jsme"],
+  "present_verb_endings": ["í", "ají", "ejí", "uje", "ují", "eme", "íme",
+                           "áme", "áte", "íte"],
   "user_entity": "uživatel",
   "focus_shift_phrases": ["v kontextu", "v ramci", "v oblasti", "myslim tim",
                           "mam na mysli"],
