@@ -197,3 +197,40 @@ def test_concept_subject_gets_context_binding():
     g = build_graph(A)
     kontext = g.facts_of("rodina", role="obj", predicate="kontext")
     assert kontext and g.participants(kontext[0], "subj") == ["Božena Němcová"]
+
+
+def test_facts_carry_source_provenance():
+    """Fakt nese zdrojový dokument (provenience) — základ pro attention nad
+    soubory: sloučený uzel „Maria" drží fakty z Bible i od Boženy odděleně."""
+    A = {
+        ("bible", 0): {"entities": [{"text": "Maria", "type": "P", "start": 0, "end": 5}],
+                       "sentences": [[
+            {"form": "Maria", "lemma": "Maria", "upos": "PROPN", "head": 2, "deprel": "nsubj", "start": 0, "end": 5},
+            {"form": "porodila", "lemma": "porodit", "upos": "VERB", "head": 0, "deprel": "root", "start": 6, "end": 14},
+            {"form": "syna", "lemma": "syn", "upos": "NOUN", "head": 2, "deprel": "obj", "start": 15, "end": 19},
+        ]]},
+    }
+    g = build_graph(A)
+    fact = g.facts_of("Maria", role="subj", predicate="porodit")[0]
+    assert "bible" in fact.source
+
+
+def test_document_graph_links_co_mentioning_sources():
+    """Graf DOKUMENTŮ (týž princip jako graf termínů): dva dokumenty sdílející
+    entitu jsou spojené hranou — aktivace jednoho vyzařuje na příbuzné."""
+    A = {
+        ("bible1", 0): {"entities": [{"text": "Maria", "type": "P", "start": 0, "end": 5}],
+                        "sentences": [[
+            {"form": "Maria", "lemma": "Maria", "upos": "PROPN", "head": 2, "deprel": "nsubj", "start": 0, "end": 5},
+            {"form": "porodila", "lemma": "porodit", "upos": "VERB", "head": 0, "deprel": "root", "start": 6, "end": 14},
+            {"form": "syna", "lemma": "syn", "upos": "NOUN", "head": 2, "deprel": "obj", "start": 15, "end": 19},
+        ]]},
+        ("bible2", 0): {"entities": [{"text": "Maria", "type": "P", "start": 0, "end": 5}],
+                        "sentences": [[
+            {"form": "Maria", "lemma": "Maria", "upos": "PROPN", "head": 2, "deprel": "nsubj", "start": 0, "end": 5},
+            {"form": "chválila", "lemma": "chválit", "upos": "VERB", "head": 0, "deprel": "root", "start": 6, "end": 14},
+            {"form": "Boha", "lemma": "Bůh", "upos": "PROPN", "head": 2, "deprel": "obj", "start": 15, "end": 19},
+        ]]},
+    }
+    g = build_graph(A)
+    assert g.doc_links.get("bible1", {}).get("bible2", 0) > 0   # sdílí Marii

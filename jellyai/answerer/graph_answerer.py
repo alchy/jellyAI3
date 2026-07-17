@@ -64,11 +64,13 @@ class GraphAnswerer(Answerer):
         self._prev_trace = None  # trasa PŘEDCHOZÍHO tahu (drill „Kdy?")
         self.visited = []        # uzly protnuté (rekurzivním) matchem → rozsvícení
         self.context = ActivationField(decay=context_decay)   # těžiště (id uzlu → jas)
+        self.source_context = ActivationField(decay=context_decay)  # attention nad ZDROJI
         self.history = []        # trajektorie konverzace (tahy s trasou a těžištěm)
 
     def reset(self):
-        """Začne nový rozhovor — vymaže těžiště i historii."""
+        """Začne nový rozhovor — vymaže těžiště, provenienci i historii."""
         self.context = ActivationField(decay=self.context_decay)
+        self.source_context = ActivationField(decay=self.context_decay)
         self.history = []
         self.last_trace = None
 
@@ -329,7 +331,8 @@ class GraphAnswerer(Answerer):
                         # vztahové jméno („bratr") není identita osoby bez
                         # protistrany — profese/druh ano
                         continue
-                    base = fact.weight + (10 if exact else 0)
+                    base = fact.weight + (10 if exact else 0) \
+                        + self._source_bonus(fact)
                     # „kdy" bere čas i rok-jako-číslo; „jaký" bere i druh
                     # (pred) — druh je vlastnost; jinak přesná role díry
                     matched = False
@@ -606,6 +609,7 @@ class GraphAnswerer(Answerer):
                 self.context.warm(node, 0.7)
             for value in values[1:]:         # výčet svítí celý (stabilita opakování)
                 self.context.warm(value, 0.7)
+            self._warm_sources(fact)         # attention nad soubory (+ jejich graf)
             self._remember(qa, topic, focus)
             self._log_turn(question, topic, fact.predicate, text)
             return Answer(text=text, sources=["graf"], score=1.0,
@@ -647,6 +651,26 @@ class GraphAnswerer(Answerer):
         self.history.append({"question": question, "topic": topic,
                              "predicate": predicate, "answer": answer,
                              "gravity": self.context.hottest()})
+
+    def _warm_sources(self, fact):
+        """Rozsvítí zdrojové dokumenty faktu a VYZÁŘÍ po grafu dokumentů
+        (doc_links) — týž princip jako spread nad termíny: sousední soubory
+        (sdílejí entity) dostanou zlomek jasu. Pak pohasne (× decay)."""
+        links = getattr(self.graph, "doc_links", {})
+        for doc in getattr(fact, "source", ()):
+            self.source_context.warm(doc, 3.0)
+            neighbors = sorted(links.get(doc, {}).items(),
+                               key=lambda kv: -kv[1])[:8]
+            for near, _ in neighbors:
+                self.source_context.warm(near, 3.0 * self.spread_falloff)
+        self.source_context.step()
+
+    def _source_bonus(self, fact):
+        """Attention nad SOUBORY: bonus faktu podle jasu jeho zdrojových
+        dokumentů. Sloučený uzel (dvě Marie z různých korpusů) tak upřednostní
+        fakt z domény, o které se právě mluví — provenience místo rozpadu uzlu."""
+        return 2.0 * sum(self.source_context.scores.get(doc, 0.0)
+                         for doc in getattr(fact, "source", ()))
 
     def _spread(self, sources, base=0.6, fanout=8):
         """SPREADING ACTIVATION do HLOUBKY: jas vyzařuje z uzlů trasy (`sources`)

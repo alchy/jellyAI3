@@ -323,3 +323,34 @@ def test_bounded_depth_radiation_lights_semantic_field():
     deep.answer(q, [])
     assert deep.context.scores.get("Josef", 0) > 0        # 2-hop soused svítí
     assert deep.context.scores["Maria"] > deep.context.scores["Josef"]  # bližší silněji
+
+
+def _je_parse(name):
+    q = f"Kdo je {name}?"
+    return {q: [[
+        {"form": "Kdo", "lemma": "kdo", "upos": "PRON", "head": 3, "deprel": "nsubj"},
+        {"form": "je", "lemma": "být", "upos": "AUX", "head": 3, "deprel": "cop"},
+        {"form": name, "lemma": name, "upos": "PROPN", "head": 0, "deprel": "root"},
+    ]]}
+
+
+def test_source_activation_disambiguates_shared_node():
+    """Attention nad SOUBORY: sloučený uzel „Maria" má vlastnost z Bible i od
+    Boženy; když svítí biblický zdroj (minulý tah odtud), vyhraje biblický
+    fakt — „Marie není Marie" se řeší proveniencí, ne rozpadem uzlu."""
+    g = FactGraph()
+    g.add_fact(make_fact("být", [Participant("subj", "Maria", "person"),
+                                 Participant("pred", "prorokyně", "concept")]), source="bible")
+    g.add_fact(make_fact("být", [Participant("subj", "Ježíš", "person"),
+                                 Participant("pred", "spasitel", "concept")]), source="bible")
+    for _ in range(3):   # v korpusu Boženy je Maria častěji „služka"
+        g.add_fact(make_fact("být", [Participant("subj", "Maria", "person"),
+                                     Participant("pred", "služka", "concept")]), source="bozena")
+    client = FakeUfalClient(parse={**_je_parse("Maria"), **_je_parse("Ježíš")})
+
+    a = GraphAnswerer(g, client, ExtractiveAnswerer(AnswererConfig()))
+    assert a.answer("Kdo je Maria?", []).text == "služka"   # bez kontextu častější
+
+    a.reset()
+    a.answer("Kdo je Ježíš?", [])                # rozsvítí zdroj „bible"
+    assert a.answer("Kdo je Maria?", []).text == "prorokyně"  # provenience vyhraje

@@ -8,7 +8,7 @@ najít fakty, v nichž vystupuje (a v jaké roli) — to je základ 2-skokového
 import os
 import pickle
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from jellyai.graph.extract import (extract_facts, make_fact, Participant,
                                    _SUBJ, _entity_type)
@@ -75,6 +75,7 @@ class FactNode:
     predicate: str
     weight: int
     participants: tuple
+    source: set = field(default_factory=set)   # zdrojové dokumenty (provenience)
 
 
 class FactGraph:
@@ -86,12 +87,15 @@ class FactGraph:
         self.facts = {}
         self._by_node = {}
         self.aliases = {}    # kanonické id → sloučené tvary (plní resolver)
+        self.doc_links = {}  # graf DOKUMENTŮ: doc → {doc: síla} (sdílené entity)
 
-    def add_fact(self, fact):
+    def add_fact(self, fact, source=None):
         """Přidá fakt: sloučí podle identity (`váha++`) nebo založí; udrží indexy.
 
         Args:
             fact (Fact): Reifikovaný fakt z extrakce.
+            source (str | None): Zdrojový dokument (provenience) — pro attention
+                nad soubory (sloučený uzel drží fakty z různých korpusů odděleně).
         """
         key = (fact.predicate, fact.participants)
         node = self.facts.get(key)
@@ -101,6 +105,8 @@ class FactGraph:
             for p in fact.participants:
                 self._by_node.setdefault(p.node, []).append((key, p.role))
         node.weight += 1
+        if source is not None:
+            node.source.add(source)
         for p in fact.participants:
             self._touch(p.node, p.type)
 
@@ -166,7 +172,8 @@ class FactGraph:
             os.makedirs(directory, exist_ok=True)
         with open(path, "wb") as f:
             pickle.dump({"nodes": self.nodes, "facts": self.facts,
-                         "by_node": self._by_node, "aliases": self.aliases}, f)
+                         "by_node": self._by_node, "aliases": self.aliases,
+                         "doc_links": self.doc_links}, f)
         return path
 
     @classmethod
@@ -179,6 +186,7 @@ class FactGraph:
         g.facts = state["facts"]
         g._by_node = state["by_node"]
         g.aliases = state.get("aliases", {})
+        g.doc_links = state.get("doc_links", {})
         return g
 
 
@@ -232,7 +240,7 @@ def _warm_persons(field, annotation, canon):
         field.warm((canon.get(e["text"], e["text"]), "person"), 2.0 if is_subject else 1.0)
 
 
-def _associate_context(graph, annotation, subject, canon, extra=()):
+def _associate_context(graph, annotation, subject, canon, extra=(), source=None):
     """Role ③ aktivačního pole: KONTEXTOVÁ ASOCIACE entit věty se subjektem.
 
     Dokumentová struktura (bibliografický řádek, výčet) často nemá sloveso,
@@ -257,7 +265,7 @@ def _associate_context(graph, annotation, subject, canon, extra=()):
         if node[0] != subject[0]:
             graph.add_fact(make_fact("kontext", [
                 Participant("subj", subject[0], subject[1]),
-                Participant("obj", node[0], node[1])]))
+                Participant("obj", node[0], node[1])]), source=source)
     entities = annotation.get("entities", [])
     for e in entities:
         typ = _entity_type(e)
@@ -272,7 +280,7 @@ def _associate_context(graph, annotation, subject, canon, extra=()):
             continue
         graph.add_fact(make_fact("kontext", [
             Participant("subj", subject[0], subject[1]),
-            Participant("obj", text, typ)]))
+            Participant("obj", text, typ)]), source=source)
 
 
 def build_graph(annotations):
@@ -294,7 +302,7 @@ def build_graph(annotations):
         doc_id, idx = key if isinstance(key, tuple) else (key, 0)
         by_doc.setdefault(doc_id, []).append((idx, annotation))
     graph = FactGraph()
-    for _, items in by_doc.items():
+    for doc_id, items in by_doc.items():
         items.sort(key=lambda t: t[0])
         canon = _canonical_persons(items)
         field = ActivationField()
@@ -303,17 +311,39 @@ def build_graph(annotations):
             sentence_facts = extract_facts(annotation, default_subject=subject,
                                            canon=canon, context=field.ranked())
             for fact in sentence_facts:
-                graph.add_fact(fact)
+                graph.add_fact(fact, source=doc_id)
             concept_subjects = {(p.node, p.type) for f in sentence_facts
                                 for p in f.participants
                                 if p.role == "subj" and p.type == "concept"}
             _associate_context(graph, annotation, subject, canon,
-                               extra=concept_subjects)
+                               extra=concept_subjects, source=doc_id)
             _warm_persons(field, annotation, canon)
             field.step()
     _decompose_dates(graph)
     resolve_entities(graph)
+    _build_doc_graph(graph)
     return graph
+
+
+def _build_doc_graph(graph):
+    """Graf dokumentů: hrana mezi dvěma dokumenty = kolik ENTIT sdílejí
+    (spolu-zmínění). Pro každou entitu posbírá dokumenty přes všechny její
+    fakty a pospojuje jejich dvojice. Týž primitiv jako graf termínů —
+    aktivace pak vyzařuje i po dokumentech (attention nad soubory se škáluje
+    s jejich počtem)."""
+    from itertools import combinations
+    links = {}
+    for node_id, entries in graph._by_node.items():   # pylint: disable=protected-access
+        node = graph.nodes.get(node_id)
+        if node is None or node.type not in ("person", "geo", "dílo"):
+            continue
+        docs = set()
+        for key, _ in entries:
+            docs |= graph.facts[key].source
+        for a, b in combinations(sorted(docs), 2):
+            links.setdefault(a, {})[b] = links.setdefault(a, {}).get(b, 0) + 1
+            links.setdefault(b, {})[a] = links.setdefault(b, {}).get(a, 0) + 1
+    graph.doc_links = {d: dict(sorted(n.items())) for d, n in sorted(links.items())}
 
 
 def _decompose_dates(graph):
@@ -411,9 +441,10 @@ def resolve_entities(graph):
         existing = remapped.get(key)
         if existing is None:
             remapped[key] = FactNode(key, moved.predicate, fact.weight,
-                                     moved.participants)
+                                     moved.participants, set(fact.source))
         else:
             existing.weight += fact.weight
+            existing.source |= fact.source
     _record_aliases(graph, node_map)
     graph.replace_facts(remapped)
     return graph
