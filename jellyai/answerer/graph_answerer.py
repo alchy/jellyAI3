@@ -249,12 +249,18 @@ class GraphAnswerer(Answerer):
             # nejednoznačné jméno rozsvítí VŠECHNY kandidáty se stejnou
             # kmenovou shodou (homonymní vějíř „Marie" → i biblická Maria) —
             # attention nese nejistotu rozřešení, vítěz svítí nejvíc; při
-            # sondě is_node (zamítaná rozpětí) se vějíř nešíří (warm=False)
+            # sondě is_node (zamítaná rozpětí) se vějíř nešíří (warm=False).
+            # AKTIVNÍ DOMÉNA vějíř drží ve svých dokumentech — holá křestní
+            # jména jinak lepí světy (bible ↔ wiki) a rozsvěcují cizí satelity
             top_stem = best_score[3]
             fan = sorted((c for c in candidates
                           if c[0] != best_id and c[1] == top_stem and c[1] > 0),
                          key=lambda c: -c[2])[:5]
             for node_id, _, _, _, _, _ in fan:
+                if self.domain_docs and not any(
+                        set(getattr(f, "source", ()) or ()) & self.domain_docs
+                        for f in self.graph.facts_of(node_id)):
+                    continue
                 self.context.warm(node_id, 0.3)
         return best_id
 

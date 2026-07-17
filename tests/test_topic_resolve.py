@@ -48,6 +48,23 @@ def test_loose_stem_reaches_short_inflected_concept():
     assert a._resolve_topic(["hru"]) == "hra"
 
 
+def test_homonym_fan_respects_active_domain():
+    """Aktivní doména (focus-shift „v kontextu Bible") drží homonymní vějíř
+    ve svých dokumentech — wiki jmenovci se nezahřívají (mosty mezi světy
+    přes holá křestní jména)."""
+    g = FactGraph()
+    g.add_fact(make_fact("křtít", [Participant("subj", "Jan Křtitel", "person"),
+                                   Participant("obj", "Ježíš", "person")]),
+               source="bible_matous")
+    g.add_fact(make_fact("napsat", [Participant("subj", "Jan Neruda", "person"),
+                                    Participant("obj", "Povídky", "dílo")]),
+               source="wiki_jan_neruda")
+    a = _answerer(g)
+    a.domain_docs = frozenset({"bible_matous"})
+    a._resolve_topic(["Jan"])
+    assert a.context.scores.get("Jan Neruda", 0) == 0    # mimo doménu tma
+
+
 def test_function_words_do_not_score():
     """„s" nesmí skórovat: „Válku s mloky" ≠ „Hovory s TGM"."""
     g = FactGraph()
