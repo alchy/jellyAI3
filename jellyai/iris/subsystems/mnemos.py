@@ -278,6 +278,47 @@ def forget(graph, path, predicate, objects, user_entity):
     return removed
 
 
+def forget_interval(graph, path, interval, user_entity):
+    """Zapomenutí OBDOBÍ („zapomeň, co jsem dnes/včera řekl"): smaže
+    fakta uživatele s časovou kotvou uvnitř intervalu — z grafu i deníku
+    (kombinace forget × recall: Chronos vybírá, Mnemos maže).
+
+    Returns:
+        list[str]: Popisy odstraněných faktů.
+    """
+    from jellyai.graph.graph import parse_date
+    removed, kept = [], {}
+    for key, fact in graph.facts.items():
+        nodes = {part.node for part in fact.participants}
+        times = [part.node for part in fact.participants
+                 if part.role == "time"]
+        if user_entity in nodes and times \
+                and any(interval.contains_date(parse_date(t))
+                        for t in times):
+            others = [part.node for part in fact.participants
+                      if part.node != user_entity
+                      and part.role != "time"]
+            removed.append(f"{times[0]} — {fact.predicate}: "
+                           f"{', '.join(others[:5])}")
+            continue
+        kept[key] = fact
+    if removed:
+        graph.replace_facts(kept)
+    if path and os.path.exists(path):
+        lines = []
+        with open(path, encoding="utf-8") as fh:
+            for line in fh:
+                if not line.strip():
+                    continue
+                row = json.loads(line)
+                if interval.contains_date(parse_date(row.get("time", ""))):
+                    continue
+                lines.append(line)
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.writelines(lines)
+    return removed
+
+
 def persist(statement, path):
     """Připíše konstatování do DENÍKU paměti (JSONL, append-only).
 

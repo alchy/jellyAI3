@@ -34,7 +34,8 @@ from jellyai.iris.subsystems.chronos import (TimeInterval, clock_answer,
                                              format_due, resolve_due,
                                              resolve_plan, resolve_temporal,
                                              resolve_weekday)
-from jellyai.iris.subsystems.mnemos import (forget, note_statement,
+from jellyai.iris.subsystems.mnemos import (forget, forget_interval,
+                                            note_statement,
                                             parse_statement, persist,
                                             remember, replay)
 from jellyai.iris.patterns import PatternDeck
@@ -438,13 +439,21 @@ class IrisAutomaton:
         remainder = " ".join(rest).rstrip(".,")
         if not remainder:
             return None
-        statement = parse_statement(remainder, self.clock(), self.deck,
-                                    is_node=self._known_word)
-        if statement is None:
-            return None
-        removed = forget(self.answerer.graph, self.memory_path,
-                         statement["predicate"], statement["objects"],
-                         current()["user_entity"])
+        if deaccent(rest[0].lower()).rstrip(".") == "co":
+            # „zapomeň, CO jsem dnes/včera řekl" — období vybírá Chronos
+            interval = resolve_temporal(remainder, self.clock())
+            if interval is None:
+                return None
+            removed = forget_interval(self.answerer.graph, self.memory_path,
+                                      interval, current()["user_entity"])
+        else:
+            statement = parse_statement(remainder, self.clock(), self.deck,
+                                        is_node=self._known_word)
+            if statement is None:
+                return None
+            removed = forget(self.answerer.graph, self.memory_path,
+                             statement["predicate"], statement["objects"],
+                             current()["user_entity"])
         card = self.deck.best("memory.forget",
                               {"candidates": removed})
         if card is None:

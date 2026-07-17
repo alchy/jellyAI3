@@ -227,6 +227,29 @@ def test_forget_selective_and_compound(tmp_path):
     assert "memory-forget-miss" in out.used["patterns"]
 
 
+def test_forget_interval_yesterday(tmp_path):
+    """„Zapomeň, co jsem včera řekl." — Chronos vybere období, Mnemos
+    smaže z grafu i deníku; dnešek zůstává."""
+    from datetime import timedelta
+    moment = [NOW]
+    path = str(tmp_path / "memory.jsonl")
+    answerer = GraphAnswerer(FactGraph(), FakeUfalClient(),
+                             ExtractiveAnswerer(AnswererConfig()),
+                             query_mode="templates",
+                             clock=lambda: moment[0])
+    iris = IrisAutomaton(answerer, clock=lambda: moment[0],
+                         memory_path=path)
+    iris.turn("Dnes jsem měl knedlíky.")
+    moment[0] = NOW + timedelta(days=1)
+    iris.turn("Venku prší.")
+    out = iris.turn("Zapomeň, co jsem včera řekl.")
+    assert "Zapomenuto" in out.text and "knedlíky" in out.text
+    out = iris.turn("Co jsem ti řekl?")
+    assert "prší" in out.text and "knedlíky" not in out.text
+    assert "knedlíky" not in (tmp_path / "memory.jsonl").read_text(
+        encoding="utf-8")
+
+
 def test_recall_what_i_told_you_by_interval():
     """Vzpomínání (zadání): „Co jsem ti řekl včera / dnes / minulý
     týden?" — timestampy Mnemos × intervaly Chronos. Hodiny se posouvají
