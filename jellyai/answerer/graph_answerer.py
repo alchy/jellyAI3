@@ -10,7 +10,7 @@ from jellyai.graph.graph import parse_date
 from jellyai.lang import current
 from jellyai.answerer.question import analyze_question
 from jellyai.answerer.pattern import question_pattern, SubQuery, Pattern
-from jellyai.answerer.query import build_query
+from jellyai.answerer.query import build_query, Query
 from jellyai.answerer.template import _to_nominative
 from jellyai.graph.activation import ActivationField
 from jellyai.graph.canon import _stem, name_gender, deaccent
@@ -62,6 +62,7 @@ class GraphAnswerer(Answerer):
         self.spread_depth = spread_depth
         self.spread_falloff = spread_falloff
         self.last_trace = None   # trasa poslední odpovědi (téma → fakt → hodnota)
+        self.last_pattern = None  # poslední vykonaný pseudo-QL Pattern (API)
         self._prev_trace = None  # trasa PŘEDCHOZÍHO tahu (drill „Kdy?")
         self.visited = []        # uzly protnuté (rekurzivním) matchem → rozsvícení
         self.context = ActivationField(decay=context_decay)   # těžiště (id uzlu → jas)
@@ -76,6 +77,7 @@ class GraphAnswerer(Answerer):
         self.source_context = ActivationField(decay=self.context_decay)
         self.history = []
         self.last_trace = None
+        self.last_pattern = None
 
     def _resolve_topic(self, topic_terms, predicate=None):
         """Najde uzel tématu otázky — nejlepší shodu s obsahovými lemmaty.
@@ -156,8 +158,8 @@ class GraphAnswerer(Answerer):
             return True
         return name_gender(node_id) == qa.gender
 
-    def _pattern_answer(self, question, qa):  # pylint: disable=too-many-return-statements,too-many-branches
-        """Univerzální match: otázka → neúplný fakt → najdi shodný v grafu → díra.
+    def _pattern_answer(self, question, pat, qa):  # pylint: disable=too-many-return-statements,too-many-branches
+        """Univerzální match: neúplný fakt (pattern) → najdi shodný v grafu → díra.
 
         Nahrazuje ruční qtype/relační pravidla i attention: predikát + známé role
         musí sedět, vrátí se účastník v roli díry (ranking váhou + aktivací). Bez
@@ -165,22 +167,14 @@ class GraphAnswerer(Answerer):
         projdou se kandidáti od nejteplejšího (gender-filtr) a vezme první, co odpoví.
 
         Args:
-            question (str): Dotaz uživatele.
-            qa (QuestionAnalysis): Rozbor (rod pro shodu kontextového tématu).
+            question (str): Původní dotaz (jen pro datum v generické větvi).
+            pat (Pattern): Neúplný fakt z otázky (šablony nebo UDPipe).
+            qa (Query | QuestionAnalysis): Rozbor (rod, qtype, témata).
 
         Returns:
             tuple: (téma | None, hodnota | None, fakt | None).
         """
         self.visited = []                    # uzly protnuté (i)rekurzí → rozsvítit
-        # ŠABLONOVÝ PARSER (pseudo-QL nad slovníkem grafu) — primární pro otázky
-        # v režimech hybrid/templates (odolný vůči diakritice i mis-taggingu);
-        # UDPipe rozbor jen mimo templates režim (fallback/primární dle režimu)
-        pat = None
-        if self.query_mode in ("hybrid", "templates"):
-            pat = build_query(question, self._predicates)
-        if pat is None and self.query_mode != "templates":
-            pat = question_pattern(question, self.client)
-        pat = pat or Pattern()
         if pat.known:
             known_set = set()
             for _, known in pat.known:
@@ -596,10 +590,21 @@ class GraphAnswerer(Answerer):
         """
         self._prev_trace = self.last_trace or self._prev_trace
         self.last_trace = None
-        qa = analyze_question(question, self.client)
         # UNIVERZÁLNÍ princip: otázka→neúplný fakt→match→díra (nahrazuje qtype pravidla
-        # i attention — kontextově navazující dotaz řeší tatáž cesta)
-        topic, values, fact = self._pattern_answer(question, qa)
+        # i attention — kontextově navazující dotaz řeší tatáž cesta). Rozbor dodají
+        # ŠABLONY (pseudo-QL, bez UDPipe); UDPipe jen mimo templates režim.
+        qa, pat = None, None
+        if self.query_mode in ("hybrid", "templates"):
+            query = build_query(question, self._predicates)
+            if query is not None:
+                qa, pat = query, query.pattern
+        if qa is None and self.query_mode != "templates":
+            qa = analyze_question(question, self.client)
+            pat = question_pattern(question, self.client)
+        if qa is None:                    # templates-only a šablony nic → nehádat
+            qa, pat = Query(), Pattern()
+        self.last_pattern = pat
+        topic, values, fact = self._pattern_answer(question, pat, qa)
         reverse = False
         focus = None                # UZEL odpovědi (paměť/okolí ≠ složený text)
         if not values:

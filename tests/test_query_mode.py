@@ -35,6 +35,18 @@ def test_templates_mode_ignores_udpipe_pattern():
     assert "nenašel" in a.answer("Kdo stvořil svět?", []).text
 
 
+class _NoParseClient(FakeUfalClient):
+    def parse(self, text):
+        raise AssertionError("query strana volala UDPipe parse!")
+
+
+def test_templates_mode_never_calls_parse():
+    """Režim templates: celá cesta otázka→odpověď bez jediného parse."""
+    a = GraphAnswerer(_graph(), _NoParseClient(),
+                      ExtractiveAnswerer(AnswererConfig()), query_mode="templates")
+    assert a.answer("Kdo stvořil svět?", []).text == "Bůh"
+
+
 def test_hybrid_mode_falls_back_to_udpipe():
     """Hybrid: překlep „sworil" šablony nespárují (prefix 1 znak) → None →
     UDPipe rozbor (fake parse zná správná lemmata) odpověď složí."""
