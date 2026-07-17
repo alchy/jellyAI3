@@ -1,7 +1,7 @@
 # BACKLOG — otevřené body (živý dokument)
 
 > Aktualizuj při každém uzavření/přidání bodu. Stav ke commitu: viz git log.
-> Metriky teď: 393 testů, etalon 28/28, focus 12/12, dialog 9/9 (vše 100 %).
+> Metriky teď: 397 testů, etalon 27/27 (5 gap), focus 12/12, dialog 9/9 (100 %).
 
 | # | Oblast | Bod | Řešení / poznámka | Fáze | Priorita |
 |---|--------|-----|-------------------|------|----------|
