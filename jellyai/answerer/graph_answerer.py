@@ -87,7 +87,22 @@ class GraphAnswerer(Answerer):
         self.last_trace = None
         self.last_pattern = None
 
-    def _resolve_topic(self, topic_terms, predicate=None):
+    def _span_is_node(self, span):
+        """Přísný test rozpětí (spec 4.3): rozřeší se na uzel A jeho obsahová
+        slova jsou podmnožinou slov uzlu (kmenově/bezdiakriticky) — slepenec
+        dvou entit ani cizí titul neprojde."""
+        terms = [t for t in span.split()
+                 if len(t) > 1
+                 and deaccent(t.lower()) not in current()["query_skip_words"]]
+        if not terms:
+            return False
+        node_id = self._resolve_topic(terms, warm=False)
+        if node_id is None:
+            return False
+        node_keys = {_loose(w) for w in node_id.split()}
+        return all(_loose(t) in node_keys for t in terms)
+
+    def _resolve_topic(self, topic_terms, predicate=None, warm=True):
         """Najde uzel tématu otázky — nejlepší shodu s obsahovými lemmaty.
 
         **Přesná shoda velikosti má přednost**, case-insensitive je fallback:
@@ -169,10 +184,11 @@ class GraphAnswerer(Answerer):
                         if c[3] == best[3] and c[4] and c[0] != best_id]
                 if same:
                     best_id = max(same, key=lambda c: c[2])[0]
-        if best_id is not None:
+        if best_id is not None and warm:
             # nejednoznačné jméno rozsvítí VŠECHNY kandidáty se stejnou
             # kmenovou shodou (homonymní vějíř „Marie" → i biblická Maria) —
-            # attention nese nejistotu rozřešení, vítěz svítí nejvíc
+            # attention nese nejistotu rozřešení, vítěz svítí nejvíc; při
+            # sondě is_node (zamítaná rozpětí) se vějíř nešíří (warm=False)
             top_stem = best_score[3]
             fan = sorted((c for c in candidates
                           if c[0] != best_id and c[1] == top_stem and c[1] > 0),
@@ -629,7 +645,7 @@ class GraphAnswerer(Answerer):
         # ŠABLONY (pseudo-QL, bez UDPipe); UDPipe jen mimo templates režim.
         qa, pat = None, None
         if self.query_mode in ("hybrid", "templates"):
-            query = build_query(question, self._predicates)
+            query = build_query(question, self._predicates, self._span_is_node)
             if query is not None:
                 qa, pat = query, query.pattern
         if qa is None and self.query_mode != "templates":

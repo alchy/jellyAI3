@@ -62,6 +62,46 @@ def test_non_question_returns_none():
     assert build_query("Karel napsal Babičku.", PREDS) is None
 
 
+def _nodes(*spans):
+    """Fake slovník grafu: is_node = přesná množina povolených rozpětí."""
+    allowed = set(spans)
+    return lambda span: span in allowed
+
+
+def test_greedy_splits_glued_entities():
+    """Dvě entity za sebou bez hranice se rozdělí na maximální uzlová rozpětí."""
+    is_node = _nodes("Karel Čapek", "Válku s mloky")
+    q = build_query("Co napsal Karel Čapek Válku s mloky?", {"napsat"}, is_node)
+    spans = [t for _, t in q.pattern.known]
+    assert spans == ["Karel Čapek", "Válku s mloky"]
+
+
+def test_skip_word_bridges_title():
+    """Předložka uvnitř titulu běh NErozbíjí: „Válku s mloky" je jedno rozpětí."""
+    is_node = _nodes("Válku s mloky")
+    q = build_query("Kdo napsal Válku s mloky?", {"napsat"}, is_node)
+    assert ("obj", "Válku s mloky") in q.pattern.known
+
+
+def test_trailing_orphan_after_match_dropped():
+    """Graf zná jen „Válku" — „s mloky" je pokračování titulu, zahodí se."""
+    is_node = _nodes("Válku")
+    q = build_query("Kdo napsal Válku s mloky?", {"napsat"}, is_node)
+    assert ("obj", "Válku") in q.pattern.known
+
+
+def test_leading_orphan_returns_none():
+    """„Ludvík" graf nezná → vzor nelze bezpečně sestavit → None (žádné
+    hádání přes „Němec", které by trefilo Němcovou)."""
+    is_node = _nodes("Němec")
+    assert build_query("Kdo je Ludvík Němec?", {"být"}, is_node) is None
+
+
+def test_without_is_node_keeps_old_behavior():
+    q = build_query("Kdo napsal Babičku?", PREDS, None)
+    assert ("obj", "Babičku") in q.pattern.known
+
+
 def test_query_gender_from_verb_form():
     q = build_query("Kdy se narodila Božena Němcová?", {"narodit"})
     assert q.gender == "Fem" and q.qtype == "Kdy"

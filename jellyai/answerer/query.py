@@ -106,12 +106,15 @@ def _verb_match(token, predicates):
     return best[0] if best else None
 
 
-def build_query(question, predicates):  # pylint: disable=too-many-locals,too-many-return-statements
+def build_query(question, predicates, is_node=None):  # pylint: disable=too-many-locals,too-many-return-statements
     """Otázku (končící „?") přeloží šablonou nad slovníkem grafu na `Query`.
 
     Args:
         question (str): Dotaz uživatele.
         predicates (set[str]): Predikáty, které graf zná (jeho slovník).
+        is_node (callable | None): Přísný test `span → bool`, zda se rozpětí
+            rozřeší na uzel grafu (slovník entit je graf — spec 4.3). None =
+            bez dělení běhů (celý běh je entita).
 
     Returns:
         Query | None: Pseudo-QL pattern + šablonová analýza (qtype/rod/spona);
@@ -139,7 +142,9 @@ def build_query(question, predicates):  # pylint: disable=too-many-locals,too-ma
     verb = _verb_match(verb_tok, predicates) if verb_tok else None
     # rod nese tvar slovesa (l-ové příčestí), u spony tvar spony („byla")
     gender = _verb_gender(verb_tok or copula_tok or "")
-    known = _collect_known(tokens, predicates, relational)
+    known = _collect_known(tokens, predicates, relational, is_node)
+    if known is None:                          # sirotek v běhu — nehádat
+        return None
 
     def _wrap(pattern):
         return Query(pattern, qtype=qtype, verb_lemma=verb,
@@ -179,20 +184,83 @@ def build_query(question, predicates):  # pylint: disable=too-many-locals,too-ma
     return None
 
 
-def _collect_known(tokens, predicates, relational):
+def _trim(run):
+    """Okrajová skip-slova rozpětí pryč („Válku s" → „Válku")."""
+    skip = current()["query_skip_words"]
+    while run and _norm(run[0]) in skip:
+        run = run[1:]
+    while run and _norm(run[-1]) in skip:
+        run = run[:-1]
+    return run
+
+
+def _split_run(run, is_node, relational):
+    """Greedy longest-match: běh → maximální `is_node` rozpětí (spec 4.3).
+
+    Vedoucí sirotek (první obsahové slovo bez shody) = nebezpečný vzor → None;
+    sirotek PO shodě je pokračování titulu → zahodit. Vztahové jméno na začátku
+    se přilepí k první entitě (vztahovou šablonu řeší build_query)."""
+    run = _trim(list(run))
+    if not run:
+        return []
+    rel = run[0] if _norm(run[0]) in relational else None
+    if rel:
+        run = _trim(run[1:])
+        if not run:
+            return [("obj", rel)]
+    if is_node is None:
+        parts = [("obj", " ".join(run))]
+    else:
+        skip = current()["query_skip_words"]
+        parts, i, matched = [], 0, False
+        while i < len(run):
+            if _norm(run[i]) in skip:
+                i += 1
+                continue
+            hit = None
+            for j in range(len(run), i, -1):
+                span = _trim(run[i:j])
+                if span and is_node(" ".join(span)):
+                    hit = (j, " ".join(span))
+                    break
+            if hit is None:
+                if not matched:
+                    return None          # vedoucí sirotek — nikdy chybný Pattern
+                i += 1                   # koncový sirotek po shodě → zahodit
+                continue
+            parts.append(("obj", hit[1]))
+            matched, i = True, hit[0]
+        if not parts:
+            return None
+    if rel:
+        parts[0] = ("obj", rel + " " + parts[0][1])
+    return parts
+
+
+def _collect_known(tokens, predicates, relational, is_node):
     """Známé účastníky = spojité běhy obsahových tokenů (kandidáti na entitu/
-    vztah); tázací/spona/předložka/sloveso běh ukončí, „který" → pod-dotaz.
-    Vztahové jméno se ponechá NA ZAČÁTKU běhu (řeší ho vztahová šablona)."""
+    vztah); tázací/spona/sloveso běh ukončí, „který" → pod-dotaz; skip-slova
+    zůstávají UVNITŘ běhu (titul „Válka s mloky" drží pohromadě) a běh se
+    dělí greedy na uzlová rozpětí (`_split_run`). Vztahové jméno se ponechá
+    NA ZAČÁTKU běhu (řeší ho vztahová šablona). None = sirotek (nehádat)."""
     lang = current()
     known, run = [], []
+
+    def flush():
+        parts = _split_run(run, is_node, relational)
+        if parts is None:
+            return False
+        known.extend(parts)
+        run.clear()
+        return True
+
     i = 0
     while i < len(tokens):
         tok = tokens[i]
         low = _norm(tok)
         if low in lang["relative_pronouns"]:   # „…autora KTERÝ napsal X"
-            if run:
-                known.append(("obj", " ".join(run)))
-                run = []
+            if not flush():
+                return None
             sub = _subquery(tokens[i + 1:], predicates)
             if sub is not None:
                 if known:
@@ -201,18 +269,16 @@ def _collect_known(tokens, predicates, relational):
                     known.append(("obj", sub))
             break
         boundary = (low in lang["interrogatives"] or low in lang["copula_forms"]
-                    or low in lang["query_skip_words"]
                     or _verb_match(tok, predicates) is not None)
         if boundary and low not in relational:
-            if run:
-                known.append(("obj", " ".join(run)))
-                run = []
+            if not flush():
+                return None
             i += 1
             continue
         run.append(tok)
         i += 1
-    if run:
-        known.append(("obj", " ".join(run)))
+    if run and not flush():
+        return None
     return known
 
 
