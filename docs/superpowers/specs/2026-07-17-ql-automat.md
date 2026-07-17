@@ -98,6 +98,31 @@ Taxonomie událostí (výchozí, roste testováním): `resolve.ambiguous`
     jako vztahové pojítko by mohla s menším ziskem aktivovat i navázané
     hrany. Vyžaduje experimenty a větší refaktor.
 
+## 3b. Časové primitivy a intervaly — Chronos (doplněk uživatele, 2026-07-17)
+
+10b. Iris umí pracovat s **časovými primitivy**: „dnes", „včera", „zítra",
+     „za hodinu", „před dvěma hodinami", „před týdnem"… — rozkládá je na
+     absolutní datum a čas relativně k okamžiku dotazu.
+10c. „Tento týden", „tento měsíc" → Iris generuje **struktury časových
+     intervalů** (půlotevřené ⟨start, end)) a umí s nimi počítat: příslušnost,
+     průnik, granularita (hodina/den/týden/měsíc/rok).
+10d. **Smysl = rozsvěcení přes čas**: má-li znalostní báze data provázaná na
+     čas, časový uzel spadající do intervalu se rozsvítí a přes něj (hranami
+     faktů) i propojení účastníci — časové zaostření je další aktivační
+     funkce sharpeneru; reverse lookup („Co se stalo…?") umí interval místo
+     přesného data.
+10e. Návrhová rozhodnutí (iterace): slovník primitiv, směrovek („před"/„za"/
+     „tento") a číslovek je **jazykové datum** (`cs.json`, klíč `temporal`);
+     intervalová aritmetika je univerzální kód (`jellyai/iris/chronos.py`);
+     **„teď" je VŽDY parametr** (`now`) — testy a benchmarky ho fixují
+     (determinismus!), živé API bere systémové hodiny. Napojení na graf přes
+     stávající `parse_date` (rok/měsíc/den časových uzlů); jemnější
+     granularita (hodiny) je v intervalech připravená pro budoucí báze.
+10f. **Princip: Iris je orientován v čase.** Automat zná „teď" svého běhu
+     (vstřikované, ne natvrdo) — každý relativní výraz umí ukotvit na časovou
+     osu a promítnout do aktivace. Čas je tak plnohodnotná osa zaostření,
+     rovnocenná jmenné (kdo/co) a prostorové (kde).
+
 ## 4. Dialogové UX — tři okna (web)
 
 11. **Okno 1 — dialog**: jen konverzace uživatel ↔ QL (dnešní konzole),
@@ -166,9 +191,11 @@ jellyai/iris/
 - **Fáze 1 — skelet Iris**: knihovna (automaton/state/patterns/assurance),
   pattern-karty infrastruktura, pseudo-QL parser jako první plugin,
   **REST API** s metadaty (absorbuje /query, /graphql, /schema), etalon drží.
-- **Fáze 2 — dialogové zaostřování**: karty clarifikace/focus-offer/poctivý
-  terminál/overflow; dialogové etalonové scénáře (ukázky z §1.1); rekurzivní
-  ostření (SubQuery).
+- **Fáze 2 — dialogové zaostřování + Chronos**: karty clarifikace/focus-offer/
+  poctivý terminál/overflow; dialogové etalonové scénáře (ukázky z §1.1);
+  rekurzivní ostření (SubQuery); **časové primitivy a intervaly** (§3b —
+  `chronos.py`, `temporal` tabulky v cs.json, rozsvěcení časových uzlů
+  intervalem, reverse lookup přes interval).
 - **Fáze 3 — web tři okna**: dialogové okno + aktivační okno uzlů + Aktivní
   dokumenty; vše přes REST API.
 - **Fáze 4 — sharpener**: cross-distribuce + vyzařování focusu; benchmark
