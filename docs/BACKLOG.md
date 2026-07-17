@@ -27,6 +27,8 @@
 | 20 | Vize | Osobnost/hlas databáze (persona nad Echo) | Far-away; závisí na Echo. | pozdější | 17 |
 | 21 | Infra | viewBase python testy: chybí httpx2 (6 souborů nekolektuje) | Doinstalovat/upravit testclient. | údržba | 18 |
 
+| 24 | Mnemos | **Negace dějů** — deník obsahuje `neprší (Už)` z „Už neprší.": predikát s ne- je jiný predikát, „Pršelo dnes?" ho (správně) nenajde; ale otázka „Prší?" by měla umět odpovědět „Ne, od 19:08 neprší" (negovaný fakt je evidence opaku). Jazyková tabulka negačního prefixu + párování predikát↔negace; „Už" se do objektů nemá ukládat (adverbium). | Karta/lang tabulka; promyslet s #10 (interval — od kdy neprší). | F3 | 8b |
+
 | 22 | Assurance v2 | ✅ HOTOVO: afinita filtruje soupeře (soupeř bez faktu predikátu není alternativa) — „Kde se narodil Jezis?" odpovídá rovnou, identitní dialogy zůstávají. | commit v main. | F2 | ✓ |
 | 23 | Mnemos | ✅ HOTOVO: rys `finite_verb` + karta `statement-event` — „Venku prší." se ukládá, „Prší venku?" → Ano; veto sloves přes doslovná slova uzlů. | commit v main. | F2 | ✓ |
 
