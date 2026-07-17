@@ -10,7 +10,8 @@
 
 | # | Oblast | Bod | Řešení / poznámka | Priorita |
 |---|--------|-----|-------------------|----------|
-| 9 | Viz / detail | Detail uzlu po rozkliknutí: **tvary/aliasy** (`graph.aliases`), kmen; vysvětlit řádky obj/subj (role, ve kterých se uzel účastní). | `viz/detail.py`; čistě prezentační — rychlá výhra, dobrý první úkol. | **1** |
+| 26 | Subsystémy | **Refaktor na společný půdorys** — spec `2026-07-18-subsystemy-iris.md`: port Subsystem (poznání/kanonizace/aktivace/záznamy), tři brány (E extrakce, Q nárok v parseru, A reflektor), fáze S0–S5. Obsahuje Chronos v2 (reminder-default „za čtvrt hodiny" + přeplánování, day_parts ráno=7:00 + učení uživatelem, registr kanálů console/window/alarm/email, okno Reminder), Topos v1 (gazetteer, kontejnment, slovesná třída pohybu — „Kde putoval Ježíš?"), Mnemos jako brána zápisu pro subsystémy. | Fáze po jedné, každá měřená; S0 mechanická. | **1** |
+| 9 | Viz / detail | Detail uzlu po rozkliknutí: **tvary/aliasy** (`graph.aliases`), kmen; vysvětlit řádky obj/subj (role, ve kterých se uzel účastní). | `viz/detail.py`; čistě prezentační — rychlá výhra, dobrý první úkol. | 2 |
 | 25 | Answerer | **Ranking identit** (etalon gap „Kdo je jezis?"→Kristus): šumová spona `být(Ježíš, Bůh)` ze „Syn Boha" přebíjí `jmenovat(Kristus)`/`druh(Mesiáš)`. | Preferuj DATOVOU cestu: „syn Boha" je vztah (genitiv), ne identita — guard v extrakci spony; případně karta (nabídka pater), NE natvrdo v kódu. | 2 |
 | 5 | Iris karty | **Zbytek**: `clarify-period`/`clarify-relation` karty (potřebují své eventy v turn()); glow-dominantní řazení výčtu po volbě oblasti. | Vzor: jak turn() hlásí `data.overflow` s `area_lit` guardem. | 3 |
 | 10 | Chronos | Interval jako **tvrdý filtr** odpovědi + E2E kovářova kobyla do etalonu (pozor: 1900 = 20. století); run_focus s časem. | Filtr v `_match` jen když otázka interval MÁ. | 4 |
