@@ -148,7 +148,9 @@ class ViewBaseView:
         Odpověď se do konzole píše přes `write` — uživatel ji vidí v prohlížeči
         (ne na stdoutu serveru).
         """
-        window = self._vb.TerminalWindow("konzole", title="Dotaz", prompt="❓ ")
+        # nezavíratelná (closable=False): po zavření by nebyla obnovitelná
+        window = self._vb.TerminalWindow("konzole", title="Dotaz", prompt="❓ ",
+                                         closable=False)
         self._terminal_id = window.window_id
         self._canvas.open_terminal(
             window, on_input=lambda event: on_input(getattr(event, "line", "")))
@@ -161,8 +163,9 @@ class ViewBaseView:
     def open_docs_panel(self):
         """Otevře druhé konzolové okno — živý panel nejaktivnějších dokumentů
         (attention nad soubory). Aktualizuje se `write_docs` po každém dotazu."""
+        # živý panel: bez vstupního řádku (input=False), nezavíratelný
         window = self._vb.TerminalWindow("dokumenty", title="📄 Aktivní dokumenty",
-                                         prompt="")
+                                         prompt="", closable=False, input=False)
         self._docs_id = window.window_id
         self._canvas.open_terminal(window, on_input=lambda event: None)
 
@@ -184,8 +187,9 @@ class ViewBaseView:
     def open_nodes_panel(self):
         """Otevře AKTIVAČNÍ OKNO — seznam uzlů seřazený podle jasu (největší
         nahoře), bez dialogu. Aktualizuje se `write_nodes` po každém tahu."""
+        # živý panel: bez vstupního řádku (input=False), nezavíratelný
         window = self._vb.TerminalWindow("aktivace", title="⚡ Aktivační okno",
-                                         prompt="")
+                                         prompt="", closable=False, input=False)
         self._nodes_id = window.window_id
         self._canvas.open_terminal(window, on_input=lambda event: None)
 
