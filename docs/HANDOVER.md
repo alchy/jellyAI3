@@ -31,14 +31,17 @@ model). Čti ho CELÝ před první změnou kódu. Doplňuje `docs/BACKLOG.md`
 
 ## 2. Stav (2026-07-18, commit 5e825a5)
 
-- **Metriky:** 431 testů, etalon 28/28 (+5 gap řádků), focus 12/12,
-  dialog 18/18 — vše 100 %. Graf: 7459 uzlů / 19117 faktů.
+- **Metriky:** 442 testů, etalon 28/28 (+5 gap řádků), focus 12/12,
+  dialog 21/21 — vše 100 %. Graf: 7459 uzlů / 19117 faktů.
 - **Hotovo:** faktový graf; pseudo-QL šablony (hybrid, UDPipe jen fallback);
   Iris karty + QueryAssurance; Chronos; Mnemos (deník `data/memory.jsonl`,
   připsané fakty s elidovaným subjektem); hygiena (upos/pád/životnost/
   uvozovky/lemma hlasování); kanonizace v1+v2 (nominativizace id);
   instanční vrstva fáze 1 (srůst jen z textového tvrzení „X řečený Y");
-  REST :8084; web 3 okna (viewBase — vlastní repo uživatele).
+  REST :8084; web 3 okna (viewBase — vlastní repo uživatele);
+  subsystémový půdorys S0–S2 (`jellyai/iris/subsystems/`, spec
+  `2026-07-18-subsystemy-iris.md`): připomínky s vlastním vláknem hodin,
+  okno Reminder, kanály, tvrdý časový filtr.
 - **Klíčová měření** (nedělej znovu, věř jim): kontextový otisk NEROZLIŠÍ
   identitu (Ježíš–Nazaretský 0.31 ≈ Jan–Křtitel 0.28 — první táž osoba,
   druzí dva lidé; manželé Němcovi 0.70). Proto srůst jmen jen z textového
@@ -112,13 +115,7 @@ voláš v místě rozhodnutí, kartu přidáš do `patterns/cs/`). Vzor: jak tur
 hlásí `data.overflow` s `area_lit` guardem. Plus glow-dominantní řazení
 výčtu po volbě oblasti (dnes aktivace jen řadí remízy).
 
-### #10 Chronos jako tvrdý filtr + „kovářova kobyla" E2E
-Dnes interval jen rozsvěcuje časové uzly (soft). Tvrdý filtr: v `_match`
-při dotazu s intervalem zahodit fakty, jejichž time účastník do intervalu
-nespadá (`interval.contains_date(parse_date(node))`). POZOR: jen když
-otázka interval MÁ; jinak nefiltrovat. E2E do etalonu: „21.1.1900 chodila
-kovářova kobyla bosa" → „Chodila kobyla bosa v 19. století?" → Ano /
-„…ve 20. století?" → (1900 = 20. století! pozor na hranici).
+### #10 — HOTOVO v S2 (tvrdý filtr, tests/test_time_filter.py); navazuje S3 Topos (spec §5).
 
 ### #24 Negace dějů
 Deník má `neprší (Už)`. Negační prefix „ne-" je jazykové pravidlo →

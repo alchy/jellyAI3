@@ -223,6 +223,11 @@ class IrisAutomaton:
                     statement["objects"] = rest
             if statement is not None:
                 return self._memorize(text, statement)
+        # VZPOMÍNÁNÍ („Co jsem ti řekl včera?") — Chronos filtr nad
+        # timestampy Mnemos; fráze z tabulky, texty karty memory.recall
+        recalled = self._recall_query(text)
+        if recalled is not None:
+            return recalled
         # DOTAZ NA PLÁN („Mám nějaké naplánované úkoly?") — aktivace jde
         # Chronosu: čekající připomínky, zúžené intervalem otázky
         plans = self._plan_query(text)
@@ -321,6 +326,39 @@ class IrisAutomaton:
                 self._note_card(card.name)
         return [card.dialog.format(task=item["task"]) if card
                 else item["task"] for item in due]
+
+    def _recall_query(self, text):
+        """„Co jsem ti řekl (včera / dnes / minulý týden)?" — výpis toho,
+        co uživatel svěřil paměti, zúžený časovým primitivem otázky
+        (Chronos nad timestampy Mnemos). Fakta uživatele = fakta grafu
+        s účastníkem `user_entity`; přísloví-poznámky se vypisují doslovně.
+
+        Returns:
+            IrisResponse | None: Výpis, nebo None (není dotaz na paměť).
+        """
+        low = deaccent(text.lower())
+        if not any(p in low for p in current()["recall_phrases"]):
+            return None
+        interval = resolve_temporal(text, self.clock())
+        user = current()["user_entity"]
+        items = []
+        for fact in self.answerer.graph.facts_of(user):
+            times = [p.node for p in fact.participants if p.role == "time"]
+            if interval is not None and not any(
+                    interval.contains_date(parse_date(t)) for t in times):
+                continue
+            others = [p.node for p in fact.participants
+                      if p.node != user and p.role != "time"]
+            label = times[0] if times else ""
+            items.append(f"{label} — {fact.predicate}: "
+                         f"{', '.join(others[:5])}")
+        items.sort()
+        card = self.deck.best("memory.recall", {"candidates": items})
+        if card is None:
+            return None
+        return self._plan_response(card,
+                                   card.dialog.format(items="\n".join(items)),
+                                   text)
 
     def _plan_query(self, text):
         """Dotaz na PLÁN („Mám nějaké naplánované úkoly?", „Nezapomněl jsem

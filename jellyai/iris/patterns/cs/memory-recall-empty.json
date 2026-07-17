@@ -1,0 +1,7 @@
+{
+  "name": "memory-recall-empty",
+  "trigger": {"event": "memory.recall"},
+  "dialog": "V tom období jsi mi nic neřekl.",
+  "action": {},
+  "teach": "Dotaz na paměť s prázdným (intervalem vyprázdněným) výsledkem — poctivá odpověď."
+}

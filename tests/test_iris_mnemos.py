@@ -200,6 +200,32 @@ def test_explicit_memory_commands_structured_and_note(tmp_path):
                for f in fresh.graph.facts.values())
 
 
+def test_recall_what_i_told_you_by_interval():
+    """Vzpomínání (zadání): „Co jsem ti řekl včera / dnes / minulý
+    týden?" — timestampy Mnemos × intervaly Chronos. Hodiny se posouvají
+    mezi výroky; výpis se zužuje intervalem otázky."""
+    from datetime import timedelta
+    moment = [NOW]
+    answerer = GraphAnswerer(FactGraph(), FakeUfalClient(),
+                             ExtractiveAnswerer(AnswererConfig()),
+                             query_mode="templates",
+                             clock=lambda: moment[0])
+    iris = IrisAutomaton(answerer, clock=lambda: moment[0])
+    iris.turn("Dnes jsem měl knedlíky.")            # pátek 17. 7.
+    moment[0] = NOW + timedelta(days=1)             # sobota 18. 7.
+    iris.turn("Venku prší.")
+    out = iris.turn("Co jsem ti řekl včera?")
+    assert "knedlíky" in out.text and "prší" not in out.text
+    assert "memory-recall" in out.used["patterns"]
+    out = iris.turn("Co jsem ti řekl dnes?")
+    assert "prší" in out.text and "knedlíky" not in out.text
+    moment[0] = NOW + timedelta(days=4)             # úterý dalšího týdne
+    out = iris.turn("Co jsem ti řekl minulý týden?")
+    assert "knedlíky" in out.text and "prší" in out.text
+    out = iris.turn("Co jsem ti řekl dnes?")
+    assert "memory-recall-empty" in out.used["patterns"]
+
+
 def test_full_dumpling_scenario_via_iris():
     """Scénář uživatele: konstatování → paměť; otázka s „v tomto roce" →
     odpověď z Mnemos faktu (Chronos ukotvil čas při uložení)."""

@@ -53,7 +53,12 @@ def test_nested_places_teach_containment(tmp_path):
     answerer = GraphAnswerer(FactGraph(), FakeUfalClient(),
                              ExtractiveAnswerer(AnswererConfig()),
                              query_mode="templates", clock=lambda: NOW)
-    answerer._gazetteer_path = str(tmp_path / "gaz.jsonl")   # učení do tmp
+    seed = tmp_path / "gaz.jsonl"                            # čistý tmp seed
+    seed.write_text('{"place": "Praha", "in": "Čechy"}\n'
+                    '{"place": "Čechy", "in": "Česko"}\n', encoding="utf-8")
+    answerer._gazetteer_path = str(seed)
+    answerer._gazetteer = load_gazetteer(str(seed))
+    answerer._area_keys = area_keys(answerer._gazetteer)
     iris = IrisAutomaton(answerer, clock=lambda: NOW)
     out = iris.turn("Zapamatuj si, že Pavla a Matěj bydlí na Barrandově "
                     "v Praze.")

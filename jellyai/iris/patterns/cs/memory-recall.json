@@ -1,0 +1,7 @@
+{
+  "name": "memory-recall",
+  "trigger": {"event": "memory.recall", "min_candidates": 1},
+  "dialog": "🧠 Řekl jsi mi:\n{items}",
+  "action": {},
+  "teach": "Vzpomínání (Co jsem ti řekl včera / dnes / minulý týden?) — výpis faktů uživatele z paměti Mnemos, zúžený časovým primitivem otázky (Chronos nad timestampy). Fráze nese tabulka recall_phrases."
+}
