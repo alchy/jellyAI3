@@ -81,6 +81,21 @@ def _leftover_terms(tokens, pattern, predicates):
     return out
 
 
+def _exact_predicate(token, predicates):
+    """Tvar je DOSLOVA predikátem grafu (i jako l-kmen: „měli"→„měl").
+
+    Přesná shoda přebíjí čtení entity (entity-first veto platí jen pro
+    prefixové odhady) — graf tento predikát opravdu nese, typicky z paměti
+    Mnemos, a nesmí ho přehlušit náhodný uzel s volnou kmenovou shodou.
+    """
+    low = _norm(token)
+    normalized = {_norm(p) for p in predicates}
+    if low in normalized:
+        return True
+    stripped = low.rstrip("aioy")
+    return stripped.endswith("l") and stripped in normalized
+
+
 def _verb_match(token, predicates, first=False):
     """Predikát grafu, jehož kmen je prefixem tvaru dotazu (napsal→napsat).
 
@@ -183,10 +198,12 @@ def build_query(question, predicates, is_node=None):  # pylint: disable=too-many
                     if k and _norm(t) in lang["relative_pronouns"]),
                    len(tokens))
     # ENTITY-FIRST: tvar, který se rozřeší na uzel grafu, je entita, ne
-    # sloveso — „rodinou" se nesmí prefixem spárovat s predikátem „rodit"
+    # sloveso — „rodinou" se nesmí prefixem spárovat s predikátem „rodit".
+    # PŘESNÝ predikát („měl" z paměti Mnemos) ale entita nepřebije.
     verb_tok = next((t for t in tokens[:rel_idx]
                      if _norm(t) not in relational
-                     and not (is_node is not None and is_node(t))
+                     and (_exact_predicate(t, predicates)
+                          or not (is_node is not None and is_node(t)))
                      and _verb_match(t, predicates)), None)
     verb = _verb_match(verb_tok, predicates) if verb_tok else None
     # rod nese tvar slovesa (l-ové příčestí), u spony tvar spony („byla")
@@ -360,7 +377,8 @@ def _collect_known(tokens, predicates, relational, is_node):
         boundary = (low in lang["interrogatives"] or low in lang["copula_forms"]
                     or low in lang["date_part_forms"]
                     or (_verb_match(tok, predicates) is not None
-                        and not (is_node is not None and is_node(tok))))
+                        and (_exact_predicate(tok, predicates)
+                             or not (is_node is not None and is_node(tok)))))
         if boundary and low not in relational:
             if not flush():
                 return None
