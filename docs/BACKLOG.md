@@ -1,35 +1,48 @@
 # BACKLOG — otevřené body (živý dokument)
 
 > Aktualizuj při každém uzavření/přidání bodu. Stav ke commitu: viz git log.
-> Metriky teď: 414 testů, etalon 27/27 (5 gap), focus 12/12, dialog 16/16 (100 %).
+> Metriky teď: **429 testů, etalon 27/27 (+5 gap), focus 12/12, dialog 16/16 — 100 %.**
+>
+> **➡️ PŘEDÁNÍ PRÁCE: čti nejdřív `docs/HANDOVER.md`** — zákony projektu,
+> testovací smyčka, implementační tipy ke každému otevřenému bodu, pasti.
 
-| # | Oblast | Bod | Řešení / poznámka | Fáze | Priorita |
-|---|--------|-----|-------------------|------|----------|
-| 1 | Kanonizace | ✅ **v1+v2 HOTOVO** — v2 (nominativizace id): hlasování `propn_lemma_votes` (PROPN + kapitalizované NOUN uvnitř věty — „Boha" má v taggeru lexikon NOUN; lemma malými se kapitalizuje, zmrzačené krátké lemma „Le" nesoudí), `nominativize` přemapuje 343 skloněných id na lemma se SLOUČENÍM do existujících nominativů: Betlémě→Betlém, Boha→Bůh (429+1143=1572), Jeruzalémě→Jeruzalém, Šimona→Šimon, Válku→Válka; typy se nemění, časové uzly nedotčeny, staré povrchy jako aliasy. POZOR nález: vakuová kompatibilita bezkmenných id v instanční vrstvě („Le" pohltilo Ježíše) — opraveno guardem. | commit v main. | F5 | ✓ |
-| 2 | Hygiena dat | ✅ **z většiny HOTOVO** (hygiene.py — hlasování upos: −394 účastníků, −353 faktů; hodit/dovoleno-jako-obj/Izaiáš pryč, strukturní predikáty whitelist). **Zbytek**: uzel „mle" (NOUN mangle — potřebuje lemma↔form konzistenci), kapitalizované slovesné predikáty (Chvalte/Chce — kosmetika /schema), „dovoleno" jako pred/attr role (tam ADJ patří — projeví se jen u vadných faktů). ✅ NER slepence osob VYŘEŠENY pádovou shodou (`name_case_agreement` v cs.json): víceslovné jméno se skloňuje ve shodě, lokální pád tokenu + korpusový fallback (kryje mis-tagy: „Ježíš" ve větě Jan 11,5 = VERB, ale 400× Nom jinde) — „Ježíš Martu" (827 výskytů janovského Ježíše!) pryč, janovská fakta na pravém „Ježíš Nazaretský"; bonus „Boženy Němcové" mis-tagy, „Hugo Sonnenscheina". Tři střepy Ježíše (holý/Nazaretský/Krista) sjednotí #8. | commit v main. | F5 | 2→zbytek |
-| 3 | Hygiena dat | ✅ **HOTOVO** — 4 guardy: (a) `scrub_semantics` životnost: osoba pod neživotným druhem padá (druh(Dorothea, vztah), druh(Abraham, chléb) — 33 faktů; subjekt sám neživotný „Týdenník" drží), (b) reifikovaný vztah bez obj protistrany padá (žena+9×časů), (c) uvozovky přilepené tokenizací/NER pryč ze všech uzlových cest (66→0 uzlů), (d) pádový fallback ≥2 jednomyslné hlasy — flat-monstrum „Masaryka Svatopluk Beneš" (váha 117) rozbito. | commit v main. | F5 | ✓ |
-| 4 | Iris karty | ✅ HOTOVO: `deck.best` (těsnost triggeru → priorita), telemetrie karet (použití + měřený zisk aktivace). | commit 6c52f93. | F2 | ✓ |
-| 5 | Iris karty | ✅ **data-overflow HOTOVO**: „Co řekl Ježíš?" → nabídka oblastí (adresátů), volba → aktivační zúžení (replace_term=false, area_lit guard, teplo účastníků v remízách). **Zbytek**: `clarify-period`/`clarify-relation` karty (potřebují své eventy); glow-dominantní řazení výčtu po volbě oblasti (dnes base drží stabilitu, aktivace jen řadí remízy). | commit 6c52f93. | F2 | 5→zbytek |
-| 6 | Mnemos | ✅ **HOTOVO**: karta `statement-attributed` (l-příčestí bez 1. osoby/spony, subjekt z kontextu) — „Měl KČ rád knedlíky?" → nenašel (entity otázky se ROZSVÍTÍ — rozřešení je zaostření) → „ano, měl rád knedlíky." → připsáno žhavé osobě → „Ano". Explicitní osoba ve výroku > těžiště; bez žhavé osoby se nepřipisuje. Navíc: zjišťovací otázka s neznámým l-slovesem (existenční šablona bez slovníku), „Pršelo dnes?" (l-tvar↔prézens, existence bez účastníků, časová slova = Chronos filtr), momentová přesnost dějů (`time_granularity` na kartě), únik z nabídky novou otázkou. | commit v main. | F2/F3 | ✓ |
-| 7 | Mnemos | **Učení pojmů dialogem** — „Co jsou závody aut?" → karta `data-empty`: „můžeš vysvětlit?" → vysvětlení se rozloží extrakční pipeline (extract_facts nad větou — build-side, UDPipe povoleno) → fakty s tématem do deníku | KRITICKY PROMYSLET (kvalita, zneužití, konflikty se statickou bází — verzování deníku, zdroj=uživatel). Koncept jasný, realizace po 6. | F3 | 6 |
-| 8 | Graf — koncept | **Jméno není entita** — ✅ **fáze 1 HOTOVÁ** (spec `2026-07-18-jmenny-uzel-instance.md`): extrakce `jmenovat` („X řečený/zvaný Y", Mt 1,16), srůst střepů VÝHRADNĚ z textového tvrzení + otisková korobrace ≥3 („Ježíše Krista"→„Ježíš", Šimon Petr↔Šimona; 6 srůstů), `graph.name_families` (169 rodin pro dialog), identitní fallback jmenovat. MĚŘENÍM doloženo: otisk sám identitu nerozliší (Ježíš–Nazaretský 0.31 ≈ Jan–Křtitel 0.28; manželé Němcovi 0.70!) — slepý statistický srůst vyloučen, nejednoznačnost řeší dialog. **Fáze 2 otevřená**: instance per odstavec, rozpuštění dvou-osobových slepenců („Áronovi Mojžíš"), jmenovka jako uzel typu jméno, Toyota s #7. Pozn. (user): extrakční parser by měl mít mírný kontext okolí. | F5+ | 7 |
-| 9 | Viz / detail | Detail uzlu po rozkliknutí: doplnit **tvary/aliasy a kmen (ocas)**; popsat řádky obj/subj (= vazby uzlu ve faktech: u „nenastat" obj: zemětřesení, subj: konec — role, ve kterých se uzel účastní) | `viz/detail.py` — přidat řádky „tvary" (graph.aliases) a „kmen"; přejmenovat/vysvětlit popisky rolí. | teď | **2b** (rychlá výhra) |
-| 10 | Chronos | Interval jako tvrdý filtr odpovědi + E2E kovářova kobyla do etalonu; run_focus s časem | — | F2 | 8 |
-| 11 | Metron | „Kolikrát letos pršelo?" = počítání výskytů faktů; zavře gap „Kolik měla dětí BN?" | Nová díra typu počet-výskytů + jazyková tabulka „kolikrát". | F2/F4 | 9 |
-| 12 | Topos | Hierarchie míst (Praha ⊂ Čechy), containment jako intervaly, „tady/poblíž" | Paralela Chronosu. | F4 | 10 |
-| 13 | Sharpener | Cross-distribuce + vyzařování focusu po hranách; váhy v configu; K-křivka run_focus | — | F4 | 11 |
-| 14 | Čistý řez | UDPipe pryč z query (gate splněn), `graph_answerer.py` → Iris pluginy, pohrobci → `conserved_` | — | F5 | 12 |
-| 15 | Coverage | Anaforický kbelík (2 136 vět se zájmenným podmětem) | — | F5+ | 13 |
-| 16 | Etalon gapy | BN copula-profese; Kolik dětí (→ Metron); Kde působila; „Jaka babicka?" | — | průběžně | 14 |
-| 17 | Infra | Konsolidace souborové struktury dat: `data/` (graph.pkl, annotations.pkl, memory.jsonl, budoucí extended knowledge) — jasná mapa statické × uživatelské znalosti | Malý úklid + README sekce. | F3 | 15 |
-| 18 | Dokumentace | **Revize dokumentace agenty** — porovnat docs vs. stav, přizpůsobit, findings jako review | Spuštěno (agent). | teď | běží |
-| 19 | Experiment | Hybridní aktivace uzel × hrana | Metrika → prototyp za flagem. | F6 | 16 |
-| 20 | Vize | Osobnost/hlas databáze (persona nad Echo) | Far-away; závisí na Echo. | pozdější | 17 |
-| 21 | Infra | viewBase python testy: chybí httpx2 (6 souborů nekolektuje) | Doinstalovat/upravit testclient. | údržba | 18 |
+## Otevřené (v pořadí priority)
 
-| 24 | Mnemos | **Negace dějů** — deník obsahuje `neprší (Už)` z „Už neprší.": predikát s ne- je jiný predikát, „Pršelo dnes?" ho (správně) nenajde; ale otázka „Prší?" by měla umět odpovědět „Ne, od 19:08 neprší" (negovaný fakt je evidence opaku). Jazyková tabulka negačního prefixu + párování predikát↔negace; „Už" se do objektů nemá ukládat (adverbium). | Karta/lang tabulka; promyslet s #10 (interval — od kdy neprší). | F3 | 8b |
+| # | Oblast | Bod | Řešení / poznámka | Priorita |
+|---|--------|-----|-------------------|----------|
+| 9 | Viz / detail | Detail uzlu po rozkliknutí: **tvary/aliasy** (`graph.aliases`), kmen; vysvětlit řádky obj/subj (role, ve kterých se uzel účastní). | `viz/detail.py`; čistě prezentační — rychlá výhra, dobrý první úkol. | **1** |
+| 25 | Answerer | **Ranking identit** (etalon gap „Kdo je jezis?"→Kristus): šumová spona `být(Ježíš, Bůh)` ze „Syn Boha" přebíjí `jmenovat(Kristus)`/`druh(Mesiáš)`. | Preferuj DATOVOU cestu: „syn Boha" je vztah (genitiv), ne identita — guard v extrakci spony; případně karta (nabídka pater), NE natvrdo v kódu. | 2 |
+| 5 | Iris karty | **Zbytek**: `clarify-period`/`clarify-relation` karty (potřebují své eventy v turn()); glow-dominantní řazení výčtu po volbě oblasti. | Vzor: jak turn() hlásí `data.overflow` s `area_lit` guardem. | 3 |
+| 10 | Chronos | Interval jako **tvrdý filtr** odpovědi + E2E kovářova kobyla do etalonu (pozor: 1900 = 20. století); run_focus s časem. | Filtr v `_match` jen když otázka interval MÁ. | 4 |
+| 24 | Mnemos | **Negace dějů** — „Prší?" s faktem `neprší(čas T)` → „Ne, od T neprší" (negovaný fakt je evidence opaku); „Už" se do objektů nemá ukládat. | Negační prefix do cs.json; párování predikát↔negace mechanismem, text kartou; promyslet s #10. | 5 |
+| 11 | Metron | „Kolikrát letos pršelo?" = díra typu počet-výskytů; zavře gap „Kolik měla dětí BN?". | Tázací tabulka cs.json + počítání faktů (s filtrem #10). | 6 |
+| 7 | Mnemos | **Učení pojmů dialogem** — „Co jsou závody aut?" → karta `data-empty` → vysvětlení rozloží extrakční pipeline → fakty do deníku. | KRITICKY PROMYSLET: verzování deníku, zdroj=uživatel, nikdy tiše nepřepsat korpus. | 7 |
+| 8 | Graf — koncept | **Jméno není entita — fáze 2** (spec `2026-07-18-jmenny-uzel-instance.md`): instance per odstavec, rozpuštění dvou-osobových slepenců („Áronovi Mojžíš"), jmenovka jako uzel typu jméno; Toyota s #7. | VELKÉ. Čti spec + měření (otisk identitu nerozliší!); pozor na vakuovou kompatibilitu (případ „Le"). Pozn. (user): extrakční parser by měl mít mírný kontext okolí. | 8 |
+| 13 | Sharpener | Cross-distribuce + vyzařování focusu po hranách (kontext hrany slabší); váhy v configu; K-křivka run_focus. | — | 9 |
+| 12 | Topos | Hierarchie míst (Praha ⊂ Čechy), containment, „tady/poblíž". | Paralela Chronosu; tabulky v cs.json. | 10 |
+| 14 | Čistý řez | UDPipe pryč z query (gate splněn: etalon 27/27 v `--mode templates`), answerer → Iris pluginy, pohrobci → `conserved_`. | Mechanické; po něm zmizí závislost dotazů na ÚFAL službách. | 11 |
+| 2 | Hygiena dat | **Zbytek**: uzel „mle" (NOUN mangle — lemma↔form konzistence), kapitalizované slovesné predikáty (Chvalte), „dovoleno" v pred/attr. | Vzor: hlasování v hygiene.py. | 12 |
+| 15 | Coverage | Anaforický kbelík (~2 100 vět se zájmenným podmětem). | — | 13 |
+| 16 | Etalon gapy | BN copula-profese; Kolik dětí (→ #11); Kde působila; „Jaka babicka?". | Průběžně s příslušnými body. | 14 |
+| 17 | Infra | Konsolidace `data/` (mapa statické × uživatelské znalosti) + README sekce. | Malý úklid. | 15 |
+| 21 | Infra | viewBase python testy: chybí httpx2 (6 souborů nekolektuje). | Doinstalovat/upravit testclient. | 16 |
+| 19 | Experiment | Hybridní aktivace uzel × hrana. | Metrika → prototyp za flagem. | 17 |
+| 20 | Vize | Osobnost/hlas databáze (persona nad Echo). | Závisí na Echo (kompozice). | 18 |
 
-| 22 | Assurance v2 | ✅ HOTOVO: afinita filtruje soupeře (soupeř bez faktu predikátu není alternativa) — „Kde se narodil Jezis?" odpovídá rovnou, identitní dialogy zůstávají. | commit v main. | F2 | ✓ |
-| 23 | Mnemos | ✅ HOTOVO: rys `finite_verb` + karta `statement-event` — „Venku prší." se ukládá, „Prší venku?" → Ano; veto sloves přes doslovná slova uzlů. | commit v main. | F2 | ✓ |
+## Hotovo (archiv — detaily v git logu)
 
-Trvalé zásady: stavový automat i znalostní báze se rozšiřují **json kartami/soubory**, logika nikdy fixně v kódu; každá změna měřena (etalon/focus/dialog/coverage).
+| # | Bod | Výsledek |
+|---|-----|----------|
+| 1 | Kanonizace v1+v2 | Pádové clustery + poziční merge; **nominativizace id** (`propn_lemma_votes` + `nominativize`, 343 id: Betlémě→Betlém, Boha+Bůh=1572, Šimona→Šimon); guard vakuové kompatibility („Le"). |
+| 2 | NER slepence osob | Pádová shoda jmen (`name_case_agreement`): korpus první, ≥2 jednomyslné hlasy — „Ježíš Martu" (827!), „Masaryka Svatopluk Beneš" pryč. |
+| 3 | Sémantické guardy | Životnost (osoba pod neživotným druhem), vztah bez protistrany, uvozovky (66→0), pádový práh. |
+| 4 | Iris benefit-výběr | `deck.best` (těsnost → priorita) + telemetrie karet (použití + měřený zisk). |
+| 5 | Data-overflow | „Co řekl Ježíš?" → nabídka oblastí, volba → aktivační zúžení. |
+| 6 | Mnemos připsané fakty | „ano, měl rád knedlíky." → subjekt z těžiště; rozřešení je zaostření; „Pršelo dnes?"; momentový čas dějů; únik z nabídky otázkou. |
+| 8f1 | Instance fáze 1 | Srůst JEN z textového tvrzení „X řečený Y" (+ otisk ≥3): „Ježíše Krista"→„Ježíš"; name_families (169); spec s měřeními. |
+| 22 | Assurance v2 | Afinita filtruje soupeře — bez faktu predikátu není alternativa. |
+| 23 | Mnemos události | „Venku prší." → fakt; „Prší venku?" → Ano. |
+
+Trvalé zásady: automat i znalostní báze se rozšiřují **JSON kartami/soubory**,
+logika nikdy fixně v kódu; každá změna měřena (etalon/focus/dialog/coverage);
+dialog > figly. Podrobně `docs/HANDOVER.md`.
