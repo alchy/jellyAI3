@@ -120,6 +120,24 @@ def test_yes_no_needs_leading_verb():
     assert build_query("Karel Čapek napsal?", {"napsat"}, is_node) is None
 
 
+def test_type_filter_roles():
+    """„Jakou hru napsal Karel Čapek?" → filtr obj=hru, téma subj=Karel Čapek."""
+    is_node = _nodes("hru", "Karel Čapek")
+    q = build_query("Jakou hru napsal Karel Čapek?", {"napsat"}, is_node)
+    assert q.pattern.hole_role == "attr"
+    assert ("obj", "hru") in q.pattern.known
+    assert ("subj", "Karel Čapek") in q.pattern.known
+
+
+def test_type_filter_prodrop_keeps_obj_role():
+    """„Jakou hru napsal?" (pro-drop) → jediný known jako obj, aby
+    _fill_subject směl doplnit podmět z konverzačního těžiště."""
+    is_node = _nodes("hru")
+    q = build_query("Jakou hru napsal?", {"napsat"}, is_node)
+    assert q.pattern.known == [("obj", "hru")]
+    assert q.pattern.hole_role == "attr" and q.gender == "Masc"
+
+
 def test_query_gender_from_verb_form():
     q = build_query("Kdy se narodila Božena Němcová?", {"narodit"})
     assert q.gender == "Fem" and q.qtype == "Kdy"

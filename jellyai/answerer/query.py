@@ -185,11 +185,18 @@ def build_query(question, predicates, is_node=None):  # pylint: disable=too-many
 
     # 2) predikát ze slovníku grafu (slovesný tvar → lemma prefixem)
     if verb is not None and known:
-        # role známé entity je komplement díry: díra subj → entita obj,
-        # jinak entita je podmět tématu („Kde se narodil X" → subj=X, díra loc)
-        role = "obj" if hole_role == "subj" else "subj"
-        known = [(role if isinstance(term, str) else r, term)
-                 for r, term in known]
+        if hole_role == "attr":
+            # výběrová otázka (spec 4.6): první known (hned za tázacím slovem)
+            # = typový filtr díry (obj), další entity jsou téma (subj) — join
+            # napsat(X,?) ∧ druh/být(?,hra) řeší answererův _typed_match
+            known = [("obj" if i == 0 else "subj", term)
+                     for i, (r, term) in enumerate(known)]
+        else:
+            # role známé entity je komplement díry: díra subj → entita obj,
+            # jinak entita je podmět tématu („Kde se narodil X" → subj=X)
+            role = "obj" if hole_role == "subj" else "subj"
+            known = [(role if isinstance(term, str) else r, term)
+                     for r, term in known]
         return _wrap(Pattern(verb, known, hole_role, hole_type))
 
     # 3) sponová identita: „Kdo je X?" / „Jaký je X?"
