@@ -27,4 +27,7 @@
 | 20 | Vize | Osobnost/hlas databáze (persona nad Echo) | Far-away; závisí na Echo. | pozdější | 17 |
 | 21 | Infra | viewBase python testy: chybí httpx2 (6 souborů nekolektuje) | Doinstalovat/upravit testclient. | údržba | 18 |
 
+| 22 | Assurance v2 | „Kde se narodil Jezis?" přes Iris teď dává nabídku místo přímé odpovědi (soupeři sráží jistotu) — **afinita predikátu má jistotu zvedat**: vítěz s narodit-faktem vs. soupeři bez něj = vysoká jistota volby. Doplnit do `assurance()` (affinity vítěze vs. soupeřů) + karta prahy přeměřit. | Demo nález 2026-07-17. | F2 | **3b** |
+| 23 | Mnemos | „Venku prší." se nepozná (observace vyžaduje sponu; prézentní sloveso chybí) — nová statement karta + rys `finite_verb` (prézens) v `utterance_features`. | Demo nález 2026-07-17. | F2 | 6b |
+
 Trvalé zásady: stavový automat i znalostní báze se rozšiřují **json kartami/soubory**, logika nikdy fixně v kódu; každá změna měřena (etalon/focus/dialog/coverage).
