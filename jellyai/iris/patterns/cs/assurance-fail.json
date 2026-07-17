@@ -1,6 +1,6 @@
 {
   "name": "assurance-fail",
-  "trigger": {"event": "focus.low", "priority": 0},
+  "trigger": {"event": "focus.low", "min_candidates": 1, "priority": 0},
   "dialog": "Nepodařilo se mi zaostřit dotaz dostatečně. Nejbližší možné odpovědi jsou: {candidates}.",
   "action": {"warm_candidates": 0.3},
   "teach": "Upřímný terminál: jistota zaostření nedosáhla prahu a není co dál nabízet — automat NEhádá, přizná to a vypíše nejbližší kandidáty (seřazené skóre). Kandidáti se zahřejí, takže i tahle odpověď zlepšuje aktivaci pro další tah."

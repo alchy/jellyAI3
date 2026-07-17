@@ -74,6 +74,31 @@ def test_clock_answers_day_and_time():
     assert clock_answer("Kdo napsal Babičku?", NOW) is None
 
 
+def test_interval_in_question_warms_matching_time_nodes():
+    """Časové primitivum v otázce rozsvítí časové uzly grafu ležící
+    v intervalu — čas je osa zaostření (aktivace, ne filtr)."""
+    from config import AnswererConfig
+    from jellyai.answerer.extractive import ExtractiveAnswerer
+    from jellyai.answerer.graph_answerer import GraphAnswerer
+    from jellyai.graph.graph import FactGraph
+    from jellyai.graph.extract import make_fact, Participant
+    from jellyai.iris.automaton import IrisAutomaton
+    from jellyai.ufal_client import FakeUfalClient
+    g = FactGraph()
+    g.add_fact(make_fact("pršet", [Participant("subj", "déšť", "concept"),
+                                   Participant("time", "12. července 2026", "time")]))
+    g.add_fact(make_fact("narodit", [Participant("subj", "Božena Němcová", "person"),
+                                     Participant("time", "2. května 1818", "time")]))
+    iris = IrisAutomaton(GraphAnswerer(g, FakeUfalClient(),
+                                       ExtractiveAnswerer(AnswererConfig()),
+                                       query_mode="templates"),
+                         clock=lambda: NOW)
+    iris.turn("Co se stalo tento měsíc?")
+    scores = iris.answerer.context.scores
+    assert scores.get("12. července 2026", 0) > 0     # v intervalu → svítí
+    assert scores.get("2. května 1818", 0) == 0       # mimo interval → tma
+
+
 def test_automaton_routes_clock_question_to_chronos():
     """Automat s injektovaným clock: hodinová otázka jde Chronosu, ne grafu."""
     from tests.test_iris_automaton import _brothers_graph, _iris

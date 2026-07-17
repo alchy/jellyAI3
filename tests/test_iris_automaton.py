@@ -77,6 +77,20 @@ def test_unanswerable_gets_honest_terminal():
     assert "assurance-fail" in out.used["patterns"]
 
 
+def test_empty_deck_means_mechanism_only():
+    """ZÁKON: rozhodnutí nesou karty — bez karet automat vždy odpovídá
+    (žádný dialog není zadrátovaný v kódu)."""
+    from jellyai.iris.patterns import PatternDeck
+    answerer = GraphAnswerer(_brothers_graph(), FakeUfalClient(),
+                             ExtractiveAnswerer(AnswererConfig()),
+                             query_mode="templates")
+    empty = PatternDeck.__new__(PatternDeck)
+    empty.directory, empty.cards = None, []
+    iris = IrisAutomaton(answerer, deck=empty)
+    out = iris.turn("Kdo je Čapek?")      # homonymum, ale bez karty → odpověď
+    assert out.kind == "answer"
+
+
 def test_plain_miss_keeps_fallback_text():
     """Nic rozlišeného (parser None) → poctivé „nenašel" fallbacku beze změny."""
     iris = _iris(_brothers_graph())

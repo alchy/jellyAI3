@@ -25,8 +25,9 @@ from dataclasses import dataclass, field
 from datetime import datetime
 
 from jellyai.graph.canon import deaccent
+from jellyai.graph.graph import parse_date
 from jellyai.iris.assurance import assurance
-from jellyai.iris.chronos import clock_answer
+from jellyai.iris.chronos import clock_answer, resolve_temporal
 from jellyai.iris.mnemos import parse_statement, remember
 from jellyai.iris.patterns import PatternDeck
 from jellyai.iris.presenter import activation_window, docs_window
@@ -69,14 +70,17 @@ class IrisResponse:
 class IrisAutomaton:
     """Stavový automat zaostření nad jedním answererem (jedna konverzace)."""
 
-    def __init__(self, answerer, deck=None, threshold=0.55, clock=None):
+    def __init__(self, answerer, deck=None, clock=None):
         """Vytvoří automat.
+
+        ZÁKON: žádné prahy ani rozhodnutí v kódu — kdy se vede dialog a kdy
+        odpovídá, určují VÝHRADNĚ karty (triggery `assurance_below`,
+        `min_candidates`…). Automat jen hlásí události a vykonává akce.
 
         Args:
             answerer (GraphAnswerer): Odpovídací plugin (drží graf i pole).
             deck (PatternDeck | None): Balíček pattern-karet; None = vestavěné
                 karty češtiny (`patterns/cs/`).
-            threshold (float): Práh QueryAssurance — pod ním se vede dialog.
             clock (callable | None): Zdroj „teď" (Chronos — časová kotva);
                 None = systémové hodiny, testy vstřikují fixní čas.
         """
@@ -85,7 +89,6 @@ class IrisAutomaton:
             deck = PatternDeck.for_language("cs")
             deck.load()
         self.deck = deck
-        self.threshold = threshold
         self.clock = clock or datetime.now
         self.state = FocusState()
 
@@ -128,6 +131,12 @@ class IrisAutomaton:
             statement = parse_statement(text, self.clock(), self.deck)
             if statement is not None:
                 return self._memorize(text, statement)
+        # ČASOVÁ OSA ZAOSTŘENÍ: primitivum v otázce („tento měsíc", „včera")
+        # rozsvítí časové uzly grafu ležící v intervalu JEŠTĚ PŘED odpovědí —
+        # ranking answereru pak remízy řadí i podle této aktivace
+        interval = resolve_temporal(text, self.clock())
+        if interval is not None:
+            self._warm_interval(interval)
         # jas PŘED tahem: „zaostřil už uživatel?" — tah sám si téma rozsvítí,
         # takže čtení po odpovědi by jistotu falešně zvedlo
         before = dict(self.answerer.context.scores)
@@ -143,21 +152,31 @@ class IrisAutomaton:
         context = {"assurance": assur, "candidates": candidates,
                    "term": res["term"] if res else text}
 
-        if answer.trace and (not candidates[1:] or assur >= self.threshold):
-            return self._respond(answer, "answer", assur, used_patterns)
+        # ROZHODUJÍ KARTY: automat jen ohlásí událost tahu (odpověď na
+        # hádané volbě → resolve.ambiguous; bez odpovědi → focus.low)
+        # a karta — pokud její trigger sedí — určí dialogovou reakci
         if answer.trace:
-            # odpověď stojí na hádání mezi rovnocennými kandidáty → nabídka
             card = self.deck.match("resolve.ambiguous", context)
             if card is not None:
                 return self._dialog(card, context, text, used_patterns)
             return self._respond(answer, "answer", assur, used_patterns)
-        if candidates:
-            # rozlišeno, ale bez odpovědního faktu → upřímný terminál
-            card = self.deck.match("focus.low", context)
-            if card is not None:
-                return self._dialog(card, context, text, used_patterns,
-                                    await_pick=False)
+        card = self.deck.match("focus.low", context)
+        if card is not None:
+            return self._dialog(card, context, text, used_patterns,
+                                await_pick=False)
         return self._respond(answer, "answer", assur, used_patterns)
+
+    def _warm_interval(self, interval, warmth=0.5):
+        """Rozsvítí časové uzly grafu spadající do intervalu (Chronos osa).
+
+        Mechanismus, ne rozhodnutí: interval → `contains_date` nad
+        `parse_date` každého časového uzlu; svítí uzel (spread answereru
+        pak jas roznese na fakty kolem něj).
+        """
+        for node in self.answerer.graph.nodes.values():
+            if node.type == "time" \
+                    and interval.contains_date(parse_date(node.id)):
+                self.answerer.context.warm(node.id, warmth)
 
     def _memorize(self, text, statement):
         """Uloží konstatování do grafu (Mnemos) a rozsvítí jeho uzly.

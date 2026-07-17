@@ -116,7 +116,7 @@ def main():
     answerer = make_graph_answerer(config)
     deck = PatternDeck.for_language(config.graph.language)
     deck.load()
-    automaton = IrisAutomaton(answerer, deck, config.graph.assurance_threshold)
+    automaton = IrisAutomaton(answerer, deck)   # prahy nesou karty (ZÁKON)
     posts, gets = make_routes(automaton, deck)
     serve(args.host, args.port, posts, gets)
 
