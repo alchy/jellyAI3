@@ -126,6 +126,11 @@ class IrisAutomaton:
             self.state.pending = None
             self.answerer.context.warm(chosen, _PICK_WARMTH)
         elif "?" not in text:
+            # POKYN K ZAOSTŘENÍ („v kontextu Bible") má přednost — posvítí
+            # na doménu a přehraje předchozí otázku (karta, spec §3e)
+            shift = self._focus_shift(text)
+            if shift is not None:
+                return shift
             # KONSTATOVÁNÍ (ne dotaz, ne volba) → Mnemos: timestamp + graf;
             # DRUH výroku rozhodují karty (utterance.statement), ne kód
             statement = parse_statement(text, self.clock(), self.deck)
@@ -159,12 +164,12 @@ class IrisAutomaton:
             card = self.deck.match("resolve.ambiguous", context)
             if card is not None:
                 return self._dialog(card, context, text, used_patterns)
-            return self._respond(answer, "answer", assur, used_patterns)
+            return self._respond(answer, "answer", assur, used_patterns, text)
         card = self.deck.match("focus.low", context)
         if card is not None:
             return self._dialog(card, context, text, used_patterns,
                                 await_pick=False)
-        return self._respond(answer, "answer", assur, used_patterns)
+        return self._respond(answer, "answer", assur, used_patterns, text)
 
     def _warm_interval(self, interval, warmth=0.5):
         """Rozsvítí časové uzly grafu spadající do intervalu (Chronos osa).
@@ -260,15 +265,84 @@ class IrisAutomaton:
         self.state.remember(question, response)
         return response
 
-    def _respond(self, answer, kind, assur, used_patterns):
-        """Zabalí odpověď answereru do IrisResponse + metadata tahu."""
+    def _respond(self, answer, kind, assur, used_patterns, question=None):
+        """Zabalí odpověď answereru do IrisResponse + metadata tahu.
+
+        Do historie jde VSTUP uživatele (otázka) — replay pokynu k zaostření
+        potřebuje, na co se ptal, ne co jsme odpověděli.
+        """
         response = IrisResponse(
             text=answer.text, kind=kind, assurance=round(assur, 3),
             activation_window=activation_window(self.answerer),
             docs_window=docs_window(self.answerer),
             used=self._used(used_patterns), trace=answer.trace,
             sources=answer.sources, alternatives=answer.alternatives)
-        self.state.remember(answer.text, response)
+        self.state.remember(question or answer.text, response)
+        return response
+
+    def _focus_shift(self, text):
+        """Pokyn k zaostření — karta `utterance.focus-shift` (spec §3e).
+
+        Kód jen měří rysy (fráze z jazykové tabulky + rozřešitelná doména)
+        a vykonává akce karty: posvítit na doménu a její dokumentové okolí,
+        přehrát poslední otázku v novém světle.
+        """
+        lang = current()
+        low = deaccent(text.lower())
+        phrase = next((p for p in lang["focus_shift_phrases"] if p in low),
+                      None)
+        features, domain, domain_docs = set(), None, []
+        if phrase is not None:
+            features.add("focus_phrase")
+            phrase_words = set(phrase.split())
+            tokens = [t.rstrip(".") for t in re.findall(r"[\w.]+", text)]
+            rest = [t for t in tokens
+                    if deaccent(t.lower()) not in phrase_words
+                    and deaccent(t.lower()) not in lang["query_skip_words"]]
+            if rest:
+                domain = self.answerer._resolve_topic(rest, warm=False)  # pylint: disable=protected-access
+                # doména nemusí být uzel — „Bible" je RODINA DOKUMENTŮ
+                # (bible_*): shoda jména s id dokumentu (attention nad zdroji)
+                links = getattr(self.answerer.graph, "doc_links", {})
+                keys = [deaccent(t.lower()) for t in rest]
+                domain_docs = [doc for doc in sorted(links)
+                               if any(k in deaccent(doc.lower())
+                                      for k in keys)]
+                if domain is not None or domain_docs:
+                    features.add("domain")
+        card = self.deck.match("utterance.focus-shift",
+                               {"features": features})
+        if card is None or (domain is None and not domain_docs):
+            return None
+        if domain is not None:
+            self.answerer.context.warm(domain,
+                                       card.action.get("warm_domain", 1.0))
+        if card.action.get("warm_documents"):
+            if domain_docs:
+                # EXPLICITNÍ doména: ostrá množina dokumentů drží do další
+                # změny zaostření (rozlišení jmen ji čte jako provenienci)
+                self.answerer.domain_docs = frozenset(domain_docs)
+            for doc in domain_docs:
+                self.answerer.source_context.warm(doc, 3.0)
+            if domain is not None:
+                for fact in self.answerer.graph.facts_of(domain):
+                    self.answerer._warm_sources(fact)  # pylint: disable=protected-access
+        prefix = card.dialog.format(domain=domain or ", ".join(domain_docs))
+        if card.action.get("replay") == "last-question":
+            previous = next((h["text"] for h in reversed(self.state.history)
+                             if "?" in h.get("text", "")), None)
+            if previous is not None:
+                replayed = self.turn(previous)
+                replayed.text = f"{prefix} {replayed.text}"
+                replayed.used["patterns"] = ([card.name]
+                                             + replayed.used["patterns"])
+                return replayed
+        response = IrisResponse(
+            text=prefix, kind="dialog", assurance=1.0,
+            activation_window=activation_window(self.answerer),
+            docs_window=docs_window(self.answerer),
+            used={"components": ["iris"], "patterns": [card.name]})
+        self.state.remember(text, response)
         return response
 
     def _used(self, patterns):

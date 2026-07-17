@@ -76,6 +76,7 @@ class GraphAnswerer(Answerer):
         self.visited = []        # uzly protnuté (rekurzivním) matchem → rozsvícení
         self.context = ActivationField(decay=context_decay)   # těžiště (id uzlu → jas)
         self.source_context = ActivationField(decay=context_decay)  # attention nad ZDROJI
+        self.domain_docs = frozenset()   # explicitní doména (focus-shift „v kontextu X")
         self._predicates = {f.predicate for f in graph.facts.values()}  # slovník QL
         self.query_mode = query_mode  # "udpipe" | "hybrid" | "templates" (pseudo-QL)
         self.history = []        # trajektorie konverzace (tahy s trasou a těžištěm)
@@ -88,6 +89,7 @@ class GraphAnswerer(Answerer):
         self.last_trace = None
         self.last_pattern = None
         self.last_resolution = None
+        self.domain_docs = frozenset()
 
     def _span_is_node(self, span):
         """Přísný test rozpětí (spec 4.3): rozřeší se na uzel A jeho obsahová
@@ -192,6 +194,25 @@ class GraphAnswerer(Answerer):
                     term_upper = any(t[:1].isupper() for t in terms)
                     best_id = max(same, key=lambda c: (
                         c[0][:1].isupper() == term_upper, c[2]))[0]
+        domain_lit = None
+        if best_id is not None and self.domain_docs:
+            # DOMÉNOVÉ PATRO: explicitní doména (focus-shift „v kontextu
+            # Bible" → ostrá množina dokumentů) arbitruje rovnocenné jmenné
+            # kandidáty PROVENIENCÍ: vyhrává kandidát s fakty z domény,
+            # soupeři se zúží na doménové. (Ostrá příslušnost, ne glow —
+            # vyzařování po doc_links by doménu rozmazalo.)
+            best_cand = next(c for c in candidates if c[0] == best_id)
+            group = [c for c in candidates if c[5] == best_cand[5]]
+            if len(group) > 1:
+                def _in_domain(node_id):
+                    return any(set(getattr(f, "source", ()) or ())
+                               & self.domain_docs
+                               for f in self.graph.facts_of(node_id))
+                lit = [c for c in group if _in_domain(c[0])]
+                if lit:
+                    domain_lit = {c[0] for c in lit}
+                    if best_id not in domain_lit:
+                        best_id = max(lit, key=lambda c: c[2])[0]
         if best_id is not None and warm:
             # EVIDENCE PRO QueryAssurance: kvalita = průměrná váha nejlepšího
             # patra na term (exact ⊂ ins → bonus +0.2/exact term); soupeři =
@@ -204,7 +225,8 @@ class GraphAnswerer(Answerer):
             best_cand = next(c for c in candidates if c[0] == best_id)
             rivals = [c[0] for c in candidates
                       if c[0] != best_id and c[5] == best_cand[5]
-                      and c[3] != best_cand[3]]
+                      and c[3] != best_cand[3]
+                      and (domain_lit is None or c[0] in domain_lit)]
             self.last_resolution = {"term": " ".join(terms), "winner": best_id,
                                     "quality": quality, "rivals": rivals}
             # nejednoznačné jméno rozsvítí VŠECHNY kandidáty se stejnou

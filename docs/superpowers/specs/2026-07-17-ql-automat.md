@@ -149,6 +149,29 @@ Taxonomie událostí (výchozí, roste testováním): `resolve.ambiguous`
      u časovaných bází. Automat dostává `clock` injektovaně (testy fixují,
      živý běh = systémové hodiny).
 
+## 3e. Focus-shift výrok — „v kontextu Bible" (zaparkováno, uživatel)
+
+10j. Dialog: „Kdo je Marie?" → „babička" → uživatel: **„v kontextu Bible"**
+     → dnes „nenašel"; SPRÁVNĚ: výrok není otázka ani konstatování, je to
+     **pokyn k zaostření** — Iris má POSVÍTIT NA KONTEXT (rozsvítit uzel
+     domény + jeho dokumentové okolí přes attention nad zdroji,
+     `source_context`/doc_links) a PŘEHRÁT předchozí otázku v novém světle
+     (homonymní vějíř Marie → biblická Maria vyhraje aktivací). Řešení =
+     karta `utterance.focus-shift` (rysy: ne-otázka + fráze „v kontextu/
+     v rámci/myslím" z jazykové tabulky + rozřešitelná doména); akce: warm
+     domény a dokumentů + replay. Realizace ve F2/F3.
+
+## 3d. Dvě znalostní báze, jedna struktura (Mnemos — rámec uživatele)
+
+10i. Existují **dva typy datových sad se strukturálně toutéž podobou grafu**:
+     (a) **korpusová znalostní báze** — fakta z textu, příběh a vazby;
+     timestamp nevyžaduje (text je bezčasý, dokud sám čas nenese);
+     (b) **uživatelem přidávaná báze** (Mnemos) — táž faktová struktura,
+     ale VŽDY s časovou kotvou: **uživatel není korpus dat, je to objekt
+     vědomě existující v čase a prostoru** — u interakce s ním se časové
+     (Chronos) a prostorové (Topos) vazby dostávají do své role inherentně.
+     Obě báze žijí v JEDNOM grafu a dotazuje je tatáž mašinérie.
+
 ## 3c. Souhra subsystémů — Topos × Chronos × Metron (ukázka uživatele)
 
 10h. Cílové dotazy nad pamětí (Mnemos ukládá „Dnes pršelo v Praze." s časovou

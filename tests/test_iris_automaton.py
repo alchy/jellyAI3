@@ -91,6 +91,22 @@ def test_empty_deck_means_mechanism_only():
     assert out.kind == "answer"
 
 
+def test_focus_shift_warms_domain_and_replays():
+    """„v kontextu Bible" není otázka ani konstatování — pokyn k zaostření:
+    karta posvítí na doménu a přehraje předchozí otázku (spec §3e)."""
+    g = FactGraph()
+    g.add_fact(make_fact("být", [Participant("subj", "Maria", "person"),
+                                 Participant("pred", "postava", "concept")]))
+    g.add_fact(make_fact("kontext", [Participant("subj", "Maria", "person"),
+                                     Participant("obj", "Bible", "dílo")]))
+    iris = _iris(g)
+    iris.turn("Kdo je Maria?")
+    out = iris.turn("v kontextu Bible")
+    assert "focus-shift" in out.used["patterns"]
+    assert iris.answerer.context.scores.get("Bible", 0) > 0   # doména svítí
+    assert "postava" in out.text      # přehraná otázka odpověděla
+
+
 def test_plain_miss_keeps_fallback_text():
     """Nic rozlišeného (parser None) → poctivé „nenašel" fallbacku beze změny."""
     iris = _iris(_brothers_graph())

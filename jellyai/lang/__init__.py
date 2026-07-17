@@ -65,6 +65,8 @@ def load_rules(language="cs"):
         rules["temporal"] = dict(rules.get("temporal", {}))
         rules["first_person"] = frozenset(rules.get("first_person", ()))
         rules["user_entity"] = rules.get("user_entity", "user")
+        rules["focus_shift_phrases"] = tuple(
+            rules.get("focus_shift_phrases", ()))
         _cache[path] = rules
     return _cache[path]
 
