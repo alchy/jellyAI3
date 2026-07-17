@@ -23,7 +23,7 @@ import re
 
 from jellyai.graph.canon import deaccent
 from jellyai.graph.extract import make_fact, Participant
-from jellyai.iris.chronos import resolve_temporal
+from jellyai.iris.subsystems.chronos import resolve_temporal
 from jellyai.lang import current
 
 

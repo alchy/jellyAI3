@@ -1,0 +1,7 @@
+{
+  "name": "reminder-default",
+  "trigger": {"event": "reminder.default"},
+  "dialog": "⏰ Nespecifikoval jsi kdy — připomenu za čtvrt hodiny ({time}): {task}. Chceš-li jindy, řekni kdy.",
+  "action": {"await": "reminder-time"},
+  "teach": "Připomínka BEZ termínu: naplánuje se výchozí ofset (default_reminder_minutes z jazykových dat) a rovnou se nabídne změna — navazující určení času (za hodinu, až zítra ráno) tuto připomínku PŘEPLÁNUJE, nevytvoří druhou. Alternativní chování (nejdřív se zeptat) nese karta reminder-when — výběr je věcí balíčku karet, ne kódu."
+}

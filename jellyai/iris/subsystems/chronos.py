@@ -245,18 +245,31 @@ def resolve_due(text, now):  # pylint: disable=too-many-branches,too-many-locals
     numerals = lang.get("numerals", {})
     due = None
     forward = frozenset(lang.get("forward_words", ()))
-    for i, tok in enumerate(tokens):             # 1) ofset „za N jednotek"
-        if tok not in forward:
+    soon = lang.get("soon_minutes", {})
+    fractions = lang.get("fraction_minutes", {})
+    for i, tok in enumerate(tokens):             # 1) ofset „za N jednotek",
+        if tok not in forward:                   #    „za chvíli/čtvrt hodiny"
             continue
-        count, unit = 1, None
+        count, unit, minutes, fraction = 1, None, None, None
         for follow in tokens[i + 1:i + 4]:
+            if follow in soon:
+                minutes = soon[follow]
+                break
+            if follow in fractions:
+                fraction = fractions[follow]
+                continue
             if follow in numerals:
                 count = numerals[follow]
             elif follow.rstrip(".").isdigit():
                 count = int(follow.rstrip("."))
             elif follow in units and units[follow] != "century":
                 unit = units[follow]
+                if fraction is not None and unit == "hour":
+                    minutes = fraction
                 break
+        if minutes is not None:
+            due = now + timedelta(minutes=minutes)
+            break
         if unit is not None:
             due = _shift(now, unit, count)
             break
@@ -289,7 +302,31 @@ def resolve_due(text, now):  # pylint: disable=too-many-branches,too-many-locals
             if year is None and due <= now:
                 due = due.replace(year=now.year + 1)
             break
-    if due is None:                              # 3b) „zítra/pozítří"
+    if due is None:                              # 3b) denní část: „(zítra)
+        day_parts = lang.get("day_parts", {})    #    ráno", „večer v 8"
+        for i, tok in enumerate(tokens):
+            if tok not in day_parts:
+                continue
+            hour, minute = (int(x) for x in day_parts[tok].split(":"))
+            num = None                           # explicitní hodina vedle
+            for near in tokens[max(0, i - 2):i + 3]:
+                if near in numerals and numerals[near] <= 12:
+                    num = numerals[near]
+                elif near.isdigit() and int(near) <= 12:
+                    num = int(near)
+            if num is not None:
+                # odpolední část dne posouvá malé číslo („večer v 8" = 20:00)
+                hour = num + 12 if hour >= 12 and num < 12 else num
+                minute = 0
+            offset = next((off for t in tokens
+                           for w, off in lang.get("day_words", {}).items()
+                           if t == w and off > 0), 0)
+            due = (_floor(now, "day")
+                   + timedelta(days=offset)).replace(hour=hour, minute=minute)
+            if offset == 0 and due <= now:
+                due += timedelta(days=1)
+            break
+    if due is None:                              # 3c) „zítra/pozítří" samotné
         for tok in tokens:
             offset = lang.get("day_words", {}).get(tok, 0)
             if offset > 0:

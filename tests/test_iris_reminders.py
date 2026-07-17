@@ -12,7 +12,7 @@ from jellyai.answerer.extractive import ExtractiveAnswerer
 from jellyai.answerer.graph_answerer import GraphAnswerer
 from jellyai.graph.graph import FactGraph
 from jellyai.iris.automaton import IrisAutomaton
-from jellyai.iris.chronos import ChronosTicker, format_due, resolve_due
+from jellyai.iris.subsystems.chronos import ChronosTicker, format_due, resolve_due
 from jellyai.ufal_client import FakeUfalClient
 
 NOW = datetime(2026, 7, 17, 12, 0)
@@ -32,6 +32,17 @@ def test_resolve_due_offset_clock_date_and_advance():
         == datetime(2026, 8, 20, 9)                    # předstih
     assert resolve_due("zítra koupit rohlíky", NOW) == datetime(2026, 7, 18, 9)
     assert resolve_due("koupit rohlíky", NOW) is None  # bez času
+
+
+def test_resolve_due_soon_fractions_and_day_parts():
+    """„za chvíli/čtvrt hodiny" (jazykové tabulky minut) a denní části:
+    „zítra ráno" = 7:00, „ráno v šest" = 6:00, „večer v 8" = 20:00."""
+    assert resolve_due("za chvíli", NOW) == NOW + timedelta(minutes=15)
+    assert resolve_due("za čtvrt hodiny", NOW) == NOW + timedelta(minutes=15)
+    assert resolve_due("za půl hodiny", NOW) == NOW + timedelta(minutes=30)
+    assert resolve_due("až zítra ráno", NOW) == datetime(2026, 7, 18, 7)
+    assert resolve_due("vzbuď mě ráno v šest", NOW) == datetime(2026, 7, 18, 6)
+    assert resolve_due("večer v 8", NOW) == datetime(2026, 7, 17, 20)
 
 
 def test_format_due_today_vs_date():
@@ -62,15 +73,19 @@ def test_reminder_set_and_fire_on_turn():
     assert not iris.reminders                        # krátkodobá paměť: pryč
 
 
-def test_reminder_without_time_asks_then_completes():
-    """Bez termínu se automat ZEPTÁ (karta reminder-when); další odpověď
-    („za hodinu") termín doplní a připomínka se naplánuje."""
+def test_reminder_without_time_defaults_then_reschedules():
+    """Bez termínu se rovnou plánuje VÝCHOZÍ ofset (karta reminder-default,
+    za čtvrt hodiny) s nabídkou změny; navazující „až zítra ráno" připomínku
+    PŘEPLÁNUJE — nevznikne druhá."""
     iris = _iris(lambda: NOW)
     out = iris.turn("Připomeň mi, že mám koupit rohlíky.")
-    assert out.kind == "dialog" and "koupit rohlíky" in out.text
-    assert "reminder-when" in out.used["patterns"]
-    out = iris.turn("za hodinu")
-    assert "Připomenu 13:00" in out.text and "koupit rohlíky" in out.text
+    assert out.kind == "answer" and "koupit rohlíky" in out.text
+    assert "12:15" in out.text and "reminder-default" in out.used["patterns"]
+    assert len(iris.reminders) == 1
+    out = iris.turn("až zítra ráno")
+    assert "Připomenu 18. července 7:00" in out.text
+    assert len(iris.reminders) == 1                  # přeplánováno, ne přidáno
+    assert iris.reminders[0]["due"].startswith("2026-07-18T07:00")
 
 
 def test_reminder_persists_across_instances(tmp_path):

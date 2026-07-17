@@ -15,7 +15,7 @@ from jellyai.answerer.graph_answerer import GraphAnswerer
 from jellyai.graph.graph import FactGraph
 from jellyai.graph.extract import make_fact, Participant
 from jellyai.iris.automaton import IrisAutomaton
-from jellyai.iris.mnemos import parse_statement, remember
+from jellyai.iris.subsystems.mnemos import parse_statement, remember
 from jellyai.ufal_client import FakeUfalClient
 
 NOW = datetime(2026, 7, 17, 12, 0)

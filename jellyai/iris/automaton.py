@@ -25,14 +25,14 @@ import re
 import threading
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from jellyai.graph.canon import deaccent
 from jellyai.graph.graph import parse_date
 from jellyai.iris.assurance import assurance
-from jellyai.iris.chronos import (clock_answer, format_due, resolve_due,
+from jellyai.iris.subsystems.chronos import (clock_answer, format_due, resolve_due,
                                   resolve_temporal)
-from jellyai.iris.mnemos import parse_statement, persist, remember, replay
+from jellyai.iris.subsystems.mnemos import parse_statement, persist, remember, replay
 from jellyai.iris.patterns import PatternDeck
 from jellyai.iris.presenter import activation_window, docs_window
 from jellyai.iris.state import FocusState, PendingFocus
@@ -160,12 +160,15 @@ class IrisAutomaton:
             # PŘIPOMÍNKY (Chronos): doplnění času rozpracované žádosti,
             # nebo nová žádost frází z jazykové tabulky; scénáře nesou
             # karty reminder-set/when/due
-            pending_task = self.state.pending_reminder
-            if pending_task is not None:
+            pending = self.state.pending_reminder
+            if pending is not None:
                 self.state.pending_reminder = None
                 due = resolve_due(text, self.clock())
                 if due is not None:
-                    return self._set_reminder(pending_task, due, text)
+                    if isinstance(pending, dict):   # PŘEPLÁNOVÁNÍ defaultu
+                        return self._set_reminder(pending["task"], due, text,
+                                                  record=pending)
+                    return self._set_reminder(pending, due, text)
             low = deaccent(text.lower())
             phrase = next((p for p in current()["reminder_phrases"]
                            if p in low), None)
@@ -299,8 +302,32 @@ class IrisAutomaton:
         due = resolve_due(text, self.clock())
         if due is not None:
             return self._set_reminder(task, due, text)
+        if not task:
+            return None
+        card = self.deck.best("reminder.default", {})
+        if card is not None:
+            # BEZ TERMÍNU: naplánuj výchozí ofset (jazyková data) a nabídni
+            # změnu — navazující určení času tuto připomínku PŘEPLÁNUJE
+            minutes = current()["temporal"].get("default_reminder_minutes", 15)
+            due = self.clock() + timedelta(minutes=minutes)
+            record = {"due": due.isoformat(), "task": task}
+            with self._reminder_lock:
+                self.reminders.append(record)
+                self.reminders.sort(key=lambda item: item["due"])
+                self._save_reminders()
+            self.state.pending_reminder = record
+            self._note_card(card.name)
+            message = card.dialog.format(time=format_due(due, self.clock()),
+                                         task=task)
+            response = IrisResponse(
+                text=message, kind="answer", assurance=1.0,
+                activation_window=activation_window(self.answerer),
+                docs_window=docs_window(self.answerer),
+                used={"components": ["chronos"], "patterns": [card.name]})
+            self.state.remember(text, response)
+            return response
         card = self.deck.best("reminder.when", {})
-        if card is None or not task:
+        if card is None:
             return None
         self.state.pending_reminder = task
         self._note_card(card.name)
@@ -314,13 +341,17 @@ class IrisAutomaton:
         self.state.remember(text, response)
         return response
 
-    def _set_reminder(self, task, due, text):
-        """Uloží připomínku do skladu a potvrdí kartou `reminder.set`."""
+    def _set_reminder(self, task, due, text, record=None):
+        """Uloží připomínku do skladu (nebo PŘEPLÁNUJE existující záznam)
+        a potvrdí kartou `reminder.set`."""
         card = self.deck.best("reminder.set", {})
         if card is None:
             return None
         with self._reminder_lock:
-            self.reminders.append({"due": due.isoformat(), "task": task})
+            if record is not None and record in self.reminders:
+                record["due"] = due.isoformat()
+            else:
+                self.reminders.append({"due": due.isoformat(), "task": task})
             self.reminders.sort(key=lambda item: item["due"])
             self._save_reminders()
         self._note_card(card.name)

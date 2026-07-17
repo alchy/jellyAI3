@@ -20,7 +20,7 @@ kandidáty), místo aby hádal další heuristikou.
 from jellyai.iris.patterns import PatternDeck, PatternCard
 from jellyai.iris.assurance import assurance
 from jellyai.iris.automaton import IrisAutomaton, IrisResponse
-from jellyai.iris.chronos import TimeInterval, resolve_temporal
+from jellyai.iris.subsystems.chronos import TimeInterval, resolve_temporal
 
 __all__ = ["PatternDeck", "PatternCard", "assurance",
            "IrisAutomaton", "IrisResponse",

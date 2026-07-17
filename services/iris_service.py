@@ -128,7 +128,7 @@ def main():
     args = parse_args()
     from config import Config
     from jellyai.iris import IrisAutomaton, PatternDeck
-    from jellyai.iris.chronos import ChronosTicker
+    from jellyai.iris.subsystems.chronos import ChronosTicker
     from jellyai.tasks import make_graph_answerer
     config = Config()
     config.graph.graph_path = args.model     # --model = uložený faktový graf
