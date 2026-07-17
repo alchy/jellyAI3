@@ -219,6 +219,46 @@ def test_apposition_across_comma_stays_out_of_object_group():
     assert "obilí" in nodes and "zanechaný" not in nodes
 
 
+def test_verbal_conj_member_stays_out_of_object_group():
+    """„Vezmi svou hůl a hoď ji" — mis-tagované sloveso („hoď" jako NOUN
+    s VerbForm) pověšené jako conj na předmět do faktu NEpatří; legitimní
+    výčet substantiv („romány a dramata") zůstává."""
+    sent = [
+        {"form": "Vezmi", "lemma": "vzít", "upos": "VERB", "head": 0,
+         "deprel": "root", "start": 0, "end": 5},
+        {"form": "hůl", "lemma": "hůl", "upos": "NOUN", "head": 1,
+         "deprel": "obj", "start": 6, "end": 9},
+        {"form": "a", "lemma": "a", "upos": "CCONJ", "head": 4,
+         "deprel": "cc", "start": 10, "end": 11},
+        {"form": "hoď", "lemma": "hodit", "upos": "NOUN", "head": 2,
+         "deprel": "conj", "feats": {"VerbForm": "Fin"}, "start": 12, "end": 15},
+    ]
+    facts = extract_facts({"entities": [], "sentences": [sent]},
+                          default_subject=("X", "person"))
+    nodes = [p.node for f in facts if f.predicate == "vzít"
+             for p in f.participants]
+    assert "hůl" in nodes and "hodit" not in nodes and "hoď" not in nodes
+
+
+def test_legit_apposition_across_single_comma_survives():
+    """„Jidáše, syna Šimonova" — legitimní apozice s čárkou (bez slovesa
+    mezi, pádová shoda) se do faktu VRACÍ; klauzový únik zůstává venku."""
+    sent = [
+        {"form": "Zradil", "lemma": "zradit", "upos": "VERB", "head": 0,
+         "deprel": "root", "start": 0, "end": 6},
+        {"form": "Jidáše", "lemma": "Jidáš", "upos": "PROPN", "head": 1,
+         "deprel": "obj", "feats": {"Case": "Acc"}, "start": 7, "end": 13},
+        {"form": ",", "lemma": ",", "upos": "PUNCT", "head": 4,
+         "deprel": "punct", "start": 13, "end": 14},
+        {"form": "syna", "lemma": "syn", "upos": "NOUN", "head": 2,
+         "deprel": "appos", "feats": {"Case": "Acc"}, "start": 15, "end": 19},
+    ]
+    facts = extract_facts({"entities": [], "sentences": [sent]},
+                          default_subject=("X", "person"))
+    fact = next(f for f in facts if f.predicate == "zradit")
+    assert "syn" in [p.node for p in fact.participants]
+
+
 def test_coordinated_subjects_distribute():
     """„Karel a Josef psali romány." → psát(Karel, …) i psát(Josef, …)."""
     sent = [

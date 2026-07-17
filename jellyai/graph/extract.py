@@ -122,11 +122,18 @@ def _default_if_agrees(default_subject, tok, strict=False):
 
 def _conj_group(tok, sent):
     """Souřadná skupina tokenu: [tok] + jeho `conj` děti (UD věší všechny
-    konjunkty na první člen). Pro distribuci faktu přes koordinaci."""
+    konjunkty na první člen). Pro distribuci faktu přes koordinaci.
+
+    SLOVESNÝ člen do skupiny nepatří — „Vezmi hůl a HOĎ ji" věší parser
+    „hoď" (občas mis-tagnuté jako NOUN, prozradí ho VerbForm) jako conj na
+    předmět; je to ale nová klauze, ne další předmět. Interpunkce signál
+    NENÍ (výčty „Abrahamovi, Izákovi a Jákobovi" čárky mají právem)."""
     tok_id = sent.index(tok) + 1
     return [tok] + [t for t in sent
                     if t.get("head") == tok_id
-                    and str(t.get("deprel", "")).startswith("conj")]
+                    and str(t.get("deprel", "")).startswith("conj")
+                    and t.get("upos") not in ("VERB", "AUX")
+                    and "VerbForm" not in (t.get("feats") or {})]
 
 
 def _pronoun_person(tok, context):
@@ -407,6 +414,27 @@ def _clause_content(head_id, sent, limit=8):
     return None
 
 
+def _appos_belongs(head, child, sent):
+    """Patří apozice k hlavě? Přilehlá vždy („hru R.U.R."); PŘES interpunkci
+    jen legitimní jmenná („Jidáše, syna Šimonova"): nejvýš jedna čárka,
+    žádné sloveso mezi (i mis-tagnuté — prozradí VerbForm) a pádová shoda
+    hlavy se členem. Klauzový únik („…obilí, jedna přijata, druhá
+    ZANECHÁNA") nesplní — mezi členy je interpunkce/klauze navíc."""
+    lo, hi = sorted((sent.index(head), sent.index(child)))
+    between = sent[lo + 1:hi]
+    puncts = [t for t in between if t.get("upos") == "PUNCT"]
+    if not puncts:
+        return True
+    if len(puncts) > 1:
+        return False
+    if any(t.get("upos") in ("VERB", "AUX")
+           or "VerbForm" in (t.get("feats") or {}) for t in between):
+        return False
+    head_case = (head.get("feats") or {}).get("Case")
+    child_case = (child.get("feats") or {}).get("Case")
+    return bool(head_case) and head_case == child_case
+
+
 def _object_groups(obj_tok, sent, entities, canon, context):
     """Skupiny předmětu: za každý souřadný člen `[obj, jeho appos tituly]`.
 
@@ -426,11 +454,7 @@ def _object_groups(obj_tok, sent, entities, canon, context):
         for child in sent:
             if child.get("head") == tok_id \
                     and str(child.get("deprel", "")).startswith("appos"):
-                # apozice patří k předmětu jen PŘILEHLÁ („hru R.U.R.");
-                # „apozice" přes interpunkci je mis-tag z jiné klauze
-                # („…obilí, jedna přijata, druhá ZANECHÁNA") a do faktu nejde
-                lo, hi = sorted((sent.index(tok), sent.index(child)))
-                if any(t.get("upos") == "PUNCT" for t in sent[lo + 1:hi]):
+                if not _appos_belongs(tok, child, sent):
                     continue
                 appos = _surface_node(child, entities, canon)
                 if appos and appos not in group:
