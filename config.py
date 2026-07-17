@@ -152,6 +152,8 @@ class GraphConfig:
         query_mode (str): Cesta rozboru otázky — "udpipe" (ML rozbor),
             "hybrid" (šablony pseudo-QL první, UDPipe fallback),
             "templates" (šablony jediná cesta, bez UDPipe).
+        assurance_threshold (float): Práh QueryAssurance automatu Iris —
+            pod prahem se místo odpovědi vede dialogové doostření.
     """
     graph_path: str = "data/graph.pkl"
     context_decay: float = 0.8
@@ -159,6 +161,7 @@ class GraphConfig:
     spread_depth: int = 2
     spread_falloff: float = 0.35
     query_mode: str = "hybrid"
+    assurance_threshold: float = 0.55
 
 
 @dataclass

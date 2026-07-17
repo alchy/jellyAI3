@@ -683,6 +683,7 @@ class GraphAnswerer(Answerer):
         """
         self._prev_trace = self.last_trace or self._prev_trace
         self.last_trace = None
+        self.last_resolution = None   # evidence tahu — nesmí přežít z minula
         # UNIVERZÁLNÍ princip: otázka→neúplný fakt→match→díra (nahrazuje qtype pravidla
         # i attention — kontextově navazující dotaz řeší tatáž cesta). Rozbor dodají
         # ŠABLONY (pseudo-QL, bez UDPipe); UDPipe jen mimo templates režim.

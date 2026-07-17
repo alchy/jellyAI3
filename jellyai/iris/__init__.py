@@ -18,5 +18,8 @@ kandidáty), místo aby hádal další heuristikou.
 """
 
 from jellyai.iris.patterns import PatternDeck, PatternCard
+from jellyai.iris.assurance import assurance
+from jellyai.iris.automaton import IrisAutomaton, IrisResponse
 
-__all__ = ["PatternDeck", "PatternCard"]
+__all__ = ["PatternDeck", "PatternCard", "assurance",
+           "IrisAutomaton", "IrisResponse"]
