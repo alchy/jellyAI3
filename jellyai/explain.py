@@ -16,7 +16,7 @@ def _explain_graph():
         "událost je uzel (predikát + váha opakování) s role-hranami na účastníky "
         "(podmět/předmět/čas/místo). Entity se kanonizují (pádové varianty → "
         "jeden uzel se základním tvarem, ostatní tvary jsou aliasy). Odpovídání "
-        "je pak match neúplného faktu s dírou: „Kdo napsal Babičku?" = "
+        "je pak match neúplného faktu s dírou: otázka Kdo napsal Babičku? = "
         "napsat(?, Babička) → díra subj → Božena Němcová. Postav grafem: "
         "./jelly annotate && ./jelly graph; dotazy: ./jelly graph-ask.")
 
