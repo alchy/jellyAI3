@@ -426,6 +426,12 @@ def _object_groups(obj_tok, sent, entities, canon, context):
         for child in sent:
             if child.get("head") == tok_id \
                     and str(child.get("deprel", "")).startswith("appos"):
+                # apozice patří k předmětu jen PŘILEHLÁ („hru R.U.R.");
+                # „apozice" přes interpunkci je mis-tag z jiné klauze
+                # („…obilí, jedna přijata, druhá ZANECHÁNA") a do faktu nejde
+                lo, hi = sorted((sent.index(tok), sent.index(child)))
+                if any(t.get("upos") == "PUNCT" for t in sent[lo + 1:hi]):
+                    continue
                 appos = _surface_node(child, entities, canon)
                 if appos and appos not in group:
                     group.append(appos)

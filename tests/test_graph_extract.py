@@ -192,6 +192,33 @@ def test_adverb_is_not_theme():
     assert not any(p.role == "theme" for p in fact.participants)
 
 
+def test_apposition_across_comma_stays_out_of_object_group():
+    """„Dvě budou mlít obilí, jedna přijata, druhá zanechána" — mis-tagnutá
+    „apozice" z vedlejší klauze (přes čárku) do předmětové skupiny NEpatří;
+    přilehlá apozice („hru R.U.R.") zůstává."""
+    sent = [
+        {"form": "Dvě", "lemma": "dva", "upos": "NUM", "head": 3,
+         "deprel": "nsubj", "start": 0, "end": 3},
+        {"form": "budou", "lemma": "být", "upos": "AUX", "head": 3,
+         "deprel": "aux", "start": 4, "end": 9},
+        {"form": "mlít", "lemma": "mlít", "upos": "VERB", "head": 0,
+         "deprel": "root", "start": 10, "end": 14},
+        {"form": "obilí", "lemma": "obilí", "upos": "NOUN", "head": 3,
+         "deprel": "obj", "start": 15, "end": 20},
+        {"form": ",", "lemma": ",", "upos": "PUNCT", "head": 3,
+         "deprel": "punct", "start": 20, "end": 21},
+        {"form": "druhá", "lemma": "druhý", "upos": "ADJ", "head": 7,
+         "deprel": "amod", "start": 22, "end": 27},
+        {"form": "zanechána", "lemma": "zanechaný", "upos": "NOUN", "head": 4,
+         "deprel": "appos", "start": 28, "end": 37},
+    ]
+    facts = extract_facts({"entities": [], "sentences": [sent]},
+                          default_subject=("X", "person"))
+    fact = next(f for f in facts if f.predicate == "mlít")
+    nodes = [p.node for p in fact.participants]
+    assert "obilí" in nodes and "zanechaný" not in nodes
+
+
 def test_coordinated_subjects_distribute():
     """„Karel a Josef psali romány." → psát(Karel, …) i psát(Josef, …)."""
     sent = [
