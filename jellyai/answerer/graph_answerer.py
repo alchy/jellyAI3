@@ -94,6 +94,8 @@ class GraphAnswerer(Answerer):
         best_id, best_score = None, None
         ring = _synonym_ring(predicate) if predicate else ()
         for node in self.graph.nodes.values():
+            if node.type == "výrok":
+                continue                  # obsah řeči je hodnota, ne téma
             low_id = node.id.lower()
             low_words = low_id.split()
             ins_hits = sum(1 for t in low_terms if t == low_id or t in low_words)
@@ -317,7 +319,7 @@ class GraphAnswerer(Answerer):
                     if hole_type and part.type == hole_type:
                         base += 100
                         matched = True
-                    if hole_role in ("loc", "time", "num") and not matched:
+                    if hole_role in ("loc", "time", "num", "pred") and not matched:
                         continue    # sémantická díra bez shody role/typu mlčí
                         #               („Kdy zemřel?" nesmí vrátit téma faktu)
                     scored.append((base, self.context.scores.get(part.node, 0.0),

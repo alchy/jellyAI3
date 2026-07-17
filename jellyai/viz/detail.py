@@ -23,6 +23,7 @@ _CZ_TYPE = {
     "institution": "instituce",
     "dílo": "dílo (doplněno spreadem)",
     "fact": "fakt",
+    "výrok": "výrok (obsah řeči)",
 }
 
 

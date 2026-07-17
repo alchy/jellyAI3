@@ -293,3 +293,70 @@ def test_common_noun_with_flat_propn_is_instance_identity():
     byt = next(f for f in facts if f.predicate == "druh")
     roles = [(p.role, p.node) for p in byt.participants]
     assert ("subj", "Božena Čapková") in roles and ("pred", "matka") in roles
+
+
+def test_dash_definition_creates_kind_identity():
+    """Bezslovesný řádek „1926 Adam stvořitel – Divadelní hra, …" →
+    druh(Adam stvořitel, hra) — pomlčková definice encyklopedické položky."""
+    sent = [
+        {"form": "1926", "lemma": "1926", "upos": "NUM", "head": 2,
+         "deprel": "nummod", "start": 0, "end": 4},
+        {"form": "Adam", "lemma": "Adam", "upos": "PROPN", "head": 0,
+         "deprel": "root", "start": 5, "end": 9},
+        {"form": "stvořitel", "lemma": "stvořitel", "upos": "NOUN", "head": 2,
+         "deprel": "flat", "start": 10, "end": 19},
+        {"form": "–", "lemma": "–", "upos": "PUNCT", "head": 6,
+         "deprel": "punct", "start": 20, "end": 21},
+        {"form": "Divadelní", "lemma": "divadelní", "upos": "ADJ", "head": 6,
+         "deprel": "amod", "start": 22, "end": 31},
+        {"form": "hra", "lemma": "hra", "upos": "NOUN", "head": 2,
+         "deprel": "appos", "start": 32, "end": 35},
+    ]
+    entities = [{"text": "Adam stvořitel", "type": "P", "start": 5, "end": 19}]
+    facts = extract_facts({"entities": entities, "sentences": [sent]})
+    druh = next(f for f in facts if f.predicate == "druh")
+    roles = [(p.role, p.node) for p in druh.participants]
+    assert ("subj", "Adam stvořitel") in roles and ("pred", "hra") in roles
+
+
+def test_negated_verb_keeps_negation_in_predicate():
+    """„Nemusel bojovat ve válce." — polarita patří do predikátu: nemuset,
+    a xcomp dědí negaci (nebojovat) — žádný falešný fakt bojovat."""
+    sent = [
+        {"form": "Nemusel", "lemma": "muset", "upos": "VERB", "head": 0,
+         "deprel": "root", "start": 0, "end": 7,
+         "feats": {"Polarity": "Neg", "Gender": "Masc"}},
+        {"form": "bojovat", "lemma": "bojovat", "upos": "VERB", "head": 1,
+         "deprel": "xcomp", "start": 8, "end": 15, "feats": {"Polarity": "Pos"}},
+        {"form": "ve", "lemma": "v", "upos": "ADP", "head": 4,
+         "deprel": "case", "start": 16, "end": 18},
+        {"form": "válce", "lemma": "válka", "upos": "NOUN", "head": 2,
+         "deprel": "obl", "start": 19, "end": 24},
+    ]
+    facts = extract_facts({"entities": [], "sentences": [sent]},
+                          default_subject=("Karel Čapek", "person"))
+    preds = {f.predicate for f in facts}
+    assert "bojovat" not in preds and "muset" not in preds
+    assert "nebojovat" in preds or "nemuset" in preds
+
+
+def test_speech_content_clause_becomes_object():
+    """„Ježíš řekl: Jdi za mnou." — obsah řeči (ccomp/parataxis) je účastník:
+    „Co řekl Ježíš?" pak odpoví obsahem, ne adresátem."""
+    sent = [
+        {"form": "Ježíš", "lemma": "Ježíš", "upos": "PROPN", "head": 2,
+         "deprel": "nsubj", "start": 0, "end": 5},
+        {"form": "řekl", "lemma": "říci", "upos": "VERB", "head": 0,
+         "deprel": "root", "start": 6, "end": 10, "feats": {"Gender": "Masc"}},
+        {"form": "Jdi", "lemma": "jít", "upos": "VERB", "head": 2,
+         "deprel": "parataxis", "start": 12, "end": 15},
+        {"form": "za", "lemma": "za", "upos": "ADP", "head": 5,
+         "deprel": "case", "start": 16, "end": 18},
+        {"form": "mnou", "lemma": "já", "upos": "PRON", "head": 3,
+         "deprel": "obl", "start": 19, "end": 23},
+    ]
+    entities = [{"text": "Ježíš", "type": "P", "start": 0, "end": 5}]
+    facts = extract_facts({"entities": entities, "sentences": [sent]})
+    rekl = next(f for f in facts if f.predicate == "říci")
+    objs = [p.node for p in rekl.participants if p.role == "obj"]
+    assert objs and "Jdi za mnou" in objs[0]

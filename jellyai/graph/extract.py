@@ -12,7 +12,7 @@ from jellyai.graph.canon import name_gender
 from jellyai.lang import current
 
 _SUBJ = {"nsubj", "nsubj:pass"}
-_OBJ = {"obj", "iobj"}
+_OBJ = {"obj"}   # iobj (adresát „řekl UČEDNÍKŮM") je theme, ne předmět
 _ATTR = {"obl", "nmod"}
 _ENTITY_TYPE = {"p": "person", "g": "geo", "t": "time", "i": "institution"}
 _ATTR_ROLE = {"time": "time", "geo": "loc", "number": "num"}   # typ cíle → role
@@ -352,6 +352,61 @@ def _apposition_identities(sent, entities, canon):
     return facts
 
 
+_DASHES = ("–", "—", "-")
+
+
+def _dash_identities(sent, entities, canon):
+    """Bezslovesná pomlčková definice „(1926) Adam stvořitel – Divadelní hra…"
+    → druh(titul, hra). Encyklopedická struktura: vlevo pojmenovaná položka,
+    za pomlčkou druhové substantivum. Jen věty bez slovesa i spony."""
+    if any(t.get("upos") == "VERB" or t.get("deprel") == "cop" for t in sent):
+        return []
+    forms = [t.get("form", "") for t in sent]
+    dash = next((i for i, f in enumerate(forms) if f in _DASHES), None)
+    if dash is None:
+        return []
+    instance = next((_surface_node(t, entities, canon)
+                     for t in sent[:dash] if t.get("upos") == "PROPN"), None)
+    kind = next((_node_for(t, entities, canon)
+                 for t in sent[dash + 1:] if t.get("upos") == "NOUN"), None)
+    if not instance or not kind or kind[1] != "concept" \
+            or kind[0] in current()["metalanguage_nouns"] \
+            or instance[0] == kind[0]:
+        return []
+    return [make_fact("druh", [Participant("subj", instance[0], instance[1]),
+                               Participant("pred", kind[0], kind[1])])]
+
+
+def _negated(index, sent):
+    """Slovesný tvar je záporný: vlastní Polarity=Neg, záporné aux dítě, nebo
+    xcomp pod záporným řídicím slovesem („NEmusel bojovat")."""
+    tok = sent[index]
+    if tok.get("feats", {}).get("Polarity") == "Neg":
+        return True
+    tok_id = index + 1
+    if any(c.get("head") == tok_id and c.get("upos") == "AUX"
+           and c.get("feats", {}).get("Polarity") == "Neg" for c in sent):
+        return True
+    if str(tok.get("deprel", "")).startswith("xcomp"):
+        head_id = tok.get("head", 0)
+        if head_id and _negated(head_id - 1, sent):
+            return True
+    return False
+
+
+def _clause_content(head_id, sent, limit=8):
+    """Obsah řeči/postoje: ccomp/parataxis klauzule jako povrchový text
+    (od hlavy klauzule dál, ohraničeno). „Co řekl X?" pak odpovídá obsahem."""
+    for i, tok in enumerate(sent):
+        if tok.get("head") == head_id \
+                and str(tok.get("deprel", "")).startswith(("ccomp", "parataxis")):
+            words = [t.get("form", "") for t in sent[i:i + limit]
+                     if t.get("upos") != "PUNCT"]
+            if words:
+                return " ".join(words)
+    return None
+
+
 def _object_groups(obj_tok, sent, entities, canon, context):
     """Skupiny předmětu: za každý souřadný člen `[obj, jeho appos tituly]`.
 
@@ -414,6 +469,7 @@ def extract_facts(annotation, default_subject=None, canon=None, context=None):
     entities = annotation.get("entities", [])
     for sent in annotation.get("sentences", []):
         facts.extend(_apposition_identities(sent, entities, canon))
+        facts.extend(_dash_identities(sent, entities, canon))
         # atributy (čas/místo/číslo/téma) — i zanořené — přiřaď nejbližšímu
         # slovesu-předku
         attrs_by_verb = {}
@@ -465,9 +521,23 @@ def extract_facts(annotation, default_subject=None, canon=None, context=None):
             if head.get("upos") != "VERB":
                 continue
             verb = _clean_lemma(head.get("lemma", ""))
+            if _negated(head_id - 1, sent):
+                verb = "ne" + verb        # polarita patří do predikátu
             obj_tok = _first(children, _OBJ)
             obj_groups = (_object_groups(obj_tok, sent, entities, canon, context)
                           if obj_tok is not None else [])
+            iobj_tok = _first(children, {"iobj"})
+            if iobj_tok is not None and iobj_tok.get("upos") not in _SKIP_UPOS:
+                addressee = _node_for(iobj_tok, entities, canon)
+                if addressee:
+                    attrs_by_verb.setdefault(head_id, set()).add(
+                        Participant("theme", addressee[0], addressee[1]))
+            if not obj_groups:
+                content = _clause_content(head_id, sent)
+                if content:
+                    # obsah řeči/postoje (ccomp/parataxis) jako předmět —
+                    # „Co řekl X?" odpovídá obsahem, ne adresátem
+                    obj_groups = [[(content, "výrok")]]
             attrs = sorted(attrs_by_verb.get(head_id, ()),
                            key=lambda p: (p.role, p.node))
             if not obj_groups and not attrs:
