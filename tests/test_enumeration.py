@@ -143,3 +143,19 @@ def test_relational_noun_is_not_identity_answer():
     ]]})
     a = GraphAnswerer(g, client, ExtractiveAnswerer(AnswererConfig()))
     assert a.answer(q, []).text == "malíř"
+
+
+def test_relational_kind_from_apposition_is_valid_identity():
+    """„Kdo je Maria?" — druh(Maria, matka) z apozice JE platná identita
+    (jediná, co text nese); filtr vztahových jmen platí jen pro sponové být."""
+    g = FactGraph()
+    g.add_fact(make_fact("druh", [Participant("subj", "Maria", "person"),
+                                  Participant("pred", "matka", "concept")]))
+    q = "Kdo je Maria?"
+    client = FakeUfalClient(parse={q: [[
+        {"form": "Kdo", "lemma": "kdo", "upos": "PRON", "head": 3, "deprel": "nsubj"},
+        {"form": "je", "lemma": "být", "upos": "AUX", "head": 3, "deprel": "cop"},
+        {"form": "Maria", "lemma": "Maria", "upos": "PROPN", "head": 0, "deprel": "root"},
+    ]]})
+    a = GraphAnswerer(g, client, ExtractiveAnswerer(AnswererConfig()))
+    assert a.answer(q, []).text == "matka"

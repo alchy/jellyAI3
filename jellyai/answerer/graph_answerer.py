@@ -299,9 +299,12 @@ class GraphAnswerer(Answerer):
                         # „stvořitel") = tautologie; dekompoziční predikáty
                         # (rok z „13. ledna 1890") echo naopak CHTĚJÍ
                         continue
-                    if hole_role in ("pred", "attr") and pred in ("být", "druh") \
-                            and (part.node in current()["relational_nouns"]
+                    if hole_role in ("pred", "attr") \
+                            and ((pred == "být"
+                                  and part.node in current()["relational_nouns"])
                                  or part.node in current()["interrogative_pronouns"]):
+                        # sponové „byl bratrem" je vztah k protistraně, ne
+                        # identita; apoziční druh („matka Maria") pojmenování JE
                         # vztahové jméno („bratr") není identita osoby bez
                         # protistrany — profese/druh ano
                         continue
@@ -605,6 +608,19 @@ class GraphAnswerer(Answerer):
                              "predicate": predicate, "answer": answer,
                              "gravity": self.context.hottest()})
 
+    def _spread(self, node_id, amount=0.3, fanout=8):
+        """SPREADING ACTIVATION: rozlije zlomek jasu na sousedy uzlu přes
+        fakty (jeden skok, top-K dle váhy). Dotaz na Marii tak rozsvítí
+        i Ježíše — attention sleduje strukturu grafu, ne jen použitý fakt."""
+        neighbors = {}
+        for fact in self.graph.facts_of(node_id):
+            for p in fact.participants:
+                if p.node != node_id and p.type != "výrok":
+                    neighbors[p.node] = max(neighbors.get(p.node, 0.0),
+                                            float(fact.weight))
+        for near in sorted(neighbors, key=neighbors.get, reverse=True)[:fanout]:
+            self.context.warm(near, amount)
+
     def _remember(self, qa, topic, value):
         """Zapíše tah do konverzačního těžiště a pohasí ho.
 
@@ -622,4 +638,5 @@ class GraphAnswerer(Answerer):
             self.context.warm(topic, 1.0)
         else:
             self.context.warm(topic, 2.0)
+        self._spread(topic)                  # attention se rozlévá po grafu
         self.context.step()

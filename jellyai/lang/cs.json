@@ -9,7 +9,7 @@
   "feminine_name_suffixes": ["ová", "á", "a"],
   "metalanguage_nouns": ["jméno", "slovo", "název", "pojmenování", "zkratka",
                          "výraz", "označení"],
-  "generic_event_verbs": ["stát", "dít", "udát", "přihodit"],
+  "generic_event_verbs": ["stát", "dít", "udát", "přihodit", "vědět"],
   "interrogative_adverbs": ["proč", "jak", "kudy", "odkud", "nač", "zač",
                             "kolikrát", "dokdy", "odkdy"],
   "interrogative_pronouns": ["jaký", "který", "kdo", "co", "čí", "kolik"],

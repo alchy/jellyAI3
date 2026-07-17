@@ -232,3 +232,23 @@ def test_relation_noun_resolves_via_identity_join():
     ]]})
     a = GraphAnswerer(g, client, ExtractiveAnswerer(AnswererConfig()))
     assert a.answer(q, []).text == "Božena Čapková"
+
+
+def test_activation_spreads_to_graph_neighbors():
+    """Attention se rozlévá: dotaz na Marii rozsvítí i Ježíše (soused přes
+    fakt), byť slaběji než přímé téma — spreading activation po hranách."""
+    g = FactGraph()
+    g.add_fact(make_fact("druh", [Participant("subj", "Maria", "person"),
+                                  Participant("pred", "matka", "concept")]))
+    g.add_fact(make_fact("porodit", [Participant("subj", "Maria", "person"),
+                                     Participant("obj", "Ježíš", "person")]))
+    q = "Kdo je Maria?"
+    client = FakeUfalClient(parse={q: [[
+        {"form": "Kdo", "lemma": "kdo", "upos": "PRON", "head": 3, "deprel": "nsubj"},
+        {"form": "je", "lemma": "být", "upos": "AUX", "head": 3, "deprel": "cop"},
+        {"form": "Maria", "lemma": "Maria", "upos": "PROPN", "head": 0, "deprel": "root"},
+    ]]})
+    a = GraphAnswerer(g, client, ExtractiveAnswerer(AnswererConfig()))
+    a.answer(q, [])
+    assert a.context.scores.get("Ježíš", 0) > 0
+    assert a.context.scores["Maria"] > a.context.scores["Ježíš"]
