@@ -27,6 +27,9 @@ def _keys(name):
     out = {base}
     if len(base) > 5 and base.endswith("ich"):
         out.add(base[:-3])           # lokativ plurálu: „Petrovicích"
+    vowels = "aeiouy"
+    if len(base) > 2 and base[-1] not in vowels and base[-2] not in vowels:
+        out.add(base[:-1] + "e" + base[-1])   # epenteze: „Plzni" ↔ „Plzeň"
     fold = current().get("palatal_fold", {})
     for key in list(out):
         if key and key[-1] in fold:
@@ -46,7 +49,8 @@ def load_gazetteer(path):
             for line in fh:
                 if line.strip():
                     row = json.loads(line)
-                    parents[_key(row["place"])] = _key(row["in"])
+                    if "in" in row:      # {"place","near"} = sousedství
+                        parents[_key(row["place"])] = _key(row["in"])
     return parents
 
 
