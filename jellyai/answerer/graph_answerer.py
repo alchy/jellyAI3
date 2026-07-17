@@ -5,8 +5,11 @@ predikátu) a z faktu s **nejvyšší vahou** vezme účastníka cílové role. 
 i „kdy" čerpají z téhož narozovacího faktu. Když nic nesedí, deleguje na fallback.
 """
 
+from datetime import datetime
+
 from jellyai.answerer.base import Answer, Answerer
 from jellyai.graph.graph import parse_date
+from jellyai.iris.subsystems.chronos import resolve_temporal
 from jellyai.lang import current
 from jellyai.answerer.question import analyze_question
 from jellyai.answerer.pattern import question_pattern, SubQuery, Pattern
@@ -56,7 +59,8 @@ class GraphAnswerer(Answerer):
     """
 
     def __init__(self, graph, client, fallback, *, context_decay=0.55,
-                 spread_depth=2, spread_falloff=0.35, query_mode="udpipe"):
+                 spread_depth=2, spread_falloff=0.35, query_mode="udpipe",
+                 clock=None):
         """Vytvoří answerer.
 
         Args:
@@ -86,6 +90,8 @@ class GraphAnswerer(Answerer):
         self.history = []        # trajektorie konverzace (tahy s trasou a těžištěm)
         self._word_set = None    # doslovná slova uzlů (veto neznámého slovesa)
         self._resolved_knowns = set()   # entity otázky rozřešené tímto tahem
+        self.clock = clock or datetime.now   # „teď" pro časová primitiva otázky
+        self.time_filter = None  # tvrdý interval otázky (Chronos, brána Q→A)
 
     def _node_word(self, token):
         """DOSLOVNÉ slovo některého ENTITNÍHO uzlu grafu — bez kmenových
@@ -488,6 +494,8 @@ class GraphAnswerer(Answerer):
             for fact in self.graph.facts_of(node0, predicate=pred):
                 if not known_set <= {p.node for p in fact.participants}:
                     continue
+                if self._time_excluded(fact):
+                    continue
                 for part in fact.participants:
                     if part.node in known_set or len(part.node) < 2:
                         continue             # díra ≠ známé; 1-znak = artefakt NER
@@ -665,6 +673,20 @@ class GraphAnswerer(Answerer):
         self.visited.extend(p.node for f in chosen for p in f.participants)
         return node0, [_event_text(f) for f in chosen], chosen[0]
 
+    def _time_excluded(self, fact):
+        """Fakt s časovým účastníkem MIMO interval otázky (tvrdý filtr).
+
+        Mechanismus brány A: interval dodal Chronos z otázky; fakt bez
+        časového účastníka se nevylučuje — nedatované časem soudit nelze.
+        """
+        if self.time_filter is None:
+            return False
+        times = [p.node for p in fact.participants if p.role == "time"]
+        if not times:
+            return False
+        return not any(self.time_filter.contains_date(parse_date(t))
+                       for t in times)
+
     def _existence(self, predicate, known_set):
         """Zjišťovací (ano/ne) otázka: existuje fakt s predikátem a všemi
         známými účastníky? → „Ano"; jinak nic (fallback „nenašel" čte se jako
@@ -680,7 +702,7 @@ class GraphAnswerer(Answerer):
             # s predikátem vůbec? Téma = první entitní účastník nálezu
             rings = {pred for pred, _ in _synonym_ring(predicate)}
             for fact in self.graph.facts.values():
-                if fact.predicate in rings:
+                if fact.predicate in rings and not self._time_excluded(fact):
                     self.visited.extend(p.node for p in fact.participants)
                     topic = next((p.node for p in fact.participants
                                   if p.role in ("subj", "obj")), None)
@@ -689,7 +711,8 @@ class GraphAnswerer(Answerer):
         node0 = next(iter(known_set))
         for pred, _ in _synonym_ring(predicate):
             for fact in self.graph.facts_of(node0, predicate=pred):
-                if known_set <= {p.node for p in fact.participants}:
+                if known_set <= {p.node for p in fact.participants} \
+                        and not self._time_excluded(fact):
                     self.visited.extend(p.node for p in fact.participants)
                     return node0, ["Ano"], fact
         return None, [], None
@@ -838,6 +861,10 @@ class GraphAnswerer(Answerer):
         self.last_trace = None
         self.last_resolution = None   # evidence tahu — nesmí přežít z minula
         self.last_overflow = []
+        # TVRDÝ ČASOVÝ FILTR: časové primitivum otázky („v 19. století",
+        # „letos", „21.1.1900") VYŘADÍ fakty s časem mimo interval;
+        # nedatované fakty filtr nechává (nelze je vyloučit časem)
+        self.time_filter = resolve_temporal(question, self.clock())
         # UNIVERZÁLNÍ princip: otázka→neúplný fakt→match→díra (nahrazuje qtype pravidla
         # i attention — kontextově navazující dotaz řeší tatáž cesta). Rozbor dodají
         # ŠABLONY (pseudo-QL, bez UDPipe); UDPipe jen mimo templates režim.

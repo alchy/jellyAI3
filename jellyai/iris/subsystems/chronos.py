@@ -174,6 +174,29 @@ def resolve_temporal(text, now):  # pylint: disable=too-many-branches,too-many-r
         half = timedelta(minutes=lang.get("now_window_minutes", 15)) / 2
         return TimeInterval(now - half, now + half, "moment")
 
+    # 2b) EXPLICITNÍ DATUM: „21.1.1900" i „21. ledna 1900" — absolutní den
+    #     (kotva pro tvrdý filtr i pro konstatování s historickým datem)
+    months = lang.get("month_forms", {})
+    for i, tok in enumerate(tokens):
+        numeric = re.fullmatch(r"(\d{1,2})\.(\d{1,2})\.(\d{4})", tok)
+        if numeric:
+            try:
+                day = datetime(int(numeric.group(3)), int(numeric.group(2)),
+                               int(numeric.group(1)))
+            except ValueError:
+                continue
+            return TimeInterval(day, day + timedelta(days=1), "day")
+        if tok in months and i:
+            day_no = tokens[i - 1].rstrip(".")
+            year = next((p for p in tokens[i + 1:i + 2]
+                         if p.isdigit() and len(p) == 4), None)
+            if day_no.isdigit() and year:
+                try:
+                    day = datetime(int(year), months[tok], int(day_no))
+                except ValueError:
+                    continue
+                return TimeInterval(day, day + timedelta(days=1), "day")
+
     # 3) slova dne: dnes/včera/zítra/předevčírem/pozítří
     for tok in tokens:
         if tok in lang.get("day_words", {}):

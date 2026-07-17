@@ -95,6 +95,10 @@ class IrisAutomaton:
                 paměť Chronos: připomínka po odpálení mizí; None = jen RAM.
         """
         self.answerer = answerer
+        if hasattr(answerer, "clock"):
+            # jeden zdroj „teď": hodiny automatu (injektované v testech)
+            # musí platit i pro tvrdý časový filtr answereru
+            answerer.clock = clock or datetime.now
         if deck is None:
             deck = PatternDeck.for_language("cs")
             deck.load()
