@@ -200,6 +200,33 @@ def test_explicit_memory_commands_structured_and_note(tmp_path):
                for f in fresh.graph.facts.values())
 
 
+def test_forget_selective_and_compound(tmp_path):
+    """Zapomenutí (zadání): „Odstraň, že Pavel bydlí na Barrandově,
+    ponech, že Pavla a Matěj bydlí na Barrandově." — přesná shoda tvarů
+    smaže jen Pavla (muže), Pavla+Matěj zůstávají; maže se graf I deník;
+    opakovaný pokyn → poctivé „nic takového si nepamatuji"."""
+    path = str(tmp_path / "memory.jsonl")
+    answerer = GraphAnswerer(FactGraph(), FakeUfalClient(),
+                             ExtractiveAnswerer(AnswererConfig()),
+                             query_mode="templates", clock=lambda: NOW)
+    answerer._gazetteer_path = str(tmp_path / "gaz.jsonl")
+    iris = IrisAutomaton(answerer, clock=lambda: NOW, memory_path=path)
+    iris.turn("Nezapomeň, Pavel bydlí na Barrandově.")
+    iris.turn("Zapamatuj si, že Pavla a Matěj bydlí na Barrandově v Praze.")
+    out = iris.turn("Odstraň, že Pavel bydlí na Barrandově, "
+                    "ponech, že Pavla a Matěj bydlí na Barrandově.")
+    assert "Zapomenuto" in out.text and "Pavel" in out.text
+    assert "memory-forget" in out.used["patterns"]
+    nodes = {part.node for f in answerer.graph.facts.values()
+             for part in f.participants}
+    assert "Pavel" not in nodes and "Pavla" in nodes   # přesná shoda tvarů
+    assert "Barrandově" in iris.turn("Kde bydlí Matěj?").text
+    diary = (tmp_path / "memory.jsonl").read_text(encoding="utf-8")
+    assert '"Pavel"' not in diary and '"Pavla"' in diary
+    out = iris.turn("Zapomeň, že Pavel bydlí na Barrandově.")
+    assert "memory-forget-miss" in out.used["patterns"]
+
+
 def test_recall_what_i_told_you_by_interval():
     """Vzpomínání (zadání): „Co jsem ti řekl včera / dnes / minulý
     týden?" — timestampy Mnemos × intervaly Chronos. Hodiny se posouvají

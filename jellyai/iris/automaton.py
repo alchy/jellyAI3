@@ -34,8 +34,9 @@ from jellyai.iris.subsystems.chronos import (TimeInterval, clock_answer,
                                              format_due, resolve_due,
                                              resolve_plan, resolve_temporal,
                                              resolve_weekday)
-from jellyai.iris.subsystems.mnemos import (note_statement, parse_statement,
-                                            persist, remember, replay)
+from jellyai.iris.subsystems.mnemos import (forget, note_statement,
+                                            parse_statement, persist,
+                                            remember, replay)
 from jellyai.iris.patterns import PatternDeck
 from jellyai.iris.presenter import activation_window, docs_window
 from jellyai.iris.state import FocusState, PendingFocus
@@ -188,6 +189,9 @@ class IrisAutomaton:
                             return self._set_reminder(pending["task"], due,
                                                       text, record=pending)
                         return self._set_reminder(pending, due, text)
+            forgot = self._forget_command(text)
+            if forgot is not None:
+                return forgot
             memo = next((p for p in sorted(current()["memorize_phrases"],
                                            key=len, reverse=True)
                          if p in deaccent(text.lower())), None)
@@ -402,6 +406,51 @@ class IrisAutomaton:
             used={"components": ["chronos"], "patterns": [card.name]})
         self.state.remember(text, response)
         return response
+
+    def _forget_command(self, text):
+        """ZAPOMENUTÍ („zapomeň/odstraň/vymaž, že Pavel bydlí na
+        Barrandově"): zbytek věty se klasifikuje jako konstatování a maže
+        se PŘESNOU shodou tvarů z grafu i deníku (Pavel ≠ Pavla — složený
+        pokyn s „ponech…" je bezpečný; klauzule za keep-slovem se ořeže).
+        Fráze tokenově (slovo „zapomeň" ≠ „nezapomeň")."""
+        lang = current()
+        tokens = re.findall(r"[\w:.]+", text)
+        lows = [deaccent(t.lower()).rstrip(".") for t in tokens]
+        start = None
+        for phrase in sorted(lang["forget_phrases"], key=len, reverse=True):
+            words = phrase.split()
+            for i in range(len(lows) - len(words) + 1):
+                if lows[i:i + len(words)] == words:
+                    start = i + len(words)
+                    break
+            if start is not None:
+                break
+        if start is None:
+            return None
+        rest = tokens[start:]
+        keep = lang["keep_words"]
+        cut = next((k for k, t in enumerate(rest)
+                    if deaccent(t.lower()).rstrip(".") in keep), None)
+        if cut is not None:
+            rest = rest[:cut]              # „ponech…" klauzule = pojistka
+        while rest and deaccent(rest[0].lower()).rstrip(".") in ("ze", "at"):
+            rest.pop(0)
+        remainder = " ".join(rest).rstrip(".,")
+        if not remainder:
+            return None
+        statement = parse_statement(remainder, self.clock(), self.deck,
+                                    is_node=self._known_word)
+        if statement is None:
+            return None
+        removed = forget(self.answerer.graph, self.memory_path,
+                         statement["predicate"], statement["objects"],
+                         current()["user_entity"])
+        card = self.deck.best("memory.forget",
+                              {"candidates": removed})
+        if card is None:
+            return None
+        message = card.dialog.format(facts="; ".join(removed))
+        return self._plan_response(card, message, text)
 
     def _memorize_command(self, text, phrase):
         """EXPLICITNÍ příkaz paměti („zapamatuj si, že…", „nezapomeň, …",

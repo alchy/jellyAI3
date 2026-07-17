@@ -1,0 +1,7 @@
+{
+  "name": "memory-forget-miss",
+  "trigger": {"event": "memory.forget"},
+  "dialog": "Nic takového si nepamatuji.",
+  "action": {},
+  "teach": "Pokyn k zapomenutí bez odpovídajícího faktu v paměti — poctivá odpověď."
+}

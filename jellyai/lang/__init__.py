@@ -82,6 +82,8 @@ def load_rules(language="cs"):
         rules["reminder_phrases"] = tuple(rules.get("reminder_phrases", ()))
         rules["memorize_phrases"] = tuple(rules.get("memorize_phrases", ()))
         rules["recall_phrases"] = tuple(rules.get("recall_phrases", ()))
+        rules["forget_phrases"] = tuple(rules.get("forget_phrases", ()))
+        rules["keep_words"] = frozenset(rules.get("keep_words", ()))
         rules["note_predicate"] = rules.get("note_predicate", "poznamenat")
         rules["plan_query_phrases"] = tuple(
             rules.get("plan_query_phrases", ()))

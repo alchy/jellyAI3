@@ -1,0 +1,7 @@
+{
+  "name": "memory-forget",
+  "trigger": {"event": "memory.forget", "min_candidates": 1},
+  "dialog": "🗑️ Zapomenuto: {facts}",
+  "action": {},
+  "teach": "Zapomenutí paměti (zapomeň/odstraň/vymaž, že …): předloha z klasifikace zbytku věty se maže PŘESNOU shodou tvarů z grafu i deníku — Pavel nesmaže Pavlu, takže složený pokyn (odstraň X, ponech Y) je bezpečný; klauzule za ponech/zachovej/nech se ořezává jako pojistka."
+}

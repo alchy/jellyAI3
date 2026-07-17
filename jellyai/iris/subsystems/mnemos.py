@@ -241,6 +241,43 @@ def remember(graph, statement, user_entity):
     return detail
 
 
+def forget(graph, path, predicate, objects, user_entity):
+    """ZAPOMENUTÍ: odstraní fakta uživatele z GRAFU i DENÍKU podle
+    předlohy — predikát + objekty jako podmnožina, PŘESNOU shodou tvarů
+    („Pavel" nesmaže „Pavlu"; složený pokyn „odstraň X, ponech Y" je tak
+    bezpečný sám od sebe). Konzistence: co zmizí z grafu, zmizí i z deníku.
+
+    Returns:
+        list[str]: Popisy odstraněných faktů (prázdné = nic nesedělo).
+    """
+    target = set(objects)
+    removed, kept = [], {}
+    for key, fact in graph.facts.items():
+        nodes = {part.node for part in fact.participants}
+        if fact.predicate == predicate and target <= nodes \
+                and user_entity in nodes:
+            removed.append(f"{fact.predicate}: "
+                           f"{', '.join(sorted(target))}")
+            continue
+        kept[key] = fact
+    if removed:
+        graph.replace_facts(kept)
+    if path and os.path.exists(path):
+        lines = []
+        with open(path, encoding="utf-8") as fh:
+            for line in fh:
+                if not line.strip():
+                    continue
+                row = json.loads(line)
+                if row.get("predicate") == predicate \
+                        and target <= set(row.get("objects", [])):
+                    continue
+                lines.append(line)
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.writelines(lines)
+    return removed
+
+
 def persist(statement, path):
     """Připíše konstatování do DENÍKU paměti (JSONL, append-only).
 
