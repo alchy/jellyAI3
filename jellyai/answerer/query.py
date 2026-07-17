@@ -17,20 +17,6 @@ from jellyai.answerer.pattern import Pattern, SubQuery
 from jellyai.graph.canon import deaccent
 from jellyai.lang import current
 
-_COPULA = {"je", "byl", "byla", "bylo", "byli", "byly", "jsou", "byt",
-           "jsem", "jsi", "jste", "jsme"}
-_RELATIVE = {"ktery", "ktera", "ktere", "kteri", "jenz", "jez"}
-_SKIP = {"se", "si", "v", "ve", "na", "o", "s", "z", "ze", "do", "u", "k"}
-# tázací slovo (bezdiakritické) → (díra role, díra typ) — pseudo-QL díra
-_HOLE = {
-    "kdo": ("subj", "person"), "koho": ("obj", "person"), "co": ("obj", None),
-    "kde": ("loc", "geo"), "kam": ("loc", "geo"), "odkud": ("loc", "geo"),
-    "kdy": ("time", "time"), "kolik": ("num", "number"),
-    "jaky": ("attr", None), "jaka": ("attr", None), "jake": ("attr", None),
-    "jakou": ("attr", None), "ktery": ("attr", None), "ci": ("subj", "person"),
-}
-
-
 def _norm(token):
     """Bezdiakritický klíč tokenu malými písmeny."""
     return deaccent(token.lower())
@@ -45,7 +31,7 @@ def _verb_match(token, predicates):
     low = _norm(token)
     # slovesný tvar v otázce je malými písmeny; velké písmeno = vlastní jméno
     # („Němec" nesmí matchnout sloveso „neměnit" přes prefix „nem")
-    if len(low) < 4 or low in _COPULA or token[:1].isupper():
+    if len(low) < 4 or low in current()["copula_forms"] or token[:1].isupper():
         return None
     best = None
     for pred in predicates:
@@ -78,14 +64,15 @@ def build_query(question, predicates):  # pylint: disable=too-many-locals,too-ma
     if not tokens:
         return None
 
+    lang = current()
     hole_role, hole_type = None, None
     for tok in tokens:                         # díra = první tázací slovo
-        if _norm(tok) in _HOLE:
-            hole_role, hole_type = _HOLE[_norm(tok)]
+        if _norm(tok) in lang["interrogatives"]:
+            hole_role, hole_type = lang["interrogatives"][_norm(tok)][:2]
             break
 
-    relational = current()["relational_nouns"]
-    has_copula = any(_norm(t) in _COPULA for t in tokens)
+    relational = lang["relational_nouns"]
+    has_copula = any(_norm(t) in lang["copula_forms"] for t in tokens)
     known = _collect_known(tokens, predicates, relational)
 
     # 1) vztahová otázka: „Kdo byl bratr X?" → vztahové jméno = predikát
@@ -124,12 +111,13 @@ def _collect_known(tokens, predicates, relational):
     """Známé účastníky = spojité běhy obsahových tokenů (kandidáti na entitu/
     vztah); tázací/spona/předložka/sloveso běh ukončí, „který" → pod-dotaz.
     Vztahové jméno se ponechá NA ZAČÁTKU běhu (řeší ho vztahová šablona)."""
+    lang = current()
     known, run = [], []
     i = 0
     while i < len(tokens):
         tok = tokens[i]
         low = _norm(tok)
-        if low in _RELATIVE:                   # „…autora KTERÝ napsal X"
+        if low in lang["relative_pronouns"]:   # „…autora KTERÝ napsal X"
             if run:
                 known.append(("obj", " ".join(run)))
                 run = []
@@ -140,7 +128,8 @@ def _collect_known(tokens, predicates, relational):
                 else:
                     known.append(("obj", sub))
             break
-        boundary = (low in _HOLE or low in _COPULA or low in _SKIP
+        boundary = (low in lang["interrogatives"] or low in lang["copula_forms"]
+                    or low in lang["query_skip_words"]
                     or _verb_match(tok, predicates) is not None)
         if boundary and low not in relational:
             if run:
@@ -157,12 +146,14 @@ def _collect_known(tokens, predicates, relational):
 
 def _subquery(rest, predicates):
     """Z „…který PREDIKÁT PŘEDMĚT" složí SubQuery(predikát, obj=předmět)."""
+    lang = current()
     verb, obj = None, []
     for tok in rest:
         match = _verb_match(tok, predicates)
         if verb is None and match:
             verb = match
-        elif verb is not None and _norm(tok) not in _COPULA | _SKIP:
+        elif verb is not None and _norm(tok) not in lang["copula_forms"] \
+                and _norm(tok) not in lang["query_skip_words"]:
             obj.append(tok)
     if verb is None or not obj:
         return None

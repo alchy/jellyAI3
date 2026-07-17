@@ -45,3 +45,15 @@ def test_language_is_config_driven():
     """Jazyk se volí v configu — přepnutí nevyžaduje zásah do kódu."""
     from config import Config
     assert Config().graph.language == "cs"
+
+
+def test_query_function_tables_loaded():
+    """Funkční slova dotazu jsou jazyková data, ne kód (spec §5)."""
+    rules = load_rules("cs")
+    assert rules["interrogatives"]["kdo"] == ("subj", "person", "Kdo")
+    assert rules["interrogatives"]["kterem"] == ("attr", None, "Který")
+    assert "byl" in rules["copula_forms"]
+    assert "ktery" in rules["relative_pronouns"]
+    assert "se" in rules["query_skip_words"]
+    assert rules["event_verb_forms"]["stalo"] == "stát"
+    assert rules["date_part_forms"]["roce"] == "rok"

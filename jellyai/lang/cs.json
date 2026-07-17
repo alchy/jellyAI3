@@ -25,5 +25,29 @@
                  "báseň", "sbírka", "drama", "text", "komedie", "novela",
                  "tragédie", "publikace", "esej", "fejeton", "trilogie"],
   "work_verbs": ["napsat", "vydat", "natočit", "složit", "namalovat", "vytvořit",
-                 "dokončit", "publikovat", "sepsat"]
+                 "dokončit", "publikovat", "sepsat"],
+  "interrogatives": {
+    "kdo": ["subj", "person", "Kdo"], "koho": ["obj", "person", "Kdo"],
+    "co": ["obj", null, "Co"], "ceho": ["obj", null, "Co"], "cemu": ["obj", null, "Co"],
+    "kde": ["loc", "geo", "Kde"], "kam": ["loc", "geo", "Kde"], "odkud": ["loc", "geo", "Kde"],
+    "kdy": ["time", "time", "Kdy"], "kolik": ["num", "number", "Kolik"],
+    "jaky": ["attr", null, "Jaký"], "jaka": ["attr", null, "Jaký"],
+    "jake": ["attr", null, "Jaký"], "jakou": ["attr", null, "Jaký"],
+    "jakeho": ["attr", null, "Jaký"], "jakem": ["attr", null, "Jaký"],
+    "ktery": ["attr", null, "Který"], "ktera": ["attr", null, "Který"],
+    "ktere": ["attr", null, "Který"], "kterou": ["attr", null, "Který"],
+    "kterem": ["attr", null, "Který"], "ci": ["subj", "person", "Čí"]
+  },
+  "copula_forms": ["je", "byl", "byla", "bylo", "byli", "byly", "jsou", "byt",
+                   "jsem", "jsi", "jste", "jsme"],
+  "relative_pronouns": ["ktery", "ktera", "ktere", "kteri", "jenz", "jez"],
+  "query_skip_words": ["se", "si", "v", "ve", "na", "o", "s", "z", "ze", "do",
+                       "u", "k", "ke", "po", "za", "pod", "nad", "pred", "pri",
+                       "ten", "ta", "to", "tento", "tato", "toto", "tomto", "teto"],
+  "event_verb_forms": {"stalo": "stát", "stala": "stát", "stal": "stát",
+                       "staly": "stát", "deje": "dít", "delo": "dít",
+                       "udalo": "udát", "prihodilo": "přihodit"},
+  "date_part_forms": {"rok": "rok", "roku": "rok", "roce": "rok", "letech": "rok",
+                      "mesic": "měsíc", "mesici": "měsíc",
+                      "den": "den", "dne": "den", "dni": "den"}
 }
