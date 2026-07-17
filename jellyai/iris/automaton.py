@@ -96,6 +96,7 @@ class IrisAutomaton:
         self.memory_path = memory_path
         self.state = FocusState()
         self._words = None       # cache doslovných slov uzlů (veto sloves)
+        self.telemetry = {}      # jméno karty → {"used", "gain"} (měřený zisk)
         if memory_path:
             restored = replay(answerer.graph, memory_path,
                               current()["user_entity"])
@@ -167,15 +168,28 @@ class IrisAutomaton:
         context = {"assurance": assur, "candidates": candidates,
                    "term": res["term"] if res else text}
 
-        # ROZHODUJÍ KARTY: automat jen ohlásí událost tahu (odpověď na
-        # hádané volbě → resolve.ambiguous; bez odpovědi → focus.low)
-        # a karta — pokud její trigger sedí — určí dialogovou reakci
+        # ROZHODUJÍ KARTY (výběr benefitem — deck.best): automat jen ohlásí
+        # událost tahu (odpověď na hádané volbě → resolve.ambiguous;
+        # přetékající výčet → data.overflow; bez odpovědi → focus.low)
         if answer.trace:
-            card = self.deck.match("resolve.ambiguous", context)
+            card = self.deck.best("resolve.ambiguous", context)
             if card is not None:
                 return self._dialog(card, context, text, used_patterns)
+            overflow = self.answerer.last_overflow
+            if overflow:
+                # svítila-li oblast už PŘED tahem (uživatel ZAOSTŘIL — volba
+                # hřeje 2.0), výčet se prostě zodpoví; mimoděčné teplo
+                # z minulých odpovědí (≤0.7) oblast nezamyká
+                over_ctx = {"assurance": assur, "candidates": overflow,
+                            "term": context["term"],
+                            "features": ({"area_lit"} if any(
+                                before.get(area, 0.0) > 1.0
+                                for area in overflow) else set())}
+                card = self.deck.best("data.overflow", over_ctx)
+                if card is not None:
+                    return self._dialog(card, over_ctx, text, used_patterns)
             return self._respond(answer, "answer", assur, used_patterns, text)
-        card = self.deck.match("focus.low", context)
+        card = self.deck.best("focus.low", context)
         if card is not None:
             return self._dialog(card, context, text, used_patterns,
                                 await_pick=False)
@@ -192,6 +206,12 @@ class IrisAutomaton:
             if node.type == "time" \
                     and interval.contains_date(parse_date(node.id)):
                 self.answerer.context.warm(node.id, warmth)
+
+    def _note_card(self, name, gain=0.0):
+        """Telemetrie karty: počet použití + kumulovaný zisk aktivace."""
+        entry = self.telemetry.setdefault(name, {"used": 0, "gain": 0.0})
+        entry["used"] += 1
+        entry["gain"] += round(gain, 4)
 
     def _known_word(self, token):
         """DOSLOVNÉ slovo uzlu grafu? Veto pro detekci slovesa v Mnemos:
@@ -220,7 +240,7 @@ class IrisAutomaton:
                 self._words.update(obj.lower().split())
         for node in statement["objects"]:
             self.answerer.context.warm(node, 0.7)
-        card = self.deck.match("memory.stored", {})
+        card = self.deck.best("memory.stored", {})
         message = card.dialog.format(fact=detail) if card else detail
         patterns = [statement["card"]] + ([card.name] if card else [])
         response = IrisResponse(
@@ -260,6 +280,8 @@ class IrisAutomaton:
         if chosen is None:
             self.state.pending = None      # nové téma — dialog končí
             return None
+        if pending.term is None:           # volba oblasti — otázka beze změny
+            return chosen, pending.question
         # zaostřená otázka: nejednoznačný termín → vybraný kandidát
         question = re.sub(re.escape(pending.term), chosen,
                           pending.question, count=1, flags=re.IGNORECASE)
@@ -269,17 +291,29 @@ class IrisAutomaton:
 
     def _dialog(self, card, context, question, used_patterns,
                 await_pick=None):
-        """Vykoná pattern-kartu: text z šablony + akce (warm, čekání na volbu)."""
+        """Vykoná pattern-kartu: text z šablony + akce (warm, čekání na volbu).
+
+        Zisk karty se MĚŘÍ (Δ jasu kandidátů po akci) — telemetrie řídí
+        další vývoj karet daty, ne dojmem (spec §2.6c).
+        """
         candidates = context["candidates"]
         text = card.dialog.format(candidates=", ".join(candidates),
                                   term=context["term"])
         warmth = card.action.get("warm_candidates", 0.0)
+        scores = self.answerer.context.scores
+        before = sum(scores.get(node, 0.0) for node in candidates)
         for node in candidates:
             self.answerer.context.warm(node, warmth)
+        gain = sum(scores.get(node, 0.0) for node in candidates) - before
+        self._note_card(card.name, gain)
         wants_pick = card.action.get("await") == "user-pick" \
             if await_pick is None else await_pick
         if wants_pick:
-            self.state.pending = PendingFocus(question, context["term"],
+            # replace_term=false (overflow): volba jen rozsvítí oblast,
+            # otázka se přehraje beze změny — zúží ji aktivace
+            term = context["term"] if card.action.get("replace_term", True) \
+                else None
+            self.state.pending = PendingFocus(question, term,
                                               candidates, card.name)
         response = IrisResponse(
             text=text, kind="dialog", assurance=context["assurance"],
@@ -335,8 +369,8 @@ class IrisAutomaton:
                                       for k in keys)]
                 if domain is not None or domain_docs:
                     features.add("domain")
-        card = self.deck.match("utterance.focus-shift",
-                               {"features": features})
+        card = self.deck.best("utterance.focus-shift",
+                              {"features": features})
         if card is None or (domain is None and not domain_docs):
             return None
         if domain is not None:

@@ -84,34 +84,65 @@ class PatternDeck:
         self.cards = cards
         return len(cards)
 
-    def match(self, event, context):
-        """Vybere první kartu, jejíž trigger sedí na událost a kontext.
+    def _specificity(self, card, event, context):
+        """Kolik podmínek triggeru na tahu sedí; None = trigger nesedí.
 
-        Args:
-            event (str): Událost automatu (např. "resolve.ambiguous").
-            context (dict): Stav tahu — `assurance` (float), `candidates`
-                (list) a cokoli dalšího, na co se trigger ptá.
+        Každá SPLNĚNÁ dodatečná podmínka (práh jistoty, počet kandidátů,
+        požadovaný/zakázaný rys) zvyšuje těsnost — a těsnější karta je pro
+        daný dotaz větším benefitem než obecná (matching dle otázky).
+        """
+        trig = card.trigger
+        if trig.get("event") != event:
+            return None
+        score = 0
+        below = trig.get("assurance_below")
+        if below is not None:
+            if context.get("assurance", 0.0) >= below:
+                return None
+            score += 1
+        minimum = trig.get("min_candidates")
+        if minimum is not None:
+            if len(context.get("candidates", ())) < minimum:
+                return None
+            score += 1
+        # rysové triggery: karta žádá rysy tahu (requires) a zakazuje jiné
+        # (forbids) — klasifikaci dělají KARTY, kód jen počítá rysy
+        features = frozenset(context.get("features", ()))
+        requires = set(trig.get("requires", ()))
+        if not requires <= features:
+            return None
+        forbids = set(trig.get("forbids", ()))
+        if features & forbids:
+            return None
+        return score + len(requires) + len(forbids)
+
+    def match(self, event, context):
+        """Vybere PRVNÍ kartu (pořadí priorita→jméno), jejíž trigger sedí.
 
         Returns:
             PatternCard | None: Vítězná karta, nebo None (žádný vzor nesedí).
         """
-        features = frozenset(context.get("features", ()))
         for card in self.cards:
-            trig = card.trigger
-            if trig.get("event") != event:
-                continue
-            below = trig.get("assurance_below")
-            if below is not None and context.get("assurance", 0.0) >= below:
-                continue
-            minimum = trig.get("min_candidates")
-            if minimum is not None \
-                    and len(context.get("candidates", ())) < minimum:
-                continue
-            # rysové triggery: karta žádá rysy tahu (requires) a zakazuje
-            # jiné (forbids) — klasifikaci dělají KARTY, kód jen počítá rysy
-            if not set(trig.get("requires", ())) <= features:
-                continue
-            if features & set(trig.get("forbids", ())):
-                continue
-            return card
+            if self._specificity(card, event, context) is not None:
+                return card
         return None
+
+    def best(self, event, context):
+        """Vybere kartu s NEJVĚTŠÍM BENEFITEM pro daný tah (spec §2.6b).
+
+        Benefit = těsnost triggeru (kolik podmínek sedí) → priorita → jméno.
+        Automat zkouší všechny kandidátky a bere tu, která dotazu nejlépe
+        odpovídá; `match()` (first-match) zůstává pro jednoduché balíčky.
+
+        Returns:
+            PatternCard | None: Karta s největším benefitem, nebo None.
+        """
+        scored = []
+        for card in self.cards:
+            specificity = self._specificity(card, event, context)
+            if specificity is not None:
+                scored.append((-specificity, -card.trigger.get("priority", 0),
+                               card.name, card))
+        if not scored:
+            return None
+        return min(scored)[3]

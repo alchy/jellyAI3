@@ -122,7 +122,7 @@ def parse_statement(text, now, deck=None, is_node=None):
               for t in re.findall(r"[\w.]+", text)]
     tokens = [t for t in tokens if t]
     norms = [deaccent(t.lower()) for t in tokens]
-    card = deck.match("utterance.statement",
+    card = deck.best("utterance.statement",
                       {"features": utterance_features(tokens, norms, is_node)})
     if card is None or "memorize" not in card.action:
         return None

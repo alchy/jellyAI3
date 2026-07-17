@@ -40,6 +40,27 @@ def test_match_unknown_event_returns_none():
     assert deck.match("neexistujici.udalost", {"assurance": 0.0}) is None
 
 
+def test_best_prefers_specific_card_over_priority(tmp_path):
+    """Benefit-výběr (spec §2.6b): těsnější trigger (víc splněných podmínek)
+    přebije obecnou kartu i s vyšší prioritou; match() zůstává first-match."""
+    import json
+    generic = {"name": "obecna", "trigger": {"event": "e", "priority": 99},
+               "dialog": "obecně", "action": {}, "teach": ""}
+    tight = {"name": "tesna",
+             "trigger": {"event": "e", "priority": 1, "min_candidates": 2,
+                         "assurance_below": 0.5, "requires": ["rys"]},
+             "dialog": "těsně", "action": {}, "teach": ""}
+    for card in (generic, tight):
+        (tmp_path / f"{card['name']}.json").write_text(
+            json.dumps(card), encoding="utf-8")
+    deck = PatternDeck(str(tmp_path))
+    deck.load()
+    context = {"assurance": 0.2, "candidates": ["A", "B"],
+               "features": {"rys"}}
+    assert deck.best("e", context).name == "tesna"
+    assert deck.best("e", {"assurance": 0.9}).name == "obecna"
+
+
 def test_custom_directory_extends_behavior(tmp_path):
     """Nový jazyk/chování = nový adresář karet, žádná změna kódu."""
     card = {"name": "test-vzor", "trigger": {"event": "data.empty"},

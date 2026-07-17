@@ -75,6 +75,7 @@ class GraphAnswerer(Answerer):
         self.last_trace = None   # trasa poslední odpovědi (téma → fakt → hodnota)
         self.last_pattern = None  # poslední vykonaný pseudo-QL Pattern (API)
         self.last_resolution = None  # evidence rozlišení (vstup QueryAssurance)
+        self.last_overflow = []  # oblasti (theme) přetékajícího výčtu
         self._prev_trace = None  # trasa PŘEDCHOZÍHO tahu (drill „Kdy?")
         self.visited = []        # uzly protnuté (rekurzivním) matchem → rozsvícení
         self.context = ActivationField(decay=context_decay)   # těžiště (id uzlu → jas)
@@ -476,6 +477,11 @@ class GraphAnswerer(Answerer):
                         continue
                     base = fact.weight + (10 if exact else 0) \
                         + self._source_bonus(fact)
+                    # aktivace VŠECH účastníků faktu (poloviční) — volba
+                    # oblasti („učedníkům") pak zvedne výroky JEJÍHO faktu
+                    glow = self.context.scores.get(part.node, 0.0) \
+                        + 0.5 * sum(self.context.scores.get(q.node, 0.0)
+                                    for q in fact.participants)
                     # „kdy" bere čas i rok-jako-číslo; „jaký" bere i druh
                     # (pred) — druh je vlastnost; jinak přesná role díry
                     matched = False
@@ -492,8 +498,7 @@ class GraphAnswerer(Answerer):
                     if hole_role in ("loc", "time", "num", "pred") and not matched:
                         continue    # sémantická díra bez shody role/typu mlčí
                         #               („Kdy zemřel?" nesmí vrátit téma faktu)
-                    scored.append((base, self.context.scores.get(part.node, 0.0),
-                                   part.node, fact))
+                    scored.append((base, glow, part.node, fact))
         if not scored:
             return [], None
         # remíza se určuje ZÁKLADNÍM skóre (váha+role/typ) — aktivace remízu
@@ -505,7 +510,17 @@ class GraphAnswerer(Answerer):
         ties = [(act, v) for b, act, v, _ in scored if b == top]
         if hole_role in ("attr", "pred") and any(act > 0 for act, _ in ties):
             ties = [(act, v) for act, v in ties if act > 0]
-        values = list(dict.fromkeys(v for _, v in ties))[:_MAX_ENUM]
+        distinct = list(dict.fromkeys(v for _, v in ties))
+        values = distinct[:_MAX_ENUM]
+        everything = list(dict.fromkeys(v for _, _, v, _ in scored))
+        if len(everything) > _MAX_ENUM:
+            # PŘETÉKAJÍCÍ VÝČET: víc kandidátních hodnot, než odpověď unese
+            # („Co řekl Ježíš?" — 143 výroků) — zapamatuj OBLASTI (theme
+            # účastníky kandidátních faktů), automat z nich nabídne zaostření
+            self.last_overflow = sorted(
+                {p.node for _, _, _, f in scored
+                 for p in f.participants if p.role == "theme"
+                 and p.node not in known_set})[:8]
         # zapamatuj všechny účastníky použitého faktu → rozsvítí se celá cesta
         self.visited.extend(p.node for p in scored[0][3].participants)
         return values, scored[0][3]
@@ -729,6 +744,7 @@ class GraphAnswerer(Answerer):
         self._prev_trace = self.last_trace or self._prev_trace
         self.last_trace = None
         self.last_resolution = None   # evidence tahu — nesmí přežít z minula
+        self.last_overflow = []
         # UNIVERZÁLNÍ princip: otázka→neúplný fakt→match→díra (nahrazuje qtype pravidla
         # i attention — kontextově navazující dotaz řeší tatáž cesta). Rozbor dodají
         # ŠABLONY (pseudo-QL, bez UDPipe); UDPipe jen mimo templates režim.

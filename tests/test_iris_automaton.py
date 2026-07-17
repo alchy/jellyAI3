@@ -107,6 +107,47 @@ def test_focus_shift_warms_domain_and_replays():
     assert "postava" in out.text      # přehraná otázka odpověděla
 
 
+def _sayings_graph():
+    """Sedm výroků Ježíše s různými adresáty — víc, než enumerace unese."""
+    g = FactGraph()
+    for i, theme in enumerate(["Janovi", "Lukášovi", "Magdaléně", "učedníkům",
+                               "Petrovi", "celníkovi", "farizeům"]):
+        g.add_fact(make_fact("říci", [
+            Participant("subj", "Ježíš", "person"),
+            Participant("obj", f"výrok číslo {i}", "výrok"),
+            Participant("theme", theme, "person")]))
+    return g
+
+
+def test_overflow_offers_activation_areas():
+    """„Co řekl Ježíš?" nad přetékajícím výčtem → karta data.overflow nabídne
+    OBLASTI aktivace (adresáty), ne jen ořezaný výčet."""
+    iris = _iris(_sayings_graph())
+    out = iris.turn("Co řekl Ježíš?")
+    assert out.kind == "dialog"
+    assert "focus-offer-overflow" in out.used["patterns"]
+    assert "učedníkům" in out.text
+
+
+def test_overflow_pick_narrows_by_activation():
+    """Volba oblasti („učedníkům") rozsvítí adresáta a přehraná otázka
+    vybere výrok z jeho faktu — zúžení čistě aktivací."""
+    iris = _iris(_sayings_graph())
+    iris.turn("Co řekl Ježíš?")
+    out = iris.turn("učedníkům")
+    assert out.kind == "answer"
+    assert "výrok číslo 3" in out.text        # výrok patřící učedníkům
+
+
+def test_card_telemetry_counts_usage_and_gain():
+    """Telemetrie karet: použití + měřený nárůst aktivace kandidátů (zisk)."""
+    iris = _iris(_brothers_graph())
+    iris.turn("Kdo je Čapek?")
+    telemetry = iris.telemetry["focus-offer-homonym"]
+    assert telemetry["used"] == 1
+    assert telemetry["gain"] > 0
+
+
 def test_plain_miss_keeps_fallback_text():
     """Nic rozlišeného (parser None) → poctivé „nenašel" fallbacku beze změny."""
     iris = _iris(_brothers_graph())

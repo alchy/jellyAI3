@@ -1,0 +1,9 @@
+{
+  "name": "focus-offer-overflow",
+  "trigger": {"event": "data.overflow", "min_candidates": 2,
+              "forbids": ["area_lit"], "priority": 10},
+  "dialog": "Mám tu více dat. Chceš upřesnit oblast datové aktivace? Nabízí se: {candidates}",
+  "action": {"warm_candidates": 0.5, "await": "user-pick",
+             "replace_term": false},
+  "teach": "Přetékající výčet (Co řekl Ježíš? — víc výroků, než odpověď unese): místo ořezaného seznamu se nabídnou OBLASTI aktivace (adresáti/témata remízových faktů). Volba oblast rozsvítí a otázka se přehraje beze změny — zúžení udělá čistě aktivace. Když už některá oblast svítí (area_lit), karta mlčí a výčet se prostě zodpoví."
+}
