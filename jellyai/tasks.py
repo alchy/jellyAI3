@@ -63,6 +63,10 @@ def build_fact_graph(config):
     dropped_s = scrub_semantics(graph, noun_animacy_votes(annotations))
     print(f"Hygiena sémantiky: −{dropped_s} faktů "
           f"(osoba pod neživotným druhem, vztah bez protistrany)")
+    from jellyai.graph.instance import resolve_instances
+    merged = resolve_instances(graph)
+    print(f"Instance: {merged} jmenných střepů srostlo (tvrzené aliasy), "
+          f"{len(graph.name_families)} jmenných rodin")
     graph.save(config.graph.graph_path)
     return graph
 

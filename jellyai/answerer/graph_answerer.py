@@ -410,9 +410,13 @@ class GraphAnswerer(Answerer):
         values, fact = self._match(pat.predicate, known_set, pat.hole_role, pat.hole_type)
         if not values and pat.hole_role in ("pred", "attr"):
             # druhové zařazení (apozice) je slabší evidence než spona „být" —
-            # čte se, až když spona mlčí („Co je R.U.R.?" → druh drama)
-            values, fact = self._match("druh", known_set, pat.hole_role,
-                                       pat.hole_type)
+            # čte se, až když spona mlčí („Co je R.U.R.?" → druh drama);
+            # a jméno je také identita („Ježíš řečený Kristus" — jmenovat)
+            for weaker in ("druh", current()["name_predicate"]):
+                values, fact = self._match(weaker, known_set, pat.hole_role,
+                                           pat.hole_type)
+                if values:
+                    break
         if not values and pat.hole_role in ("subj", "obj") \
                 and self.graph.nodes.get(pat.predicate) is not None \
                 and self.graph.nodes[pat.predicate].type == "concept":

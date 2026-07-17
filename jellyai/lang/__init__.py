@@ -73,6 +73,9 @@ def load_rules(language="cs"):
             rules.get("confirmation_words", ()))
         rules["name_case_agreement"] = bool(
             rules.get("name_case_agreement", False))
+        rules["name_predicate"] = rules.get("name_predicate", "jmenovat")
+        rules["alias_participles"] = frozenset(
+            rules.get("alias_participles", ()))
         _cache[path] = rules
     return _cache[path]
 

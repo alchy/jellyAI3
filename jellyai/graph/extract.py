@@ -364,6 +364,41 @@ def _apposition_identities(sent, entities, canon):
     return facts
 
 
+def _alias_identities(sent, entities, canon):
+    """Textové tvrzení JMENNÉ ROVNOSTI: „X řečený/zvaný Y" → jmenovat(X, Y).
+
+    Korpus sám říká, která jména patří téže entitě („Ježíš řečený Kristus"
+    — Mt 1,16; „Mesiáš, zvaný Kristus"). To je jediná POCTIVÁ evidence pro
+    srůst jmenných střepů (backlog #8): kontextový otisk sám nerozliší dvě
+    jména téže osoby od dvou osob téhož příběhu. Příčestí z jazykové
+    tabulky `alias_participles`; X = nejbližší jmenný soused vlevo,
+    Y = PROPN vpravo.
+    """
+    lang = current()
+    facts = []
+    for i, tok in enumerate(sent):
+        if _clean_lemma(tok.get("form", "")).lower() \
+                not in lang["alias_participles"]:
+            continue
+        # TĚSNÉ sousedství: výčtová věta („Šimona, …, Judu, …") nesmí
+        # spárovat vzdálená jména — nositel ≤3 tokeny vlevo, alias ≤2 vpravo
+        bearer = next((t for t in reversed(sent[max(0, i - 3):i])
+                       if t.get("upos") in ("PROPN", "NOUN")), None)
+        alias = next((t for t in sent[i + 1:i + 3]
+                      if t.get("upos") == "PROPN"), None)
+        if bearer is None or alias is None:
+            continue
+        bearer_node = _node_for(bearer, entities, canon)
+        alias_node = _surface_node(alias, entities, canon)
+        if bearer_node and alias_node \
+                and bearer_node[0] != alias_node[0]:
+            facts.append(make_fact(lang["name_predicate"], [
+                Participant("subj", bearer_node[0], bearer_node[1]),
+                Participant("pred", alias_node[0], "jméno"),
+            ]))
+    return facts
+
+
 _DASHES = ("–", "—", "-")
 
 
@@ -505,6 +540,7 @@ def extract_facts(annotation, default_subject=None, canon=None, context=None):
     for sent in annotation.get("sentences", []):
         facts.extend(_apposition_identities(sent, entities, canon))
         facts.extend(_dash_identities(sent, entities, canon))
+        facts.extend(_alias_identities(sent, entities, canon))
         # atributy (čas/místo/číslo/téma) — i zanořené — přiřaď nejbližšímu
         # slovesu-předku
         attrs_by_verb = {}

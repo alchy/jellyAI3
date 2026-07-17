@@ -24,7 +24,7 @@
 {"q": "Co se stalo v listopadu 1848?", "expect": ["svazek"], "reject": ["rodina"], "cat": "reverzní"}
 {"dialog": ["Co se stalo v červenci 1848?", "Co se stalo s rodinou?"], "expect": ["ocitnout", "Domažlic"], "cat": "návaznost"}
 {"dialog": ["Co napsal Karel Čapek?", "Jakou hru napsal?"], "expect": ["R.U.R."], "reject": ["Čapek"], "cat": "návaznost"}
-{"q": "Kdo je jezis?", "expect": ["Kristus"], "cat": "diakritika", "gap": "kanonizace v1: identita Kristus žije na nesloučeném uzlu 'Ježíše Krista' — čeká na sjednocení jednoslovné↔víceslovné jméno (backlog #8)"}
+{"q": "Kdo je jezis?", "expect": ["Kristus"], "cat": "diakritika", "gap": "#8 fáze 1: střep 'Ježíše Krista' UŽ srostl (jmenovat-tvrzení Mt 1,16), ale šumový fakt být(pred=Boha) přebíjí druh(Mesiáš)/jmenovat(Kristus) — čeká na #1v2 nominativizaci a ranking identit"}
 {"q": "Kde se narodil Jezis?", "expect": ["Betlém"], "cat": "diakritika"}
 {"q": "Kdo byl bratr autora, ktery napsal R.U.R.?", "expect": ["Josef"], "cat": "diakritika", "gap": "UDPipe cesta bez diakritiky selhává; šablony umí — zezelená přepnutím"}
 {"q": "Kdo je Božena Němcová?", "expect": ["spisovatelka", "spisovatel"], "cat": "identita", "gap": "copula-profese (#5): vrací 'úřad'"}

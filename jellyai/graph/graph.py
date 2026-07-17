@@ -96,6 +96,7 @@ class FactGraph:
         self._by_node = {}
         self.aliases = {}    # kanonické id → sloučené tvary (plní resolver)
         self.doc_links = {}  # graf DOKUMENTŮ: doc → {doc: síla} (sdílené entity)
+        self.name_families = {}  # kmen jména → osobní uzly (instanční vrstva)
 
     def add_fact(self, fact, source=None):
         """Přidá fakt: sloučí podle identity (`váha++`) nebo založí; udrží indexy.
@@ -181,7 +182,8 @@ class FactGraph:
         with open(path, "wb") as f:
             pickle.dump({"nodes": self.nodes, "facts": self.facts,
                          "by_node": self._by_node, "aliases": self.aliases,
-                         "doc_links": self.doc_links}, f)
+                         "doc_links": self.doc_links,
+                         "name_families": self.name_families}, f)
         return path
 
     @classmethod
@@ -195,6 +197,7 @@ class FactGraph:
         g._by_node = state["by_node"]
         g.aliases = state.get("aliases", {})
         g.doc_links = state.get("doc_links", {})
+        g.name_families = state.get("name_families", {})
         return g
 
 
@@ -453,16 +456,27 @@ def resolve_entities(graph):
                 node_map[name] = final
     if not node_map:
         return graph
-    # sloučené clustery jsou osoby — typ se u jejich členů VYNUTÍ person
-    # (koncept „Ježíš" nesmí po sloučení kanonu vnutit typ concept)
+    remap_nodes(graph, node_map)
+    return graph
+
+
+def remap_nodes(graph, node_map):
+    """Přemapuje uzly faktů podle `node_map` (in-place, sdílená mechanika
+    kanonizace i instanční vrstvy). Členové mapy jsou osoby — typ se
+    VYNUTÍ person (koncept „Ježíš" nesmí po sloučení vnutit typ concept);
+    kolize identity faktů → součet vah; aliasy se zaznamenají.
+    """
     person_ids = set(node_map) | set(node_map.values())
     remapped = {}
     for fact in graph.facts.values():
         moved = make_fact(fact.predicate,
                           [Participant(p.role, node_map.get(p.node, p.node),
                                        "person" if node_map.get(p.node, p.node)
-                                       in person_ids else p.type)
+                                       in person_ids and p.type != "jméno"
+                                       else p.type)
                            for p in fact.participants])
+        if len({p.node for p in moved.participants}) < 2:
+            continue    # účastníci splynuli v jeden uzel — fakt nic nenese
         key = (moved.predicate, moved.participants)
         existing = remapped.get(key)
         if existing is None:
@@ -473,7 +487,6 @@ def resolve_entities(graph):
             existing.source |= fact.source
     _record_aliases(graph, node_map)
     graph.replace_facts(remapped)
-    return graph
 
 
 def _record_aliases(graph, node_map):
