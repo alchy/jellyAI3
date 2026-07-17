@@ -45,6 +45,62 @@ def lemma_upos_votes(annotations):
     return votes
 
 
+def form_case_votes(annotations):
+    """Hlasy o VELIKOSTI PÍSMEN tvarů: slovo → (malé, velké) počty.
+
+    Jméno se v textu píše s velkým písmenem; slovo psané převážně malými
+    („chléb") součástí jména není — NameTag ho občas splete s příjmením
+    a vyrobí kontejner „Abraham chléb".
+
+    Returns:
+        dict[str, list[int, int]]: slovo (lower) → [malých, velkých].
+    """
+    votes = defaultdict(lambda: [0, 0])
+    for annotation in annotations.values():
+        for sent in annotation.get("sentences", []):
+            for token in sent:
+                form = token.get("form") or ""
+                if not form or not form[:1].isalpha():
+                    continue
+                votes[form.lower()][0 if form[:1].islower() else 1] += 1
+    return votes
+
+
+def _lowercase_word(case_votes, word):
+    """Slovo psané v korpusu PŘEVÁŽNĚ malými písmeny (≥3 hlasy, ≥80 %)."""
+    lower, upper = case_votes.get(word.lower(), (0, 0))
+    total = lower + upper
+    return total >= _MIN_VOTES and lower / total >= _DOMINANCE
+
+
+def scrub_entities(annotations, case_votes):
+    """Vyřadí OSOBNÍ entity slepené s obecnými slovy (in-place, před buildem).
+
+    Osobní entita (typ začíná p/P — vč. CNEC kontejnerů), jejíž KTERÉKOLI
+    slovo je v korpusu převážně malé, není jméno: kontejner „Abraham chléb"
+    i falešné příjmení „chléb" padají DŘÍV, než z nich kanonizace dokumentu
+    udělá „nejdelší jméno" a přemapuje na ně celou osobu.
+
+    Returns:
+        int: Počet vyřazených entit.
+    """
+    dropped = 0
+    for annotation in annotations.values():
+        entities = annotation.get("entities")
+        if not entities:
+            continue
+        kept = []
+        for entity in entities:
+            if entity.get("type", "")[:1].lower() == "p" and any(
+                    _lowercase_word(case_votes, word)
+                    for word in entity.get("text", "").split()):
+                dropped += 1
+                continue
+            kept.append(entity)
+        annotation["entities"] = kept
+    return dropped
+
+
 def _dominant(votes, lemma, kinds):
     """True, když má lemma dost hlasů a `kinds` v nich převažují."""
     counter = votes.get(lemma)

@@ -85,6 +85,30 @@ def test_structural_predicates_survive_noun_votes():
     assert {f.predicate for f in g.facts.values()} == {"bratr", "rok"}
 
 
+def test_entity_scrub_drops_lowercase_glued_person():
+    """NameTag kontejner „Abraham chléb" (chléb mis-tagnutý jako příjmení):
+    slovo v korpusu převážně malé není součást jména → entita pryč; čisté
+    „Abraham" (a geo entity) zůstávají."""
+    from jellyai.graph.hygiene import form_case_votes, scrub_entities
+    annotations = {("doc", 0): {"sentences": [[
+        {"form": "Abraham", "lemma": "Abraham", "upos": "PROPN"},
+        {"form": "vzal", "lemma": "vzít", "upos": "VERB"},
+        {"form": "chléb", "lemma": "chléb", "upos": "NOUN"},
+        {"form": "chléb", "lemma": "chléb", "upos": "NOUN"},
+        {"form": "chléb", "lemma": "chléb", "upos": "NOUN"},
+    ]], "entities": [
+        {"text": "Abraham chléb", "type": "P", "start": 0, "end": 13},
+        {"text": "Abraham", "type": "pf", "start": 0, "end": 7},
+        {"text": "chléb", "type": "ps", "start": 8, "end": 13},
+        {"text": "Betlém", "type": "gu", "start": 20, "end": 26},
+    ]}}
+    votes = form_case_votes(annotations)
+    dropped = scrub_entities(annotations, votes)
+    kept = [e["text"] for e in annotations[("doc", 0)]["entities"]]
+    assert dropped == 2                      # kontejner + falešné příjmení
+    assert kept == ["Abraham", "Betlém"]
+
+
 def test_scrub_drops_fact_left_without_partner():
     """Když po vyřazení účastníka zbude faktu jediný účastník, fakt padá
     (fakt bez protistrany nic nenese)."""

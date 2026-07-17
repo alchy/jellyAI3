@@ -48,6 +48,9 @@ def build_fact_graph(config):
     """
     set_language(config.graph.language)       # jazyk kanonizace = zásuvný modul
     annotations = load_annotations(config.services.annotations_path)
+    from jellyai.graph.hygiene import form_case_votes, scrub_entities
+    dropped_e = scrub_entities(annotations, form_case_votes(annotations))
+    print(f"Hygiena entit: −{dropped_e} osobních slepenců s obecnými slovy")
     graph = build_graph(annotations)
     from jellyai.graph.recover import recover_entities
     recover_entities(annotations, graph)      # role ②: doplnit tituly, co NER minul
