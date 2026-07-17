@@ -124,6 +124,30 @@ def test_plan_query_next_week_and_future_phrases():
     assert "reminder-list-empty" in out.used["patterns"]
 
 
+def test_months_as_interval_and_due():
+    """Měsíce: „v září" = letošní interval (otázky o faktech), termín
+    připomínky = 1. den v 9:00; minulý měsíc → napřesrok; „příští rok"
+    posouvá; „v lednu" jako termín = leden 2027."""
+    from jellyai.iris.subsystems.chronos import resolve_temporal
+    interval = resolve_temporal("Pršelo v září?", NOW)
+    assert (interval.start, interval.granularity) \
+        == (datetime(2026, 9, 1), "month")
+    assert resolve_temporal("v lednu", NOW).start == datetime(2026, 1, 1)
+    assert resolve_temporal("v září příští rok", NOW).start \
+        == datetime(2027, 9, 1)
+    assert resolve_due("v září koupit učebnice", NOW) \
+        == datetime(2026, 9, 1, 9)
+    assert resolve_due("v lednu revize", NOW) == datetime(2027, 1, 1, 9)
+    assert resolve_due("příští rok obnovit pas", NOW) \
+        == datetime(2027, 1, 1, 9)
+    iris = _iris(lambda: NOW)
+    iris.turn("Připomeň mi v září koupit učebnice.")
+    out = iris.turn("Co mám v plánu v září?")
+    assert "učebnice" in out.text and "1. září" in out.text
+    out = iris.turn("Co mám v plánu v lednu?")
+    assert "reminder-list-empty" in out.used["patterns"]
+
+
 def test_plan_query_honest_when_empty():
     """„Nezapomněl jsem na něco?" s prázdným skladem → poctivé nic nečeká."""
     iris = _iris(lambda: NOW)

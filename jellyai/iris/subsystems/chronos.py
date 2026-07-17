@@ -199,6 +199,22 @@ def resolve_temporal(text, now):  # pylint: disable=too-many-branches,too-many-r
                     continue
                 return TimeInterval(day, day + timedelta(days=1), "day")
 
+    # 2c) HOLÝ MĚSÍC: „v září", „v lednu [2027]", „v září příští rok" —
+    #     měsíční interval; bez roku letošní (fakta bývají minulá),
+    #     „příští" ho posune
+    nexts = frozenset(lang.get("next_words", ()))
+    for i, tok in enumerate(tokens):
+        month_no = months.get(tok) or lang.get("months", {}).get(tok)
+        if month_no is None:
+            continue
+        if i and tokens[i - 1].rstrip(".").isdigit():
+            continue                     # den před měsícem = explicitní datum
+        year = next((int(p) for p in tokens[i + 1:i + 2]
+                     if p.isdigit() and len(p) == 4),
+                    now.year + (1 if any(t in nexts for t in tokens) else 0))
+        lo = datetime(year, month_no, 1)
+        return TimeInterval(lo, _shift(lo, "month", 1), "month")
+
     # 3) slova dne: dnes/včera/zítra/předevčírem/pozítří
     for tok in tokens:
         if tok in lang.get("day_words", {}):
@@ -319,25 +335,37 @@ def resolve_due(text, now):  # pylint: disable=too-many-branches,too-many-locals
                 if due <= now:
                     due += timedelta(days=1)
                 break
-    if due is None:                              # 3) datum „21. června [2027]"
-        months = lang.get("month_forms", {})
+    if due is None:                              # 3) datum „21. června [2027]",
+        months = lang.get("month_forms", {})     #    holý měsíc „v září",
+        nexts = frozenset(lang.get("next_words", ()))    # „příští rok"
+        hour = lang.get("reminder_hour", 9)
         for i, tok in enumerate(tokens):
-            if tok not in months:
+            month_no = months.get(tok) or lang.get("months", {}).get(tok)
+            if month_no is None:
                 continue
             day = next((int(p.rstrip(".")) for p in tokens[max(0, i - 1):i]
                         if p.rstrip(".").isdigit()), None)
-            if day is None:
-                continue
             year = next((int(p) for p in tokens[i + 1:i + 2]
                          if p.isdigit() and len(p) == 4), None)
+            if year is None and any(t in nexts for t in tokens):
+                year = now.year + 1
             try:
-                due = datetime(year or now.year, months[tok], day,
-                               lang.get("reminder_hour", 9))
+                due = datetime(year or now.year, month_no, day or 1, hour)
             except ValueError:
                 return None
             if year is None and due <= now:
-                due = due.replace(year=now.year + 1)
+                if day is None and now.month == month_no:
+                    # právě běžící měsíc: „v září" uvnitř září = zítřek
+                    due = (_floor(now, "day")
+                           + timedelta(days=1)).replace(hour=hour)
+                else:
+                    due = due.replace(year=now.year + 1)
             break
+        if due is None and any(t in nexts for t in tokens) \
+                and any(lang.get("units", {}).get(t) == "year"
+                        for t in tokens):
+            # „příští rok" bez měsíce → 1. ledna v reminder_hour
+            due = datetime(now.year + 1, 1, 1, hour)
     if due is None:                              # 3b) denní část: „(zítra)
         day_parts = lang.get("day_parts", {})    #    ráno", „večer v 8"
         for i, tok in enumerate(tokens):
