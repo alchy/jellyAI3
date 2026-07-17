@@ -32,3 +32,4 @@
 {"q": "Kdo napsal Válku s mloky?", "expect": ["Čapek"], "cat": "autor", "gap": "titul nezachycen"}
 {"q": "Kolik měla dětí Božena Němcová?", "expect": ["čtyři", "4"], "cat": "počet", "gap": "coverage"}
 {"q": "Kde působila Božena Němcová?", "expect": ["Praha", "Domažlice"], "cat": "místo", "gap": "coverage"}
+{"q": "Jaka babicka?", "expect": ["postava", "próza"], "cat": "diakritika", "gap": "bezdiakritická otázka — UDPipe nerozpozná 'Jaka'→jaký; cíl pseudo-QL"}
