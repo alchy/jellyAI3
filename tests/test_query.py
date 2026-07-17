@@ -90,6 +90,17 @@ def test_trailing_orphan_after_match_dropped():
     assert ("obj", "Válku") in q.pattern.known
 
 
+def test_preposition_after_common_noun_keeps_participant():
+    """„Jaký měl vztah k Martě?" — předložková fráze po OBECNÉM (malém)
+    slově je NOVÝ účastník, ne ocas titulu; polykání pokračování platí
+    jen po kapitalizované entitě („Válku s mloky"). Bez toho se Marta
+    ztratí a attr-fallback vytáhne cizí druh-fakt (Dorothea)."""
+    is_node = _nodes("vztah", "Martě")
+    q = build_query("Jaký měl vztah k Martě?", {"měl"}, is_node)
+    spans = [k for _, k in q.pattern.known]
+    assert "vztah" in spans and "Martě" in spans
+
+
 def test_leading_orphan_returns_none():
     """„Ludvík" graf nezná → vzor nelze bezpečně sestavit → None (žádné
     hádání přes „Němec", které by trefilo Němcovou)."""

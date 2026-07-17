@@ -342,12 +342,14 @@ def _split_run(run, is_node, relational):
         parts = [("obj", " ".join(run))]
     else:
         skip = current()["query_skip_words"]
-        parts, i, matched = [], 0, False
+        parts, i, matched, titled = [], 0, False, False
         while i < len(run):
             if _norm(run[i]) in skip:
-                if matched:
-                    # předložková fráze PO entitě je pokračování jejího titulu
-                    # („Válku S MLOKY" — mlok je uzel, ale ne účastník otázky)
+                if matched and titled:
+                    # předložková fráze PO KAPITALIZOVANÉ entitě je pokračování
+                    # jejího titulu („Válku S MLOKY" — mlok je uzel, ale ne
+                    # účastník otázky); po obecném slově je to NOVÝ účastník
+                    # („vztah K MARTĚ" — Marta se nesmí spolknout)
                     break
                 i += 1
                 continue
@@ -366,6 +368,7 @@ def _split_run(run, is_node, relational):
                 continue
             parts.append(("obj", hit[1]))
             matched, i = True, hit[0]
+            titled = hit[1][:1].isupper()
         if not parts:
             return None
     if rel:
