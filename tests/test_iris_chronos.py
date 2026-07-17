@@ -50,8 +50,38 @@ def test_this_week_and_month_intervals():
                                         datetime(2026, 8, 1))
 
 
+def test_now_word_gets_moment_window():
+    """„Teď/nyní" = bod v čase s oknem (15 min symetricky kolem now)."""
+    from datetime import timedelta
+    ted = resolve_temporal("Co se děje teď?", NOW)
+    assert ted.granularity == "moment"
+    assert (ted.start, ted.end) == (NOW - timedelta(minutes=7.5),
+                                    NOW + timedelta(minutes=7.5))
+    assert ted.contains(NOW)
+    assert resolve_temporal("nyní", NOW) == ted
+
+
 def test_no_temporal_primitive_returns_none():
     assert resolve_temporal("Kdo napsal Babičku?", NOW) is None
+
+
+def test_clock_answers_day_and_time():
+    """Hodinové otázky odpovídá Chronos přímo z „teď" (2026-07-17 je pátek)."""
+    from jellyai.iris.chronos import clock_answer
+    den = clock_answer("Co je za den?", NOW)
+    assert den == "Dnes je pátek 17. července 2026."
+    assert clock_answer("Kolik je hodin?", NOW) == "Je 12:00."
+    assert clock_answer("Kdo napsal Babičku?", NOW) is None
+
+
+def test_automaton_routes_clock_question_to_chronos():
+    """Automat s injektovaným clock: hodinová otázka jde Chronosu, ne grafu."""
+    from tests.test_iris_automaton import _brothers_graph, _iris
+    iris = _iris(_brothers_graph())
+    iris.clock = lambda: NOW
+    out = iris.turn("Kolik je hodin?")
+    assert out.kind == "answer" and out.text == "Je 12:00."
+    assert out.used["components"] == ["chronos"]
 
 
 def test_contains_date_over_parse_date_output():

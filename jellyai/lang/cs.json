@@ -54,6 +54,8 @@
                       "mesic": "měsíc", "mesici": "měsíc",
                       "den": "den", "dne": "den", "dni": "den"},
   "temporal": {
+    "now_words": ["ted", "nyni", "prave"],
+    "now_window_minutes": 15,
     "day_words": {"predevcirem": -2, "vcera": -1, "dnes": 0, "zitra": 1, "pozitri": 2},
     "units": {"hodina": "hour", "hodinu": "hour", "hodiny": "hour", "hodin": "hour",
               "hodinou": "hour", "hodinami": "hour",
@@ -75,6 +77,16 @@
                  "devet": 9, "deviti": 9, "deset": 10, "deseti": 10},
     "months": {"leden": 1, "unor": 2, "brezen": 3, "duben": 4, "kveten": 5,
                "cerven": 6, "cervenec": 7, "srpen": 8, "zari": 9, "rijen": 10,
-               "listopad": 11, "prosinec": 12}
+               "listopad": 11, "prosinec": 12},
+    "weekday_names": ["pondělí", "úterý", "středa", "čtvrtek", "pátek",
+                      "sobota", "neděle"],
+    "month_genitives": ["ledna", "února", "března", "dubna", "května",
+                        "června", "července", "srpna", "září", "října",
+                        "listopadu", "prosince"],
+    "clock_questions": {
+      "day": ["co je za den", "co je dnes za den", "jaky je den",
+              "jaky je dnes den", "kolikateho je"],
+      "time": ["kolik je hodin", "kolik je prave hodin", "kolik je ted hodin"]
+    }
   }
 }

@@ -106,6 +106,32 @@ class TimeInterval:
         return lo < self.end and self.start < hi
 
 
+def clock_answer(text, now):
+    """Přímá odpověď z hodin: „Co je za den?", „Kolik je hodin?".
+
+    Chronos je tu sám odpovídací komponentou — odpověď nejde z grafu, ale
+    z okamžiku `now`. Fráze otázek i jména dnů/měsíců jsou jazyková data
+    (`temporal.clock_questions`, `weekday_names`, `month_genitives`).
+
+    Args:
+        text (str): Dotaz uživatele.
+        now (datetime): Okamžik „teď" (zvenku — determinismus).
+
+    Returns:
+        str | None: Věta s odpovědí, nebo None (není hodinová otázka).
+    """
+    lang = current()["temporal"]
+    questions = lang.get("clock_questions", {})
+    low = deaccent(text.lower())
+    if any(phrase in low for phrase in questions.get("day", ())):
+        weekday = lang["weekday_names"][now.weekday()]
+        month = lang["month_genitives"][now.month - 1]
+        return f"Dnes je {weekday} {now.day}. {month} {now.year}."
+    if any(phrase in low for phrase in questions.get("time", ())):
+        return f"Je {now.hour}:{now.minute:02d}."
+    return None
+
+
 def resolve_temporal(text, now):  # pylint: disable=too-many-branches,too-many-return-statements
     """Najde v textu časové primitivum a ukotví ho na absolutní interval.
 
@@ -132,7 +158,13 @@ def resolve_temporal(text, now):  # pylint: disable=too-many-branches,too-many-r
                                 datetime(max(cents) * 100 + 1, 1, 1),
                                 "century")
 
-    # 2) slova dne: dnes/včera/zítra/předevčírem/pozítří
+    # 2) „teď/nyní" — bod v čase s oknem (default 15 min, symetricky kolem
+    #    now): korelace na okamžik potřebuje toleranci, ne celý den
+    if any(tok in frozenset(lang.get("now_words", ())) for tok in tokens):
+        half = timedelta(minutes=lang.get("now_window_minutes", 15)) / 2
+        return TimeInterval(now - half, now + half, "moment")
+
+    # 3) slova dne: dnes/včera/zítra/předevčírem/pozítří
     for tok in tokens:
         if tok in lang.get("day_words", {}):
             day = _floor(now, "day") + timedelta(days=lang["day_words"][tok])

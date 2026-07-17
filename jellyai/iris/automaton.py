@@ -22,9 +22,11 @@ karet (dialog > figly).
 import re
 
 from dataclasses import dataclass, field
+from datetime import datetime
 
 from jellyai.graph.canon import deaccent
 from jellyai.iris.assurance import assurance
+from jellyai.iris.chronos import clock_answer
 from jellyai.iris.patterns import PatternDeck
 from jellyai.iris.presenter import activation_window, docs_window
 from jellyai.iris.state import FocusState, PendingFocus
@@ -65,7 +67,7 @@ class IrisResponse:
 class IrisAutomaton:
     """Stavový automat zaostření nad jedním answererem (jedna konverzace)."""
 
-    def __init__(self, answerer, deck=None, threshold=0.55):
+    def __init__(self, answerer, deck=None, threshold=0.55, clock=None):
         """Vytvoří automat.
 
         Args:
@@ -73,6 +75,8 @@ class IrisAutomaton:
             deck (PatternDeck | None): Balíček pattern-karet; None = vestavěné
                 karty češtiny (`patterns/cs/`).
             threshold (float): Práh QueryAssurance — pod ním se vede dialog.
+            clock (callable | None): Zdroj „teď" (Chronos — časová kotva);
+                None = systémové hodiny, testy vstřikují fixní čas.
         """
         self.answerer = answerer
         if deck is None:
@@ -80,6 +84,7 @@ class IrisAutomaton:
             deck.load()
         self.deck = deck
         self.threshold = threshold
+        self.clock = clock or datetime.now
         self.state = FocusState()
 
     def reset(self):
@@ -97,6 +102,17 @@ class IrisAutomaton:
         Returns:
             IrisResponse: Odpověď nebo dialogové doostření + metadata.
         """
+        direct = clock_answer(text, self.clock())
+        if direct is not None:
+            # hodinová otázka — odpovídá Chronos sám (časová kotva), graf se
+            # nedotkne; aktivační pole zůstává, jak bylo
+            response = IrisResponse(
+                text=direct, kind="answer", assurance=1.0,
+                activation_window=activation_window(self.answerer),
+                docs_window=docs_window(self.answerer),
+                used={"components": ["chronos"], "patterns": []})
+            self.state.remember(text, response)
+            return response
         used_patterns = []
         pick = self._resume_pick(text)
         if pick is not None:

@@ -135,6 +135,14 @@ Taxonomie událostí (výchozí, roste testováním): `resolve.ambiguous`
      (vstřikované, ne natvrdo) — každý relativní výraz umí ukotvit na časovou
      osu a promítnout do aktivace. Čas je tak plnohodnotná osa zaostření,
      rovnocenná jmenné (kdo/co) a prostorové (kde).
+10g. **Chronos je ČASOVÝ SUBSYSTÉM s více použitími — časová kotva projektu**
+     (uživatel): jediný zdroj „teď" pro všechny komponenty. Použití: (a)
+     primitiva a intervaly (§10b–e), (b) bod „teď/nyní" s konfigurovatelným
+     oknem (default 15 min), (c) přímé hodinové odpovědi („Co je za den?",
+     „Kolik je hodin?" — jména dnů/měsíců jsou jazyková data), (d) telemetrie
+     karet (časové razítko zisků), (e) výhledově recency vážení faktů
+     u časovaných bází. Automat dostává `clock` injektovaně (testy fixují,
+     živý běh = systémové hodiny).
 
 ## 4. Dialogové UX — tři okna (web)
 
