@@ -30,6 +30,21 @@ def test_gazetteer_containment_transitive_and_inflected():
     assert "cech" in {k[:4] for k in area_keys(GAZ)} or area_keys(GAZ)
 
 
+def test_mnemos_place_roundtrip_with_containment():
+    """Vklad přes Mnemos (zadání): „Marcela bydlí v Petrovicích." →
+    místo dostane roli loc/geo → „Kde bydlí Marcela?" odpoví místem
+    a „Bydlí Marcela v Čechách?" → Ano kontejnmentem (Petrovice ⊂
+    Plzeň ⊂ Čechy); „na Moravě?" poctivě ne."""
+    answerer = GraphAnswerer(FactGraph(), FakeUfalClient(),
+                             ExtractiveAnswerer(AnswererConfig()),
+                             query_mode="templates", clock=lambda: NOW)
+    iris = IrisAutomaton(answerer, clock=lambda: NOW)
+    assert "Zapamatováno" in iris.turn("Marcela bydlí v Petrovicích.").text
+    assert "Petrovicích" in iris.turn("Kde bydlí Marcela?").text
+    assert iris.turn("Bydlí Marcela v Čechách?").text == "Ano"
+    assert iris.turn("Bydlí Marcela na Moravě?").text != "Ano"
+
+
 def test_rain_in_prague_answers_by_containment():
     """E2E zadavatele: „V Praze prší." → „Pršelo v Čechách?" → Ano
     (Praha ⊂ Čechy); „na Moravě?" → poctivé nenašel — oblast je FILTR

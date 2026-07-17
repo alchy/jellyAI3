@@ -82,10 +82,15 @@ def utterance_features(tokens, norms, is_node=None):
         features.add("first_person")
     if any(n in lang["copula_forms"] for n in norms):
         features.add("copula")
-    if any(_l_form(t) for t in tokens):
-        features.add("l_verb")
-    if _finite_verb(tokens, norms, is_node) is not None:
+    finite = _finite_verb(tokens, norms, is_node)
+    if finite is not None:
         features.add("finite_verb")
+    # l-příčestí: jméno „Marcela" po ořezu vypadá jako l-tvar — KAPITALIZOVANÝ
+    # začátek věty se počítá, jen když věta nemá prézentní sloveso („Pršelo…")
+    if any(_l_form(t) and t != finite
+           and (t[:1].islower() or (i == 0 and finite is None))
+           for i, t in enumerate(tokens)):
+        features.add("l_verb")
     return features
 
 
@@ -161,8 +166,16 @@ def parse_statement(text, now, deck=None, is_node=None):
                and len(tok) > 1]
     if not objects or (kind == "observation" and len(objects) < 2):
         return None
+    # MÍSTA (brána E Toposu v dialogu): objekt za předložkou „v/ve/na"
+    # je místo — dostane roli loc/geo („Marcela bydlí V PETROVICÍCH"),
+    # aby „Kde bydlí…?" i kontejnment („v Čechách?") měly za co vzít
+    places = []
+    for i, tok in enumerate(tokens[:-1]):
+        if deaccent(tok.lower()) in ("v", "ve", "na") \
+                and tokens[i + 1] in objects:
+            places.append(tokens[i + 1])
     return {"kind": kind, "predicate": predicate, "objects": objects,
-            "time": time_label, "card": card.name,
+            "places": places, "time": time_label, "card": card.name,
             "needs_subject": card.action.get("subject_from") == "context"}
 
 
@@ -181,23 +194,29 @@ def remember(graph, statement, user_entity):
         str: Lidský popis uloženého faktu (pro potvrzení v dialogu).
     """
     objects = statement["objects"]
+    places = set(statement.get("places", ()))
+
+    def _part(role, node, typ):
+        if node in places:
+            return Participant("loc", node, "geo")
+        return Participant(role, node, typ)
     if statement["kind"] == "episode":
         participants = [Participant("subj", user_entity, "person")]
-        participants += [Participant("obj", obj, "concept") for obj in objects]
+        participants += [_part("obj", obj, "concept") for obj in objects]
     elif statement["kind"] == "attributed":
         # fakt PŘIPSANÝ korpusové osobě („ano, měl rád knedlíky" → subjekt
         # z těžiště/výroku doplnil automat); uživatel je zdroj (theme)
         participants = [Participant("subj", statement["subject"], "person")]
-        participants += [Participant("obj", obj, "concept") for obj in objects]
+        participants += [_part("obj", obj, "concept") for obj in objects]
         participants.append(Participant("theme", user_entity, "person"))
     elif statement["kind"] == "event":
         # prézentní děj („Venku prší"): účastníci jsou obsahová slova,
         # uživatel je pozorovatel — zjišťovací „Prší venku?" pak sedí
-        participants = [Participant("obj", obj, "concept") for obj in objects]
+        participants = [_part("obj", obj, "concept") for obj in objects]
         participants.append(Participant("theme", user_entity, "person"))
     else:
         participants = [Participant("subj", objects[0], "concept")]
-        participants += [Participant("pred", obj, "concept")
+        participants += [_part("pred", obj, "concept")
                          for obj in objects[1:]]
         participants.append(Participant("theme", user_entity, "person"))
     participants.append(Participant("time", statement["time"], "time"))
