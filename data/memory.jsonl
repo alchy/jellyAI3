@@ -1,3 +1,9 @@
 {"kind": "episode", "predicate": "měl", "objects": ["knedlíky"], "time": "17. července 2026", "card": "statement-episode"}
 {"kind": "event", "predicate": "neprší", "objects": ["Už"], "time": "17. července 2026", "card": "statement-event"}
 {"kind": "event", "predicate": "prší", "objects": ["Venku"], "time": "17. července 2026 19:26", "card": "statement-event", "needs_subject": false}
+{"kind": "event", "predicate": "prší", "objects": ["Praze"], "time": "17. července 2026 23:16", "card": "statement-event", "needs_subject": false}
+{"kind": "event", "predicate": "bydlí", "objects": ["Marcela", "Petrovicích"], "places": ["Petrovicích"], "time": "17. července 2026 23:24", "card": "statement-event", "needs_subject": false}
+{"kind": "observation", "predicate": "být", "objects": ["Karel", "vtipný", "chlapek"], "places": [], "time": "17. července 2026", "card": "statement-observation", "needs_subject": false}
+{"kind": "event", "predicate": "není", "objects": ["kouře", "bez", "ohně"], "places": [], "time": "17. července 2026 23:29", "card": "statement-event", "needs_subject": false}
+{"kind": "event", "predicate": "bydlí", "objects": ["Pavel", "Barrandově"], "places": ["Barrandově"], "time": "17. července 2026 23:29", "card": "statement-event", "needs_subject": false}
+{"kind": "event", "predicate": "bydlí", "objects": ["Pavla", "Matěj", "Barrandově", "Praze"], "places": ["Barrandově", "Praze"], "time": "17. července 2026 23:32", "card": "statement-event", "needs_subject": false}
