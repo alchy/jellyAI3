@@ -19,6 +19,7 @@
 {"q": "Kdo byl Svatopluk Machar?", "expect": ["nenašel"], "reject": ["Morgenpost"], "cat": "poctivost"}
 {"q": "Napsal Karel Čapek Válku s mloky?", "expect": ["Ano"], "cat": "ano-ne"}
 {"q": "Publikoval Karel v tomto časopisu?", "expect": ["nenašel"], "reject": ["Josef"], "cat": "ano-ne"}
+{"q": "Napsal Josef Čapek Babičku?", "expect": ["nenašel"], "reject": ["Ano"], "cat": "ano-ne"}
 {"q": "Co se stalo v listopadu 1848?", "expect": ["svazek"], "reject": ["rodina"], "cat": "reverzní"}
 {"dialog": ["Co se stalo v červenci 1848?", "Co se stalo s rodinou?"], "expect": ["ocitnout", "Domažlic"], "cat": "návaznost"}
 {"dialog": ["Co napsal Karel Čapek?", "Jakou hru napsal?"], "expect": ["R.U.R."], "reject": ["Čapek"], "cat": "návaznost"}

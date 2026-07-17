@@ -81,16 +81,19 @@ def _leftover_terms(tokens, pattern, predicates):
     return out
 
 
-def _verb_match(token, predicates):
+def _verb_match(token, predicates, first=False):
     """Predikát grafu, jehož kmen je prefixem tvaru dotazu (napsal→napsat).
 
     Český slovesný tvar sdílí s lemmatem počáteční kmen (liší se koncovka);
     shoda = delší prefix pokrývající většinu kratšího slova (min 4 znaky).
+    `first=True` = první token věty: velké písmeno tam nese začátek věty
+    („Napsal…?"), ne vlastní jméno — guard se neuplatní.
     """
     low = _norm(token)
     # slovesný tvar v otázce je malými písmeny; velké písmeno = vlastní jméno
     # („Němec" nesmí matchnout sloveso „neměnit" přes prefix „nem")
-    if len(low) < 4 or low in current()["copula_forms"] or token[:1].isupper():
+    if len(low) < 4 or low in current()["copula_forms"] \
+            or (token[:1].isupper() and not first):
         return None
     best = None
     for pred in predicates:
@@ -136,6 +139,20 @@ def build_query(question, predicates, is_node=None):  # pylint: disable=too-many
             break
 
     relational = lang["relational_nouns"]
+    if hole_role is None:
+        # zjišťovací (ano/ne) otázka (spec 4.5): bez tázacího slova, věta
+        # začíná slovesem spárovaným s predikátem grafu; díra žádná —
+        # answerer ji vykoná jako existenční test („Ano"/nenašel)
+        verb = _verb_match(tokens[0], predicates, first=True)
+        if verb is None:
+            return None
+        known = _collect_known(tokens[1:], predicates, relational, is_node)
+        if not known:                     # None (sirotek) i [] (bez entit)
+            return None
+        known = [("subj" if i == 0 else "obj", term)
+                 for i, (_, term) in enumerate(known)]
+        return Query(Pattern(verb, known, None, None), qtype=None,
+                     verb_lemma=verb, gender=_verb_gender(tokens[0]))
     copula_tok = next((t for t in tokens
                        if _norm(t) in lang["copula_forms"]), None)
     verb_tok = next((t for t in tokens if _verb_match(t, predicates)), None)
@@ -215,12 +232,18 @@ def _split_run(run, is_node, relational):
         parts, i, matched = [], 0, False
         while i < len(run):
             if _norm(run[i]) in skip:
+                if matched:
+                    # předložková fráze PO entitě je pokračování jejího titulu
+                    # („Válku S MLOKY" — mlok je uzel, ale ne účastník otázky)
+                    break
                 i += 1
                 continue
             hit = None
             for j in range(len(run), i, -1):
-                span = _trim(run[i:j])
-                if span and is_node(" ".join(span)):
+                if _norm(run[j - 1]) in skip:
+                    continue             # rozpětí nesmí končit předložkou
+                span = run[i:j]
+                if is_node(" ".join(span)):
                     hit = (j, " ".join(span))
                     break
             if hit is None:

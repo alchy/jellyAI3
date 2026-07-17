@@ -102,6 +102,24 @@ def test_without_is_node_keeps_old_behavior():
     assert ("obj", "Babičku") in q.pattern.known
 
 
+def test_yes_no_question_builds_existence_pattern():
+    """„Napsal Karel Čapek Válku s mloky?" → predikát + všechny entity known,
+    díra žádná (existenční test), qtype None."""
+    is_node = _nodes("Karel Čapek", "Válku s mloky")
+    q = build_query("Napsal Karel Čapek Válku s mloky?", {"napsat"}, is_node)
+    assert q is not None and q.qtype is None
+    assert q.pattern.predicate == "napsat"
+    assert q.pattern.hole_role is None
+    assert ("subj", "Karel Čapek") in q.pattern.known
+    assert ("obj", "Válku s mloky") in q.pattern.known
+
+
+def test_yes_no_needs_leading_verb():
+    """Bez tázacího slova a bez počátečního slovesa vzor nevznikne (None)."""
+    is_node = _nodes("Karel Čapek")
+    assert build_query("Karel Čapek napsal?", {"napsat"}, is_node) is None
+
+
 def test_query_gender_from_verb_form():
     q = build_query("Kdy se narodila Božena Němcová?", {"narodit"})
     assert q.gender == "Fem" and q.qtype == "Kdy"
