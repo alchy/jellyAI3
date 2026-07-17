@@ -1,0 +1,7 @@
+{
+  "name": "reminder-heads-up",
+  "trigger": {"event": "reminder.heads-up"},
+  "dialog": "⏰ Připomenu {time}: {task}. Jestli chceš jiný čas nebo datum, řekni kdy.",
+  "action": {"await": "reminder-time"},
+  "teach": "Připomínka s ODVOZENÝM výchozím časem (pravidla v jazykových datech): událost s časem dnes → předstih event_lead_hours; dnes bez času → za today_lead_hours; zítra → ráno (tomorrow_part); příští týden/měsíc → večer před začátkem (heads-up). Vždy se nabídne upřesnění — navazující určení času/data připomínku PŘEPLÁNUJE."
+}

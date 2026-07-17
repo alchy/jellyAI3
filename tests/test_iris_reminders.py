@@ -175,19 +175,51 @@ def test_plan_move_bulk_to_weekday():
     iris.turn("Připomeň mi zítra koupit rohlíky.")
     out = iris.turn("Posuň všechny ze zítra na čtvrtek.")
     assert "reminder-move" in out.used["patterns"]
-    assert iris.reminders[0]["due"].startswith("2026-07-23T09:00")
+    assert iris.reminders[0]["due"].startswith("2026-07-23T07:00")
     assert "23. července" in out.text
 
 
 def test_plan_reschedule_by_hour():
-    """„Přeplánuj to ze 17 na 20." — zdroj vybírá hodina, cíl je nová
-    hodina téhož dne."""
+    """„Přeplánuj to ze 17 na 20." — „ze 17" míří na ČAS UDÁLOSTI
+    (předstih posunul due na 15:00); explicitní cíl ruší předstih."""
     iris = _iris(lambda: NOW)
     iris.turn("Připomeň mi v 17:00 vyzvednout dítě ze školy.")
+    assert iris.reminders[0]["due"].startswith("2026-07-17T15:00")
     out = iris.turn("Přeplánuj to ze 17 na 20.")
     assert "reminder-move" in out.used["patterns"]
     assert iris.reminders[0]["due"].startswith("2026-07-17T20:00")
+    assert "event" not in iris.reminders[0]
     assert "20:00" in out.text and "dítě" in out.text
+
+
+def test_smart_defaults_for_notification_time():
+    """Chytré defaulty (zadání): událost s časem dnes → předstih 2 h
+    („jede v pět vlak" = 17:00 → 15:00); „dnes" bez času → za 3 h;
+    „zítra" → ráno 7:00; „příští týden" → neděle večer PŘED týdnem.
+    Vše s nabídkou upřesnění (karta reminder-heads-up) a navazující
+    určení času připomínku PŘEPLÁNUJE."""
+    iris = _iris(lambda: NOW)
+    out = iris.turn("Připomeň mi, že mi jede v pět vlak.")
+    assert "reminder-heads-up" in out.used["patterns"]
+    assert iris.reminders[0]["due"].startswith("2026-07-17T15:00")
+    assert iris.reminders[0]["event"].startswith("2026-07-17T17:00")
+    out = iris.turn("připomeň mi to v 16:30")
+    assert iris.reminders[0]["due"].startswith("2026-07-17T16:30")
+
+    iris = _iris(lambda: NOW)
+    out = iris.turn("Připomeň mi dnes zaplatit fakturu.")
+    assert "reminder-heads-up" in out.used["patterns"]
+    assert iris.reminders[0]["due"].startswith("2026-07-17T15:00")   # +3 h
+
+    iris = _iris(lambda: NOW)
+    out = iris.turn("Připomeň mi zítra koupit rohlíky.")
+    assert "reminder-heads-up" in out.used["patterns"]
+    assert iris.reminders[0]["due"].startswith("2026-07-18T07:00")   # ráno
+
+    iris = _iris(lambda: NOW)
+    out = iris.turn("Připomeň mi příští týden úklid garáže.")
+    assert "reminder-heads-up" in out.used["patterns"]
+    assert iris.reminders[0]["due"].startswith("2026-07-19T19:00")   # ne večer
 
 
 def test_plan_manage_honest_miss():

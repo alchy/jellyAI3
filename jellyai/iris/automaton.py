@@ -32,7 +32,7 @@ from jellyai.graph.graph import parse_date
 from jellyai.iris.assurance import assurance
 from jellyai.iris.subsystems.chronos import (TimeInterval, clock_answer,
                                              format_due, resolve_due,
-                                             resolve_temporal,
+                                             resolve_plan, resolve_temporal,
                                              resolve_weekday)
 from jellyai.iris.subsystems.mnemos import parse_statement, persist, remember, replay
 from jellyai.iris.patterns import PatternDeck
@@ -169,12 +169,24 @@ class IrisAutomaton:
             pending = self.state.pending_reminder
             if pending is not None:
                 self.state.pending_reminder = None
-                due = resolve_due(text, self.clock())
-                if due is not None:
-                    if isinstance(pending, dict):   # PŘEPLÁNOVÁNÍ defaultu
-                        return self._set_reminder(pending["task"], due, text,
-                                                  record=pending)
-                    return self._set_reminder(pending, due, text)
+                low0 = deaccent(text.lower())
+                phrase0 = next((p for p in current()["reminder_phrases"]
+                                if p in low0), None)
+                # „připomeň mi TO v 16:30" = odkaz na čekající (prázdný
+                # úkol po očištění), ne nová připomínka
+                takeover = (
+                    (phrase0 is not None
+                     and self._reminder_task(text, phrase0) not in ("", "to"))
+                    or any(t.rstrip(".") in current()["plan_cancel_words"]
+                           or t.rstrip(".") in current()["plan_move_words"]
+                           for t in re.findall(r"[\w:.]+", low0)))
+                if not takeover:            # nový příkaz nabídku ukončí
+                    due = resolve_due(text, self.clock())
+                    if due is not None:
+                        if isinstance(pending, dict):   # PŘEPLÁNOVÁNÍ
+                            return self._set_reminder(pending["task"], due,
+                                                      text, record=pending)
+                        return self._set_reminder(pending, due, text)
             managed = self._plan_manage(text)
             if managed is not None:
                 return managed
@@ -381,9 +393,13 @@ class IrisAutomaton:
 
         def selected(record):
             due = datetime.fromisoformat(record["due"])
-            if interval is not None and not interval.contains(due):
+            event = datetime.fromisoformat(record["event"]) \
+                if record.get("event") else None
+            if interval is not None and not interval.contains(due) \
+                    and not (event is not None and interval.contains(event)):
                 return False
-            if src_hour is not None and due.hour != src_hour:
+            if src_hour is not None and due.hour != src_hour \
+                    and not (event is not None and event.hour == src_hour):
                 return False
             if interval is None and src_hour is None and not take_all:
                 task = deaccent(record["task"].lower())
@@ -430,6 +446,7 @@ class IrisAutomaton:
                         return None
                     due = resolved
                 record["due"] = due.isoformat()
+                record.pop("event", None)   # explicitní cíl ruší předstih
             self.reminders.sort(key=lambda item: item["due"])
             self._save_reminders()
         card = self.deck.best(
@@ -463,9 +480,11 @@ class IrisAutomaton:
             IrisResponse | None: Potvrzení/dotaz, nebo None (karty mlčí).
         """
         task = self._reminder_task(text, phrase)
-        due = resolve_due(text, self.clock())
-        if due is not None:
-            return self._set_reminder(task, due, text)
+        plan = resolve_plan(text, self.clock())
+        if plan is not None:
+            return self._set_reminder(task, plan["due"], text,
+                                      event=plan.get("event"),
+                                      offered=plan["offered"])
         if not task:
             return None
         card = self.deck.best("reminder.default", {})
@@ -505,19 +524,30 @@ class IrisAutomaton:
         self.state.remember(text, response)
         return response
 
-    def _set_reminder(self, task, due, text, record=None):
+    def _set_reminder(self, task, due, text, record=None, event=None,
+                      offered=False):
         """Uloží připomínku do skladu (nebo PŘEPLÁNUJE existující záznam)
-        a potvrdí kartou `reminder.set`."""
-        card = self.deck.best("reminder.set", {})
+        a potvrdí kartou — `reminder.set` (doslovný termín), NEBO
+        `reminder.heads-up` (odvozený default s nabídkou upřesnění;
+        navazující určení času záznam přeplánuje). Čas UDÁLOSTI se
+        u předstihu ukládá (`event`) — výběr „ze 17" pak míří na událost."""
+        card = self.deck.best("reminder.heads-up" if offered
+                              else "reminder.set", {})
         if card is None:
             return None
         with self._reminder_lock:
             if record is not None and record in self.reminders:
                 record["due"] = due.isoformat()
+                record.pop("event", None)   # explicitní čas ruší předstih
             else:
-                self.reminders.append({"due": due.isoformat(), "task": task})
+                record = {"due": due.isoformat(), "task": task}
+                if event is not None:
+                    record["event"] = event.isoformat()
+                self.reminders.append(record)
             self.reminders.sort(key=lambda item: item["due"])
             self._save_reminders()
+        if offered:
+            self.state.pending_reminder = record
         self._note_card(card.name)
         message = card.dialog.format(time=format_due(due, self.clock()),
                                      task=task)

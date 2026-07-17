@@ -418,6 +418,97 @@ def resolve_due(text, now):  # pylint: disable=too-many-branches,too-many-locals
     return due
 
 
+def resolve_plan(text, now):  # pylint: disable=too-many-branches
+    """Termín PŘIPOMÍNKY s CHYTRÝMI DEFAULTY (zadání 2026-07-18).
+
+    Když uživatel neřekne, KDY notifikovat, odvodí se výchozí čas z
+    kontextu výroku (pravidla = jazyková data) a nabídne se upřesnění:
+
+    * čas UDÁLOSTI dnes („jede v pět vlak", „v 17:00 vyzvednout") →
+      předstih `event_lead_hours` (2 h) před událostí;
+    * „dnes" bez času → za `today_lead_hours` (3 h);
+    * „zítra" bez času → ráno (`tomorrow_part` → day_parts, 7:00);
+    * „příští týden/měsíc" → večer PŘED začátkem intervalu (heads-up);
+    * plný termín (datum, „ráno v šest", ofset) → doslova, bez nabídky.
+
+    Returns:
+        dict | None: {"due", "event" (datetime | None — čas události při
+        předstihu), "offered" (bool — nabídnout upřesnění)}; None bez
+        jakéhokoli časového vodítka.
+    """
+    lang = current()["temporal"]
+    if not lang:
+        return None
+    tokens = [deaccent(t.lower()).rstrip(".") or "."
+              for t in re.findall(r"[\w:.]+", text)]
+    numerals = lang.get("numerals", {})
+    day_parts = lang.get("day_parts", {})
+    has_day_part = any(t in day_parts for t in tokens)
+    has_day_word = any(t in lang.get("day_words", {}) for t in tokens)
+    explicit = resolve_due(text, now)
+
+    # ČAS UDÁLOSTI DNES: holá hodina („v pět", „v 17:00") bez denní části
+    # a bez data — jde o odjezd/vyzvednutí, notifikace s předstihem
+    if not has_day_part and not has_day_word \
+            and not any(t in lang.get("month_forms", {})
+                        or t in lang.get("months", {}) for t in tokens):
+        event = None
+        for i, tok in enumerate(tokens):
+            clock = re.fullmatch(r"(\d{1,2}):(\d{2})", tok)
+            if clock:
+                event = now.replace(hour=int(clock.group(1)),
+                                    minute=int(clock.group(2)),
+                                    second=0, microsecond=0)
+                break
+            if i and tokens[i - 1] in ("v", "ve"):
+                hour = numerals.get(tok) if tok in numerals else (
+                    int(tok) if tok.isdigit() and int(tok) < 24 else None)
+                if hour is not None:
+                    if hour < lang.get("afternoon_threshold", 7):
+                        hour += 12       # „v pět" bez rána = odpoledne
+                    event = now.replace(hour=hour, minute=0,
+                                        second=0, microsecond=0)
+                    break
+        if event is not None and event > now:
+            due = event - timedelta(hours=lang.get("event_lead_hours", 2))
+            if due <= now:
+                due = now + timedelta(minutes=5)
+            return {"due": due, "event": event, "offered": True}
+
+    # „PŘÍŠTÍ TÝDEN/MĚSÍC" → heads-up večer před začátkem intervalu
+    nexts = frozenset(lang.get("next_words", ()))
+    units = lang.get("units", {})
+    if any(t in nexts for t in tokens) \
+            and any(units.get(t) in ("week", "month") for t in tokens):
+        unit = next(units[t] for t in tokens
+                    if units.get(t) in ("week", "month"))
+        start = _shift(_floor(now, unit), unit, 1)
+        part = day_parts.get(lang.get("headsup_part", "vecer"), "19:00")
+        hour, minute = (int(x) for x in part.split(":"))
+        due = (start - timedelta(days=1)).replace(hour=hour, minute=minute)
+        return {"due": due, "event": start, "offered": True}
+
+    # „DNES" bez času → za pár hodin
+    if explicit is None and any(
+            lang.get("day_words", {}).get(t) == 0 for t in tokens):
+        return {"due": now + timedelta(hours=lang.get("today_lead_hours", 3)),
+                "event": None, "offered": True}
+
+    # „ZÍTRA" holé → ráno (tomorrow_part); jinak doslovný termín
+    if explicit is not None:
+        offered = False
+        if has_day_word and not has_day_part \
+                and explicit.hour == lang.get("reminder_hour", 9) \
+                and any(lang.get("day_words", {}).get(t, 0) > 0
+                        for t in tokens):
+            part = day_parts.get(lang.get("tomorrow_part", "rano"), "07:00")
+            hour, minute = (int(x) for x in part.split(":"))
+            explicit = explicit.replace(hour=hour, minute=minute)
+            offered = True
+        return {"due": explicit, "event": None, "offered": offered}
+    return None
+
+
 def resolve_weekday(text, now):
     """„na čtvrtek" → datum nejbližšího BUDOUCÍHO takového dne (00:00).
 
