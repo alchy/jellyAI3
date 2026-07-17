@@ -281,11 +281,26 @@ def cmd_web(config, view=None):
     """
     from jellyai.tasks import make_graph_answerer, load_fact_graph
     from jellyai.viz.pulse import TracePulse
+    from jellyai.answerer.template import _to_nominative
     answerer = make_graph_answerer(config)
+
+    _label_cache = {}
+
+    def base_form_label(node):
+        """Titulek uzlu v ZÁKLADNÍM tvaru: skloněné povrchy (geo/dílo/instituce)
+        nominativizuje morfologií; osoby jsou kanonické, pojmy lemmata."""
+        if node.type not in ("geo", "dílo", "institution"):
+            return node.id
+        if node.id not in _label_cache:
+            _label_cache[node.id] = _to_nominative(node.id, answerer.client) \
+                or node.id
+        return _label_cache[node.id]
+
     if view is None:
         # lazy import: viewBase je volitelný, jádro ho nepotřebuje
         from jellyai.viz.viewbase_view import ViewBaseView
-        view = ViewBaseView("jellyAI3").from_graph(load_fact_graph(config))
+        view = ViewBaseView("jellyAI3").from_graph(load_fact_graph(config),
+                                                   labeler=base_form_label)
 
     pulse = TracePulse()             # aktivace („context window") → jas + provoz tras
 
@@ -296,12 +311,19 @@ def cmd_web(config, view=None):
         scores = dict(context.scores) if context is not None else {}
         trace = getattr(answerer, "last_trace", None)
         path = [trace["topic"], trace["answer"]] if trace else []
-        # vizualizace zrcadlí stav aktivace po dotazu: rozsvítí pole, přidá trasu
+        # vizualizace zrcadlí stav aktivace po dotazu: rozsvítí pole, přidá
+        # trasu, do detailu propíše ŽIVOU aktivaci (attention) a kamera se
+        # vystředí na nejaktivnější uzel (obdoba kliknutí)
         state = pulse.ignite(scores, path)
         for node_id, bright in state["sizes"].items():
-            view.update_node(node_id, size=1.0 + bright)
+            view.update_node(node_id, size=1.0 + bright,
+                             **{"aktivace (attention)": f"{bright:.2f}"})
         for node_id in state["extinguish"]:   # uzly mimo pole → zpět na základ
-            view.update_node(node_id, size=1.0)
+            view.update_node(node_id, size=1.0,
+                             **{"aktivace (attention)": "0"})
+        if state["sizes"] and hasattr(view, "focus"):
+            hottest = max(state["sizes"], key=state["sizes"].get)
+            view.focus(hottest)
         reply = f"❓ {question}\n💬 {answer.text}"
         if answer.alternatives:      # souvislosti (krmivo pro budoucí kompozitor/NN)
             reply += f"\n   souvislosti: {', '.join(answer.alternatives[:4])}"

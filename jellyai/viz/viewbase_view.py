@@ -47,11 +47,13 @@ class ViewBaseView:
         self._handle = None
         self._terminal_id = None
 
-    def from_graph(self, graph):
+    def from_graph(self, graph, labeler=None):
         """Naplní plátno uzly a hranami faktového grafu (entity + faktové uzly).
 
         Args:
             graph (FactGraph): Zdrojový graf.
+            labeler (callable | None): Volitelná úprava titulku uzlu (např.
+                nominativizace „Hronově"→„Hronov" morfologií); id zůstává.
 
         Returns:
             ViewBaseView: self (pro řetězení).
@@ -60,16 +62,26 @@ class ViewBaseView:
         for kind in {node.type for node in graph.nodes.values()} | {"fact"}:
             self._canvas.define_type(kind, **_TYPE_STYLE.get(kind, {"color": "#8a949f"}))
         for node in graph.nodes.values():
+            label = labeler(node) if labeler else node.id
             # meta = co o uzlu držíme (typ, váha, fakty) → naplní detailní okno
-            self.add_node(node.id, label=node.id, type=node.type,
+            self.add_node(node.id, label=label, type=node.type,
                           **dict(node_detail_rows(graph, node.id)))
         for index, fact in enumerate(graph.facts.values()):
             fid = f"fact:{fact.predicate}:{index}"     # unikátní id (bez kolizí)
-            self.add_node(fid, label=fact.predicate, type="fact",
+            # kontextová asociace není přímý vztah → titulек „souvislost"
+            label = "souvislost" if fact.predicate == "kontext" else fact.predicate
+            self.add_node(fid, label=label, type="fact",
                           **dict(fact_detail_rows(fact)))
             for participant in fact.participants:
                 self.add_edge(fid, participant.node, role=participant.role)
         return self
+
+    def focus(self, node_id):
+        """Vystředí kameru na uzel (obdoba kliknutí) — např. na nejaktivnější."""
+        try:
+            self._canvas.focus(node_id)
+        except Exception:  # pylint: disable=broad-exception-caught
+            pass          # neznámý uzel kameru nehýbe
 
     def add_node(self, node_id, **meta):
         """Přidá/aktualizuje uzel (idempotentní)."""

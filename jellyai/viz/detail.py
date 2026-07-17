@@ -46,7 +46,8 @@ def node_detail_rows(graph, node_id):
     if node is None:
         return [("uzel", node_id)]
     rows = [("typ", _CZ_TYPE.get(node.type, node.type)),
-            ("váha", str(node.weight))]
+            ("váha (výskyty v textu)", str(node.weight)),
+            ("aktivace (attention)", "0")]     # živě přepisuje web po dotazu
     if node.type == "person":
         # morfologie osoby: rod z tvaru jména, kmenový klíč clusteru a
         # pádové tvary, které resolver sloučil do tohoto uzlu

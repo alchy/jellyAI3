@@ -18,7 +18,8 @@ def _graph():
 def test_entity_rows_type_weight_and_facts():
     rows = dict(node_detail_rows(_graph(), "Božena Němcová"))
     assert rows["typ"] == "osoba"
-    assert rows["váha"] == "2"                 # figuruje ve 2 faktech
+    assert rows["váha (výskyty v textu)"] == "2"   # figuruje ve 2 faktech
+    assert rows["aktivace (attention)"] == "0"     # živě přepisuje web
     assert rows["napsat →"] == "Babička"
     assert rows["narodit →"] == "1820"
 
@@ -54,9 +55,9 @@ def test_caps_to_five_most_frequent_connections():
                                   Participant("obj", f"cíl{i}", "concept")]))
     rows = node_detail_rows(g, "Autor")
     labels = [k for k, _ in rows]
-    assert labels[:2] == ["typ", "váha"]
-    # typ, váha + morfologie osoby (rod, kmen) + top 5 spojení
-    assert len(rows) == 2 + 2 + 5
+    assert labels[0] == "typ"
+    # typ, váha, aktivace + morfologie osoby (rod, kmen) + top 5 spojení
+    assert len(rows) == 3 + 2 + 5
     assert "pred0 →" in labels                   # nejčastější (3x) se vejde
     assert dict(rows)["pred0 →"] == "cíl0"
 
