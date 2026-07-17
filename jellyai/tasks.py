@@ -86,4 +86,5 @@ def make_graph_answerer(config):
                          ExtractiveAnswerer(config.answerer),
                          context_decay=config.graph.context_decay,
                          spread_depth=config.graph.spread_depth,
-                         spread_falloff=config.graph.spread_falloff)
+                         spread_falloff=config.graph.spread_falloff,
+                         query_mode=config.graph.query_mode)

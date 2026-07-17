@@ -9,6 +9,54 @@ from jellyai.graph.extract import make_fact, Participant
 from jellyai.ufal_client import FakeUfalClient
 
 
+def _answerer(graph):
+    return GraphAnswerer(graph, FakeUfalClient(), ExtractiveAnswerer(AnswererConfig()))
+
+
+def test_term_coverage_beats_single_surface_hit():
+    """Dva kmenové hity („Karla"+„Čapka") přebijí jeden povrchový hit („Čapka"
+    v uzlu „Antonína Čapka") — pokrytí termů je primární patro."""
+    g = FactGraph()
+    g.add_fact(make_fact("být", [Participant("subj", "Antonína Čapka", "person"),
+                                 Participant("pred", "otec", "concept")]))
+    g.add_fact(make_fact("bratr", [Participant("subj", "Josef Čapek", "person"),
+                                   Participant("obj", "Karel Antonín Čapek", "person")]))
+    a = _answerer(g)
+    assert a._resolve_topic(["Karla", "Čapka"]) == "Karel Antonín Čapek"
+
+
+def test_same_cluster_prefers_predicate_affinity():
+    """Zbytkový skloněný uzel „Babičku" (exact hit) nesmí přebít variantu
+    „Babička", o níž se predikát otázky dá vypovědět — v rámci TÉHOŽ
+    kmenového clusteru rozhoduje afinita."""
+    g = FactGraph()
+    g.add_fact(make_fact("kontext", [Participant("subj", "Babičku", "concept"),
+                                     Participant("obj", "kraj", "concept")]))
+    g.add_fact(make_fact("napsat", [Participant("subj", "Božena Němcová", "person"),
+                                    Participant("obj", "Babička", "dílo")]))
+    a = _answerer(g)
+    assert a._resolve_topic(["Babičku"], "napsat") == "Babička"
+
+
+def test_loose_stem_reaches_short_inflected_concept():
+    """„hru"→„hra": min_stem=3 blokuje kmen, nejvolnější patro (oboustranné
+    seříznutí koncové samohlásky) dosáhne."""
+    g = FactGraph()
+    g.add_fact(make_fact("druh", [Participant("subj", "R.U.R.", "dílo"),
+                                  Participant("pred", "hra", "concept")]))
+    a = _answerer(g)
+    assert a._resolve_topic(["hru"]) == "hra"
+
+
+def test_function_words_do_not_score():
+    """„s" nesmí skórovat: „Válku s mloky" ≠ „Hovory s TGM"."""
+    g = FactGraph()
+    g.add_fact(make_fact("napsat", [Participant("subj", "Karel Čapek", "person"),
+                                    Participant("obj", "Hovory s TGM", "dílo")]))
+    a = _answerer(g)
+    assert a._resolve_topic(["Válku", "s", "mloky"]) is None
+
+
 def test_lowercase_lemma_resolves_capitalized_title():
     g = FactGraph()
     g.add_fact(make_fact("napsat", [Participant("subj", "Jaroslav Seifert", "person"),

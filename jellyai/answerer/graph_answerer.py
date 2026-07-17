@@ -9,14 +9,22 @@ from jellyai.answerer.base import Answer, Answerer
 from jellyai.graph.graph import parse_date
 from jellyai.lang import current
 from jellyai.answerer.question import analyze_question
-from jellyai.answerer.pattern import question_pattern, SubQuery
-from jellyai.answerer.query import build_query
+from jellyai.answerer.pattern import question_pattern, SubQuery, Pattern
+from jellyai.answerer.query import build_query, Query
 from jellyai.answerer.template import _to_nominative
 from jellyai.graph.activation import ActivationField
 from jellyai.graph.canon import _stem, name_gender, deaccent
 
 _DATE_PARTS = {"rok", "měsíc", "den"}   # drill: „v kterém roce/měsíci…"
 _MAX_ENUM = 5                           # strop výčtové odpovědi (čitelnost)
+
+
+def _loose(word):
+    """Nejvolnější porovnávací klíč: kmen → bez diakritiky → bez koncové
+    samohlásky (floor 2). „hru"≡„hra"≡„hr", „jezis"≡„Ježíš". Nejslabší patro
+    rozlišení — nikdy nepřebije přesnější shodu."""
+    s = deaccent(_stem(word))
+    return s[:-1] if len(s) > 2 and s[-1] in "aeiouy" else s
 
 
 def _synonym_ring(predicate):
@@ -45,7 +53,7 @@ class GraphAnswerer(Answerer):
     """
 
     def __init__(self, graph, client, fallback, *, context_decay=0.55,
-                 spread_depth=2, spread_falloff=0.35, use_templates=False):
+                 spread_depth=2, spread_falloff=0.35, query_mode="udpipe"):
         """Vytvoří answerer.
 
         Args:
@@ -62,12 +70,13 @@ class GraphAnswerer(Answerer):
         self.spread_depth = spread_depth
         self.spread_falloff = spread_falloff
         self.last_trace = None   # trasa poslední odpovědi (téma → fakt → hodnota)
+        self.last_pattern = None  # poslední vykonaný pseudo-QL Pattern (API)
         self._prev_trace = None  # trasa PŘEDCHOZÍHO tahu (drill „Kdy?")
         self.visited = []        # uzly protnuté (rekurzivním) matchem → rozsvícení
         self.context = ActivationField(decay=context_decay)   # těžiště (id uzlu → jas)
         self.source_context = ActivationField(decay=context_decay)  # attention nad ZDROJI
         self._predicates = {f.predicate for f in graph.facts.values()}  # slovník QL
-        self.use_templates = use_templates   # šablonový parser jako primární
+        self.query_mode = query_mode  # "udpipe" | "hybrid" | "templates" (pseudo-QL)
         self.history = []        # trajektorie konverzace (tahy s trasou a těžištěm)
 
     def reset(self):
@@ -76,8 +85,24 @@ class GraphAnswerer(Answerer):
         self.source_context = ActivationField(decay=self.context_decay)
         self.history = []
         self.last_trace = None
+        self.last_pattern = None
 
-    def _resolve_topic(self, topic_terms, predicate=None):
+    def _span_is_node(self, span):
+        """Přísný test rozpětí (spec 4.3): rozřeší se na uzel A jeho obsahová
+        slova jsou podmnožinou slov uzlu (kmenově/bezdiakriticky) — slepenec
+        dvou entit ani cizí titul neprojde."""
+        terms = [t for t in span.split()
+                 if len(t) > 1
+                 and deaccent(t.lower()) not in current()["query_skip_words"]]
+        if not terms:
+            return False
+        node_id = self._resolve_topic(terms, warm=False)
+        if node_id is None:
+            return False
+        node_keys = {_loose(w) for w in node_id.split()}
+        return all(_loose(t) in node_keys for t in terms)
+
+    def _resolve_topic(self, topic_terms, predicate=None, warm=True):
         """Najde uzel tématu otázky — nejlepší shodu s obsahovými lemmaty.
 
         **Přesná shoda velikosti má přednost**, case-insensitive je fallback:
@@ -96,25 +121,38 @@ class GraphAnswerer(Answerer):
         Returns:
             str | None: Id uzlu tématu, nebo None když nic nesedí.
         """
-        terms = [t for t in topic_terms if t]
+        lang = current()
+        terms = [t for t in topic_terms
+                 if t and len(t) > 1
+                 and deaccent(t.lower()) not in lang["query_skip_words"]]
         low_terms = [t.lower() for t in terms]
         stems = [_stem(t) for t in terms]
         da_stems = [deaccent(s) for s in stems]   # bezdiakritický alias dotazu
+        loose = [_loose(t) for t in terms]
         best_id, best_score = None, None
-        candidates = []          # (id, stem_hits, váha) — homonymní vějíř
+        candidates = []   # (id, stem_hits, váha, loose klíč, afinita) — vějíř
         ring = _synonym_ring(predicate) if predicate else ()
         for node in self.graph.nodes.values():
             if node.type == "výrok":
                 continue                  # obsah řeči je hodnota, ne téma
             low_id = node.id.lower()
             low_words = low_id.split()
-            ins_hits = sum(1 for t in low_terms if t == low_id or t in low_words)
             node_stems = {_stem(w) for w in low_words}
-            stem_hits = sum(1 for s in stems if s in node_stems)
             da_node = {deaccent(s) for s in node_stems}
-            da_hits = sum(1 for s in da_stems if s in da_node)
-            if ins_hits == 0 and stem_hits == 0 and da_hits == 0:
+            loose_node = frozenset(_loose(w) for w in low_words)
+            per_term = [(t == low_id or t in low_words, s in node_stems,
+                         d in da_node, l in loose_node)
+                        for t, s, d, l in zip(low_terms, stems, da_stems, loose)]
+            # POKRYTÍ TERMŮ je primární patro: uzel trefený víc slovy dotazu
+            # (jakýmkoli patrem) přebije jediný povrchový hit („Karla Čapka"
+            # → „Karel Antonín Čapek", ne zbytkový uzel „Antonína Čapka")
+            coverage = sum(1 for hit in per_term if any(hit))
+            if coverage == 0:
                 continue
+            ins_hits = sum(1 for hit in per_term if hit[0])
+            stem_hits = sum(1 for hit in per_term if hit[1])
+            da_hits = sum(1 for hit in per_term if hit[2])
+            loose_hits = sum(1 for hit in per_term if hit[3])
             # přesná shoda velikosti má smysl jen u termů NESOUCÍCH velké
             # písmeno (lowercase lemma „vějíř" nerozliší pojem od titulu)
             exact_hits = sum(1 for t in terms
@@ -126,22 +164,41 @@ class GraphAnswerer(Answerer):
             # „Němec" s být-faktem jiné osoby)
             affinity = int(any(self.graph.facts_of(node.id, predicate=pred)
                                for pred, _ in ring))
-            # bezdiakritická shoda je nejslabší patro (pod kmenovou), aby
-            # „cestina" dosáhla na uzel, ale nikdy nepřebila přesnější shodu
-            score = (exact_hits, ins_hits, stem_hits, da_hits, affinity,
-                     len(low_words), node.weight)
-            candidates.append((node.id, stem_hits, node.weight))
+            # bezdiakritická a volná shoda jsou nejslabší patra (pod kmenovou),
+            # aby „cestina"/„hru" dosáhly na uzel a nikdy nepřebily přesnější;
+            # POKRYTÍ stojí i nad exact — skloněný povrchový uzel („Čapka")
+            # nesmí jedinou přesnou shodou přebít plnější jméno
+            score = (coverage, exact_hits, ins_hits, stem_hits, da_hits,
+                     loose_hits, affinity, len(low_words), node.weight)
+            candidates.append((node.id, stem_hits, node.weight,
+                               loose_node, affinity))
             if best_score is None or score > best_score:
                 best_id, best_score = node.id, score
-        if best_id is not None:
+        if best_id is not None and ring:
+            # CLUSTER-AFINITA: varianty TÉHOŽ jména (stejný volný klíč) arbitruje
+            # predikát — zbytkový skloněný uzel („Babičku", exact hit) nepřebije
+            # variantu s faktem otázky („Babička" s napsat); cizí jména nemění
+            best = next(c for c in candidates if c[0] == best_id)
+            if not best[4]:
+                same = [c for c in candidates
+                        if c[3] == best[3] and c[4] and c[0] != best_id]
+                if same:
+                    # mezi afinitními variantami rozhodne shoda velikosti
+                    # písmen s termem („Babičku"→„Babička", ne „babička"),
+                    # pak váha
+                    term_upper = any(t[:1].isupper() for t in terms)
+                    best_id = max(same, key=lambda c: (
+                        c[0][:1].isupper() == term_upper, c[2]))[0]
+        if best_id is not None and warm:
             # nejednoznačné jméno rozsvítí VŠECHNY kandidáty se stejnou
             # kmenovou shodou (homonymní vějíř „Marie" → i biblická Maria) —
-            # attention nese nejistotu rozřešení, vítěz svítí nejvíc
-            top_stem = best_score[2]
+            # attention nese nejistotu rozřešení, vítěz svítí nejvíc; při
+            # sondě is_node (zamítaná rozpětí) se vějíř nešíří (warm=False)
+            top_stem = best_score[3]
             fan = sorted((c for c in candidates
                           if c[0] != best_id and c[1] == top_stem and c[1] > 0),
                          key=lambda c: -c[2])[:5]
-            for node_id, _, _ in fan:
+            for node_id, _, _, _, _ in fan:
                 self.context.warm(node_id, 0.3)
         return best_id
 
@@ -156,8 +213,8 @@ class GraphAnswerer(Answerer):
             return True
         return name_gender(node_id) == qa.gender
 
-    def _pattern_answer(self, question, qa):  # pylint: disable=too-many-return-statements,too-many-branches
-        """Univerzální match: otázka → neúplný fakt → najdi shodný v grafu → díra.
+    def _pattern_answer(self, question, pat, qa):  # pylint: disable=too-many-return-statements,too-many-branches
+        """Univerzální match: neúplný fakt (pattern) → najdi shodný v grafu → díra.
 
         Nahrazuje ruční qtype/relační pravidla i attention: predikát + známé role
         musí sedět, vrátí se účastník v roli díry (ranking váhou + aktivací). Bez
@@ -165,20 +222,14 @@ class GraphAnswerer(Answerer):
         projdou se kandidáti od nejteplejšího (gender-filtr) a vezme první, co odpoví.
 
         Args:
-            question (str): Dotaz uživatele.
-            qa (QuestionAnalysis): Rozbor (rod pro shodu kontextového tématu).
+            question (str): Původní dotaz (jen pro datum v generické větvi).
+            pat (Pattern): Neúplný fakt z otázky (šablony nebo UDPipe).
+            qa (Query | QuestionAnalysis): Rozbor (rod, qtype, témata).
 
         Returns:
             tuple: (téma | None, hodnota | None, fakt | None).
         """
         self.visited = []                    # uzly protnuté (i)rekurzí → rozsvítit
-        # ŠABLONOVÝ PARSER (pseudo-QL nad slovníkem grafu) — primární pro otázky,
-        # když je zapnutý (odolný vůči diakritice i mis-taggingu); jinak/při
-        # nesestaveném vzoru ML rozbor UDPipe
-        pat = None
-        if self.use_templates:
-            pat = build_query(question, self._predicates)
-        pat = pat or question_pattern(question, self.client)
         if pat.known:
             known_set = set()
             for _, known in pat.known:
@@ -594,10 +645,21 @@ class GraphAnswerer(Answerer):
         """
         self._prev_trace = self.last_trace or self._prev_trace
         self.last_trace = None
-        qa = analyze_question(question, self.client)
         # UNIVERZÁLNÍ princip: otázka→neúplný fakt→match→díra (nahrazuje qtype pravidla
-        # i attention — kontextově navazující dotaz řeší tatáž cesta)
-        topic, values, fact = self._pattern_answer(question, qa)
+        # i attention — kontextově navazující dotaz řeší tatáž cesta). Rozbor dodají
+        # ŠABLONY (pseudo-QL, bez UDPipe); UDPipe jen mimo templates režim.
+        qa, pat = None, None
+        if self.query_mode in ("hybrid", "templates"):
+            query = build_query(question, self._predicates, self._span_is_node)
+            if query is not None:
+                qa, pat = query, query.pattern
+        if qa is None and self.query_mode != "templates":
+            qa = analyze_question(question, self.client)
+            pat = question_pattern(question, self.client)
+        if qa is None:                    # templates-only a šablony nic → nehádat
+            qa, pat = Query(), Pattern()
+        self.last_pattern = pat
+        topic, values, fact = self._pattern_answer(question, pat, qa)
         reverse = False
         focus = None                # UZEL odpovědi (paměť/okolí ≠ složený text)
         if not values:

@@ -5,6 +5,7 @@
 {"q": "Kdo byl robot?", "expect": ["stroj"], "cat": "identita"}
 {"q": "Kde se narodil Josef Čapek?", "expect": ["Hronov"], "cat": "místo"}
 {"q": "Kdy se narodila Božena Němcová?", "expect": ["1818"], "cat": "čas"}
+{"q": "V kterém roce se narodila Božena Němcová?", "expect": ["1818"], "cat": "čas"}
 {"q": "Co se stalo 2. května 1818?", "expect": ["Božena Němcová"], "cat": "reverzní"}
 {"q": "Kdo byl bratr Karla Čapka?", "expect": ["Josef"], "cat": "vztah"}
 {"q": "Kdo byl bratr Josefa Čapka?", "expect": ["Karel"], "cat": "vztah"}
@@ -19,9 +20,13 @@
 {"q": "Kdo byl Svatopluk Machar?", "expect": ["nenašel"], "reject": ["Morgenpost"], "cat": "poctivost"}
 {"q": "Napsal Karel Čapek Válku s mloky?", "expect": ["Ano"], "cat": "ano-ne"}
 {"q": "Publikoval Karel v tomto časopisu?", "expect": ["nenašel"], "reject": ["Josef"], "cat": "ano-ne"}
+{"q": "Napsal Josef Čapek Babičku?", "expect": ["nenašel"], "reject": ["Ano"], "cat": "ano-ne"}
 {"q": "Co se stalo v listopadu 1848?", "expect": ["svazek"], "reject": ["rodina"], "cat": "reverzní"}
 {"dialog": ["Co se stalo v červenci 1848?", "Co se stalo s rodinou?"], "expect": ["ocitnout", "Domažlic"], "cat": "návaznost"}
 {"dialog": ["Co napsal Karel Čapek?", "Jakou hru napsal?"], "expect": ["R.U.R."], "reject": ["Čapek"], "cat": "návaznost"}
+{"q": "Kdo je jezis?", "expect": ["Kristus"], "cat": "diakritika"}
+{"q": "Kde se narodil Jezis?", "expect": ["Betlém"], "cat": "diakritika"}
+{"q": "Kdo byl bratr autora, ktery napsal R.U.R.?", "expect": ["Josef"], "cat": "diakritika", "gap": "UDPipe cesta bez diakritiky selhává; šablony umí — zezelená přepnutím"}
 {"q": "Kdo je Božena Němcová?", "expect": ["spisovatelka", "spisovatel"], "cat": "identita", "gap": "copula-profese (#5): vrací 'úřad'"}
 {"q": "Kdo napsal R.U.R.?", "expect": ["Čapek"], "cat": "autor", "gap": "tokenizace tečkované zkratky (#3)"}
 {"q": "Kdo napsal Válku s mloky?", "expect": ["Čapek"], "cat": "autor", "gap": "titul nezachycen"}

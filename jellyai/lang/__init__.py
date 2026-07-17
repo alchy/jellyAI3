@@ -54,6 +54,12 @@ def load_rules(language="cs"):
             lemma: tuple(group)
             for group in rules.get("predicate_synonyms", ())
             for lemma in group}
+        rules["interrogatives"] = {k: tuple(v) for k, v
+                                   in rules.get("interrogatives", {}).items()}
+        for key in ("copula_forms", "relative_pronouns", "query_skip_words"):
+            rules[key] = frozenset(rules.get(key, ()))
+        for key in ("event_verb_forms", "date_part_forms"):
+            rules[key] = dict(rules.get(key, {}))
         _cache[path] = rules
     return _cache[path]
 
