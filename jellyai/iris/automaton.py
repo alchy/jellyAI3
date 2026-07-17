@@ -430,8 +430,11 @@ class IrisAutomaton:
                 | frozenset(temporal.get("numerals", {}))
                 | frozenset(temporal.get("month_forms", {}))
                 | frozenset(temporal.get("day_words", {}))
+                | frozenset(temporal.get("day_parts", {}))
                 | frozenset(temporal.get("forward_words", ()))
-                | frozenset(temporal.get("advance_words", ())))
+                | frozenset(temporal.get("advance_words", ()))
+                | frozenset(temporal.get("soon_minutes", {}))
+                | frozenset(temporal.get("fraction_minutes", {})))
         tokens = re.findall(r"[\w:.]+", text)
         lows = [deaccent(t.lower()) for t in tokens]
         keep = [True] * len(tokens)
