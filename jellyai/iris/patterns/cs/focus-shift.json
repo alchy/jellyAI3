@@ -1,0 +1,9 @@
+{
+  "name": "focus-shift",
+  "trigger": {"event": "utterance.focus-shift", "priority": 10,
+              "requires": ["focus_phrase", "domain"]},
+  "dialog": "Zaostřuji na {domain}.",
+  "action": {"warm_domain": 1.5, "warm_documents": true,
+             "replay": "last-question"},
+  "teach": "Pokyn k zaostření (Kdo je Marie? -> babička -> uživatel: v kontextu Bible): výrok není otázka ani konstatování — Iris posvítí na doménu (uzel + jeho dokumentové okolí přes attention nad zdroji) a přehraje předchozí otázku v novém světle."
+}

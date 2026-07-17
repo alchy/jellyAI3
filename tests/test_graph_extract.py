@@ -141,8 +141,25 @@ def test_attribute_goes_to_its_own_clause_verb():
 
 
 def test_concept_oblique_becomes_theme_participant():
-    """„Uvažoval o souvislosti." → uvažovat(osoba, theme=souvislost) —
+    """„Uvažoval o literatuře." → uvažovat(osoba, theme=literatura) —
     konceptové obl se už nezahazuje (největší kbelík coverage auditu)."""
+    sent = [
+        {"form": "Uvažoval", "lemma": "uvažovat", "upos": "VERB", "head": 0,
+         "deprel": "root", "start": 0, "end": 8},
+        {"form": "o", "lemma": "o", "upos": "ADP", "head": 3, "deprel": "case",
+         "start": 9, "end": 10},
+        {"form": "literatuře", "lemma": "literatura", "upos": "NOUN", "head": 1,
+         "deprel": "obl", "start": 11, "end": 21},
+    ]
+    facts = extract_facts({"entities": [], "sentences": [sent]},
+                          default_subject=("Karel Čapek", "person"))
+    fact = next(f for f in facts if f.predicate == "uvažovat")
+    assert ("theme", "literatura") in [(p.role, p.node) for p in fact.participants]
+
+
+def test_function_noun_oblique_is_not_theme():
+    """Funkční substantivum („v souvislosti s…") theme účastníka NEvytvoří —
+    je to spojovací vata, ne obsah; do grafu by nesla šumové uzly."""
     sent = [
         {"form": "Uvažoval", "lemma": "uvažovat", "upos": "VERB", "head": 0,
          "deprel": "root", "start": 0, "end": 8},
@@ -150,11 +167,13 @@ def test_concept_oblique_becomes_theme_participant():
          "start": 9, "end": 10},
         {"form": "souvislosti", "lemma": "souvislost", "upos": "NOUN", "head": 1,
          "deprel": "obl", "start": 11, "end": 22},
+        {"form": "díla", "lemma": "dílo", "upos": "NOUN", "head": 1,
+         "deprel": "obj", "start": 23, "end": 27},
     ]
     facts = extract_facts({"entities": [], "sentences": [sent]},
                           default_subject=("Karel Čapek", "person"))
     fact = next(f for f in facts if f.predicate == "uvažovat")
-    assert ("theme", "souvislost") in [(p.role, p.node) for p in fact.participants]
+    assert not any(p.node == "souvislost" for p in fact.participants)
 
 
 def test_adverb_is_not_theme():
@@ -171,6 +190,73 @@ def test_adverb_is_not_theme():
                           default_subject=("Karel Čapek", "person"))
     fact = next(f for f in facts if f.predicate == "psát")
     assert not any(p.role == "theme" for p in fact.participants)
+
+
+def test_apposition_across_comma_stays_out_of_object_group():
+    """„Dvě budou mlít obilí, jedna přijata, druhá zanechána" — mis-tagnutá
+    „apozice" z vedlejší klauze (přes čárku) do předmětové skupiny NEpatří;
+    přilehlá apozice („hru R.U.R.") zůstává."""
+    sent = [
+        {"form": "Dvě", "lemma": "dva", "upos": "NUM", "head": 3,
+         "deprel": "nsubj", "start": 0, "end": 3},
+        {"form": "budou", "lemma": "být", "upos": "AUX", "head": 3,
+         "deprel": "aux", "start": 4, "end": 9},
+        {"form": "mlít", "lemma": "mlít", "upos": "VERB", "head": 0,
+         "deprel": "root", "start": 10, "end": 14},
+        {"form": "obilí", "lemma": "obilí", "upos": "NOUN", "head": 3,
+         "deprel": "obj", "start": 15, "end": 20},
+        {"form": ",", "lemma": ",", "upos": "PUNCT", "head": 3,
+         "deprel": "punct", "start": 20, "end": 21},
+        {"form": "druhá", "lemma": "druhý", "upos": "ADJ", "head": 7,
+         "deprel": "amod", "start": 22, "end": 27},
+        {"form": "zanechána", "lemma": "zanechaný", "upos": "NOUN", "head": 4,
+         "deprel": "appos", "start": 28, "end": 37},
+    ]
+    facts = extract_facts({"entities": [], "sentences": [sent]},
+                          default_subject=("X", "person"))
+    fact = next(f for f in facts if f.predicate == "mlít")
+    nodes = [p.node for p in fact.participants]
+    assert "obilí" in nodes and "zanechaný" not in nodes
+
+
+def test_verbal_conj_member_stays_out_of_object_group():
+    """„Vezmi svou hůl a hoď ji" — mis-tagované sloveso („hoď" jako NOUN
+    s VerbForm) pověšené jako conj na předmět do faktu NEpatří; legitimní
+    výčet substantiv („romány a dramata") zůstává."""
+    sent = [
+        {"form": "Vezmi", "lemma": "vzít", "upos": "VERB", "head": 0,
+         "deprel": "root", "start": 0, "end": 5},
+        {"form": "hůl", "lemma": "hůl", "upos": "NOUN", "head": 1,
+         "deprel": "obj", "start": 6, "end": 9},
+        {"form": "a", "lemma": "a", "upos": "CCONJ", "head": 4,
+         "deprel": "cc", "start": 10, "end": 11},
+        {"form": "hoď", "lemma": "hodit", "upos": "NOUN", "head": 2,
+         "deprel": "conj", "feats": {"VerbForm": "Fin"}, "start": 12, "end": 15},
+    ]
+    facts = extract_facts({"entities": [], "sentences": [sent]},
+                          default_subject=("X", "person"))
+    nodes = [p.node for f in facts if f.predicate == "vzít"
+             for p in f.participants]
+    assert "hůl" in nodes and "hodit" not in nodes and "hoď" not in nodes
+
+
+def test_legit_apposition_across_single_comma_survives():
+    """„Jidáše, syna Šimonova" — legitimní apozice s čárkou (bez slovesa
+    mezi, pádová shoda) se do faktu VRACÍ; klauzový únik zůstává venku."""
+    sent = [
+        {"form": "Zradil", "lemma": "zradit", "upos": "VERB", "head": 0,
+         "deprel": "root", "start": 0, "end": 6},
+        {"form": "Jidáše", "lemma": "Jidáš", "upos": "PROPN", "head": 1,
+         "deprel": "obj", "feats": {"Case": "Acc"}, "start": 7, "end": 13},
+        {"form": ",", "lemma": ",", "upos": "PUNCT", "head": 4,
+         "deprel": "punct", "start": 13, "end": 14},
+        {"form": "syna", "lemma": "syn", "upos": "NOUN", "head": 2,
+         "deprel": "appos", "feats": {"Case": "Acc"}, "start": 15, "end": 19},
+    ]
+    facts = extract_facts({"entities": [], "sentences": [sent]},
+                          default_subject=("X", "person"))
+    fact = next(f for f in facts if f.predicate == "zradit")
+    assert "syn" in [p.node for p in fact.participants]
 
 
 def test_coordinated_subjects_distribute():

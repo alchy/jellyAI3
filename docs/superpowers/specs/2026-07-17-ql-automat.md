@@ -55,6 +55,11 @@ QL:   Specifikuj období zaostření — mám tato období: (aktivační okno)
 4. **Automat v kódu neřeší specifika jazyka** — chování řídí JSON
    pattern-karty. Přidání karty = rozšíření komunikačních schopností,
    bez zásahu do kódu.
+4b. **ZÁKON: logika se NIKDY nestaví fixně programově** (uživatel). Kód
+    obsahuje jen mechanismy (výpočet rysů výroku, aritmetiku, matching
+    engine); KAŽDÉ rozhodnutí o chování — klasifikace konstatování,
+    dialogová reakce, priorita — je karta/JSON. Karty mají rysové triggery
+    (`requires`/`forbids` nad rysy tahu: first_person, copula, l_verb…).
 5. **Jedna karta = jeden vzor**: obsahuje (a) **trigger** — při jaké události
    ji automat vytáhne (např. flag `focus-attention-query`, událost
    `resolve.ambiguous`, práh assurance), (b) **dialog** — šablona textu
@@ -63,6 +68,19 @@ QL:   Specifikuj období zaostření — mám tato období: (aktivační okno)
 6. Vzorů bude „přehršel" a **doplňují se během testování** — karty pro
    upřesnění osoby, souvislosti, vztahu (ke komu/čemu), oblasti, roku,
    století, celého jména…; i pro stavy „nemám dost dat", „mám dat příliš".
+6b. **Karty se modelují průběžně podle složitosti — komplexita roste**
+    (doplněk uživatele): začíná se jednoduchými (first-match dle priority),
+    postupně **matching dle otázky** — automat smí vyhodnotit VÍCE
+    kandidátních karet a vzít tu s největším benefitem pro daný dotaz.
+    Benefit = specificita triggeru (kolik podmínek sedí a jak těsně) ×
+    priorita × očekávaný zisk zaostření; výhledově i spekulativní vyzkoušení
+    karty (simuluj akci, změř nárůst aktivace správným směrem).
+6c. **Benefit se MĚŘÍ jako nárůst aktivace** (potvrzení uživatele): po akci
+    karty se měří Δ zaostření (koncentrace jasu na relevantních kandidátech);
+    automat vede telemetrii karet (použití + zisk, součást API metadat).
+    Díky stavovému automatu lze karty **dynamicky průběžně přidávat** a
+    pokrývat vzory dotazů — vývoj karet řídí data (run_focus nad dialogovými
+    scénáři), ne dojem.
 7. **Výměna jazyka = přepnutí adresáře** s kartami + jazykovým JSON
    (stávající `jellyai/lang/cs.json` princip se rozšiřuje na celý automat).
    Automat využívá poznatky z českého korpusu, ale není na něj fixován.
@@ -97,6 +115,72 @@ Taxonomie událostí (výchozí, roste testováním): `resolve.ambiguous`
 10. Úvaha (odloženo, nízká priorita): **hybridní model uzel×hrana** — hrana
     jako vztahové pojítko by mohla s menším ziskem aktivovat i navázané
     hrany. Vyžaduje experimenty a větší refaktor.
+
+## 3b. Časové primitivy a intervaly — Chronos (doplněk uživatele, 2026-07-17)
+
+10b. Iris umí pracovat s **časovými primitivy**: „dnes", „včera", „zítra",
+     „za hodinu", „před dvěma hodinami", „před týdnem"… — rozkládá je na
+     absolutní datum a čas relativně k okamžiku dotazu.
+10c. „Tento týden", „tento měsíc" → Iris generuje **struktury časových
+     intervalů** (půlotevřené ⟨start, end)) a umí s nimi počítat: příslušnost,
+     průnik, granularita (hodina/den/týden/měsíc/rok).
+10d. **Smysl = rozsvěcení přes čas**: má-li znalostní báze data provázaná na
+     čas, časový uzel spadající do intervalu se rozsvítí a přes něj (hranami
+     faktů) i propojení účastníci — časové zaostření je další aktivační
+     funkce sharpeneru; reverse lookup („Co se stalo…?") umí interval místo
+     přesného data.
+10e. Návrhová rozhodnutí (iterace): slovník primitiv, směrovek („před"/„za"/
+     „tento") a číslovek je **jazykové datum** (`cs.json`, klíč `temporal`);
+     intervalová aritmetika je univerzální kód (`jellyai/iris/chronos.py`);
+     **„teď" je VŽDY parametr** (`now`) — testy a benchmarky ho fixují
+     (determinismus!), živé API bere systémové hodiny. Napojení na graf přes
+     stávající `parse_date` (rok/měsíc/den časových uzlů); jemnější
+     granularita (hodiny) je v intervalech připravená pro budoucí báze.
+10f. **Princip: Iris je orientován v čase.** Automat zná „teď" svého běhu
+     (vstřikované, ne natvrdo) — každý relativní výraz umí ukotvit na časovou
+     osu a promítnout do aktivace. Čas je tak plnohodnotná osa zaostření,
+     rovnocenná jmenné (kdo/co) a prostorové (kde).
+10g. **Chronos je ČASOVÝ SUBSYSTÉM s více použitími — časová kotva projektu**
+     (uživatel): jediný zdroj „teď" pro všechny komponenty. Použití: (a)
+     primitiva a intervaly (§10b–e), (b) bod „teď/nyní" s konfigurovatelným
+     oknem (default 15 min), (c) přímé hodinové odpovědi („Co je za den?",
+     „Kolik je hodin?" — jména dnů/měsíců jsou jazyková data), (d) telemetrie
+     karet (časové razítko zisků), (e) výhledově recency vážení faktů
+     u časovaných bází. Automat dostává `clock` injektovaně (testy fixují,
+     živý běh = systémové hodiny).
+
+## 3e. Focus-shift výrok — „v kontextu Bible" (zaparkováno, uživatel)
+
+10j. Dialog: „Kdo je Marie?" → „babička" → uživatel: **„v kontextu Bible"**
+     → dnes „nenašel"; SPRÁVNĚ: výrok není otázka ani konstatování, je to
+     **pokyn k zaostření** — Iris má POSVÍTIT NA KONTEXT (rozsvítit uzel
+     domény + jeho dokumentové okolí přes attention nad zdroji,
+     `source_context`/doc_links) a PŘEHRÁT předchozí otázku v novém světle
+     (homonymní vějíř Marie → biblická Maria vyhraje aktivací). Řešení =
+     karta `utterance.focus-shift` (rysy: ne-otázka + fráze „v kontextu/
+     v rámci/myslím" z jazykové tabulky + rozřešitelná doména); akce: warm
+     domény a dokumentů + replay. Realizace ve F2/F3.
+
+## 3d. Dvě znalostní báze, jedna struktura (Mnemos — rámec uživatele)
+
+10i. Existují **dva typy datových sad se strukturálně toutéž podobou grafu**:
+     (a) **korpusová znalostní báze** — fakta z textu, příběh a vazby;
+     timestamp nevyžaduje (text je bezčasý, dokud sám čas nenese);
+     (b) **uživatelem přidávaná báze** (Mnemos) — táž faktová struktura,
+     ale VŽDY s časovou kotvou: **uživatel není korpus dat, je to objekt
+     vědomě existující v čase a prostoru** — u interakce s ním se časové
+     (Chronos) a prostorové (Topos) vazby dostávají do své role inherentně.
+     Obě báze žijí v JEDNOM grafu a dotazuje je tatáž mašinérie.
+
+## 3c. Souhra subsystémů — Topos × Chronos × Metron (ukázka uživatele)
+
+10h. Cílové dotazy nad pamětí (Mnemos ukládá „Dnes pršelo v Praze." s časovou
+     kotvou): **„Pršelo tento měsíc v Praze?"** — Chronos (interval „tento
+     měsíc") × místo (Praha) × existence → Ano/nenašel. **„Kolikrát letos
+     pršelo v Čechách?"** — Chronos („letos") × **Topos** (hierarchie míst:
+     Praha ⊂ Čechy — containment jako u časových intervalů) × **Metron**
+     („kolikrát" = počítání VÝSKYTŮ faktů, nová díra typu počet, ne num
+     účastník). Subsystémy jsou kotvy os a skládají se v jednom dotazu.
 
 ## 4. Dialogové UX — tři okna (web)
 
@@ -166,9 +250,11 @@ jellyai/iris/
 - **Fáze 1 — skelet Iris**: knihovna (automaton/state/patterns/assurance),
   pattern-karty infrastruktura, pseudo-QL parser jako první plugin,
   **REST API** s metadaty (absorbuje /query, /graphql, /schema), etalon drží.
-- **Fáze 2 — dialogové zaostřování**: karty clarifikace/focus-offer/poctivý
-  terminál/overflow; dialogové etalonové scénáře (ukázky z §1.1); rekurzivní
-  ostření (SubQuery).
+- **Fáze 2 — dialogové zaostřování + Chronos**: karty clarifikace/focus-offer/
+  poctivý terminál/overflow; dialogové etalonové scénáře (ukázky z §1.1);
+  rekurzivní ostření (SubQuery); **časové primitivy a intervaly** (§3b —
+  `chronos.py`, `temporal` tabulky v cs.json, rozsvěcení časových uzlů
+  intervalem, reverse lookup přes interval).
 - **Fáze 3 — web tři okna**: dialogové okno + aktivační okno uzlů + Aktivní
   dokumenty; vše přes REST API.
 - **Fáze 4 — sharpener**: cross-distribuce + vyzařování focusu; benchmark

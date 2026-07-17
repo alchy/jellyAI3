@@ -113,12 +113,20 @@ Cíl: existuje knihovna `jellyai/iris/` (automaton/state/patterns/assurance/pres
 
 ---
 
-## FÁZE 2 — dialogové zaostřování (obrys; detailní tasky po Fázi 1)
+## FÁZE 2 — dialogové zaostřování + Chronos (obrys; detailní tasky po Fázi 1)
 
 - Karty: `clarify-person`, `clarify-relation`, `clarify-period` („v jakém roce/století?"), `data-overflow` („Co řekl Ježíš?" → nabídka oblastí aktivace), `data-empty` + rekurzivní ostření (nejistota v SubQuery nese cestu).
+- **Kartový audit (ZÁKON §2.4b)**: sweep VŠECH natvrdo udělaných logických stavů v kódu Iris — větvení `turn()` (kdy answer/dialog/terminál), prahy, potvrzovací texty, výběr akcí — a migrace rozhodnutí do karet; v kódu smí zbýt jen mechanismy (rysy, aritmetika, matching). Iris je stavový automat ŘÍZENÝ json kartami.
+- **Výběr karty benefitem (spec §2.6b)**: `PatternDeck.best(event, context)` — kandidátky se skórují (specificita: kolik trigger podmínek sedí a jak těsně; priorita; případně simulovaný zisk zaostření) a vyhrává největší benefit; first-match zůstává fallback pro jednoduché balíčky. Testy: karta s těsnějším triggerem přebije obecnou i s nižší prioritou.
+- Datová hygiena (nález z /schema): šum v predikátech grafu („Chvalte", „Izaiáš" — velká písmena/jména jako predikáty) → guard v extrakci, měřit coverage.
 - Dialogové scénáře ze spec §1.1 do etalonu jako `dialog` řádky (runner umí); expecty po změření.
 - `_pattern_answer` guessing patra (kontext asociace) se ZAŘADÍ ZA clarifikaci (dialog > figly) — měřit, že poctivost řádky drží.
-- Akceptace: oba scénáře §1.1 projdou přes `/query` sekvenci; etalon 100 %.
+- **F2.chronos — Iris orientován v čase (spec §3b)**:
+  - `jellyai/iris/chronos.py`: `TimeInterval(start, end, granularity)` (půlotevřený, datetime přesnost) + `resolve_temporal(tokens, now) -> TimeInterval|None` — primitiva („dnes/vcera/zitra"), směrovky („pred/za" ± offset, „tento" = aktuální interval jednotky), jednotky (hodina/den/týden/měsíc/rok), číslovky („dvema"→2) — VŠE z `cs.json` klíče `temporal`; `now` vždy parametr (testy fixují `datetime(2026, 7, 17, 12, 0)`, API bere hodiny).
+  - Napojení na graf: `interval.contains_date(parsed)` nad `parse_date` časových uzlů; sharpener krok „rozsviť časové uzly v intervalu + účastníky jejich faktů" (hrany); `_reverse_lookup` umí interval místo přesného data („Co se stalo tento měsíc?" na bázi s aktuálními daty).
+  - Testy: čistá aritmetika s fixním now (dnes/včera/za hodinu/před dvěma hodinami/před týdnem/tento týden/tento měsíc — hranice intervalů!); syntetický graf s časovými uzly → interval rozsvítí správné uzly a fakty; determinismus (dvojí běh = týž výsledek).
+  - POZOR: aktuální korpus (1818/1890/bible) relativní dotazy netrefí — akceptace na syntetickém grafu s dnešními daty; etalon beze změny.
+- Akceptace: oba scénáře §1.1 projdou přes `/query` sekvenci; etalon 100 %; chronos testy zelené.
 
 ## FÁZE 3 — web tři okna (obrys)
 

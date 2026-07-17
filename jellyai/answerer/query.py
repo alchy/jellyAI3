@@ -81,6 +81,21 @@ def _leftover_terms(tokens, pattern, predicates):
     return out
 
 
+def _exact_predicate(token, predicates):
+    """Tvar je DOSLOVA predikátem grafu (i jako l-kmen: „měli"→„měl").
+
+    Přesná shoda přebíjí čtení entity (entity-first veto platí jen pro
+    prefixové odhady) — graf tento predikát opravdu nese, typicky z paměti
+    Mnemos, a nesmí ho přehlušit náhodný uzel s volnou kmenovou shodou.
+    """
+    low = _norm(token)
+    normalized = {_norm(p) for p in predicates}
+    if low in normalized:
+        return True
+    stripped = low.rstrip("aioy")
+    return stripped.endswith("l") and stripped in normalized
+
+
 def _verb_match(token, predicates, first=False):
     """Predikát grafu, jehož kmen je prefixem tvaru dotazu (napsal→napsat).
 
@@ -92,8 +107,18 @@ def _verb_match(token, predicates, first=False):
     low = _norm(token)
     # slovesný tvar v otázce je malými písmeny; velké písmeno = vlastní jméno
     # („Němec" nesmí matchnout sloveso „neměnit" přes prefix „nem")
-    if len(low) < 4 or low in current()["copula_forms"] \
-            or (token[:1].isupper() and not first):
+    if low in current()["copula_forms"] or (token[:1].isupper() and not first):
+        return None
+    # PŘESNÁ shoda s predikátem grafu obchází délkový práh — paměťové
+    # predikáty Mnemos jsou krátké l-ové kmeny („měl"); porovná se i kmen
+    # l-formy tvaru („měli" → „měl")
+    normalized = {_norm(p): p for p in predicates}
+    if low in normalized:
+        return normalized[low]
+    stripped = low.rstrip("aioy")
+    if stripped.endswith("l") and stripped in normalized:
+        return normalized[stripped]
+    if len(low) < 4:
         return None
     # generická dějová slovesa („stalo"→stát) mají tvary v jazykové tabulce —
     # prefix na krátké kmeny nestačí; predikát nemusí být ve slovníku grafu
@@ -173,18 +198,28 @@ def build_query(question, predicates, is_node=None):  # pylint: disable=too-many
                     if k and _norm(t) in lang["relative_pronouns"]),
                    len(tokens))
     # ENTITY-FIRST: tvar, který se rozřeší na uzel grafu, je entita, ne
-    # sloveso — „rodinou" se nesmí prefixem spárovat s predikátem „rodit"
+    # sloveso — „rodinou" se nesmí prefixem spárovat s predikátem „rodit".
+    # PŘESNÝ predikát („měl" z paměti Mnemos) ale entita nepřebije.
     verb_tok = next((t for t in tokens[:rel_idx]
                      if _norm(t) not in relational
-                     and not (is_node is not None and is_node(t))
+                     and (_exact_predicate(t, predicates)
+                          or not (is_node is not None and is_node(t)))
                      and _verb_match(t, predicates)), None)
     verb = _verb_match(verb_tok, predicates) if verb_tok else None
     # rod nese tvar slovesa (l-ové příčestí), u spony tvar spony („byla")
     gender = _verb_gender(verb_tok or copula_tok or "")
     # „v kterém ROCE" = 2-skokový drill přes časový uzel; tvar → část data
-    # z jazykové tabulky, tázací „kterém" pak míří na čas, ne na vlastnost
-    date_part = next((lang["date_part_forms"][_norm(t)] for t in tokens
-                      if _norm(t) in lang["date_part_forms"]), None)
+    # z jazykové tabulky, tázací „kterém" pak míří na čas, ne na vlastnost.
+    # „v TOMTO roce" drill NENÍ — je to časový filtr (interval řeší Chronos)
+    current_time_words = frozenset(
+        lang["temporal"].get("current_words", ()))
+    date_part = None
+    for k, tok in enumerate(tokens):
+        if _norm(tok) in lang["date_part_forms"]:
+            if k and _norm(tokens[k - 1]) in current_time_words:
+                continue
+            date_part = lang["date_part_forms"][_norm(tok)]
+            break
     if date_part and hole_role == "attr":
         hole_role, hole_type = "time", "time"
     known = _collect_known(tokens, predicates, relational, is_node)
@@ -220,7 +255,13 @@ def build_query(question, predicates, is_node=None):  # pylint: disable=too-many
 
     # 2) predikát ze slovníku grafu (slovesný tvar → lemma prefixem)
     if verb is not None and known:
-        if hole_role == "attr":
+        if any(_norm(t) in lang["first_person"] for t in tokens):
+            # 1. OSOBA („Kdy jsem měl…") — podmětem je IDENTITA UŽIVATELE
+            # (uzel Mnemos); pojmenované entity jsou předměty
+            known = [("obj", term) if isinstance(term, str) else (r, term)
+                     for r, term in known]
+            known.append(("subj", lang["user_entity"]))
+        elif hole_role == "attr":
             # výběrová otázka (spec 4.6): první known (hned za tázacím slovem)
             # = typový filtr díry (obj), další entity jsou téma (subj) — join
             # napsat(X,?) ∧ druh/být(?,hra) řeší answererův _typed_match
@@ -336,7 +377,8 @@ def _collect_known(tokens, predicates, relational, is_node):
         boundary = (low in lang["interrogatives"] or low in lang["copula_forms"]
                     or low in lang["date_part_forms"]
                     or (_verb_match(tok, predicates) is not None
-                        and not (is_node is not None and is_node(tok))))
+                        and (_exact_predicate(tok, predicates)
+                             or not (is_node is not None and is_node(tok)))))
         if boundary and low not in relational:
             if not flush():
                 return None

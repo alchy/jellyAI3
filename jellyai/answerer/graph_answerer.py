@@ -21,8 +21,11 @@ _MAX_ENUM = 5                           # strop výčtové odpovědi (čitelnost
 
 def _loose(word):
     """Nejvolnější porovnávací klíč: kmen → bez diakritiky → bez koncové
-    samohlásky (floor 2). „hru"≡„hra"≡„hr", „jezis"≡„Ježíš". Nejslabší patro
-    rozlišení — nikdy nepřebije přesnější shodu."""
+    samohlásky (floor 2). „hru"≡„hra"≡„hr", „jezis"≡„Ježíš", „Čapka"≡„Čapek"
+    (epenteze kmene je pro jména nutná). Daň: krátká slova se občas potkají
+    se šumem („měl"→„ml" ≡ vadný uzel „mle") — to ale řeší upřímný dialog
+    (nízká assurance), ne ticho; šum patří vyčistit v datech. Nejslabší
+    patro — nikdy nepřebije přesnější shodu."""
     s = deaccent(_stem(word))
     return s[:-1] if len(s) > 2 and s[-1] in "aeiouy" else s
 
@@ -71,10 +74,12 @@ class GraphAnswerer(Answerer):
         self.spread_falloff = spread_falloff
         self.last_trace = None   # trasa poslední odpovědi (téma → fakt → hodnota)
         self.last_pattern = None  # poslední vykonaný pseudo-QL Pattern (API)
+        self.last_resolution = None  # evidence rozlišení (vstup QueryAssurance)
         self._prev_trace = None  # trasa PŘEDCHOZÍHO tahu (drill „Kdy?")
         self.visited = []        # uzly protnuté (rekurzivním) matchem → rozsvícení
         self.context = ActivationField(decay=context_decay)   # těžiště (id uzlu → jas)
         self.source_context = ActivationField(decay=context_decay)  # attention nad ZDROJI
+        self.domain_docs = frozenset()   # explicitní doména (focus-shift „v kontextu X")
         self._predicates = {f.predicate for f in graph.facts.values()}  # slovník QL
         self.query_mode = query_mode  # "udpipe" | "hybrid" | "templates" (pseudo-QL)
         self.history = []        # trajektorie konverzace (tahy s trasou a těžištěm)
@@ -86,6 +91,8 @@ class GraphAnswerer(Answerer):
         self.history = []
         self.last_trace = None
         self.last_pattern = None
+        self.last_resolution = None
+        self.domain_docs = frozenset()
 
     def _span_is_node(self, span):
         """Přísný test rozpětí (spec 4.3): rozřeší se na uzel A jeho obsahová
@@ -171,9 +178,10 @@ class GraphAnswerer(Answerer):
             score = (coverage, exact_hits, ins_hits, stem_hits, da_hits,
                      loose_hits, affinity, len(low_words), node.weight)
             candidates.append((node.id, stem_hits, node.weight,
-                               loose_node, affinity))
+                               loose_node, affinity, score[:6]))
             if best_score is None or score > best_score:
                 best_id, best_score = node.id, score
+                best_terms, best_exact = per_term, exact_hits
         if best_id is not None and ring:
             # CLUSTER-AFINITA: varianty TÉHOŽ jména (stejný volný klíč) arbitruje
             # predikát — zbytkový skloněný uzel („Babičku", exact hit) nepřebije
@@ -189,7 +197,41 @@ class GraphAnswerer(Answerer):
                     term_upper = any(t[:1].isupper() for t in terms)
                     best_id = max(same, key=lambda c: (
                         c[0][:1].isupper() == term_upper, c[2]))[0]
+        domain_lit = None
+        if best_id is not None and self.domain_docs:
+            # DOMÉNOVÉ PATRO: explicitní doména (focus-shift „v kontextu
+            # Bible" → ostrá množina dokumentů) arbitruje rovnocenné jmenné
+            # kandidáty PROVENIENCÍ: vyhrává kandidát s fakty z domény,
+            # soupeři se zúží na doménové. (Ostrá příslušnost, ne glow —
+            # vyzařování po doc_links by doménu rozmazalo.)
+            best_cand = next(c for c in candidates if c[0] == best_id)
+            group = [c for c in candidates if c[5] == best_cand[5]]
+            if len(group) > 1:
+                def _in_domain(node_id):
+                    return any(set(getattr(f, "source", ()) or ())
+                               & self.domain_docs
+                               for f in self.graph.facts_of(node_id))
+                lit = [c for c in group if _in_domain(c[0])]
+                if lit:
+                    domain_lit = {c[0] for c in lit}
+                    if best_id not in domain_lit:
+                        best_id = max(lit, key=lambda c: c[2])[0]
         if best_id is not None and warm:
+            # EVIDENCE PRO QueryAssurance: kvalita = průměrná váha nejlepšího
+            # patra na term (exact ⊂ ins → bonus +0.2/exact term); soupeři =
+            # kandidáti s TOUTÉŽ jmennou evidencí z JINÉHO kmenového clusteru
+            # („Kdo je Čapek?" → Karel i Josef). Sondy is_node nezapisují.
+            weights = (0.8, 0.6, 0.4, 0.25)          # ins/stem/da/loose
+            base = sum(max((w for w, hit in zip(weights, t) if hit),
+                           default=0.0) for t in best_terms)
+            quality = min(1.0, (base + 0.2 * best_exact) / max(1, len(terms)))
+            best_cand = next(c for c in candidates if c[0] == best_id)
+            rivals = [c[0] for c in candidates
+                      if c[0] != best_id and c[5] == best_cand[5]
+                      and c[3] != best_cand[3]
+                      and (domain_lit is None or c[0] in domain_lit)]
+            self.last_resolution = {"term": " ".join(terms), "winner": best_id,
+                                    "quality": quality, "rivals": rivals}
             # nejednoznačné jméno rozsvítí VŠECHNY kandidáty se stejnou
             # kmenovou shodou (homonymní vějíř „Marie" → i biblická Maria) —
             # attention nese nejistotu rozřešení, vítěz svítí nejvíc; při
@@ -198,7 +240,7 @@ class GraphAnswerer(Answerer):
             fan = sorted((c for c in candidates
                           if c[0] != best_id and c[1] == top_stem and c[1] > 0),
                          key=lambda c: -c[2])[:5]
-            for node_id, _, _, _, _ in fan:
+            for node_id, _, _, _, _, _ in fan:
                 self.context.warm(node_id, 0.3)
         return best_id
 
@@ -280,6 +322,27 @@ class GraphAnswerer(Answerer):
             if values:
                 return topic, values, fact
         return None, [], None
+
+    def run_pattern(self, pat):
+        """Vykoná pseudo-QL `Pattern` přímo (API `/graphql` — jazyk je
+        testovatelný bez parseru). Sémantika = jádro `_pattern_answer`:
+        rozřeš known → díra/existence; bez kontextových pater.
+
+        Returns:
+            tuple: (téma | None, list hodnot, fakt | None).
+        """
+        self.visited = []
+        known_set = set()
+        for _, known in pat.known:
+            node = self._solve(known, pat.predicate)
+            if node is None:
+                return None, [], None
+            known_set.add(node)
+        if not known_set:
+            return None, [], None
+        if pat.hole_role is None and pat.date_part is None:
+            return self._existence(pat.predicate, known_set)
+        return self._answer_from(pat, known_set)
 
     def _answer_from(self, pat, known_set):
         """Z množiny známých uzlů dořeší díru patternu (vč. 2-skokového drillu).
@@ -645,6 +708,7 @@ class GraphAnswerer(Answerer):
         """
         self._prev_trace = self.last_trace or self._prev_trace
         self.last_trace = None
+        self.last_resolution = None   # evidence tahu — nesmí přežít z minula
         # UNIVERZÁLNÍ princip: otázka→neúplný fakt→match→díra (nahrazuje qtype pravidla
         # i attention — kontextově navazující dotaz řeší tatáž cesta). Rozbor dodají
         # ŠABLONY (pseudo-QL, bez UDPipe); UDPipe jen mimo templates režim.

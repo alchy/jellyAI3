@@ -225,3 +225,34 @@ def _parse_sent(sent):
                                 and c.get("upos") == "ADP" for c in sent):
                     known.append(("theme", _entity_term(child, sent)))
     return Pattern(verb, known, hole_role, hole_type, date_part)
+
+
+def pattern_to_json(pat):
+    """Pseudo-QL jako data (API wire formát): SubQuery → {"subquery": …}."""
+    if pat is None:
+        return None
+    def term(t):
+        if isinstance(t, SubQuery):
+            return {"subquery": {"predicate": t.predicate,
+                                 "known": [[r, term(k)] for r, k in t.known],
+                                 "hole": t.hole_role}}
+        return t
+    return {"predicate": pat.predicate,
+            "known": [[r, term(t)] for r, t in pat.known],
+            "hole": pat.hole_role, "hole_type": pat.hole_type,
+            "date_part": pat.date_part}
+
+
+def pattern_from_json(data):
+    """Opačný směr: dict z API → Pattern (přijímá „hole" i „hole_role")."""
+    def term(t):
+        if isinstance(t, dict) and "subquery" in t:
+            s = t["subquery"]
+            return SubQuery(s["predicate"],
+                            [(r, term(k)) for r, k in s.get("known", ())],
+                            s.get("hole", "subj"))
+        return t
+    return Pattern(data.get("predicate"),
+                   [(r, term(t)) for r, t in data.get("known", ())],
+                   data.get("hole") or data.get("hole_role"),
+                   data.get("hole_type"), data.get("date_part"))

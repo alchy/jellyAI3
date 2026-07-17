@@ -120,6 +120,7 @@ class ServicesConfig:
     Atributy:
         host (str): Adresa, kde služby poslouchají (jen localhost).
         nametag_port, udpipe_port, morpho_port (int): Porty jednotlivých služeb.
+        iris_port (int): Port REST služby automatu Iris (dotazy + metadata).
         nametag_model, morphodita_model, udpipe_model (str): Cesty k modelům.
         startup_timeout (float): Max. čekání na naběhnutí služby (s).
         annotations_path (str): Kam ukládat offline anotace pasáží.
@@ -128,6 +129,7 @@ class ServicesConfig:
     nametag_port: int = 8081
     udpipe_port: int = 8082
     morpho_port: int = 8083
+    iris_port: int = 8084
     nametag_model: str = "data/models/czech-cnec.ner"
     morphodita_model: str = "data/models/czech-morfflex.tagger"
     udpipe_model: str = "data/models/udpipe-czech.model"
@@ -152,6 +154,8 @@ class GraphConfig:
         query_mode (str): Cesta rozboru otázky — "udpipe" (ML rozbor),
             "hybrid" (šablony pseudo-QL první, UDPipe fallback),
             "templates" (šablony jediná cesta, bez UDPipe).
+        memory_path (str): Deník paměti Mnemos (JSONL) — konstatování
+            uživatele; přežívá restart služby i přestavbu grafu.
     """
     graph_path: str = "data/graph.pkl"
     context_decay: float = 0.8
@@ -159,6 +163,7 @@ class GraphConfig:
     spread_depth: int = 2
     spread_falloff: float = 0.35
     query_mode: str = "hybrid"
+    memory_path: str = "data/memory.jsonl"
 
 
 @dataclass

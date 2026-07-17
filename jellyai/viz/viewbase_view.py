@@ -19,6 +19,9 @@ _TYPE_STYLE = {
     "institution": {"color": "#8a4a17"},
     "dílo": {"color": "#c74f7a", "size": 1.2},   # titul doplněný role ② (neighbor-spread)
     "fact": {"color": "#8a949f", "size": 0.7},
+    # kontextová asociace: tisíce slabých vazeb — bez popisku, drobná a matná,
+    # ať nezaplavují plátno textem „souvislost" (detail po kliknutí zůstává)
+    "asociace": {"color": "#4a5158", "size": 0.35},
 }
 
 
@@ -59,7 +62,9 @@ class ViewBaseView:
             ViewBaseView: self (pro řetězení).
         """
         self._canvas.detail_window()               # klik na uzel → box se všemi meta
-        for kind in {node.type for node in graph.nodes.values()} | {"fact"}:
+        kinds = ({node.type for node in graph.nodes.values()}
+                 | {"fact", "asociace"})
+        for kind in kinds:
             self._canvas.define_type(kind, **_TYPE_STYLE.get(kind, {"color": "#8a949f"}))
         for node in graph.nodes.values():
             label = labeler(node) if labeler else node.id
@@ -68,10 +73,14 @@ class ViewBaseView:
                           **dict(node_detail_rows(graph, node.id)))
         for index, fact in enumerate(graph.facts.values()):
             fid = f"fact:{fact.predicate}:{index}"     # unikátní id (bez kolizí)
-            # kontextová asociace není přímý vztah → titulек „souvislost"
-            label = "souvislost" if fact.predicate == "kontext" else fact.predicate
-            self.add_node(fid, label=label, type="fact",
-                          **dict(fact_detail_rows(fact)))
+            if fact.predicate == "kontext":
+                # asociace není přímý vztah: BEZ popisku (tisíce „souvislost"
+                # zaplavovaly plátno), drobná a matná; detail řekne zbytek
+                self.add_node(fid, label="", type="asociace",
+                              **dict(fact_detail_rows(fact)))
+            else:
+                self.add_node(fid, label=fact.predicate, type="fact",
+                              **dict(fact_detail_rows(fact)))
             for participant in fact.participants:
                 self.add_edge(fid, participant.node, role=participant.role)
         return self
@@ -92,8 +101,14 @@ class ViewBaseView:
         self._canvas.ensure_edge(src, dst, **meta)
 
     def update_node(self, node_id, **attrs):
-        """Živě změní uzel (velikost/barva/label) — push přes WebSocket."""
-        self._canvas.update_node(node_id, **attrs)
+        """Živě změní uzel (push přes WebSocket). Uzel, který plátno ještě
+        nezná (Mnemos ho přidal za běhu — „uživatel", nová vzpomínka, čas),
+        se rovnou PŘIDÁ: paměť uživatele roste do grafu i vizuálně."""
+        try:
+            self._canvas.update_node(node_id, **attrs)
+        except ValueError:
+            self._canvas.ensure_node(node_id, label=node_id, type="concept",
+                                     **attrs)
 
     def flow(self, path):
         """Animuje světelné částice po trase (topic → answer). viewBase si cestu
@@ -133,7 +148,9 @@ class ViewBaseView:
         Odpověď se do konzole píše přes `write` — uživatel ji vidí v prohlížeči
         (ne na stdoutu serveru).
         """
-        window = self._vb.TerminalWindow("konzole", title="Dotaz", prompt="❓ ")
+        # nezavíratelná (closable=False): po zavření by nebyla obnovitelná
+        window = self._vb.TerminalWindow("konzole", title="Dotaz", prompt="❓ ",
+                                         closable=False)
         self._terminal_id = window.window_id
         self._canvas.open_terminal(
             window, on_input=lambda event: on_input(getattr(event, "line", "")))
@@ -146,8 +163,9 @@ class ViewBaseView:
     def open_docs_panel(self):
         """Otevře druhé konzolové okno — živý panel nejaktivnějších dokumentů
         (attention nad soubory). Aktualizuje se `write_docs` po každém dotazu."""
+        # živý panel: bez vstupního řádku (input=False), nezavíratelný
         window = self._vb.TerminalWindow("dokumenty", title="📄 Aktivní dokumenty",
-                                         prompt="")
+                                         prompt="", closable=False, input=False)
         self._docs_id = window.window_id
         self._canvas.open_terminal(window, on_input=lambda event: None)
 
@@ -165,6 +183,31 @@ class ViewBaseView:
         lines = [f"{i}. {doc:24} {'█' * round(score) or '·'} {score:.2f}"
                  for i, (doc, score) in enumerate(ranked, 1)]
         self._canvas.terminal_write(self._docs_id, "\n".join(lines))
+
+    def open_nodes_panel(self):
+        """Otevře AKTIVAČNÍ OKNO — seznam uzlů seřazený podle jasu (největší
+        nahoře), bez dialogu. Aktualizuje se `write_nodes` po každém tahu."""
+        # živý panel: bez vstupního řádku (input=False), nezavíratelný
+        window = self._vb.TerminalWindow("aktivace", title="⚡ Aktivační okno",
+                                         prompt="", closable=False, input=False)
+        self._nodes_id = window.window_id
+        self._canvas.open_terminal(window, on_input=lambda event: None)
+
+    def write_nodes(self, ranked):
+        """Vypíše do aktivačního okna uzly s jasem (sestupně).
+
+        Args:
+            ranked (list[tuple[str, float]]): (uzel, jas) seřazené sestupně.
+        """
+        if getattr(self, "_nodes_id", None) is None:
+            return
+        if not ranked:
+            self._canvas.terminal_write(self._nodes_id, "— (žádná aktivace)")
+            return
+        lines = [f"{i:2}. {node:28} {'█' * min(10, round(score)) or '·'} "
+                 f"{score:.2f}"
+                 for i, (node, score) in enumerate(ranked, 1)]
+        self._canvas.terminal_write(self._nodes_id, "\n".join(lines))
 
     def serve(self, open_browser=True, block=True):
         """Nastartuje webserver. `block=True` drží proces (standalone), jinak handle.

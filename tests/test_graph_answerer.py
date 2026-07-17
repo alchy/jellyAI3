@@ -212,3 +212,19 @@ def test_conversation_history_records_trajectory():
     assert a.history[1]["gravity"] == "Božena Němcová"    # trajektorie těžiště
     a.reset()
     assert a.history == [] and a.context.hottest() is None
+
+
+def test_run_pattern_executes_direct_ql():
+    from jellyai.answerer.pattern import Pattern
+    g = FactGraph()
+    g.add_fact(make_fact("napsat", [Participant("subj", "Božena Němcová", "person"),
+                                    Participant("obj", "Babička", "dílo")]))
+    a = GraphAnswerer(g, FakeUfalClient(), ExtractiveAnswerer(AnswererConfig()),
+                      query_mode="templates")
+    topic, values, fact = a.run_pattern(Pattern("napsat", [("obj", "Babička")],
+                                                "subj", "person"))
+    assert values == ["Božena Němcová"] and fact.predicate == "napsat"
+    topic, values, fact = a.run_pattern(Pattern("napsat",
+                                                [("subj", "Božena Němcová"),
+                                                 ("obj", "Babička")], None, None))
+    assert values == ["Ano"]

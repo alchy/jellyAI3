@@ -1,0 +1,7 @@
+{
+  "name": "memory-stored",
+  "trigger": {"event": "memory.stored", "priority": 5},
+  "dialog": "Zapamatováno: {fact}",
+  "action": {},
+  "teach": "Konstatování uživatele (ne dotaz) Mnemos uložil do grafu jako časově ukotvený fakt s uživatelem jako entitou — potvrzení říká, CO přesně se zapamatovalo (transparentnost paměti)."
+}

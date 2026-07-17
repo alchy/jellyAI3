@@ -42,6 +42,8 @@ def load_rules(language="cs"):
         rules["vowel_fold"] = rules.get("vowel_fold", {})
         rules["metalanguage_nouns"] = frozenset(
             rules.get("metalanguage_nouns", ()))
+        rules["function_nouns"] = frozenset(
+            rules.get("function_nouns", ()))
         rules["generic_event_verbs"] = frozenset(
             rules.get("generic_event_verbs", ()))
         rules["interrogative_adverbs"] = frozenset(
@@ -60,6 +62,11 @@ def load_rules(language="cs"):
             rules[key] = frozenset(rules.get(key, ()))
         for key in ("event_verb_forms", "date_part_forms"):
             rules[key] = dict(rules.get(key, {}))
+        rules["temporal"] = dict(rules.get("temporal", {}))
+        rules["first_person"] = frozenset(rules.get("first_person", ()))
+        rules["user_entity"] = rules.get("user_entity", "user")
+        rules["focus_shift_phrases"] = tuple(
+            rules.get("focus_shift_phrases", ()))
         _cache[path] = rules
     return _cache[path]
 

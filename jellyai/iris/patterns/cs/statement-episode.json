@@ -1,0 +1,9 @@
+{
+  "name": "statement-episode",
+  "trigger": {"event": "utterance.statement", "priority": 10,
+              "requires": ["first_person", "l_verb"]},
+  "dialog": "Zapamatováno: {fact}",
+  "action": {"memorize": "episode", "predicate_from": "l_verb",
+             "exclude_l_forms": true},
+  "teach": "Epizoda uživatele: 1. osoba + l-ové příčestí (Dnes jsem měl knedlíky). Podmětem faktu je identita uživatele, příčestí je predikát v kmenovém tvaru, Chronos přidá časovou kotvu."
+}
