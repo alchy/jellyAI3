@@ -265,24 +265,32 @@ def cmd_graph(config, view=False):
     return len(graph.nodes)
 
 
-def cmd_web(config, view=None):
-    """Spustí webovou vizualizaci: graf ve viewBase + prompt pro dotazy.
+def cmd_web(config, view=None, client=None):
+    """Spustí webovou vizualizaci: graf ve viewBase + dialog s Iris přes REST.
 
-    Terminál i web volají tutéž `answer`. Při dotazu se do grafu promítne aktivace
-    nodů (těžiště) a trasa (flow). `view` lze injektovat (testy/vlastní UI);
-    None = výchozí `ViewBaseView` nad uloženým grafem.
+    Prohlížeč mluví s automatem Iris VÝHRADNĚ přes REST službu (jeden vstupní
+    bod): odpověď, jistota, použité karty, aktivační okno uzlů i aktivních
+    dokumentů jdou z API odpovědi. Tři okna: dialog (konzole), ⚡ aktivační
+    okno uzlů (seřazený jas, bez dialogu) a 📄 aktivní dokumenty.
 
     Args:
         config (Config): Konfigurace (graf, služby).
         view: Injektovaný GraphView (None = ViewBaseView).
+        client: Injektovaný Iris klient (None = IrisClient — připojí se na
+            běžící službu, nebo ji nastartuje).
 
     Returns:
         None: Interakce běží v prohlížeči.
     """
-    from jellyai.tasks import make_graph_answerer, load_fact_graph
+    from jellyai.tasks import load_fact_graph
     from jellyai.viz.pulse import TracePulse
     from jellyai.answerer.template import _to_nominative
-    answerer = make_graph_answerer(config)
+    from jellyai.iris.client import IrisClient
+    from jellyai.ufal_client import UfalClient
+
+    if client is None:
+        client = IrisClient(config.services, config.graph.graph_path)
+    morpho = UfalClient(config.services)   # jen popisky uzlů (nominativizace)
 
     _label_cache = {}
 
@@ -292,8 +300,7 @@ def cmd_web(config, view=None):
         if node.type not in ("geo", "dílo", "institution"):
             return node.id
         if node.id not in _label_cache:
-            _label_cache[node.id] = _to_nominative(node.id, answerer.client) \
-                or node.id
+            _label_cache[node.id] = _to_nominative(node.id, morpho) or node.id
         return _label_cache[node.id]
 
     if view is None:
@@ -306,14 +313,13 @@ def cmd_web(config, view=None):
 
     def on_query(question):
         # temperature > 0 → fuzzy: k odpovědi i další kontext s menší vahou
-        answer = answerer.answer(question, [], temperature=0.35)
-        context = getattr(answerer, "context", None)
-        scores = dict(context.scores) if context is not None else {}
-        trace = getattr(answerer, "last_trace", None)
+        out = client.query(question, temperature=0.35)
+        nodes = [tuple(n) for n in out.get("activation", {}).get("nodes", [])]
+        scores = {node: float(jas) for node, jas in nodes}
+        trace = out.get("trace")
         path = [trace["topic"], trace["answer"]] if trace else []
-        # vizualizace zrcadlí stav aktivace po dotazu: rozsvítí pole, přidá
-        # trasu, do detailu propíše ŽIVOU aktivaci (attention) a kamera se
-        # vystředí na nejaktivnější uzel (obdoba kliknutí)
+        # vizualizace zrcadlí stav aktivace po tahu: rozsvítí pole, přidá
+        # trasu a kamera se vystředí na nejaktivnější uzel
         state = pulse.ignite(scores, path)
         for node_id, bright in state["sizes"].items():
             view.update_node(node_id, size=1.0 + bright,
@@ -322,30 +328,30 @@ def cmd_web(config, view=None):
             view.update_node(node_id, size=1.0,
                              **{"aktivace (attention)": "0"})
         if state["sizes"] and hasattr(view, "focus"):
-            hottest = max(state["sizes"], key=state["sizes"].get)
-            view.focus(hottest)
-        # živý panel: 5 nejaktivnějších dokumentů (attention nad soubory)
-        src = getattr(answerer, "source_context", None)
-        if src is not None and hasattr(view, "write_docs"):
-            ranked = sorted(src.scores.items(), key=lambda kv: -kv[1])[:5]
-            view.write_docs(ranked)
-        reply = f"❓ {question}\n💬 {answer.text}"
-        if answer.alternatives:      # souvislosti (krmivo pro budoucí kompozitor/NN)
-            reply += f"\n   souvislosti: {', '.join(answer.alternatives[:4])}"
-        view.write(reply)            # odpověď (+ souvislosti) v prohlížeči
+            view.focus(max(state["sizes"], key=state["sizes"].get))
+        if hasattr(view, "write_docs"):       # 📄 aktivní dokumenty
+            view.write_docs([tuple(d) for d in
+                             out.get("activation", {}).get("docs", [])])
+        if hasattr(view, "write_nodes"):      # ⚡ aktivační okno uzlů
+            view.write_nodes(nodes)
+        used = out.get("used", {})
+        reply = f"❓ {question}\n💬 {out['answer']}"
+        if used.get("patterns"):
+            reply += f"\n   karty: {', '.join(used['patterns'])}"
+        if out.get("alternatives"):  # souvislosti (krmivo pro budoucí kompozitor)
+            reply += f"\n   souvislosti: {', '.join(out['alternatives'][:4])}"
+        view.write(reply)            # odpověď (+ metadata) v prohlížeči
         # --- debug výpis konverzace (do logu serveru; flush kvůli RT) ---
-        top = sorted(scores.items(), key=lambda kv: -kv[1])[:6]
-        trace_line = (f"{trace['topic']} ─[{trace['predicate']}]→ {trace['answer']}"
-                      if trace else "žádná (bez odpovědi v grafu → fallback)")
+        top = ", ".join(f"{n}={v:.2f}" for n, v in nodes[:6])
         print(
             f"\n❓ {question}"
-            f"\n💬 {answer.text}   (zdroj: {', '.join(answer.sources) or '—'})"
-            f"\n   trasa: {trace_line}"
-            f"\n   souvislosti (fuzzy): {', '.join(answer.alternatives) or '—'}"
-            f"\n   aktivace (kontext): "
-            f"{', '.join(f'{n}={v:.2f}' for n, v in top) or '—'}",
+            f"\n💬 [{out.get('kind')}, assurance {out.get('assurance', 0.0):.2f}] "
+            f"{out['answer']}"
+            f"\n   karty: {', '.join(used.get('patterns', ())) or '—'}"
+            f"   komponenty: {', '.join(used.get('components', ())) or '—'}"
+            f"\n   aktivace: {top or '—'}",
             flush=True)
-        return answer.text
+        return out["answer"]
 
     def animate():
         # ~7×/s: každá aktivní trasa vyšle paket podle své hustoty (∝ aktivaci)
@@ -353,9 +359,11 @@ def cmd_web(config, view=None):
             view.packet(packet_path)
 
     view.every(0.15, animate)
-    view.open_terminal(on_query)     # konzole: vstup i výstup v prohlížeči
+    view.open_terminal(on_query)     # okno 1: dialog (vstup i výstup)
     if hasattr(view, "open_docs_panel"):
-        view.open_docs_panel()       # panel nejaktivnějších dokumentů
+        view.open_docs_panel()       # okno 3: aktivní dokumenty
+    if hasattr(view, "open_nodes_panel"):
+        view.open_nodes_panel()      # okno 2: aktivační okno uzlů
     view.serve(open_browser=True)
 
 

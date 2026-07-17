@@ -166,6 +166,30 @@ class ViewBaseView:
                  for i, (doc, score) in enumerate(ranked, 1)]
         self._canvas.terminal_write(self._docs_id, "\n".join(lines))
 
+    def open_nodes_panel(self):
+        """Otevře AKTIVAČNÍ OKNO — seznam uzlů seřazený podle jasu (největší
+        nahoře), bez dialogu. Aktualizuje se `write_nodes` po každém tahu."""
+        window = self._vb.TerminalWindow("aktivace", title="⚡ Aktivační okno",
+                                         prompt="")
+        self._nodes_id = window.window_id
+        self._canvas.open_terminal(window, on_input=lambda event: None)
+
+    def write_nodes(self, ranked):
+        """Vypíše do aktivačního okna uzly s jasem (sestupně).
+
+        Args:
+            ranked (list[tuple[str, float]]): (uzel, jas) seřazené sestupně.
+        """
+        if getattr(self, "_nodes_id", None) is None:
+            return
+        if not ranked:
+            self._canvas.terminal_write(self._nodes_id, "— (žádná aktivace)")
+            return
+        lines = [f"{i:2}. {node:28} {'█' * min(10, round(score)) or '·'} "
+                 f"{score:.2f}"
+                 for i, (node, score) in enumerate(ranked, 1)]
+        self._canvas.terminal_write(self._nodes_id, "\n".join(lines))
+
     def serve(self, open_browser=True, block=True):
         """Nastartuje webserver. `block=True` drží proces (standalone), jinak handle.
 
