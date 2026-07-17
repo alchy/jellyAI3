@@ -295,3 +295,31 @@ def test_knowledge_query_aggregates_neighborhood():
     text = a.answer(q, []).text
     assert "porodit" in text                 # přímý fakt Marie
     assert "pokřtít" in text or "učit" in text   # soused Ježíš (hloubka 2)
+
+
+def test_bounded_depth_radiation_lights_semantic_field():
+    """Aktivace vyzařuje do OKOLÍ do hloubky (spread_depth): 2-hop soused se
+    rozsvítí při hloubce 2, ne při 0; útlum drží vzdálené slabší než blízké."""
+    g = FactGraph()
+    g.add_fact(make_fact("být", [Participant("subj", "Ježíš", "person"),
+                                 Participant("pred", "prorok", "concept")]))
+    g.add_fact(make_fact("porodit", [Participant("subj", "Maria", "person"),
+                                     Participant("obj", "Ježíš", "person")]))
+    g.add_fact(make_fact("provdat", [Participant("subj", "Maria", "person"),
+                                     Participant("obj", "Josef", "person")]))
+    q = "Kdo je Ježíš?"
+    client = FakeUfalClient(parse={q: [[
+        {"form": "Kdo", "lemma": "kdo", "upos": "PRON", "head": 3, "deprel": "nsubj"},
+        {"form": "je", "lemma": "být", "upos": "AUX", "head": 3, "deprel": "cop"},
+        {"form": "Ježíš", "lemma": "Ježíš", "upos": "PROPN", "head": 0, "deprel": "root"},
+    ]]})
+    shallow = GraphAnswerer(g, client, ExtractiveAnswerer(AnswererConfig()),
+                            spread_depth=0)
+    shallow.answer(q, [])
+    assert shallow.context.scores.get("Josef", 0) == 0   # 2-hop mimo dosah
+
+    deep = GraphAnswerer(g, client, ExtractiveAnswerer(AnswererConfig()),
+                         spread_depth=2)
+    deep.answer(q, [])
+    assert deep.context.scores.get("Josef", 0) > 0        # 2-hop soused svítí
+    assert deep.context.scores["Maria"] > deep.context.scores["Josef"]  # bližší silněji

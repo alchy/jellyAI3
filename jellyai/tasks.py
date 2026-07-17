@@ -84,4 +84,6 @@ def make_graph_answerer(config):
     graph = load_fact_graph(config)
     return GraphAnswerer(graph, UfalClient(config.services),
                          ExtractiveAnswerer(config.answerer),
-                         context_decay=config.graph.context_decay)
+                         context_decay=config.graph.context_decay,
+                         spread_depth=config.graph.spread_depth,
+                         spread_falloff=config.graph.spread_falloff)

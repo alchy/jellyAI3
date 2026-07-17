@@ -146,10 +146,15 @@ class GraphConfig:
             slábne s dalšími dotazy — a tím i řídnutí provozu ve vizualizaci.
         language (str): Jazyk kmenování/kanonizace entit — kód souboru
             `jellyai/lang/<jazyk>.json`, nebo cesta k vlastnímu JSON s pravidly.
+        spread_depth (int): Do kolika skoků od trasy vyzařuje aktivace do okolí
+            (0 = jen trasa; hloubka laděná testy — okolní ukotvení tématu).
+        spread_falloff (float): Útlum vyzařování na skok (jas × falloff^dist).
     """
     graph_path: str = "data/graph.pkl"
     context_decay: float = 0.8
     language: str = "cs"
+    spread_depth: int = 2
+    spread_falloff: float = 0.35
 
 
 @dataclass

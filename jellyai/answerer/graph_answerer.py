@@ -43,7 +43,8 @@ class GraphAnswerer(Answerer):
     („Kdy se narodila?"), vezme se nejteplejší uzel z rozhovoru — dialog tak plyne.
     """
 
-    def __init__(self, graph, client, fallback, *, context_decay=0.55):
+    def __init__(self, graph, client, fallback, *, context_decay=0.55,
+                 spread_depth=2, spread_falloff=0.35):
         """Vytvoří answerer.
 
         Args:
@@ -57,6 +58,8 @@ class GraphAnswerer(Answerer):
         self.client = client
         self.fallback = fallback
         self.context_decay = context_decay
+        self.spread_depth = spread_depth
+        self.spread_falloff = spread_falloff
         self.last_trace = None   # trasa poslední odpovědi (téma → fakt → hodnota)
         self._prev_trace = None  # trasa PŘEDCHOZÍHO tahu (drill „Kdy?")
         self.visited = []        # uzly protnuté (rekurzivním) matchem → rozsvícení
@@ -645,18 +648,37 @@ class GraphAnswerer(Answerer):
                              "predicate": predicate, "answer": answer,
                              "gravity": self.context.hottest()})
 
-    def _spread(self, node_id, amount=0.3, fanout=8):
-        """SPREADING ACTIVATION: rozlije zlomek jasu na sousedy uzlu přes
-        fakty (jeden skok, top-K dle váhy). Dotaz na Marii tak rozsvítí
-        i Ježíše — attention sleduje strukturu grafu, ne jen použitý fakt."""
-        neighbors = {}
-        for fact in self.graph.facts_of(node_id):
-            for p in fact.participants:
-                if p.node != node_id and p.type != "výrok":
-                    neighbors[p.node] = max(neighbors.get(p.node, 0.0),
-                                            float(fact.weight))
-        for near in sorted(neighbors, key=neighbors.get, reverse=True)[:fanout]:
-            self.context.warm(near, amount)
+    def _spread(self, sources, base=0.6, fanout=8):
+        """SPREADING ACTIVATION do HLOUBKY: jas vyzařuje z uzlů trasy (`sources`)
+        po role-hranách do `spread_depth` skoků, útlum `spread_falloff^dist`.
+        Silná hrana (těžší fakt) nese jas dál; opakované protnutí uzel akumuluje
+        (warm je aditivní), takže napříč tahy okolí obecně sílí a lépe ukotvuje
+        téma. Výroky (obsah řeči) se nešíří. Depth 0 = jen trasa (žádné okolí).
+
+        Args:
+            sources (iterable): Uzly trasy (téma i odpověď — okolní n-gramy obou).
+            base (float): Výchozí jas zdroje pro vyzařování (na skok se tlumí).
+            fanout (int): Nejvíc sousedů na uzel a skok (top-K dle váhy hrany).
+        """
+        frontier = {node: base for node in sources if node}
+        visited = set(frontier)
+        for dist in range(self.spread_depth):
+            nxt = {}
+            for node, energy in frontier.items():
+                neighbors = {}
+                for fact in self.graph.facts_of(node):
+                    for p in fact.participants:
+                        if p.node != node and p.type != "výrok":
+                            neighbors[p.node] = max(neighbors.get(p.node, 0.0),
+                                                    float(fact.weight))
+                top = sorted(neighbors, key=neighbors.get, reverse=True)[:fanout]
+                give = energy * self.spread_falloff
+                for near in top:
+                    self.context.warm(near, give)
+                    if near not in visited:
+                        visited.add(near)
+                        nxt[near] = max(nxt.get(near, 0.0), give)
+            frontier = nxt
 
     def _remember(self, qa, topic, value):
         """Zapíše tah do konverzačního těžiště a pohasí ho.
@@ -675,5 +697,7 @@ class GraphAnswerer(Answerer):
             self.context.warm(topic, 1.0)
         else:
             self.context.warm(topic, 2.0)
-        self._spread(topic)                  # attention se rozlévá po grafu
+        # rozlij z celé trasy: téma, odpověď i uzly protnuté (rekurzí) —
+        # okolní n-gramy ukotvují téma pro navazující dotaz
+        self._spread(set(self.visited) | {topic, value})
         self.context.step()
