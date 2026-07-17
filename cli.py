@@ -360,6 +360,10 @@ def cmd_web(config, view=None, client=None):
 
     view.every(0.15, animate)
     view.open_terminal(on_query)     # okno 1: dialog (vstup i výstup)
+    if hasattr(view, "on_event"):
+        # most pro CHRONOS: služba Iris pushne dozrálou připomínku REST
+        # eventem terminal_write → řádek v konzoli; web je pasivní displej
+        view.on_event("terminal_write", lambda e: view.write(e.line))
     if hasattr(view, "open_docs_panel"):
         view.open_docs_panel()       # okno 3: aktivní dokumenty
     if hasattr(view, "open_nodes_panel"):

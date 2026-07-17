@@ -106,10 +106,29 @@ def make_routes(automaton, deck):
     return posts, gets
 
 
+def _web_notify(host, port, message):
+    """Push připomínky do webové konzole (REST event `terminal_write`).
+
+    Iniciátorem je CHRONOS — web je pasivní displej; když neběží, push
+    tiše selže (konzole služby připomínku nese vždy).
+    """
+    import json as _json
+    import urllib.request
+    body = _json.dumps({"event": "terminal_write",
+                        "payload": {"window_id": "konzole",
+                                    "line": message}}).encode("utf-8")
+    request = urllib.request.Request(
+        f"http://{host}:{port}/api/event", data=body,
+        headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(request, timeout=2):
+        pass
+
+
 def main():
     args = parse_args()
     from config import Config
     from jellyai.iris import IrisAutomaton, PatternDeck
+    from jellyai.iris.chronos import ChronosTicker
     from jellyai.tasks import make_graph_answerer
     config = Config()
     config.graph.graph_path = args.model     # --model = uložený faktový graf
@@ -117,7 +136,18 @@ def main():
     deck = PatternDeck.for_language(config.graph.language)
     deck.load()
     automaton = IrisAutomaton(answerer, deck,   # prahy nesou karty (ZÁKON)
-                              memory_path=config.graph.memory_path)
+                              memory_path=config.graph.memory_path,
+                              reminders_path=config.graph.reminders_path)
+
+    def notify(message):
+        print(f"\n{message}", flush=True)
+        try:
+            _web_notify(config.services.host, config.services.web_port,
+                        message)
+        except Exception:  # noqa: BLE001 — web nemusí běžet
+            pass
+
+    ChronosTicker(automaton.fire_due, notify).start()   # vlastní vlákno hodin
     posts, gets = make_routes(automaton, deck)
     serve(args.host, args.port, posts, gets)
 

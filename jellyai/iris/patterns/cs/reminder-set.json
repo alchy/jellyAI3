@@ -1,0 +1,7 @@
+{
+  "name": "reminder-set",
+  "trigger": {"event": "reminder.set"},
+  "dialog": "⏰ Připomenu {time}: {task}",
+  "action": {},
+  "teach": "Potvrzení naplánované připomínky. Chronos drží termín ve vlastním vlákně časovače a při dozrání pošle text karty reminder-due do konzole (služby i webu). Připomínky jsou KRÁTKODOBÁ paměť — po odpálení mizí ze skladu (data/reminders.jsonl). Scénáře připomínek se rozšiřují kartami, ne kódem."
+}

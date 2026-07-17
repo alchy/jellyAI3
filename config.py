@@ -130,6 +130,7 @@ class ServicesConfig:
     udpipe_port: int = 8082
     morpho_port: int = 8083
     iris_port: int = 8084
+    web_port: int = 8080     # viewBase web — cíl pushů Chronos (REST event)
     nametag_model: str = "data/models/czech-cnec.ner"
     morphodita_model: str = "data/models/czech-morfflex.tagger"
     udpipe_model: str = "data/models/udpipe-czech.model"
@@ -164,6 +165,7 @@ class GraphConfig:
     spread_falloff: float = 0.35
     query_mode: str = "hybrid"
     memory_path: str = "data/memory.jsonl"
+    reminders_path: str = "data/reminders.jsonl"
 
 
 @dataclass

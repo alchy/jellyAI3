@@ -1,0 +1,7 @@
+{
+  "name": "reminder-when",
+  "trigger": {"event": "reminder.when"},
+  "dialog": "Kdy ti mám připomenout „{task}“ — za jak dlouho, nebo v kolik?",
+  "action": {"await": "reminder-time"},
+  "teach": "Žádost o připomenutí BEZ termínu (Připomeň mi, že mám koupit rohlíky) — automat se ptá na čas (dialog > figly) a úkol čeká na doplnění: příští odpověď uživatele (za hodinu / v 18:30 / zítra) termín dodá. Odpověď, která čas nenese, žádost tiše uzavře (nové téma)."
+}

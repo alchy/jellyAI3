@@ -1,0 +1,7 @@
+{
+  "name": "reminder-due",
+  "trigger": {"event": "reminder.due"},
+  "dialog": "⏰ Připomínám: {task}",
+  "action": {},
+  "teach": "Dozrálá připomínka — odpaluje ji tep Chronos (vlastní vlákno hodin, nezávislé na tazích dialogu) nebo začátek tahu. Text jde do konzole služby a pushem i do webové konzole (REST event terminal_write); web je pasivní displej, iniciátorem je Chronos."
+}

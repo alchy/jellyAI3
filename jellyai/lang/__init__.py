@@ -78,6 +78,8 @@ def load_rules(language="cs"):
             rules.get("alias_participles", ()))
         rules["relation_query_nouns"] = frozenset(
             rules.get("relation_query_nouns", ()))
+        rules["reminder_phrases"] = tuple(rules.get("reminder_phrases", ()))
+        rules["reminder_strip"] = frozenset(rules.get("reminder_strip", ()))
         _cache[path] = rules
     return _cache[path]
 

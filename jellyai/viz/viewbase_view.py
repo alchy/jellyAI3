@@ -160,6 +160,11 @@ class ViewBaseView:
         if self._terminal_id is not None:
             self._canvas.terminal_write(self._terminal_id, text)
 
+    def on_event(self, name, handler):
+        """Zaregistruje handler obecného eventu plátna — vnější procesy
+        (Chronos tep) pushují přes REST `/api/event` (viewBase most)."""
+        self._canvas.on(name, handler)
+
     def open_docs_panel(self):
         """Otevře druhé konzolové okno — živý panel nejaktivnějších dokumentů
         (attention nad soubory). Aktualizuje se `write_docs` po každém dotazu."""

@@ -7,3 +7,5 @@
 {"name": "prsi-event", "turns": [{"u": "Venku prší.", "expect": ["Zapamatováno", "prší"]}, {"u": "Prší venku?", "kind": "answer", "expect": ["Ano"]}]}
 {"name": "jezis-overflow", "turns": [{"u": "Kdo je Ježíš?", "kind": "dialog", "expect": ["Ježíš"]}, {"u": "Ježíš", "kind": "answer", "expect": ["Bůh"]}, {"u": "Co řekl Ježíš?", "kind": "dialog", "expect": ["více dat", "celník"]}, {"u": "celník", "kind": "answer", "expect": ["celník"]}]}
 {"name": "jan-vztah", "turns": [{"u": "Kdo je Jan Křtitel?", "kind": "answer", "expect": ["prorok"]}, {"u": "Jaký měl vztah k Ježíšovi?", "kind": "answer", "expect": ["poslat"]}]}
+{"name": "reminder-maso", "turns": [{"u": "Připomeň mi za deset minut vybrat maso z trouby.", "kind": "answer", "expect": ["12:10", "maso"]}]}
+{"name": "reminder-rohliky", "turns": [{"u": "Připomeň mi, že mám koupit rohlíky.", "kind": "dialog", "expect": ["Kdy", "rohlíky"]}, {"u": "za hodinu", "kind": "answer", "expect": ["13:00", "rohlíky"]}]}

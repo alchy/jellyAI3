@@ -22,6 +22,8 @@ import calendar
 import re
 
 from dataclasses import dataclass
+import threading
+
 from datetime import datetime, timedelta
 
 from jellyai.graph.canon import deaccent
@@ -30,6 +32,10 @@ from jellyai.lang import current
 
 def _floor(moment, unit):
     """Zarovná okamžik na začátek své jednotky (hodina/den/týden/měsíc/rok)."""
+    if unit == "second":
+        return moment.replace(microsecond=0)
+    if unit == "minute":
+        return moment.replace(second=0, microsecond=0)
     if unit == "hour":
         return moment.replace(minute=0, second=0, microsecond=0)
     day = moment.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -44,6 +50,10 @@ def _floor(moment, unit):
 
 def _shift(moment, unit, n):
     """Posune okamžik o n jednotek (kalendářně u měsíců/roků, jinak deltou)."""
+    if unit == "second":
+        return moment + timedelta(seconds=n)
+    if unit == "minute":
+        return moment + timedelta(minutes=n)
     if unit == "hour":
         return moment + timedelta(hours=n)
     if unit == "day":
@@ -190,7 +200,7 @@ def resolve_temporal(text, now):  # pylint: disable=too-many-branches,too-many-r
             continue
         sign = -1 if tok in back else 1
         shifted = _shift(now, unit, sign * count)
-        gran = "hour" if unit == "hour" else "day"
+        gran = unit if unit in ("second", "minute", "hour") else "day"
         start = _floor(shifted, gran)
         return TimeInterval(start, _shift(start, gran, 1), gran)
 
@@ -207,3 +217,154 @@ def resolve_temporal(text, now):  # pylint: disable=too-many-branches,too-many-r
                 start = _floor(now, unit)
                 return TimeInterval(start, _shift(start, unit, 1), unit)
     return None
+
+
+def resolve_due(text, now):  # pylint: disable=too-many-branches,too-many-locals
+    """Termín PŘIPOMENUTÍ z textu → konkrétní okamžik, nebo None.
+
+    Tři vzory + předstih (vše jazyková data `temporal`):
+
+    * ofset „za deset minut" → now + delta (přesně, bez zaokrouhlení),
+    * denní čas „v 18:30" → dnes, po termínu zítra,
+    * datum „21. června [2027]" → v `reminder_hour`; bez roku nejbližší
+      BUDOUCÍ výskyt (svátky se točí po roce),
+    * modifikátor „(dva dny) předem" termín posune zpět.
+
+    Args:
+        text (str): Výrok uživatele.
+        now (datetime): Okamžik „teď" (zvenku — determinismus).
+
+    Returns:
+        datetime | None: Termín připomenutí.
+    """
+    lang = current()["temporal"]
+    if not lang:
+        return None
+    tokens = [deaccent(t.lower()) for t in re.findall(r"[\w:.]+", text)]
+    units = lang.get("units", {})
+    numerals = lang.get("numerals", {})
+    due = None
+    forward = frozenset(lang.get("forward_words", ()))
+    for i, tok in enumerate(tokens):             # 1) ofset „za N jednotek"
+        if tok not in forward:
+            continue
+        count, unit = 1, None
+        for follow in tokens[i + 1:i + 4]:
+            if follow in numerals:
+                count = numerals[follow]
+            elif follow.rstrip(".").isdigit():
+                count = int(follow.rstrip("."))
+            elif follow in units and units[follow] != "century":
+                unit = units[follow]
+                break
+        if unit is not None:
+            due = _shift(now, unit, count)
+            break
+    if due is None:                              # 2) denní čas „v 18:30"
+        for tok in tokens:
+            match = re.fullmatch(r"(\d{1,2}):(\d{2})", tok)
+            if match and int(match.group(1)) < 24 and int(match.group(2)) < 60:
+                due = now.replace(hour=int(match.group(1)),
+                                  minute=int(match.group(2)),
+                                  second=0, microsecond=0)
+                if due <= now:
+                    due += timedelta(days=1)
+                break
+    if due is None:                              # 3) datum „21. června [2027]"
+        months = lang.get("month_forms", {})
+        for i, tok in enumerate(tokens):
+            if tok not in months:
+                continue
+            day = next((int(p.rstrip(".")) for p in tokens[max(0, i - 1):i]
+                        if p.rstrip(".").isdigit()), None)
+            if day is None:
+                continue
+            year = next((int(p) for p in tokens[i + 1:i + 2]
+                         if p.isdigit() and len(p) == 4), None)
+            try:
+                due = datetime(year or now.year, months[tok], day,
+                               lang.get("reminder_hour", 9))
+            except ValueError:
+                return None
+            if year is None and due <= now:
+                due = due.replace(year=now.year + 1)
+            break
+    if due is None:                              # 3b) „zítra/pozítří"
+        for tok in tokens:
+            offset = lang.get("day_words", {}).get(tok, 0)
+            if offset > 0:
+                base = _floor(now, "day") + timedelta(days=offset)
+                due = base.replace(hour=lang.get("reminder_hour", 9))
+                break
+    if due is None:
+        return None
+    advance = frozenset(lang.get("advance_words", ()))   # 4) „(N dní) předem"
+    for i, tok in enumerate(tokens):
+        if tok not in advance:
+            continue
+        count, unit = 1, "day"
+        for prev in reversed(tokens[max(0, i - 3):i]):
+            if prev in units and units[prev] != "century":
+                unit = units[prev]
+                continue
+            if prev in numerals:
+                count = numerals[prev]
+            elif prev.rstrip(".").isdigit():
+                count = int(prev.rstrip("."))
+            break
+        due = _shift(due, unit, -count)
+        break
+    return due
+
+
+def format_due(due, now):
+    """Lidský tvar termínu: dnes jen „HH:MM", jinak „D. měsíce [RRRR] HH:MM"."""
+    lang = current()["temporal"]
+    clock = f"{due.hour}:{due.minute:02d}"
+    if due.date() == now.date():
+        return clock
+    label = f"{due.day}. {lang['month_genitives'][due.month - 1]}"
+    if due.year != now.year:
+        label += f" {due.year}"
+    return f"{label} {clock}"
+
+
+class ChronosTicker:
+    """Vlastní VLÁKNO Chronos — hodiny plynou nezávisle na tazích dialogu.
+
+    Každý interval se zeptá zdroje (`fire` — typicky `automaton.fire_due`)
+    na dozrálé připomínky a každou předá `notify` (konzole služby + push
+    do webové konzole přes REST event). Časovač je čistý MECHANISMUS:
+    kdy a s jakým textem se připomíná, nesou JSON karty balíčku Iris
+    (reminder-set/when/due) — scénáře se rozšiřují kartami, ne kódem.
+    """
+
+    def __init__(self, fire, notify, interval=15.0):
+        self._fire = fire
+        self._notify = notify
+        self._interval = interval
+        self._stop = threading.Event()
+        self._thread = None
+
+    def beat(self):
+        """Jeden tep (volatelný i přímo — testy): odpal dozrálé, notifikuj."""
+        for message in self._fire():
+            try:
+                self._notify(message)
+            except Exception:  # noqa: BLE001 — notifikace nesmí zabít hodiny
+                pass
+
+    def _run(self):
+        while not self._stop.wait(self._interval):
+            self.beat()
+
+    def start(self):
+        """Spustí vlákno časovače (daemon — nesmí držet proces při konci)."""
+        self._thread = threading.Thread(target=self._run, daemon=True,
+                                        name="chronos-ticker")
+        self._thread.start()
+        return self
+
+    def stop(self):
+        """Zastaví časovač."""
+        self._stop.set()

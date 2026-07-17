@@ -30,6 +30,7 @@ class PendingFocus:
 class FocusState:
     """Stav automatu mezi tahy: rozpracovaný dialog + historie tahů."""
     pending: PendingFocus = None
+    pending_reminder: str = None   # úkol připomínky čekající na doplnění času
     history: list = field(default_factory=list)   # [{"text", "kind", …}]
 
     def remember(self, text, response):

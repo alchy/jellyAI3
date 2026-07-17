@@ -19,7 +19,10 @@ Chování NENÍ v kódu — o textech a akcích rozhodují pattern-karty
 karet (dialog > figly).
 """
 
+import json
+import os
 import re
+import threading
 
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -27,7 +30,8 @@ from datetime import datetime
 from jellyai.graph.canon import deaccent
 from jellyai.graph.graph import parse_date
 from jellyai.iris.assurance import assurance
-from jellyai.iris.chronos import clock_answer, resolve_temporal
+from jellyai.iris.chronos import (clock_answer, format_due, resolve_due,
+                                  resolve_temporal)
 from jellyai.iris.mnemos import parse_statement, persist, remember, replay
 from jellyai.iris.patterns import PatternDeck
 from jellyai.iris.presenter import activation_window, docs_window
@@ -70,7 +74,8 @@ class IrisResponse:
 class IrisAutomaton:
     """Stavový automat zaostření nad jedním answererem (jedna konverzace)."""
 
-    def __init__(self, answerer, deck=None, clock=None, memory_path=None):
+    def __init__(self, answerer, deck=None, clock=None, memory_path=None,
+                 reminders_path=None):
         """Vytvoří automat.
 
         ZÁKON: žádné prahy ani rozhodnutí v kódu — kdy se vede dialog a kdy
@@ -86,6 +91,8 @@ class IrisAutomaton:
             memory_path (str | None): Deník paměti Mnemos (memory.jsonl) —
                 při startu se PŘEHRAJE do grafu (paměť přežívá restart);
                 None = paměť jen v RAM (testy).
+            reminders_path (str | None): Sklad připomínek (JSONL) — KRÁTKODOBÁ
+                paměť Chronos: připomínka po odpálení mizí; None = jen RAM.
         """
         self.answerer = answerer
         if deck is None:
@@ -101,6 +108,9 @@ class IrisAutomaton:
             restored = replay(answerer.graph, memory_path,
                               current()["user_entity"])
             answerer._predicates |= restored  # pylint: disable=protected-access
+        self.reminders_path = reminders_path
+        self._reminder_lock = threading.Lock()   # Chronos tep běží v jiném vlákně
+        self.reminders = self._load_reminders()
 
     def reset(self):
         """Nový rozhovor: vymaže rozpracovaný dialog i pole answereru."""
@@ -110,6 +120,9 @@ class IrisAutomaton:
     def turn(self, text, temperature=0.0):
         """Jeden tah konverzace (viz docstring modulu).
 
+        Před tahem se odpálí DOZRÁLÉ připomínky (Chronos) — jejich texty
+        se předřadí odpovědi (plynutí hodin vidí i uživatel bez tikeru).
+
         Args:
             text (str): Vstup uživatele (otázka NEBO volba kandidáta).
             temperature (float): Teplota answereru (fuzzy souvislosti).
@@ -117,6 +130,14 @@ class IrisAutomaton:
         Returns:
             IrisResponse: Odpověď nebo dialogové doostření + metadata.
         """
+        fired = self.fire_due()
+        response = self._turn(text, temperature=temperature)
+        if fired:
+            response.text = "\n".join(fired + [response.text])
+        return response
+
+    def _turn(self, text, temperature=0.0):
+        """Vlastní tah (bez odpalu připomínek — replay/focus-shift rekurze)."""
         direct = clock_answer(text, self.clock())
         if direct is not None:
             # hodinová otázka — odpovídá Chronos sám (časová kotva), graf se
@@ -136,6 +157,22 @@ class IrisAutomaton:
             self.state.pending = None
             self.answerer.context.warm(chosen, _PICK_WARMTH)
         elif "?" not in text:
+            # PŘIPOMÍNKY (Chronos): doplnění času rozpracované žádosti,
+            # nebo nová žádost frází z jazykové tabulky; scénáře nesou
+            # karty reminder-set/when/due
+            pending_task = self.state.pending_reminder
+            if pending_task is not None:
+                self.state.pending_reminder = None
+                due = resolve_due(text, self.clock())
+                if due is not None:
+                    return self._set_reminder(pending_task, due, text)
+            low = deaccent(text.lower())
+            phrase = next((p for p in current()["reminder_phrases"]
+                           if p in low), None)
+            if phrase is not None:
+                reminder = self._reminder(text, phrase)
+                if reminder is not None:
+                    return reminder
             # POKYN K ZAOSTŘENÍ („v kontextu Bible") má přednost — posvítí
             # na doménu a přehraje předchozí otázku (karta, spec §3e)
             shift = self._focus_shift(text)
@@ -201,6 +238,135 @@ class IrisAutomaton:
             return self._dialog(card, context, text, used_patterns,
                                 await_pick=False)
         return self._respond(answer, "answer", assur, used_patterns, text)
+
+    def _load_reminders(self):
+        """Načte sklad připomínek (JSONL {due, task}); chybějící = prázdný."""
+        items = []
+        if self.reminders_path and os.path.exists(self.reminders_path):
+            with open(self.reminders_path, encoding="utf-8") as fh:
+                for line in fh:
+                    if line.strip():
+                        items.append(json.loads(line))
+        return items
+
+    def _save_reminders(self):
+        """Přepíše sklad připomínek (krátkodobá paměť — odpálené mizí)."""
+        if not self.reminders_path:
+            return
+        directory = os.path.dirname(self.reminders_path)
+        if directory:
+            os.makedirs(directory, exist_ok=True)
+        with open(self.reminders_path, "w", encoding="utf-8") as fh:
+            for item in self.reminders:
+                fh.write(json.dumps(item, ensure_ascii=False) + "\n")
+
+    def fire_due(self, now=None):
+        """Odpálí DOZRÁLÉ připomínky (tep Chronos i začátek tahu).
+
+        Mechanismus: termín ≤ teď → připomínka se vyřadí ze skladu a vrátí
+        se její text z karty `reminder.due`. Volá se z vlákna časovače
+        i z tahů — sklad chrání zámek.
+
+        Returns:
+            list[str]: Texty odpálených připomínek (prázdné = nic nedozrálo).
+        """
+        now = now or self.clock()
+        with self._reminder_lock:
+            due = [r for r in self.reminders
+                   if datetime.fromisoformat(r["due"]) <= now]
+            if not due:
+                return []
+            self.reminders = [r for r in self.reminders if r not in due]
+            self._save_reminders()
+        card = self.deck.best("reminder.due", {})
+        if card is not None:
+            for _ in due:
+                self._note_card(card.name)
+        return [card.dialog.format(task=item["task"]) if card
+                else item["task"] for item in due]
+
+    def _reminder(self, text, phrase):
+        """Žádost o připomenutí: úkol + termín (Chronos `resolve_due`).
+
+        Bez termínu se automat ZEPTÁ (karta `reminder.when`, dialog > figly)
+        a úkol čeká na doplnění v příštím tahu. Bez karet se nic neděje
+        (mechanismus bez karet nemá chování — ZÁKON).
+
+        Returns:
+            IrisResponse | None: Potvrzení/dotaz, nebo None (karty mlčí).
+        """
+        task = self._reminder_task(text, phrase)
+        due = resolve_due(text, self.clock())
+        if due is not None:
+            return self._set_reminder(task, due, text)
+        card = self.deck.best("reminder.when", {})
+        if card is None or not task:
+            return None
+        self.state.pending_reminder = task
+        self._note_card(card.name)
+        message = card.dialog.format(task=task)
+        response = IrisResponse(
+            text=message, kind="dialog", assurance=1.0,
+            activation_window=activation_window(self.answerer),
+            docs_window=docs_window(self.answerer),
+            used={"components": ["chronos"], "patterns": [card.name]},
+            clarify={"prompt": message, "candidates": []})
+        self.state.remember(text, response)
+        return response
+
+    def _set_reminder(self, task, due, text):
+        """Uloží připomínku do skladu a potvrdí kartou `reminder.set`."""
+        card = self.deck.best("reminder.set", {})
+        if card is None:
+            return None
+        with self._reminder_lock:
+            self.reminders.append({"due": due.isoformat(), "task": task})
+            self.reminders.sort(key=lambda item: item["due"])
+            self._save_reminders()
+        self._note_card(card.name)
+        message = card.dialog.format(time=format_due(due, self.clock()),
+                                     task=task)
+        response = IrisResponse(
+            text=message, kind="answer", assurance=1.0,
+            activation_window=activation_window(self.answerer),
+            docs_window=docs_window(self.answerer),
+            used={"components": ["chronos"], "patterns": [card.name]})
+        self.state.remember(text, response)
+        return response
+
+    def _reminder_task(self, text, phrase):
+        """Úkol připomínky: text bez fráze, časových výrazů a úvodních spojek.
+
+        Časové běhy se mažou i s předložkou před nimi („v 18:30"); vnitřní
+        předložky úkolu zůstávají („vybrat maso Z trouby").
+        """
+        lang = current()
+        temporal = lang["temporal"]
+        drop = (frozenset(temporal.get("units", {}))
+                | frozenset(temporal.get("numerals", {}))
+                | frozenset(temporal.get("month_forms", {}))
+                | frozenset(temporal.get("day_words", {}))
+                | frozenset(temporal.get("forward_words", ()))
+                | frozenset(temporal.get("advance_words", ())))
+        tokens = re.findall(r"[\w:.]+", text)
+        lows = [deaccent(t.lower()) for t in tokens]
+        keep = [True] * len(tokens)
+        parts = phrase.split()
+        for i in range(len(lows) - len(parts) + 1):    # fráze pryč
+            if lows[i:i + len(parts)] == parts:
+                for j in range(i, i + len(parts)):
+                    keep[j] = False
+                break
+        for i, low in enumerate(lows):                 # časové výrazy pryč
+            if low in drop or re.fullmatch(r"\d[\d:.]*", low):
+                keep[i] = False
+                if i and lows[i - 1] in ("v", "ve"):
+                    keep[i - 1] = False
+        words = [t for t, k in zip(tokens, keep) if k]
+        strip = lang["reminder_strip"]
+        while words and deaccent(words[0].lower()) in strip:
+            words.pop(0)
+        return " ".join(words)
 
     def _warm_interval(self, interval, warmth=0.5):
         """Rozsvítí časové uzly grafu spadající do intervalu (Chronos osa).
