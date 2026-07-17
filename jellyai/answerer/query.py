@@ -95,17 +95,29 @@ def _verb_match(token, predicates, first=False):
     if len(low) < 4 or low in current()["copula_forms"] \
             or (token[:1].isupper() and not first):
         return None
+    # generická dějová slovesa („stalo"→stát) mají tvary v jazykové tabulce —
+    # prefix na krátké kmeny nestačí; predikát nemusí být ve slovníku grafu
+    # (_event_answer fakt s tímto predikátem nepotřebuje)
+    lemma = current()["event_verb_forms"].get(low)
+    if lemma:
+        return lemma
     best = None
-    for pred in predicates:
+    # páruje se i proti synonymům predikátů (spec 4.2): „žili"→žít, expanzi
+    # na bydlet-fakty pak dělá answererův _synonym_ring
+    for pred in set(predicates) | set(current()["predicate_synonyms"]):
         p = _norm(pred)
         common = 0
         for a, b in zip(low, p):
             if a != b:
                 break
             common += 1
-        if common >= 4 and common >= min(len(low), len(p)) - 2:
-            if best is None or common > best[1]:  # pylint: disable=unsubscriptable-object
-                best = (pred, common)
+        ok = common >= 4 and common >= min(len(low), len(p)) - 2
+        if not ok and len(p) <= 3:
+            # krátké lemma („žít"): stačí kmen bez koncové souhlásky, ale tvar
+            # musí být l-ové příčestí („zima" ≠ „žít")
+            ok = common >= len(p) - 1 and low.rstrip("aeiouy").endswith("l")
+        if ok and (best is None or common > best[1]):  # pylint: disable=unsubscriptable-object
+            best = (pred, common)
     return best[0] if best else None
 
 
@@ -144,7 +156,7 @@ def build_query(question, predicates, is_node=None):  # pylint: disable=too-many
         # začíná slovesem spárovaným s predikátem grafu; díra žádná —
         # answerer ji vykoná jako existenční test („Ano"/nenašel)
         verb = _verb_match(tokens[0], predicates, first=True)
-        if verb is None:
+        if verb is None or (is_node is not None and is_node(tokens[0])):
             return None
         known = _collect_known(tokens[1:], predicates, relational, is_node)
         if not known:                     # None (sirotek) i [] (bez entit)
@@ -155,10 +167,26 @@ def build_query(question, predicates, is_node=None):  # pylint: disable=too-many
                      verb_lemma=verb, gender=_verb_gender(tokens[0]))
     copula_tok = next((t for t in tokens
                        if _norm(t) in lang["copula_forms"]), None)
-    verb_tok = next((t for t in tokens if _verb_match(t, predicates)), None)
+    # hlavní sloveso se hledá PŘED vztažným zájmenem — sloveso vztažné věty
+    # patří pod-dotazu („bratr autora, KTERÝ NAPSAL…"), ne hlavnímu vzoru
+    rel_idx = next((k for k, t in enumerate(tokens)
+                    if k and _norm(t) in lang["relative_pronouns"]),
+                   len(tokens))
+    # ENTITY-FIRST: tvar, který se rozřeší na uzel grafu, je entita, ne
+    # sloveso — „rodinou" se nesmí prefixem spárovat s predikátem „rodit"
+    verb_tok = next((t for t in tokens[:rel_idx]
+                     if _norm(t) not in relational
+                     and not (is_node is not None and is_node(t))
+                     and _verb_match(t, predicates)), None)
     verb = _verb_match(verb_tok, predicates) if verb_tok else None
     # rod nese tvar slovesa (l-ové příčestí), u spony tvar spony („byla")
     gender = _verb_gender(verb_tok or copula_tok or "")
+    # „v kterém ROCE" = 2-skokový drill přes časový uzel; tvar → část data
+    # z jazykové tabulky, tázací „kterém" pak míří na čas, ne na vlastnost
+    date_part = next((lang["date_part_forms"][_norm(t)] for t in tokens
+                      if _norm(t) in lang["date_part_forms"]), None)
+    if date_part and hole_role == "attr":
+        hole_role, hole_type = "time", "time"
     known = _collect_known(tokens, predicates, relational, is_node)
     if known is None:                          # sirotek v běhu — nehádat
         return None
@@ -169,17 +197,24 @@ def build_query(question, predicates, is_node=None):  # pylint: disable=too-many
                      topic_terms=_leftover_terms(tokens, pattern, predicates),
                      gender=gender)
 
-    # 1) vztahová otázka: „Kdo byl bratr X?" → vztahové jméno = predikát
-    for role, term in list(known):
+    # 1) vztahová otázka: „Kdo byl bratr X?" → vztahové jméno = predikát;
+    #    POD SLOVESEM je vztah vnořený dotaz („Kde se narodil bratr X?" →
+    #    narodit(subj=SubQuery(bratr, obj=X), díra loc)) — sloveso vládne
+    for k, (role, term) in enumerate(list(known)):
         head = term.split()[0] if isinstance(term, str) and term else None
         if head and _norm(head) in relational:
             rest = " ".join(term.split()[1:])
-            if rest:
+            if not rest:
+                continue
+            if verb is not None:
+                known[k] = ("subj", SubQuery(_norm(head), [("obj", rest)],
+                                             "subj"))
+            else:
                 return _wrap(Pattern(_norm(head), [("obj", rest)],
                                      "subj", "person"))
-        if isinstance(term, SubQuery):         # „bratr autora který napsal X"
+        if isinstance(term, SubQuery) and verb is None:
             rel = next((t for t in tokens if _norm(t) in relational), None)
-            if rel:
+            if rel:                            # „bratr autora který napsal X"
                 return _wrap(Pattern(_norm(rel), [("obj", term)],
                                      "subj", "person"))
 
@@ -197,7 +232,7 @@ def build_query(question, predicates, is_node=None):  # pylint: disable=too-many
             role = "obj" if hole_role == "subj" else "subj"
             known = [(role if isinstance(term, str) else r, term)
                      for r, term in known]
-        return _wrap(Pattern(verb, known, hole_role, hole_type))
+        return _wrap(Pattern(verb, known, hole_role, hole_type, date_part))
 
     # 3) sponová identita: „Kdo je X?" / „Jaký je X?"
     if copula_tok is not None and known:
@@ -288,7 +323,7 @@ def _collect_known(tokens, predicates, relational, is_node):
     while i < len(tokens):
         tok = tokens[i]
         low = _norm(tok)
-        if low in lang["relative_pronouns"]:   # „…autora KTERÝ napsal X"
+        if low in lang["relative_pronouns"] and i:   # „…autora KTERÝ napsal X"
             if not flush():
                 return None
             sub = _subquery(tokens[i + 1:], predicates)
@@ -299,7 +334,9 @@ def _collect_known(tokens, predicates, relational, is_node):
                     known.append(("obj", sub))
             break
         boundary = (low in lang["interrogatives"] or low in lang["copula_forms"]
-                    or _verb_match(tok, predicates) is not None)
+                    or low in lang["date_part_forms"]
+                    or (_verb_match(tok, predicates) is not None
+                        and not (is_node is not None and is_node(tok))))
         if boundary and low not in relational:
             if not flush():
                 return None

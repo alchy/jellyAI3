@@ -138,6 +138,54 @@ def test_type_filter_prodrop_keeps_obj_role():
     assert q.pattern.hole_role == "attr" and q.gender == "Masc"
 
 
+def test_relational_under_verb_becomes_subquery():
+    """„Kde se narodil bratr Karla Čapka?" → narodit(subj=SubQuery(bratr,
+    obj=Karla Čapka), díra loc) — vztah je vnořený dotaz, sloveso vládne."""
+    q = build_query("Kde se narodil bratr Karla Čapka?", {"narodit", "bratr"})
+    assert q.pattern.predicate == "narodit" and q.pattern.hole_role == "loc"
+    role, sub = q.pattern.known[0]
+    assert role == "subj" and isinstance(sub, SubQuery)
+    assert sub.predicate == "bratr" and ("obj", "Karla Čapka") in sub.known
+
+
+def test_bare_relational_without_verb_unchanged():
+    q = build_query("Kdo byl bratr Karla Capka?", PREDS)
+    assert q.pattern.predicate == "bratr"
+    assert ("obj", "Karla Capka") in q.pattern.known
+
+
+def test_date_part_drill():
+    """„V kterém roce se narodila BN?" → date_part=rok (2-skokový drill),
+    „roce" není účastník."""
+    q = build_query("V kterém roce se narodila Božena Němcová?", {"narodit"})
+    assert q.pattern.predicate == "narodit" and q.pattern.date_part == "rok"
+    assert ("subj", "Božena Němcová") in q.pattern.known
+    assert q.gender == "Fem"
+
+
+def test_generic_event_verb_from_table():
+    """„Co se stalo s rodinou?" → predikát stát (tvar z jazykové tabulky,
+    prefix nestačí), rodina jako téma."""
+    q = build_query("Co se stalo s rodinou?", set())
+    assert q.pattern.predicate == "stát"
+    assert ("subj", "rodinou") in q.pattern.known
+
+
+def test_reverse_date_question_stays_none():
+    """„Co se stalo v listopadu 1848?" bez uzlového rozpětí → None; reverzní
+    lookup (datum→děj) zůstává na answereru (spec §7)."""
+    assert build_query("Co se stalo v listopadu 1848?", set(), _nodes()) is None
+
+
+def test_predicate_synonym_from_language_table():
+    """„Kde žili…?" na graf s predikátem „bydlet": tvar se páruje i proti
+    lemmatům z predicate_synonyms; vrátí se synonymum („žít") — expanzi na
+    bydlet-fakty dělá answererův _synonym_ring (spec 4.2)."""
+    q = build_query("Kde žili Čapkovi?", {"bydlet"}, _nodes("Čapkovi"))
+    assert q.pattern.predicate == "žít"
+    assert q.pattern.hole_role == "loc"
+
+
 def test_query_gender_from_verb_form():
     q = build_query("Kdy se narodila Božena Němcová?", {"narodit"})
     assert q.gender == "Fem" and q.qtype == "Kdy"

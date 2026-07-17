@@ -183,7 +183,12 @@ class GraphAnswerer(Answerer):
                 same = [c for c in candidates
                         if c[3] == best[3] and c[4] and c[0] != best_id]
                 if same:
-                    best_id = max(same, key=lambda c: c[2])[0]
+                    # mezi afinitními variantami rozhodne shoda velikosti
+                    # písmen s termem („Babičku"→„Babička", ne „babička"),
+                    # pak váha
+                    term_upper = any(t[:1].isupper() for t in terms)
+                    best_id = max(same, key=lambda c: (
+                        c[0][:1].isupper() == term_upper, c[2]))[0]
         if best_id is not None and warm:
             # nejednoznačné jméno rozsvítí VŠECHNY kandidáty se stejnou
             # kmenovou shodou (homonymní vějíř „Marie" → i biblická Maria) —

@@ -5,6 +5,7 @@
 {"q": "Kdo byl robot?", "expect": ["stroj"], "cat": "identita"}
 {"q": "Kde se narodil Josef Čapek?", "expect": ["Hronov"], "cat": "místo"}
 {"q": "Kdy se narodila Božena Němcová?", "expect": ["1818"], "cat": "čas"}
+{"q": "V kterém roce se narodila Božena Němcová?", "expect": ["1818"], "cat": "čas"}
 {"q": "Co se stalo 2. května 1818?", "expect": ["Božena Němcová"], "cat": "reverzní"}
 {"q": "Kdo byl bratr Karla Čapka?", "expect": ["Josef"], "cat": "vztah"}
 {"q": "Kdo byl bratr Josefa Čapka?", "expect": ["Karel"], "cat": "vztah"}
