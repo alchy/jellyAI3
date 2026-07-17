@@ -10,6 +10,9 @@ from datetime import datetime
 from jellyai.answerer.base import Answer, Answerer
 from jellyai.graph.graph import parse_date
 from jellyai.iris.subsystems.chronos import resolve_temporal
+from jellyai.iris.subsystems.topos import (_key as _topos_key,
+                                           area_keys, load_gazetteer,
+                                           place_within)
 from jellyai.lang import current
 from jellyai.answerer.question import analyze_question
 from jellyai.answerer.pattern import question_pattern, SubQuery, Pattern
@@ -92,6 +95,9 @@ class GraphAnswerer(Answerer):
         self._resolved_knowns = set()   # entity otázky rozřešené tímto tahem
         self.clock = clock or datetime.now   # „teď" pro časová primitiva otázky
         self.time_filter = None  # tvrdý interval otázky (Chronos, brána Q→A)
+        self.place_filter = None  # oblast otázky (Topos kontejnment)
+        self._gazetteer = load_gazetteer("data/sub_topos_gazetteer.jsonl")
+        self._area_keys = area_keys(self._gazetteer)
 
     def _node_word(self, token):
         """DOSLOVNÉ slovo některého ENTITNÍHO uzlu grafu — bez kmenových
@@ -681,6 +687,22 @@ class GraphAnswerer(Answerer):
         self.visited.extend(p.node for f in chosen for p in f.participants)
         return node0, [_event_text(f) for f in chosen], chosen[0]
 
+    def _is_area(self, token):
+        """Slovo otázky je OBLASTÍ gazetteeru (kmenově) — nárok Topos."""
+        return _topos_key(token) in self._area_keys
+
+    def _place_excluded(self, fact):
+        """Fakt bez účastníka UVNITŘ oblasti otázky (kontejnment Topos).
+
+        Na rozdíl od času je nepřítomnost místa vylučující: fakt, o němž
+        nevíme KDE, není evidence pro „v Čechách".
+        """
+        if self.place_filter is None:
+            return False
+        return not any(place_within(p.node, self.place_filter,
+                                    self._gazetteer)
+                       for p in fact.participants)
+
     def _time_excluded(self, fact):
         """Fakt s časovým účastníkem MIMO interval otázky (tvrdý filtr).
 
@@ -710,7 +732,8 @@ class GraphAnswerer(Answerer):
             # s predikátem vůbec? Téma = první entitní účastník nálezu
             rings = {pred for pred, _ in _synonym_ring(predicate)}
             for fact in self.graph.facts.values():
-                if fact.predicate in rings and not self._time_excluded(fact):
+                if fact.predicate in rings and not self._time_excluded(fact) \
+                        and not self._place_excluded(fact):
                     self.visited.extend(p.node for p in fact.participants)
                     topic = next((p.node for p in fact.participants
                                   if p.role in ("subj", "obj")), None)
@@ -720,7 +743,8 @@ class GraphAnswerer(Answerer):
         for pred, _ in _synonym_ring(predicate):
             for fact in self.graph.facts_of(node0, predicate=pred):
                 if known_set <= {p.node for p in fact.participants} \
-                        and not self._time_excluded(fact):
+                        and not self._time_excluded(fact) \
+                        and not self._place_excluded(fact):
                     self.visited.extend(p.node for p in fact.participants)
                     return node0, ["Ano"], fact
         return None, [], None
@@ -873,15 +897,17 @@ class GraphAnswerer(Answerer):
         # „letos", „21.1.1900") VYŘADÍ fakty s časem mimo interval;
         # nedatované fakty filtr nechává (nelze je vyloučit časem)
         self.time_filter = resolve_temporal(question, self.clock())
+        self.place_filter = None   # nastaví brána Q (oblast v otázce)
         # UNIVERZÁLNÍ princip: otázka→neúplný fakt→match→díra (nahrazuje qtype pravidla
         # i attention — kontextově navazující dotaz řeší tatáž cesta). Rozbor dodají
         # ŠABLONY (pseudo-QL, bez UDPipe); UDPipe jen mimo templates režim.
         qa, pat = None, None
         if self.query_mode in ("hybrid", "templates"):
             query = build_query(question, self._predicates, self._span_is_node,
-                                self._node_word)
+                                self._node_word, self._is_area)
             if query is not None:
                 qa, pat = query, query.pattern
+                self.place_filter = getattr(query, "place", None)
         if qa is None and self.query_mode != "templates":
             qa = analyze_question(question, self.client)
             pat = question_pattern(question, self.client)

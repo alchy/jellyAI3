@@ -64,6 +64,7 @@
                       "mesic": "měsíc", "mesici": "měsíc",
                       "den": "den", "dne": "den", "dni": "den"},
   "name_case_agreement": true,
+  "palatal_fold": {"z": "h", "c": "k", "s": "ch", "š": "ch"},
   "name_predicate": "jmenovat",
   "relation_query_nouns": ["vztah", "vztahu", "vztahy", "vazba", "vazbu",
                            "spojeni", "souvislost"],

@@ -74,6 +74,7 @@ def load_rules(language="cs"):
         rules["name_case_agreement"] = bool(
             rules.get("name_case_agreement", False))
         rules["name_predicate"] = rules.get("name_predicate", "jmenovat")
+        rules["palatal_fold"] = dict(rules.get("palatal_fold", {}))
         rules["alias_participles"] = frozenset(
             rules.get("alias_participles", ()))
         rules["relation_query_nouns"] = frozenset(

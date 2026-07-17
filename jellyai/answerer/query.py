@@ -47,6 +47,7 @@ class Query:
     is_copula: bool = False
     topic_terms: list = field(default_factory=list)
     gender: str = None
+    place: str = None      # oblast otázky („v Čechách") — filtr Topos
 
 
 def _known_words(known):
@@ -150,7 +151,8 @@ def _verb_match(token, predicates, first=False):
     return best[0] if best else None
 
 
-def build_query(question, predicates, is_node=None, is_word=None):  # pylint: disable=too-many-locals,too-many-return-statements,too-many-branches
+def build_query(question, predicates, is_node=None, is_word=None,
+                is_area=None):  # pylint: disable=too-many-locals,too-many-return-statements,too-many-branches
     """Otázku (končící „?") přeloží šablonou nad slovníkem grafu na `Query`.
 
     Args:
@@ -227,11 +229,17 @@ def build_query(question, predicates, is_node=None, is_word=None):  # pylint: di
                 verb = stem
         if verb is None:
             return None
-        # časová slova nejsou účastníci — filtr intervalu drží Chronos
+        # časová slova nejsou účastníci — filtr intervalu drží Chronos;
+        # OBLAST („v Čechách") stejně tak — filtr kontejnmentu drží Topos
         temporal = {w for key in ("day_words", "units", "now_words",
                                   "current_words")
                     for w in lang["temporal"].get(key, ())}
         rest = [t for t in tokens[1:] if _norm(t) not in temporal]
+        place = None
+        if is_area is not None:
+            place = next((t for t in rest if is_area(t)), None)
+            if place is not None:
+                rest = [t for t in rest if t != place]
         known = _collect_known(rest, predicates, relational, is_node)
         if known is None:                 # sirotek v běhu — nehádat
             return None
@@ -241,7 +249,8 @@ def build_query(question, predicates, is_node=None, is_word=None):  # pylint: di
         known = [("subj" if i == 0 else "obj", term)
                  for i, (_, term) in enumerate(known)]
         return Query(Pattern(verb, known, None, None), qtype=None,
-                     verb_lemma=verb, gender=_verb_gender(tokens[0]))
+                     verb_lemma=verb, gender=_verb_gender(tokens[0]),
+                     place=place)
     copula_tok = next((t for t in tokens
                        if _norm(t) in lang["copula_forms"]), None)
     # hlavní sloveso se hledá PŘED vztažným zájmenem — sloveso vztažné věty
