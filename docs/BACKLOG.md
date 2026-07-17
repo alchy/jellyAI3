@@ -1,7 +1,7 @@
 # BACKLOG — otevřené body (živý dokument)
 
 > Aktualizuj při každém uzavření/přidání bodu. Stav ke commitu: viz git log.
-> Metriky teď: **442 testů, etalon 28/28 (+5 gap), focus 12/12, dialog 21/21 — 100 %.**
+> Metriky teď: **449 testů, etalon 28/28 (+5 gap), focus 12/12, dialog 21/21 — 100 %.**
 >
 > **➡️ PŘEDÁNÍ PRÁCE: čti nejdřív `docs/HANDOVER.md`** — zákony projektu,
 > testovací smyčka, implementační tipy ke každému otevřenému bodu, pasti.
