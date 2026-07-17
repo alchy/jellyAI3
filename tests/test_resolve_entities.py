@@ -61,6 +61,24 @@ def test_conservative_father_son_and_bare_surname_stay_apart():
     assert {"Karel Antonín Čapek", "Antonína Čapka", "Čapek"} <= set(g.nodes)
 
 
+def test_capitalized_concept_merges_into_person_cluster():
+    """NER nekonzistence: „Ježíš" (koncept — NER ho minul) vedle „Ježíše"
+    (person) je TÁŽ osoba → sloučit; kanon = lex-min (základní tvar!), typ
+    person. Malé „bůh" vedle „Bůh" zůstává pojmem (pojem ≠ osoba)."""
+    g = FactGraph()
+    g.add_fact(_narodit("Ježíše", "Betlémě"))
+    g.add_fact(make_fact("kázat", [Participant("subj", "Ježíš", "concept"),
+                                   Participant("loc", "hoře", "geo")]))
+    g.add_fact(make_fact("být", [Participant("subj", "Bůh", "person"),
+                                 Participant("pred", "stvořitel", "concept")]))
+    g.add_fact(make_fact("být", [Participant("subj", "bůh", "concept"),
+                                 Participant("pred", "pojem", "concept")]))
+    resolve_entities(g)
+    assert "Ježíš" in g.nodes and "Ježíše" not in g.nodes
+    assert g.nodes["Ježíš"].type == "person"
+    assert "bůh" in g.nodes and "Bůh" in g.nodes     # pojem zůstal oddělený
+
+
 def test_non_person_nodes_untouched():
     # mantinel 3: geo/time/číselné uzly se (zatím) neshlukují
     g = FactGraph()

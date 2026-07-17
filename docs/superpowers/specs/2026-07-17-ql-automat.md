@@ -5,6 +5,16 @@
 > commit `1c37ca8`). Vstřebává nedokončené Tasky 11–15 + 13b původního plánu
 > (`2026-07-17-query-sablony.md`) — REST API, web, clarifikace, odchod UDPipe.
 
+> **STAV REALIZACE (2026-07-17, merge `b0ff114`):** Fáze 0, 1 a 3 hotové
+> (knihovna `jellyai/iris/`, pattern-karty, QueryAssurance, REST služba :8084,
+> web tři okna); z Fáze 2 hotové Chronos (§3b vč. hodinových odpovědí),
+> Mnemos (§3d) + perzistence `data/memory.jsonl`, focus-shift (§3e), kartový
+> audit (§2.4b) a dialogový benchmark `run_dialog.py`. Otevřené: karty
+> clarify-*/data-overflow, benefit-výběr karet (§2.6b), sharpener (§3 —
+> `sharpener.py` zatím neexistuje, aktivace jede trasovou funkcí), čistý řez
+> (Fáze 5 — adresář `plugins/` z §6.1 zatím nevznikl, automat volá answerer
+> přímo). Detailní stav: plán `2026-07-17-ql-automat.md` + `docs/BACKLOG.md`.
+
 ## 0. Terminologie (návrh — k vetu uživatelem)
 
 - **Iris** — jméno stavového automatu (clona oka/objektivu: řídí, kolik světla

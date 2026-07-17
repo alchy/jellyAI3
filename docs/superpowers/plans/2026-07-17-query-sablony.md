@@ -2,6 +2,14 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **STAV (2026-07-17): Tasky 1–10 HOTOVÉ** (parita šablon, přepnutí na
+> `hybrid`, commit `1c37ca8`); **Tasky 11–15 + 13b VSTŘEBÁNY do plánu
+> ql-automat** (`2026-07-17-ql-automat.md`) — run_pattern/wire formát a REST
+> služba tam už vznikly (jako `services/iris_service.py`, ne `query_service.py`),
+> clarifikace = pattern-karty Iris, odchod UDPipe (Task 14) zůstává otevřený
+> (Fáze 5 / BACKLOG 14). Checkboxy níže se už neodškrtávají — plán je
+> historický záznam.
+
 **Goal:** Dovést šablonový parser otázek (pseudo-QL) na paritu s UDPipe cestou (etalon JÁDRO 24/24), publikovat ho jako REST/graphQL službu (`/query`, `/graphql`, `/schema`) a odstranit UDPipe z query strany.
 
 **Architecture:** `Pattern`/`SubQuery` zůstávají AST pseudo-QL (vykonavatel `_pattern_answer`/`_match`/`_solve` se osvědčil — parita je cíl, nový AST je YAGNI). Parser `build_query` nově vrací bohatší **`Query`** (pattern + qtype/rod/spona — vše odvozené šablonami, bez UDPipe), takže po přepnutí query strana UDPipe vůbec nepotřebuje. „GraphQL publikace" se děje na API vrstvě: JSON wire formát Patternu + `/schema`. Postup je řízen benchmarkem: každý task končí měřením (`run_etalon.py --mode templates`).

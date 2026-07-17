@@ -429,7 +429,19 @@ def resolve_entities(graph):
     clusters = {}
     for name in persons:
         clusters.setdefault(cluster_key(name), []).append(name)
-    canon_by_key = {key: min(members) for key, members in clusters.items()}
+    # NER nekonzistence: KAPITALIZOVANÝ koncept se shodným klíčem („Ježíš"
+    # koncept vedle „Ježíše" person — tagger jednou osobu minul) patří do
+    # person clusteru; malé písmeno („bůh" vedle „Bůh") zůstává pojmem
+    for node in sorted(graph.nodes.values(), key=lambda n: n.id):
+        if node.type != "concept" or not node.id[:1].isupper():
+            continue
+        key = cluster_key(node.id)
+        if key in clusters:
+            clusters[key].append(node.id)
+    # kanon = NEJKRATŠÍ člen (nominativ nebývá skloněním prodloužený), pak
+    # lex — samotné lex-min přes diakritiku klame („Nazaretského" < „ý")
+    canon_by_key = {key: min(members, key=lambda m: (len(m), m))
+                    for key, members in clusters.items()}
     positional = _positional_merge(canon_by_key)
     node_map = {}
     for key, members in clusters.items():
@@ -440,10 +452,15 @@ def resolve_entities(graph):
                 node_map[name] = final
     if not node_map:
         return graph
+    # sloučené clustery jsou osoby — typ se u jejich členů VYNUTÍ person
+    # (koncept „Ježíš" nesmí po sloučení kanonu vnutit typ concept)
+    person_ids = set(node_map) | set(node_map.values())
     remapped = {}
     for fact in graph.facts.values():
         moved = make_fact(fact.predicate,
-                          [Participant(p.role, node_map.get(p.node, p.node), p.type)
+                          [Participant(p.role, node_map.get(p.node, p.node),
+                                       "person" if node_map.get(p.node, p.node)
+                                       in person_ids else p.type)
                            for p in fact.participants])
         key = (moved.predicate, moved.participants)
         existing = remapped.get(key)

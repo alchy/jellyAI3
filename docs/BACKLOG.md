@@ -1,0 +1,30 @@
+# BACKLOG — otevřené body (živý dokument)
+
+> Aktualizuj při každém uzavření/přidání bodu. Stav ke commitu: viz git log.
+> Metriky teď: 393 testů, etalon 28/28, focus 12/12, dialog 9/9 (vše 100 %).
+
+| # | Oblast | Bod | Řešení / poznámka | Fáze | Priorita |
+|---|--------|-----|-------------------|------|----------|
+| 1 | Kanonizace | **Aliasy uzlů + základní tvar jako výchozí podoba** — uzel má JEDEN základní tvar (nominativ) jako id/popisek, všechny pádové tvary jsou aliasy; výstupy (odpovědi, souvislosti, okna) nikdy nezobrazí skloněný tvar („Ježíše Krista" → „Ježíš Kristus"). Testovat i na Ježíš/Ježíše/ježíšovo. | Build: alias mapa (cluster → kanon, `graph.aliases` existuje); id = základní tvar (lex-min + morfologická nominativizace); query: `_resolve_topic` čte aliasy přednostně. | F5→**teď** | **1** |
+| 2 | Hygiena dat | Mis-tag ocas (uzly „mle", „Ježíš Martu", fakty s „hodit/dovoleno"), predikáty „Chvalte/Izaiáš" | Korpusová evidence lemmat (tvar doložen jinde jako VERB → vyřadit), ne příponové pravidlo (koleno/rameno). | F5 | **2** |
+| 3 | Hygiena dat | Zbylé guardy z auditu: `_apposition_identities` (114), `_relation_person` (95), `flat` (77, nízký dopad) | Stejné vzory jako `_appos_belongs`/verbální filtr. | F5 | 5 |
+| 4 | Iris karty | Benefit-výběr karet (`deck.best`): skórování kandidátek + **měřený nárůst aktivace** po akci; telemetrie karet (použití/zisk, časové razítko Chronos) | run_focus nad dialogovými scénáři jako metrika zisku. | F2 | **3** |
+| 5 | Iris karty | Karty `data-overflow` („Co řekl Ježíš?" → nabídka oblastí aktivace), `clarify-period`, `clarify-relation` | Mechanismus hotový (deck + eventy), jen karty + eventy z answereru. | F2 | **3** |
+| 6 | Mnemos | **Fakta ke korpusovým entitám z potvrzení** — „Měl KČ rád knedlíky?" → nenašel → „ano, měl rád knedlíky" → subjekt z konverzačního těžiště (pro-drop v Mnemos), fakt `měl-rád(Karel Čapek, knedlíky)` do deníku | Statement karta bez 1. osoby s elipsou subjektu + `_fill_subject` mechanika; deník memory.jsonl UŽ je oddělený od statické báze a merguje se po startu (transparentně) — splňuje požadavek extended memory. | F2/F3 | **4** |
+| 7 | Mnemos | **Učení pojmů dialogem** — „Co jsou závody aut?" → karta `data-empty`: „můžeš vysvětlit?" → vysvětlení se rozloží extrakční pipeline (extract_facts nad větou — build-side, UDPipe povoleno) → fakty s tématem do deníku | KRITICKY PROMYSLET (kvalita, zneužití, konflikty se statickou bází — verzování deníku, zdroj=uživatel). Koncept jasný, realizace po 6. | F3 | 6 |
+| 8 | Graf — koncept | **Homonymní instance (dva Jan Novákové; Moje vs. Karlova Toyota)** — ZAPARKOVÁNO s konceptem: *jméno není entita*. Jmenný uzel (jmenovka) + instanční uzly spojené hranou „jmenuje se"; instance per provenienční kontext (dokument/odstavec), srůstání jen při překryvu kontextových otisků (sdílené okolí — doc_links/kontext fakty). Toyota = druhový uzel, moje/Karlova = instance přes druh-hranu (`_is_a` už existuje); vlastnosti (modrá/bílá) se váží VŽDY na instanci, nikdy na druh. Žádné vícerozměrné rozšíření není potřeba. | Dotaz na jmenovku → focus-offer instancí (mechanismus hotový). Realizace = build-side změna vzniku uzlů; promyslet migraci. | F5+ | 7 (park) |
+| 9 | Viz / detail | Detail uzlu po rozkliknutí: doplnit **tvary/aliasy a kmen (ocas)**; popsat řádky obj/subj (= vazby uzlu ve faktech: u „nenastat" obj: zemětřesení, subj: konec — role, ve kterých se uzel účastní) | `viz/detail.py` — přidat řádky „tvary" (graph.aliases) a „kmen"; přejmenovat/vysvětlit popisky rolí. | teď | **2b** (rychlá výhra) |
+| 10 | Chronos | Interval jako tvrdý filtr odpovědi + E2E kovářova kobyla do etalonu; run_focus s časem | — | F2 | 8 |
+| 11 | Metron | „Kolikrát letos pršelo?" = počítání výskytů faktů; zavře gap „Kolik měla dětí BN?" | Nová díra typu počet-výskytů + jazyková tabulka „kolikrát". | F2/F4 | 9 |
+| 12 | Topos | Hierarchie míst (Praha ⊂ Čechy), containment jako intervaly, „tady/poblíž" | Paralela Chronosu. | F4 | 10 |
+| 13 | Sharpener | Cross-distribuce + vyzařování focusu po hranách; váhy v configu; K-křivka run_focus | — | F4 | 11 |
+| 14 | Čistý řez | UDPipe pryč z query (gate splněn), `graph_answerer.py` → Iris pluginy, pohrobci → `conserved_` | — | F5 | 12 |
+| 15 | Coverage | Anaforický kbelík (2 136 vět se zájmenným podmětem) | — | F5+ | 13 |
+| 16 | Etalon gapy | BN copula-profese; Kolik dětí (→ Metron); Kde působila; „Jaka babicka?" | — | průběžně | 14 |
+| 17 | Infra | Konsolidace souborové struktury dat: `data/` (graph.pkl, annotations.pkl, memory.jsonl, budoucí extended knowledge) — jasná mapa statické × uživatelské znalosti | Malý úklid + README sekce. | F3 | 15 |
+| 18 | Dokumentace | **Revize dokumentace agenty** — porovnat docs vs. stav, přizpůsobit, findings jako review | Spuštěno (agent). | teď | běží |
+| 19 | Experiment | Hybridní aktivace uzel × hrana | Metrika → prototyp za flagem. | F6 | 16 |
+| 20 | Vize | Osobnost/hlas databáze (persona nad Echo) | Far-away; závisí na Echo. | pozdější | 17 |
+| 21 | Infra | viewBase python testy: chybí httpx2 (6 souborů nekolektuje) | Doinstalovat/upravit testclient. | údržba | 18 |
+
+Trvalé zásady: stavový automat i znalostní báze se rozšiřují **json kartami/soubory**, logika nikdy fixně v kódu; každá změna měřena (etalon/focus/dialog/coverage).

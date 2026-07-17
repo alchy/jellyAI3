@@ -52,3 +52,11 @@ def test_feminine_surname_and_vowel_length_merge():
     k = cluster_key("Marie Magdalena Novotná")
     assert cluster_key("Marie Magdaleny Novotné") == k
     assert cluster_key("Marie Magdaléna Novotná") == k
+
+
+def test_genitive_adjective_and_possessive_suffixes_fold():
+    """„Nazaretského"≡„Nazaretský", „Ježíšova"≡„Ježíš" — koncovky ého/ova
+    patří do kmenování (jinak se pádové uzly téže osoby nesloučí)."""
+    from jellyai.graph.canon import cluster_key
+    assert cluster_key("Nazaretský") == cluster_key("Nazaretského")
+    assert cluster_key("Ježíšova") == cluster_key("Ježíš")

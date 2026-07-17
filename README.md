@@ -43,10 +43,12 @@ jelly.save_session("capkovi")     # JSON: váhy těžiště + historie
 Porty (rozhraní pro vlastní/NN implementace): `Tokenizer`, `QuestionAnalyzer`,
 `FactExtractor`, `Composer`, `CorpusPort`, `GraphView` + existující `Retriever`/`Answerer`.
 
-**Web vizualizace (viewBase):** `./jelly web` spustí prohlížeč s grafem nahoře a
-promptem dole; při dotazu se graf **živě rozsvěcuje** (těžiště) a **proletí trasa**
-(`ViewBaseView` = adaptér portu `GraphView`, volitelný `pip install viewbase`; jádro
-knihovny viewBase nepotřebuje). Terminál i web volají tutéž `ask`.
+**Web vizualizace (viewBase):** `./jelly web` spustí prohlížeč s grafem a **třemi
+okny**: dialog (konzole), ⚡ aktivační okno uzlů (seřazený jas) a 📄 aktivní
+dokumenty. Prohlížeč mluví s automatem **Iris** výhradně přes REST službu (viz
+sekce Iris níže); při dotazu se graf **živě rozsvěcuje** (aktivační pole)
+a **proletí trasa** (`ViewBaseView` = adaptér portu `GraphView`, volitelný
+`pip install viewbase`; jádro knihovny viewBase nepotřebuje).
 
 Runnable ukázky jsou v `examples/` (01 retrieval, 02 graf, 03 korpus, 04 konverzace,
 05 injektování bloku, 06 web). Návrh v
@@ -116,6 +118,14 @@ Měj se! 👋
 | `./jelly ask "otázka?"` | jednorázový dotaz |
 | `./jelly ask` | interaktivní prompt na dotazování |
 | `./jelly explain <blok>` | vysvětlí blok (bez argumentu vypíše seznam bloků) |
+| `./jelly annotate` | offline anotace vět (entity + role) — vstup faktového grafu |
+| `./jelly graph [--view]` | postaví faktový graf z anotací (`--view` = export do viewBase) |
+| `./jelly graph-ask [otázka]` | dotaz / interaktivní prompt přes faktový graf |
+| `./jelly web` | prohlížeč: graf + tři okna Iris (dialog / uzly / dokumenty, přes REST) |
+| `./jelly template [otázka]` | pravidlový (V3) dotaz / interaktivní prompt |
+| `./jelly qa-models` | stáhne ÚFAL modely (NameTag + MorphoDiTa + UDPipe) |
+| `./jelly wiki` | stáhne kurátorované české wiki články do `data/raw` |
+| `./jelly qa` | vygeneruje syntetický QA dataset (V2a) |
 
 ## Bez wrapperu (přímo přes Python)
 
@@ -152,7 +162,8 @@ Veškerá konfigurace (velikost pasáží, metoda vyhledávání, top-k, …) je
 ## Testy
 
 ```bash
-python -m pytest -v
+.venv/bin/python -m pytest -q     # bez aktivace venv (konvence projektu)
+python -m pytest -v               # v aktivovaném venv
 ```
 
 ## V2a — syntetická QA data (příprava pro generátor)
@@ -269,15 +280,77 @@ a **precizní answerer**. **Konverzační těžiště** (B2) navazuje follow-up 
 („…kdy se narodila? → 1818, …kde? → Slezsko"). Default `mode` zůstává `extractive`
 → nulová regrese. Detaily v `docs/superpowers/2026-07-16-fact-graph-results.md`.
 
+## Iris — stavový automat zaostření (aktuální směr)
+
+Nad faktovým grafem běží **Iris** (`jellyai/iris/`) — jazykově agnostický
+stavový automat pro **zaostření aktivace** uzlů: správné uzly mají svítit,
+špatné ne. Chování neřídí kód, ale **JSON pattern-karty**
+(`jellyai/iris/patterns/cs/` — 1 karta = 1 vzor: trigger → dialog → akce →
+teach; i prahy rozhodování nesou karty). Pod prahem jistoty (**QueryAssurance**)
+se automat ptá místo hádání („dialog > figly"). Otázku nejdřív zkouší
+**šablonový parser pseudo-QL** (`jellyai/answerer/query.py`; režim
+`GraphConfig.query_mode = "hybrid"` — šablony první, UDPipe fallback).
+
+Subsystémy:
+
+- **Chronos** (`jellyai/iris/chronos.py`) — orientace v čase: „dnes / včera /
+  před týdnem / tento měsíc / v 19. století" → absolutní intervaly; „teď" je
+  vždy injektovaný parametr (determinismus testů), živý běh bere systémové
+  hodiny; přímé hodinové odpovědi („Co je za den?", „Kolik je hodin?");
+  časové uzly grafu se rozsvěcují intervalem.
+- **Mnemos** (`jellyai/iris/mnemos.py`) — paměť uživatele: konstatování
+  („Dnes jsem měl knedlíky.") se uloží jako běžný fakt do TÉHOŽ grafu,
+  s časovou kotvou ukotvenou hned při uložení. Deník `data/memory.jsonl`
+  se při startu přehraje (perzistence napříč sezeními).
+- **Focus-shift** — „v kontextu Bible" není otázka, ale pokyn k zaostření:
+  posvítí na doménu a přehraje předchozí otázku v novém světle.
+
+**REST služba** (`services/iris_service.py`, port `8084` —
+`ServicesConfig.iris_port`) je jediný vstupní bod pro web i externí klienty:
+
+```bash
+.venv/bin/python services/iris_service.py --port 8084 --model data/graph.pkl
+curl -s localhost:8084/schema        # na co se lze ptát (predikáty, role, karty)
+```
+
+- `POST /query {"question", "temperature"?}` → odpověď/dialog + **metadata**:
+  assurance, použité komponenty a pattern-karty, aktivační okno uzlů
+  i aktivních dokumentů,
+- `POST /graphql {pattern JSON}` → přímé vykonání pseudo-QL patternu,
+- `POST /reset` → nový rozhovor, `GET /schema` → popis dotazovatelného.
+
+Web (`./jelly web`) se připojuje přes `IrisClient` (`jellyai/iris/client.py`)
+— na už běžící službu, nebo si ji nastartuje sám. Návrh a stav:
+`docs/superpowers/specs/2026-07-17-ql-automat.md` (spec)
+a `docs/superpowers/plans/2026-07-17-ql-automat.md` (plán).
+
+## Benchmarky — objektivní řízení změn
+
+Každá změna se měří čísly; normativy neklesají (guardrail). Stav: etalon
+28/28, focus 12/12, dialog 9/9 (vše 100 %).
+
+```bash
+.venv/bin/python benchmark/run_etalon.py    # správnost odpovědí (JÁDRO + gap tracking; --mode udpipe/hybrid/templates)
+.venv/bin/python benchmark/run_focus.py     # zaostření aktivace: expect uzly v top-K jasu
+.venv/bin/python benchmark/run_dialog.py    # dialogové scénáře Iris (fixní hodiny — determinismus)
+.venv/bin/python benchmark/run_coverage.py  # výtěžnost extrakce (kbelíky příčin) — diagnostika
+```
+
+Otevřené body a priority sleduje `docs/BACKLOG.md`.
+
 ## Roadmapa
 
 - **Hotovo:** V1 (retrieval + extraktivní QA), V2a (syntetická QA data),
   V3 (pravidlové odpovědi), V4a fáze A (bohatá analýza otázky), B1 (větný retrieval —
   zakonzervováno), **faktový graf** (reifikované n-ární fakty, zanořená data,
-  aktivační koreference, konverzační těžiště B2 — experimentální). V2b (generátor)
-  je na samostatné větvi.
-- **Další:** vizualizace tras/těžiště ve viewBase; fakt-jako-účastník (vedlejší věty);
-  *podmíněně* konsolidace kódu k grafu.
+  aktivační koreference, konverzační těžiště B2), **pseudo-QL** (šablonový
+  parser otázek, parita s UDPipe cestou, režim hybrid), **Iris fáze 0–3**
+  (pattern-karty, QueryAssurance, Chronos, Mnemos + perzistence, focus-shift,
+  REST služba :8084, web tři okna). V2b (generátor) je na samostatné větvi.
+- **Další:** sharpener (cross-distribuce + vyzařování focusu po hranách),
+  čistý řez (UDPipe pryč z query strany, answerer → pluginy, pohrobci do
+  `conserved_`), kanonizace aliasů uzlů — viz `docs/BACKLOG.md`.
 
-Detaily v `docs/superpowers/specs/2026-07-15-cesky-gpt-design.md` a
-`docs/superpowers/plans/2026-07-15-cesky-qa-v1.md`.
+Detaily v `docs/superpowers/specs/2026-07-15-cesky-gpt-design.md`,
+`docs/superpowers/specs/2026-07-17-ql-automat.md` a
+`docs/superpowers/plans/2026-07-17-ql-automat.md`.

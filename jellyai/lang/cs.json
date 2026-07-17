@@ -1,7 +1,8 @@
 {
   "language": "cs",
   "min_stem": 3,
-  "suffixes": ["ovými", "ových", "ovém", "ovou", "ové", "ová", "ovi", "ovu", "ovy",
+  "suffixes": ["ovými", "ových", "ovém", "ovou", "ové", "ová", "ova", "ovo",
+               "ovi", "ovu", "ovy", "ého", "ému",
                "ými", "ých", "ém", "ům", "ách", "emi", "ami", "ou", "em", "ěm",
                "é", "á", "ý", "í", "ú", "ó", "e", "ě", "y", "u", "a", "o", "i"],
   "vowel_fold": {"á": "a", "é": "e", "í": "i", "ó": "o", "ú": "u", "ů": "u", "ý": "y", "ě": "e"},

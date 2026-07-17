@@ -147,8 +147,12 @@ class GraphAnswerer(Answerer):
             node_stems = {_stem(w) for w in low_words}
             da_node = {deaccent(s) for s in node_stems}
             loose_node = frozenset(_loose(w) for w in low_words)
-            per_term = [(t == low_id or t in low_words, s in node_stems,
-                         d in da_node, l in loose_node)
+            # ALIASY (sloučené tvary z kanonizace) platí jako povrch uzlu:
+            # „Ježíše" je táž osoba jako uzel „Ježíš"
+            alias_forms = set(self.graph.aliases.get(node.id, ()))
+            alias_low = {a.lower() for a in alias_forms}
+            per_term = [(t == low_id or t in low_words or t in alias_low,
+                         s in node_stems, d in da_node, l in loose_node)
                         for t, s, d, l in zip(low_terms, stems, da_stems, loose)]
             # POKRYTÍ TERMŮ je primární patro: uzel trefený víc slovy dotazu
             # (jakýmkoli patrem) přebije jediný povrchový hit („Karla Čapka"
@@ -164,7 +168,8 @@ class GraphAnswerer(Answerer):
             # písmeno (lowercase lemma „vějíř" nerozliší pojem od titulu)
             exact_hits = sum(1 for t in terms
                              if any(ch.isupper() for ch in t)
-                             and (t == node.id or t in node.id.split()))
+                             and (t == node.id or t in node.id.split()
+                                  or t in alias_forms))
             # PREDIKÁTOVÁ AFINITA: mezi rovnocennými jmennými shodami vyhrává
             # uzel, o němž se predikát otázky dá vypovědět („Vějíř" s napsat
             # faktem) — ale jmenné shody nikdy nepřebije (Ludvík Němec ≠
@@ -175,8 +180,12 @@ class GraphAnswerer(Answerer):
             # aby „cestina"/„hru" dosáhly na uzel a nikdy nepřebily přesnější;
             # POKRYTÍ stojí i nad exact — skloněný povrchový uzel („Čapka")
             # nesmí jedinou přesnou shodou přebít plnější jméno
+            # PLNÉ POKRYTÍ uzlu (žádné nezakryté slovo) až ZA afinitou:
+            # exact „Ježíš" přebije slepenec „Ježíš Martu", ale fragment
+            # nikdy nepřebije plné jméno dřív, než promluví jmenná patra
+            full = int(coverage == len(low_words))
             score = (coverage, exact_hits, ins_hits, stem_hits, da_hits,
-                     loose_hits, affinity, len(low_words), node.weight)
+                     loose_hits, affinity, full, len(low_words), node.weight)
             candidates.append((node.id, stem_hits, node.weight,
                                loose_node, affinity, score[:6]))
             if best_score is None or score > best_score:
