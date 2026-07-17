@@ -84,6 +84,20 @@ class GraphAnswerer(Answerer):
         self._predicates = {f.predicate for f in graph.facts.values()}  # slovník QL
         self.query_mode = query_mode  # "udpipe" | "hybrid" | "templates" (pseudo-QL)
         self.history = []        # trajektorie konverzace (tahy s trasou a těžištěm)
+        self._word_set = None    # doslovná slova uzlů (veto neznámého slovesa)
+        self._resolved_knowns = set()   # entity otázky rozřešené tímto tahem
+
+    def _node_word(self, token):
+        """DOSLOVNÉ slovo některého ENTITNÍHO uzlu grafu — bez kmenových
+        pater (volná shoda by vetovala i slovesa: „Měl"≈šumový uzel „mle")
+        a bez výrokových uzlů (obsah řeči jsou celé věty, ne entity). Cache
+        se přestaví, když paměť Mnemos přidá uzly (fingerprint = počet)."""
+        if self._word_set is None or self._word_set[0] != len(self.graph.nodes):
+            self._word_set = (len(self.graph.nodes),
+                              {word for node in self.graph.nodes.values()
+                               if node.type != "výrok"
+                               for word in node.id.lower().split()})
+        return token.lower() in self._word_set[1]
 
     def reset(self):
         """Začne nový rozhovor — vymaže těžiště, provenienci i historii."""
@@ -294,12 +308,19 @@ class GraphAnswerer(Answerer):
         """
         self.visited = []                    # uzly protnuté (i)rekurzí → rozsvítit
         if pat.known:
-            known_set = set()
+            known_set, first_res = set(), None
             for _, known in pat.known:
                 node = self._solve(known, pat.predicate)   # rekurzivně (i vnořené)
                 if node is None:
                     return None, [], None    # pojmenované, ale neznámé → nehádat
                 known_set.add(node)
+                if first_res is None:
+                    first_res = self.last_resolution
+            if first_res is not None:
+                # evidence tahu = rozlišení PODMĚTU (první known) — pozdější
+                # předměty („rád") nesmí přepsat, o kom otázka je
+                self.last_resolution = first_res
+            self._resolved_knowns = set(known_set)
             filled = self._fill_subject(pat, qa)
             if filled is not None:
                 # QUERY-SIDE PRO-DROP: elidovaný podmět otázky („Jakou hru
@@ -321,6 +342,11 @@ class GraphAnswerer(Answerer):
                 # zjišťovací otázka („Napsal X Y?") — existence, ne díra
                 return self._existence(pat.predicate, known_set)
             return self._answer_from(pat, known_set)
+        if qa.qtype is None and pat.hole_role is None \
+                and pat.predicate is not None:
+            # zjišťovací otázka BEZ účastníků („Pršelo dnes?") — existence
+            # samotného predikátu; časový interval už rozsvítil Chronos
+            return self._existence(pat.predicate, set())
         if pat.predicate is None and pat.hole_role and self._prev_trace:
             # holé tázací navázání („Kdy?", „Kde?") = drill do POSLEDNÍHO
             # faktu — jeho účastník v roli/typu díry
@@ -593,6 +619,17 @@ class GraphAnswerer(Answerer):
         """
         if predicate is None:
             return None, [], None
+        if not known_set:
+            # bez pojmenovaných účastníků („Pršelo dnes?"): existuje fakt
+            # s predikátem vůbec? Téma = první entitní účastník nálezu
+            rings = {pred for pred, _ in _synonym_ring(predicate)}
+            for fact in self.graph.facts.values():
+                if fact.predicate in rings:
+                    self.visited.extend(p.node for p in fact.participants)
+                    topic = next((p.node for p in fact.participants
+                                  if p.role in ("subj", "obj")), None)
+                    return topic, ["Ano"], fact
+            return None, [], None
         node0 = next(iter(known_set))
         for pred, _ in _synonym_ring(predicate):
             for fact in self.graph.facts_of(node0, predicate=pred):
@@ -750,7 +787,8 @@ class GraphAnswerer(Answerer):
         # ŠABLONY (pseudo-QL, bez UDPipe); UDPipe jen mimo templates režim.
         qa, pat = None, None
         if self.query_mode in ("hybrid", "templates"):
-            query = build_query(question, self._predicates, self._span_is_node)
+            query = build_query(question, self._predicates, self._span_is_node,
+                                self._node_word)
             if query is not None:
                 qa, pat = query, query.pattern
         if qa is None and self.query_mode != "templates":
@@ -759,7 +797,15 @@ class GraphAnswerer(Answerer):
         if qa is None:                    # templates-only a šablony nic → nehádat
             qa, pat = Query(), Pattern()
         self.last_pattern = pat
+        self._resolved_knowns = set()
         topic, values, fact = self._pattern_answer(question, pat, qa)
+        for node in self._resolved_knowns:
+            # ROZŘEŠENÍ JE ZAOSTŘENÍ: pojmenované entity otázky svítí i bez
+            # odpovědi — navazující tah („ano, měl rád knedlíky.") potřebuje
+            # vědět, o kom byla řeč. Až PO matchi: vnitřní guardy „je téma
+            # žhavé z MINULÉHO tahu?" nesmí vidět jas právě probíhajícího
+            # rozřešení (svěží identitní otázka by hádala z kontextu)
+            self.context.warm(node, 0.5)
         reverse = False
         focus = None                # UZEL odpovědi (paměť/okolí ≠ složený text)
         if not values:

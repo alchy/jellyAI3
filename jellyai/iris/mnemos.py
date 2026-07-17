@@ -137,8 +137,15 @@ def parse_statement(text, now, deck=None, is_node=None):
     if predicate is None:
         return None
     interval = resolve_temporal(text, now)
+    time_label = None
     if interval is None:
         interval = resolve_temporal("dnes", now)   # čas výroku = dnešek
+        if card.action.get("time_granularity") == "moment":
+            # DĚJ se kotví na OKAMŽIK výroku — den nestačí („Venku prší"
+            # v 14:32 ≠ celý den); přesnost určuje karta, ne kód
+            time_label = f"{_date_label(interval)} {now.hour}:{now.minute:02d}"
+    if time_label is None:
+        time_label = _date_label(interval)
     temporal_words = (set(lang["temporal"].get("day_words", ()))
                       | set(lang["temporal"].get("units", ()))
                       | set(lang["temporal"].get("now_words", ())))
@@ -147,6 +154,7 @@ def parse_statement(text, now, deck=None, is_node=None):
                if norm not in lang["first_person"]
                and norm not in lang["copula_forms"]
                and norm not in lang["query_skip_words"]
+               and norm not in lang["confirmation_words"]
                and norm not in temporal_words
                and not (exclude_l and _l_form(tok) is not None)
                and tok != predicate            # sloveso není účastník
@@ -154,7 +162,8 @@ def parse_statement(text, now, deck=None, is_node=None):
     if not objects or (kind == "observation" and len(objects) < 2):
         return None
     return {"kind": kind, "predicate": predicate, "objects": objects,
-            "time": _date_label(interval), "card": card.name}
+            "time": time_label, "card": card.name,
+            "needs_subject": card.action.get("subject_from") == "context"}
 
 
 def remember(graph, statement, user_entity):
@@ -175,6 +184,12 @@ def remember(graph, statement, user_entity):
     if statement["kind"] == "episode":
         participants = [Participant("subj", user_entity, "person")]
         participants += [Participant("obj", obj, "concept") for obj in objects]
+    elif statement["kind"] == "attributed":
+        # fakt PŘIPSANÝ korpusové osobě („ano, měl rád knedlíky" → subjekt
+        # z těžiště/výroku doplnil automat); uživatel je zdroj (theme)
+        participants = [Participant("subj", statement["subject"], "person")]
+        participants += [Participant("obj", obj, "concept") for obj in objects]
+        participants.append(Participant("theme", user_entity, "person"))
     elif statement["kind"] == "event":
         # prézentní děj („Venku prší"): účastníci jsou obsahová slova,
         # uživatel je pozorovatel — zjišťovací „Prší venku?" pak sedí
@@ -187,7 +202,10 @@ def remember(graph, statement, user_entity):
         participants.append(Participant("theme", user_entity, "person"))
     participants.append(Participant("time", statement["time"], "time"))
     graph.add_fact(make_fact(statement["predicate"], participants))
-    return f"{statement['predicate']}: {', '.join(objects)} ({statement['time']})"
+    detail = f"{statement['predicate']}: {', '.join(objects)} ({statement['time']})"
+    if statement["kind"] == "attributed":
+        detail = f"{statement['subject']} — {detail}"
+    return detail
 
 
 def persist(statement, path):

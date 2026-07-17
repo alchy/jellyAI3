@@ -13,6 +13,7 @@ from config import AnswererConfig
 from jellyai.answerer.extractive import ExtractiveAnswerer
 from jellyai.answerer.graph_answerer import GraphAnswerer
 from jellyai.graph.graph import FactGraph
+from jellyai.graph.extract import make_fact, Participant
 from jellyai.iris.automaton import IrisAutomaton
 from jellyai.iris.mnemos import parse_statement, remember
 from jellyai.ufal_client import FakeUfalClient
@@ -68,16 +69,19 @@ def test_remember_writes_user_fact_into_graph():
 
 def test_present_tense_observation_is_recognized():
     """„Venku prší." — pozorování s prézentním slovesem (bez spony i 1. osoby):
-    rys finite_verb + karta statement-event; timestamp jako vždy."""
+    rys finite_verb + karta statement-event; DĚJ se kotví na okamžik výroku
+    (den + hodina:minuta — přesnost určuje karta `time_granularity`)."""
     fact = parse_statement("Venku prší.", NOW)
     assert fact is not None and fact["kind"] == "event"
     assert fact["predicate"] == "prší"
     assert "Venku" in fact["objects"]
-    assert fact["time"] == "17. července 2026"
+    assert fact["time"] == "17. července 2026 12:00"
 
 
 def test_present_event_round_trip_via_iris():
-    """Uložené prézentní pozorování jde dotázat zjišťovací otázkou."""
+    """Uložené prézentní pozorování jde dotázat zjišťovací otázkou — i
+    minulým časem bez účastníků („Pršelo dnes?": l-příčestí se spáruje
+    s prézentním predikátem, „dnes" je Chronos filtr, ne účastník)."""
     g = FactGraph()
     answerer = GraphAnswerer(g, FakeUfalClient(),
                              ExtractiveAnswerer(AnswererConfig()),
@@ -87,6 +91,63 @@ def test_present_event_round_trip_via_iris():
     assert "Zapamatováno" in stored.text
     out = iris.turn("Prší venku?")
     assert out.text == "Ano"
+    out = iris.turn("Pršelo dnes?")
+    assert out.text == "Ano"
+
+
+def _capek_graph():
+    g = FactGraph()
+    g.add_fact(make_fact("být", [Participant("subj", "Karel Čapek", "person"),
+                                 Participant("pred", "spisovatel", "concept")]))
+    return g
+
+
+def test_confirmation_attributes_fact_to_hot_person():
+    """„Měl KČ rád knedlíky?" → nenašel (ale KČ se ROZSVÍTÍ — rozřešení
+    entit otázky je zaostření i bez odpovědi) → „ano, měl rád knedlíky." →
+    subjekt z konverzačního těžiště → fakt do paměti → táž otázka → Ano."""
+    answerer = GraphAnswerer(_capek_graph(), FakeUfalClient(),
+                             ExtractiveAnswerer(AnswererConfig()),
+                             query_mode="templates")
+    iris = IrisAutomaton(answerer, clock=lambda: NOW)
+    first = iris.turn("Měl Karel Čapek rád knedlíky?")
+    assert first.text != "Ano"                   # poctivé nenašel
+    stored = iris.turn("ano, měl rád knedlíky.")
+    assert "Zapamatováno" in stored.text
+    assert "Karel Čapek" in stored.text          # komu se fakt připsal
+    out = iris.turn("Měl Karel Čapek rád knedlíky?")
+    assert out.text == "Ano"
+
+
+def test_explicit_person_in_statement_beats_context():
+    """„Josef Čapek měl rád barvy." — explicitní osoba ve výroku má přednost
+    před těžištěm; „ano" (potvrzovací slovo) není účastník."""
+    g = _capek_graph()
+    g.add_fact(make_fact("být", [Participant("subj", "Josef Čapek", "person"),
+                                 Participant("pred", "malíř", "concept")]))
+    answerer = GraphAnswerer(g, FakeUfalClient(),
+                             ExtractiveAnswerer(AnswererConfig()),
+                             query_mode="templates")
+    iris = IrisAutomaton(answerer, clock=lambda: NOW)
+    iris.turn("Kdo je Karel Čapek?")             # těžiště = KAREL
+    stored = iris.turn("ano, Josef Čapek měl rád barvy.")
+    assert "Josef Čapek" in stored.text
+    fact = next(f for f in iris.answerer.graph.facts.values()
+                if f.predicate == "měl")
+    parts = {(p.role, p.node) for p in fact.participants}
+    assert ("subj", "Josef Čapek") in parts
+    assert not any(p.node == "ano" for p in fact.participants)
+
+
+def test_attribution_without_hot_person_does_not_memorize():
+    """Bez svítící osoby (i po neúspěšném tahu) se nic nepřipisuje —
+    poctivé nenašel místo faktu přišitého komukoli."""
+    iris = IrisAutomaton(GraphAnswerer(FactGraph(), FakeUfalClient(),
+                                       ExtractiveAnswerer(AnswererConfig()),
+                                       query_mode="templates"),
+                         clock=lambda: NOW)
+    out = iris.turn("ano, měl rád knedlíky.")
+    assert "Zapamatováno" not in out.text
 
 
 def test_new_card_extends_recognition_without_code(tmp_path):

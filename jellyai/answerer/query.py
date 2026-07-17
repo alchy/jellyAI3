@@ -141,12 +141,16 @@ def _verb_match(token, predicates, first=False):
             # krátké lemma („žít"): stačí kmen bez koncové souhlásky, ale tvar
             # musí být l-ové příčestí („zima" ≠ „žít")
             ok = common >= len(p) - 1 and low.rstrip("aeiouy").endswith("l")
+        if not ok and low.rstrip("aeiouy").endswith("l"):
+            # paměťový predikát v PRÉZENTU („prší") vs. l-ové příčestí otázky
+            # („Pršelo") — kmen musí pokrýt celé lemma kromě koncové samohlásky
+            ok = common >= max(3, len(p) - 1)
         if ok and (best is None or common > best[1]):  # pylint: disable=unsubscriptable-object
             best = (pred, common)
     return best[0] if best else None
 
 
-def build_query(question, predicates, is_node=None):  # pylint: disable=too-many-locals,too-many-return-statements
+def build_query(question, predicates, is_node=None, is_word=None):  # pylint: disable=too-many-locals,too-many-return-statements,too-many-branches
     """Otázku (končící „?") přeloží šablonou nad slovníkem grafu na `Query`.
 
     Args:
@@ -155,6 +159,9 @@ def build_query(question, predicates, is_node=None):  # pylint: disable=too-many
         is_node (callable | None): Přísný test `span → bool`, zda se rozpětí
             rozřeší na uzel grafu (slovník entit je graf — spec 4.3). None =
             bez dělení běhů (celý běh je entita).
+        is_word (callable | None): DOSLOVNÉ slovo některého uzlu (bez
+            kmenových pater) — veto pro čtení neznámého slovesa; volná
+            shoda by sloveso zabila šumem („Měl"≈uzel „mle").
 
     Returns:
         Query | None: Pseudo-QL pattern + šablonová analýza (qtype/rod/spona);
@@ -181,12 +188,34 @@ def build_query(question, predicates, is_node=None):  # pylint: disable=too-many
         # začíná slovesem spárovaným s predikátem grafu; díra žádná —
         # answerer ji vykoná jako existenční test („Ano"/nenašel)
         verb = _verb_match(tokens[0], predicates, first=True)
-        if verb is None or (is_node is not None and is_node(tokens[0])
-                            and not _exact_predicate(tokens[0], predicates)):
+        if verb is not None:
+            if is_node is not None and is_node(tokens[0]) \
+                    and not _exact_predicate(tokens[0], predicates):
+                return None
+        elif _norm(tokens[0]) not in lang["copula_forms"]:
+            # NEZNÁMÉ sloveso: l-ové příčestí na začátku zjišťovací otázky
+            # („Měl … rád knedlíky?" před prvním záznamem paměti) nese
+            # existenční dotaz i bez slovníku grafu — odpoví se poctivé
+            # „nenašel", ale entity otázky se rozřeší a ROZSVÍTÍ, takže
+            # navazující potvrzení („ano, měl rád knedlíky.") ví, o kom
+            # byla řeč. Veto entity je tu DOSLOVNÉ (`is_word`).
+            stem = tokens[0].lower().rstrip("aioy")
+            if stem.endswith("l") and len(stem) >= 3 \
+                    and not (is_word is not None and is_word(tokens[0])):
+                verb = stem
+        if verb is None:
             return None
-        known = _collect_known(tokens[1:], predicates, relational, is_node)
-        if not known:                     # None (sirotek) i [] (bez entit)
+        # časová slova nejsou účastníci — filtr intervalu drží Chronos
+        temporal = {w for key in ("day_words", "units", "now_words",
+                                  "current_words")
+                    for w in lang["temporal"].get(key, ())}
+        rest = [t for t in tokens[1:] if _norm(t) not in temporal]
+        known = _collect_known(rest, predicates, relational, is_node)
+        if known is None:                 # sirotek v běhu — nehádat
             return None
+        if not known and _verb_match(tokens[0], predicates,
+                                     first=True) is None:
+            return None    # bez entit i bez známého predikátu není co testovat
         known = [("subj" if i == 0 else "obj", term)
                  for i, (_, term) in enumerate(known)]
         return Query(Pattern(verb, known, None, None), qtype=None,

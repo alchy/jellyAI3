@@ -69,6 +69,8 @@ def load_rules(language="cs"):
             rules.get("focus_shift_phrases", ()))
         rules["present_verb_endings"] = tuple(
             rules.get("present_verb_endings", ()))
+        rules["confirmation_words"] = frozenset(
+            rules.get("confirmation_words", ()))
         _cache[path] = rules
     return _cache[path]
 

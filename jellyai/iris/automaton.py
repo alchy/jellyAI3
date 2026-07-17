@@ -145,6 +145,13 @@ class IrisAutomaton:
             # DRUH výroku rozhodují karty (utterance.statement), ne kód
             statement = parse_statement(text, self.clock(), self.deck,
                                         is_node=self._known_word)
+            if statement is not None and statement.get("needs_subject"):
+                subject, rest = self._statement_subject(statement["objects"])
+                if subject is None:
+                    statement = None     # není komu připsat → nepřipisovat
+                else:
+                    statement["subject"] = subject
+                    statement["objects"] = rest
             if statement is not None:
                 return self._memorize(text, statement)
         # ČASOVÁ OSA ZAOSTŘENÍ: primitivum v otázce („tento měsíc", „včera")
@@ -213,6 +220,29 @@ class IrisAutomaton:
         entry["used"] += 1
         entry["gain"] += round(gain, 4)
 
+    def _statement_subject(self, objects):
+        """Podmět připsaného tvrzení: EXPLICITNÍ osoba ve výroku (nejdelší
+        rozpětí objektů rozřešitelné na person uzel) má přednost; jinak
+        nejteplejší osoba konverzačního těžiště (o kom se právě mluvilo).
+
+        Returns:
+            tuple: (id osoby | None, objekty bez rozpětí podmětu).
+        """
+        for size in range(len(objects), 0, -1):
+            for i in range(len(objects) - size + 1):
+                span = " ".join(objects[i:i + size])
+                if not self.answerer._span_is_node(span):  # pylint: disable=protected-access
+                    continue
+                node = self.answerer._resolve_topic(span.split(), warm=False)  # pylint: disable=protected-access
+                found = self.answerer.graph.nodes.get(node)
+                if found is not None and found.type == "person":
+                    return node, objects[:i] + objects[i + size:]
+        for candidate in self.answerer._context_candidates():  # pylint: disable=protected-access
+            node = self.answerer.graph.nodes.get(candidate)
+            if node is not None and node.type == "person":
+                return candidate, objects
+        return None, objects
+
     def _known_word(self, token):
         """DOSLOVNÉ slovo uzlu grafu? Veto pro detekci slovesa v Mnemos:
         „nádraží" (věc) sloveso není, „prší" (v grafu nefiguruje) ano.
@@ -264,6 +294,12 @@ class IrisAutomaton:
         """
         pending = self.state.pending
         if pending is None:
+            return None
+        if "?" in text:
+            # NOVÁ OTÁZKA místo volby — odpověď se netýká zaostření (i kdyby
+            # sdílela slova s kandidáty: „Kdo je Ježíš Martu?" po nabídce
+            # oblastí); nabídka končí a otázka jde běžnou cestou
+            self.state.pending = None
             return None
         words = {deaccent(w.lower()) for w in re.findall(r"[\w.]+", text)}
         if not words:

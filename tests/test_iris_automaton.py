@@ -64,6 +64,18 @@ def test_user_pick_resumes_and_answers():
     assert out.kind == "answer" and "malíř" in out.text
 
 
+def test_new_question_escapes_pending_offer():
+    """Uživatel na nabídku zaostření neodpoví volbou, ale NOVOU otázkou —
+    automat pozná, že odpověď se zaostření netýká (i když sdílí slova
+    s kandidáty: „Kdo je Josef Čapek?"), nabídku zahodí a otázku zodpoví."""
+    iris = _iris(_brothers_graph())
+    first = iris.turn("Kdo je Čapek?")
+    assert first.kind == "dialog"
+    out = iris.turn("Kdo je Josef Čapek?")
+    assert out.kind == "answer" and "malíř" in out.text
+    assert iris.state.pending is None            # nabídka skončila
+
+
 def test_unanswerable_gets_honest_terminal():
     """Rozlišený uzel bez odpovědního faktu → upřímný terminál s kandidáty
     (žádné hádání), kandidát se rozsvítí pro další tah."""
