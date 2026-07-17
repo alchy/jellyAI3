@@ -34,7 +34,8 @@ from jellyai.iris.subsystems.chronos import (TimeInterval, clock_answer,
                                              format_due, resolve_due,
                                              resolve_plan, resolve_temporal,
                                              resolve_weekday)
-from jellyai.iris.subsystems.mnemos import parse_statement, persist, remember, replay
+from jellyai.iris.subsystems.mnemos import (note_statement, parse_statement,
+                                            persist, remember, replay)
 from jellyai.iris.patterns import PatternDeck
 from jellyai.iris.presenter import activation_window, docs_window
 from jellyai.iris.state import FocusState, PendingFocus
@@ -187,6 +188,13 @@ class IrisAutomaton:
                             return self._set_reminder(pending["task"], due,
                                                       text, record=pending)
                         return self._set_reminder(pending, due, text)
+            memo = next((p for p in sorted(current()["memorize_phrases"],
+                                           key=len, reverse=True)
+                         if p in deaccent(text.lower())), None)
+            if memo is not None:
+                memorized = self._memorize_command(text, memo)
+                if memorized is not None:
+                    return memorized
             managed = self._plan_manage(text)
             if managed is not None:
                 return managed
@@ -356,6 +364,44 @@ class IrisAutomaton:
             used={"components": ["chronos"], "patterns": [card.name]})
         self.state.remember(text, response)
         return response
+
+    def _memorize_command(self, text, phrase):
+        """EXPLICITNÍ příkaz paměti („zapamatuj si, že…", „nezapomeň, …",
+        „zapiš si za uši…"): zbytek věty jde běžnou kartovou klasifikací
+        konstatování (fakt s místem/časem); bez rozpoznatelné struktury
+        (přísloví) se uloží DOSLOVNĚ jako poznámka (karta memory-note) —
+        příkaz „pamatuj" znamená persistenci vždy."""
+        words = phrase.split()
+        tokens = re.findall(r"[\w:.]+", text)
+        lows = [deaccent(t.lower()).rstrip(".") for t in tokens]
+        start = None
+        for i in range(len(lows) - len(words) + 1):
+            if lows[i:i + len(words)] == words:
+                start = i + len(words)
+                break
+        if start is None:
+            return None
+        rest = tokens[start:]
+        while rest and deaccent(rest[0].lower()).rstrip(".") in ("ze", "at"):
+            rest.pop(0)
+        remainder = " ".join(rest)
+        if not remainder:
+            return None
+        statement = parse_statement(remainder, self.clock(), self.deck,
+                                    is_node=self._known_word)
+        if statement is not None and statement.get("needs_subject"):
+            subject, others = self._statement_subject(statement["objects"])
+            if subject is None:
+                statement = None
+            else:
+                statement["subject"] = subject
+                statement["objects"] = others
+        if statement is None:
+            card = self.deck.best("memory.note", {})
+            if card is None:
+                return None
+            statement = note_statement(remainder.rstrip("."), self.clock())
+        return self._memorize(text, statement)
 
     def _plan_manage(self, text):  # pylint: disable=too-many-locals,too-many-branches
         """SPRÁVA PLÁNU dialogem: „zruš všechno na zítra", „posuň všechny

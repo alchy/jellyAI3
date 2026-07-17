@@ -1,0 +1,7 @@
+{
+  "name": "memory-note",
+  "trigger": {"event": "memory.note"},
+  "dialog": "Zapamatováno: {fact}",
+  "action": {},
+  "teach": "Explicitní příkaz paměti (zapamatuj si, pamatuj, ulož si — tabulka memorize_phrases): zbytek věty jde běžnou kartovou klasifikací konstatování; bez rozpoznatelné struktury (přísloví) se uloží DOSLOVNĚ jako poznámka — výrok uživatele s časovou kotvou v deníku."
+}

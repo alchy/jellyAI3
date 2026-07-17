@@ -172,6 +172,34 @@ def test_new_card_extends_recognition_without_code(tmp_path):
     assert fact["predicate"] == "pršel"
 
 
+def test_explicit_memory_commands_structured_and_note(tmp_path):
+    """Explicitní příkazy paměti (zadání): strukturovaný zbytek jde
+    kartami („Karel je vtipný chlapek" → fakt; „Pavel bydlí na Barrandově"
+    → fakt s místem), přísloví bez struktury se uloží DOSLOVNĚ jako
+    poznámka — a vše PŘEŽIJE restart (deník)."""
+    path = str(tmp_path / "memory.jsonl")
+    answerer = GraphAnswerer(FactGraph(), FakeUfalClient(),
+                             ExtractiveAnswerer(AnswererConfig()),
+                             query_mode="templates", clock=lambda: NOW)
+    iris = IrisAutomaton(answerer, clock=lambda: NOW, memory_path=path)
+    assert "Zapamatováno" in iris.turn(
+        "Zapamatuj si, že Karel je vtipný chlapek.").text
+    assert "vtipný" in iris.turn("Jaký je Karel?").text
+    assert "Zapamatováno" in iris.turn(
+        "Nezapomeň, Pavel bydlí na Barrandově.").text
+    assert "Barrandově" in iris.turn("Kde bydlí Pavel?").text
+    out = iris.turn("Ulož si, co se škádlívá, to se rádo má.")
+    assert "Zapamatováno" in out.text and "škádlívá" in out.text
+    # persistence: nová instance přehraje deník a odpovídá dál
+    fresh = GraphAnswerer(FactGraph(), FakeUfalClient(),
+                          ExtractiveAnswerer(AnswererConfig()),
+                          query_mode="templates", clock=lambda: NOW)
+    again = IrisAutomaton(fresh, clock=lambda: NOW, memory_path=path)
+    assert "Barrandově" in again.turn("Kde bydlí Pavel?").text
+    assert any(f.predicate == "poznamenat"
+               for f in fresh.graph.facts.values())
+
+
 def test_full_dumpling_scenario_via_iris():
     """Scénář uživatele: konstatování → paměť; otázka s „v tomto roce" →
     odpověď z Mnemos faktu (Chronos ukotvil čas při uložení)."""

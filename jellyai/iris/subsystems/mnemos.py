@@ -179,6 +179,17 @@ def parse_statement(text, now, deck=None, is_node=None):
             "needs_subject": card.action.get("subject_from") == "context"}
 
 
+def note_statement(text, now):
+    """POZNÁMKA — explicitní příkaz paměti bez rozpoznatelné struktury
+    („Ulož si, co se škádlívá, to se rádo má."): text se uchová DOSLOVNĚ
+    jako výrok uživatele s časovou kotvou. Příkaz řekl „pamatuj" —
+    persistence náleží i příslovím."""
+    interval = resolve_temporal("dnes", now)
+    return {"kind": "note", "predicate": current()["note_predicate"],
+            "objects": [text], "places": [], "time": _date_label(interval),
+            "card": "memory-note", "needs_subject": False}
+
+
 def remember(graph, statement, user_entity):
     """Uloží rozložené konstatování do grafu jako časově ukotvený fakt.
 
@@ -200,7 +211,10 @@ def remember(graph, statement, user_entity):
         if node in places:
             return Participant("loc", node, "geo")
         return Participant(role, node, typ)
-    if statement["kind"] == "episode":
+    if statement["kind"] == "note":
+        participants = [Participant("subj", user_entity, "person"),
+                        Participant("pred", objects[0], "výrok")]
+    elif statement["kind"] == "episode":
         participants = [Participant("subj", user_entity, "person")]
         participants += [_part("obj", obj, "concept") for obj in objects]
     elif statement["kind"] == "attributed":

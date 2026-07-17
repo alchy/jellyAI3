@@ -80,6 +80,8 @@ def load_rules(language="cs"):
         rules["relation_query_nouns"] = frozenset(
             rules.get("relation_query_nouns", ()))
         rules["reminder_phrases"] = tuple(rules.get("reminder_phrases", ()))
+        rules["memorize_phrases"] = tuple(rules.get("memorize_phrases", ()))
+        rules["note_predicate"] = rules.get("note_predicate", "poznamenat")
         rules["plan_query_phrases"] = tuple(
             rules.get("plan_query_phrases", ()))
         for key in ("plan_cancel_words", "plan_move_words", "plan_all_words"):
