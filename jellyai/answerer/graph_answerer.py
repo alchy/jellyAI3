@@ -499,6 +499,14 @@ class GraphAnswerer(Answerer):
                 for part in fact.participants:
                     if part.node in known_set or len(part.node) < 2:
                         continue             # díra ≠ známé; 1-znak = artefakt NER
+                    if hole_type == "geo" and not exact \
+                            and (node := self.graph.nodes.get(part.node)) \
+                            and node.type == "person":
+                        # OSOBA jako místo („přišel K JOSEFOVI") jen u
+                        # PŘESNÉHO predikátu — synonymní kruh („přespal"
+                        # ≈ přijít) ji na „kde" půjčovat nesmí; rozhoduje
+                        # typ UZLU (typ účastníka je u geo jmen šumový)
+                        continue
                     if pred in ("být", "druh", "kontext") \
                             and any(part.node.lower() in k.lower().split()
                                     for k in known_set):
