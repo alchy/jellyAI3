@@ -165,6 +165,20 @@ class ViewBaseView:
         (Chronos tep) pushují přes REST `/api/event` (viewBase most)."""
         self._canvas.on(name, handler)
 
+    def open_reminder(self, text):
+        """Otevře STATICKÉ okno „⏰ Reminder" s textem připomínky.
+
+        Okno VISÍ, dokud ho uživatel nezavře (closable=True, bez vstupu) —
+        připomínka nesmí zapadnout v toku konzole. Každá připomínka má
+        vlastní okno (unikátní id) — víc připomínek = víc oken.
+        """
+        self._reminder_seq = getattr(self, "_reminder_seq", 0) + 1
+        window = self._vb.TerminalWindow(f"reminder-{self._reminder_seq}",
+                                         title="⏰ Reminder", prompt="",
+                                         closable=True, input=False)
+        self._canvas.open_terminal(window, on_input=lambda event: None)
+        self._canvas.terminal_write(window.window_id, text)
+
     def open_docs_panel(self):
         """Otevře druhé konzolové okno — živý panel nejaktivnějších dokumentů
         (attention nad soubory). Aktualizuje se `write_docs` po každém dotazu."""

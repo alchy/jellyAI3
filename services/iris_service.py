@@ -106,15 +106,15 @@ def make_routes(automaton, deck):
     return posts, gets
 
 
-def _web_notify(host, port, message):
-    """Push připomínky do webové konzole (REST event `terminal_write`).
+def _web_event(host, port, event, message):
+    """Push eventu do webu (viewBase REST most `/api/event`).
 
     Iniciátorem je CHRONOS — web je pasivní displej; když neběží, push
     tiše selže (konzole služby připomínku nese vždy).
     """
     import json as _json
     import urllib.request
-    body = _json.dumps({"event": "terminal_write",
+    body = _json.dumps({"event": event,
                         "payload": {"window_id": "konzole",
                                     "line": message}}).encode("utf-8")
     request = urllib.request.Request(
@@ -122,6 +122,26 @@ def _web_notify(host, port, message):
         headers={"Content-Type": "application/json"})
     with urllib.request.urlopen(request, timeout=2):
         pass
+
+
+def _channels(config):
+    """REGISTR KANÁLŮ připomínek (spec §4.3 — modularita pro integrace).
+
+    Kanál = jméno → funkce(message). Dnes `console` (konzole služby +
+    řádek webové konzole) a `window` (statické okno ⏰ Reminder visící
+    do zavření). Budoucí `alarm-audio`/`email`/`whatsapp` se sem jen
+    PŘIDAJÍ — jádro se nemění; volbu kanálu ponesou karty.
+    """
+    host, port = config.services.host, config.services.web_port
+
+    def console(message):
+        print(f"\n{message}", flush=True)
+        _web_event(host, port, "terminal_write", message)
+
+    def window(message):
+        _web_event(host, port, "reminder_window", message)
+
+    return {"console": console, "window": window}
 
 
 def main():
@@ -139,13 +159,14 @@ def main():
                               memory_path=config.graph.memory_path,
                               reminders_path=config.graph.reminders_path)
 
+    channels = _channels(config)
+
     def notify(message):
-        print(f"\n{message}", flush=True)
-        try:
-            _web_notify(config.services.host, config.services.web_port,
-                        message)
-        except Exception:  # noqa: BLE001 — web nemusí běžet
-            pass
+        for send in channels.values():   # v1: všechny kanály; volbu
+            try:                         # per připomínka ponesou karty
+                send(message)
+            except Exception:  # noqa: BLE001 — web nemusí běžet
+                pass
 
     ChronosTicker(automaton.fire_due, notify).start()   # vlastní vlákno hodin
     posts, gets = make_routes(automaton, deck)
