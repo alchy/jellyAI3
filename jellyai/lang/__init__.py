@@ -71,6 +71,8 @@ def load_rules(language="cs"):
             rules.get("present_verb_endings", ()))
         rules["confirmation_words"] = frozenset(
             rules.get("confirmation_words", ()))
+        rules["name_case_agreement"] = bool(
+            rules.get("name_case_agreement", False))
         _cache[path] = rules
     return _cache[path]
 

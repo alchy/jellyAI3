@@ -109,6 +109,81 @@ def test_entity_scrub_drops_lowercase_glued_person():
     assert kept == ["Abraham", "Betlém"]
 
 
+def test_entity_scrub_drops_case_disagreeing_name():
+    """NameTag kontejner „Ježíš Martu" (Jan 11,5 — akuzativní Marta jako
+    „příjmení" nominativního Ježíše): české víceslovné jméno se skloňuje
+    VE SHODĚ, pádově neshodné PROPN členy jsou dva větní účastníci, ne
+    jméno (jazykové pravidlo `name_case_agreement`). Členy kontejneru
+    (skutečné osoby věty) zůstávají."""
+    from jellyai.graph.hygiene import form_case_votes, scrub_entities
+    annotations = {("doc", 0): {"sentences": [[
+        {"form": "Ježíš", "upos": "PROPN", "start": 0, "end": 5,
+         "feats": {"Case": "Nom"}},
+        {"form": "Martu", "upos": "PROPN", "start": 6, "end": 11,
+         "feats": {"Case": "Acc"}},
+        {"form": "miloval", "upos": "VERB", "start": 12, "end": 19,
+         "feats": {}},
+    ]], "entities": [
+        {"text": "Ježíš Martu", "type": "P", "start": 0, "end": 11},
+        {"text": "Ježíš", "type": "pf", "start": 0, "end": 5},
+        {"text": "Martu", "type": "ps", "start": 6, "end": 11},
+    ]}}
+    dropped = scrub_entities(annotations, form_case_votes(annotations))
+    kept = [e["text"] for e in annotations[("doc", 0)]["entities"]]
+    assert dropped == 1                      # jen kontejner
+    assert kept == ["Ježíš", "Martu"]
+
+
+def test_entity_scrub_case_rule_survives_local_mistag():
+    """Reálný tvar chyby z Jan 11,5: UDPipe v TÉ větě otagoval „Ježíš" jako
+    VERB (bez pádu), takže lokální neshoda nevznikne — ale 3+ nominativní
+    výskyty tvaru jinde v korpusu vědí lépe (korpusový fallback pádu)."""
+    from jellyai.graph.hygiene import form_case_votes, scrub_entities
+    elsewhere = [[{"form": "Ježíš", "upos": "PROPN", "start": 100 + i,
+                   "end": 105 + i, "feats": {"Case": "Nom"}}]
+                 for i in range(3)]
+    annotations = {("doc", 0): {"sentences": [[
+        {"form": "Ježíš", "upos": "VERB", "start": 0, "end": 5,
+         "feats": {"Mood": "Ind", "Person": "2"}},      # mis-tag, žádný pád
+        {"form": "Martu", "upos": "PROPN", "start": 6, "end": 11,
+         "feats": {"Case": "Acc"}},
+    ]], "entities": [
+        {"text": "Ježíš Martu", "type": "P", "start": 0, "end": 11},
+        {"text": "Ježíš", "type": "pf", "start": 0, "end": 5},
+        {"text": "Martu", "type": "ps", "start": 6, "end": 11},
+    ]}}
+    annotations.update({("doc", i + 1): {"sentences": [s], "entities": []}
+                        for i, s in enumerate(elsewhere)})
+    dropped = scrub_entities(annotations, form_case_votes(annotations))
+    kept = [e["text"] for e in annotations[("doc", 0)]["entities"]]
+    assert dropped == 1
+    assert kept == ["Ježíš", "Martu"]
+
+
+def test_entity_scrub_keeps_agreeing_and_uncertain_names():
+    """Skloněné jméno ve shodě („Karla Čapka" Gen+Gen) zůstává; člen bez
+    jistého pádu (nesklonné příjmení bez feats, víceznačné „Acc,Nom")
+    neshodu nezakládá — soudí se jen dva JISTÉ různé pády."""
+    from jellyai.graph.hygiene import form_case_votes, scrub_entities
+    annotations = {("doc", 0): {"sentences": [[
+        {"form": "Karla", "upos": "PROPN", "start": 0, "end": 5,
+         "feats": {"Case": "Gen"}},
+        {"form": "Čapka", "upos": "PROPN", "start": 6, "end": 11,
+         "feats": {"Case": "Gen"}},
+        {"form": "Marii", "upos": "PROPN", "start": 20, "end": 25,
+         "feats": {"Case": "Dat"}},
+        {"form": "Curie", "upos": "PROPN", "start": 26, "end": 31,
+         "feats": {}},
+    ]], "entities": [
+        {"text": "Karla Čapka", "type": "P", "start": 0, "end": 11},
+        {"text": "Marii Curie", "type": "P", "start": 20, "end": 31},
+    ]}}
+    dropped = scrub_entities(annotations, form_case_votes(annotations))
+    kept = [e["text"] for e in annotations[("doc", 0)]["entities"]]
+    assert dropped == 0
+    assert kept == ["Karla Čapka", "Marii Curie"]
+
+
 def test_scrub_drops_fact_left_without_partner():
     """Když po vyřazení účastníka zbude faktu jediný účastník, fakt padá
     (fakt bez protistrany nic nenese)."""

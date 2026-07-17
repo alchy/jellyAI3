@@ -56,6 +56,7 @@
   "date_part_forms": {"rok": "rok", "roku": "rok", "roce": "rok", "letech": "rok",
                       "mesic": "měsíc", "mesici": "měsíc",
                       "den": "den", "dne": "den", "dni": "den"},
+  "name_case_agreement": true,
   "first_person": ["jsem", "sem", "jsme"],
   "confirmation_words": ["ano", "jo", "ne"],
   "present_verb_endings": ["í", "ají", "ejí", "uje", "ují", "eme", "íme",

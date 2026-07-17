@@ -73,29 +73,105 @@ def _lowercase_word(case_votes, word):
     return total >= _MIN_VOTES and lower / total >= _DOMINANCE
 
 
-def scrub_entities(annotations, case_votes):
-    """Vyřadí OSOBNÍ entity slepené s obecnými slovy (in-place, před buildem).
+def name_case_votes(annotations):
+    """Hlasy o PÁDU jmenných tvarů přes korpus: tvar → Counter({pád: počet}).
 
-    Osobní entita (typ začíná p/P — vč. CNEC kontejnerů), jejíž KTERÉKOLI
-    slovo je v korpusu převážně malé, není jméno: kontejner „Abraham chléb"
-    i falešné příjmení „chléb" padají DŘÍV, než z nich kanonizace dokumentu
-    udělá „nejdelší jméno" a přemapuje na ně celou osobu.
+    Tvar českého jména nese pád morfologicky („Ježíš" je nominativ, „Martu"
+    akuzativ) — hlasuje se jen z jistých výskytů (PROPN s jednoznačným
+    Case). Homografy („Petra": ženský Nom × mužský Gen) mají hlasy
+    rozštěpené, takže pod dominancí zůstanou nesouzené.
+    """
+    votes = defaultdict(Counter)
+    for annotation in annotations.values():
+        for sent in annotation.get("sentences", []):
+            for token in sent:
+                case = (token.get("feats") or {}).get("Case", "")
+                if token.get("upos") == "PROPN" and case and "," not in case:
+                    votes[(token.get("form") or "").lower()][case] += 1
+    return votes
+
+
+def _dominant_case(votes, form):
+    """Dominantní pád tvaru z korpusu (≥3 hlasy, ≥80 %); jinak None."""
+    counter = votes.get(form.lower())
+    if not counter:
+        return None
+    total = sum(counter.values())
+    if total < _MIN_VOTES:
+        return None
+    case, count = counter.most_common(1)[0]
+    return case if count / total >= _DOMINANCE else None
+
+
+def _span_cases(tokens, start, end, votes):
+    """Pády slov jmenného rozpětí: lokální jistý pád tokenu (PROPN,
+    jednoznačný Case), jinak dominantní pád TVARU z korpusu.
+
+    Korpusový fallback kryje mis-tagy uvnitř věty — v „Ježíš Martu ...
+    miloval" (Jan 11,5) je „Ježíš" otagován jako VERB bez pádu, ale 400
+    nominativních výskytů jinde ví lépe. Bez jistoty (víceznačný pád,
+    řídký tvar) se slovo nesoudí.
+    """
+    cases = []
+    for token in tokens:
+        t_start, t_end = token.get("start"), token.get("end")
+        if t_start is None or t_end is None \
+                or t_start < start or t_end > end:
+            continue
+        form = token.get("form") or ""
+        if not form[:1].isalpha():
+            continue
+        case = (token.get("feats") or {}).get("Case", "")
+        if token.get("upos") == "PROPN" and case and "," not in case:
+            cases.append(case)
+            continue
+        fallback = _dominant_case(votes, form)
+        if fallback is not None:
+            cases.append(fallback)
+    return cases
+
+
+def scrub_entities(annotations, case_votes):
+    """Vyřadí OSOBNÍ entity slepené omylem NER (in-place, před buildem).
+
+    Dva nezávislé signály, oba DŘÍV, než z kontejneru kanonizace dokumentu
+    udělá „nejdelší jméno" a přemapuje na něj celou osobu:
+
+    * **velikost písmen** — entita (typ p/P vč. CNEC kontejnerů), jejíž
+      KTERÉKOLI slovo je v korpusu převážně malé, není jméno („Abraham
+      chléb": obecné slovo mis-tagnuté jako příjmení);
+    * **pádová shoda** (jazykové pravidlo `name_case_agreement`) — české
+      víceslovné jméno se skloňuje VE SHODĚ („Karla Čapka" Gen+Gen);
+      pádově neshodné PROPN členy („Ježíš Martu" Nom+Acc, Jan 11,5) jsou
+      dva větní účastníci, ne jedno jméno. Členy kontejneru (pf „Ježíš",
+      ps „Martu") zůstávají — jsou to skutečné osoby té věty.
 
     Returns:
         int: Počet vyřazených entit.
     """
+    agreement = current()["name_case_agreement"]
+    grammar_votes = name_case_votes(annotations) if agreement else {}
     dropped = 0
     for annotation in annotations.values():
         entities = annotation.get("entities")
         if not entities:
             continue
+        tokens = [token for sent in annotation.get("sentences", [])
+                  for token in sent] if agreement else []
         kept = []
         for entity in entities:
-            if entity.get("type", "")[:1].lower() == "p" and any(
-                    _lowercase_word(case_votes, word)
-                    for word in entity.get("text", "").split()):
+            person = entity.get("type", "")[:1].lower() == "p"
+            if person and any(_lowercase_word(case_votes, word)
+                              for word in entity.get("text", "").split()):
                 dropped += 1
                 continue
+            if person and agreement and " " in entity.get("text", "") \
+                    and entity.get("start") is not None:
+                cases = _span_cases(tokens, entity["start"], entity["end"],
+                                    grammar_votes)
+                if len(set(cases)) > 1:
+                    dropped += 1
+                    continue
             kept.append(entity)
         annotation["entities"] = kept
     return dropped
