@@ -11,18 +11,26 @@ import json
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 
-def _make_handler(routes):
-    """Vytvoří HTTP handler, který POST cesty směruje na funkce z `routes`.
+def _make_handler(routes, gets=None):
+    """Vytvoří HTTP handler, který cesty směruje na funkce z `routes`/`gets`.
 
     Args:
-        routes (dict): cesta → funkce(payload_dict) → dict.
+        routes (dict): POST cesta → funkce(payload_dict) → dict.
+        gets (dict | None): GET cesta → funkce() → dict (bez payloadu);
+            `/health` odpovídá vždy, i bez `gets`.
 
     Returns:
         type: Třída handleru pro HTTPServer.
     """
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self):
-            if self.path == "/health":
+            fn = (gets or {}).get(self.path)
+            if fn is not None:
+                try:
+                    self._send(200, fn())
+                except Exception as exc:  # noqa: BLE001 - chybu vrátíme klientovi
+                    self._send(500, {"error": str(exc)})
+            elif self.path == "/health":
                 self._send(200, {"status": "ok"})
             else:
                 self._send(404, {"error": "not found"})
@@ -53,15 +61,17 @@ def _make_handler(routes):
     return Handler
 
 
-def serve(host, port, routes):
+def serve(host, port, routes, gets=None):
     """Spustí HTTP službu s danými cestami (blokující).
 
     Args:
         host (str): Adresa (jen localhost).
         port (int): Port.
-        routes (dict): cesta → funkce(payload) → dict.
+        routes (dict): POST cesta → funkce(payload) → dict.
+        gets (dict | None): GET cesta → funkce() → dict (bez payloadu).
     """
-    ThreadingHTTPServer((host, port), _make_handler(routes)).serve_forever()
+    ThreadingHTTPServer((host, port),
+                        _make_handler(routes, gets)).serve_forever()
 
 
 def parse_args():
