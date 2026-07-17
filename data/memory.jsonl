@@ -1,1 +1,3 @@
 {"kind": "episode", "predicate": "měl", "objects": ["knedlíky"], "time": "17. července 2026", "card": "statement-episode"}
+{"kind": "event", "predicate": "neprší", "objects": ["Už"], "time": "17. července 2026", "card": "statement-event"}
+{"kind": "event", "predicate": "prší", "objects": ["Venku"], "time": "17. července 2026 19:26", "card": "statement-event", "needs_subject": false}
