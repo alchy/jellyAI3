@@ -38,9 +38,14 @@ def _loose(word):
 
 def _synonym_ring(predicate):
     """(predikát, exact) + jeho synonyma z jazykových dat — „Kde žili?" najde
-    bydlet-fakt; přesný predikát drží přednost bonusem."""
+    bydlet-fakt; přesný predikát drží přednost bonusem. Kapitalizovaný
+    predikát grafu („Putovat" — mis-lemma začátku věty) sáhne po
+    synonymech přes lowercase, jinak by remíza kapitalizace o ring
+    připravila (nedeterminismus pořadí setu)."""
+    synonyms = current()["predicate_synonyms"]
+    group = synonyms.get(predicate) or synonyms.get(predicate.lower(), ())
     ring = [(predicate, True)]
-    for lemma in current()["predicate_synonyms"].get(predicate, ()):
+    for lemma in group:
         if lemma != predicate:
             ring.append((lemma, False))
     return ring
