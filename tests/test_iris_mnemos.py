@@ -252,8 +252,9 @@ def test_forget_interval_yesterday(tmp_path):
 
 def test_recall_what_i_told_you_by_interval():
     """Vzpomínání (zadání): „Co jsem ti řekl včera / dnes / minulý
-    týden?" — timestampy Mnemos × intervaly Chronos. Hodiny se posouvají
-    mezi výroky; výpis se zužuje intervalem otázky."""
+    týden?" — timestampy Mnemos jsou PEVNÉ kotvy, intervaly Chronos
+    POHYBLIVÁ okna: posun hodin neposouvá vzpomínky, ale to, kam na ose
+    ukazuje „včera/dnes/minulý týden"."""
     from datetime import timedelta
     moment = [NOW]
     answerer = GraphAnswerer(FactGraph(), FakeUfalClient(),
