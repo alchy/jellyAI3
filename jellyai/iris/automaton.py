@@ -707,6 +707,17 @@ class IrisAutomaton:
                           current()["user_entity"])
         if self.memory_path:
             persist(statement, self.memory_path)   # paměť přežije restart
+        places = statement.get("places", ())
+        if len(places) >= 2 and hasattr(self.answerer, "_gazetteer"):
+            # PŘESAH DO TOPOSU: vnořená místa („na Barrandově v Praze")
+            # učí kontejnment za pochodu — zápis subsystému
+            from jellyai.iris.subsystems.topos import (area_keys,
+                                                       learn_containment)
+            for inner, outer in zip(places, places[1:]):
+                learn_containment(self.answerer._gazetteer,
+                                  getattr(self.answerer, "_gazetteer_path",
+                                          None), inner, outer)
+            self.answerer._area_keys = area_keys(self.answerer._gazetteer)
         # nový fakt = nový slovník: predikát musí znát i pseudo-QL parser
         self.answerer._predicates.add(statement["predicate"])  # pylint: disable=protected-access
         if self._words is not None:      # nové uzly paměti do veto cache

@@ -101,7 +101,8 @@ class GraphAnswerer(Answerer):
         self.clock = clock or datetime.now   # „teď" pro časová primitiva otázky
         self.time_filter = None  # tvrdý interval otázky (Chronos, brána Q→A)
         self.place_filter = None  # oblast otázky (Topos kontejnment)
-        self._gazetteer = load_gazetteer("data/sub_topos_gazetteer.jsonl")
+        self._gazetteer_path = "data/sub_topos_gazetteer.jsonl"
+        self._gazetteer = load_gazetteer(self._gazetteer_path)
         self._area_keys = area_keys(self._gazetteer)
 
     def _node_word(self, token):

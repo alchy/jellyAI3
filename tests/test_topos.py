@@ -45,6 +45,26 @@ def test_mnemos_place_roundtrip_with_containment():
     assert iris.turn("Bydlí Marcela na Moravě?").text != "Ano"
 
 
+def test_nested_places_teach_containment(tmp_path):
+    """Zadání: „Zapamatuj si, že Pavla a Matěj bydlí na Barrandově
+    v Praze." — dva podměty v JEDNOM faktu, obě místa role loc, a PŘESAH
+    do Toposu: vnořená místa učí kontejnment (Barrandov ⊂ Praha) →
+    „Bydlí Matěj v Česku?" → Ano přes naučený řetěz."""
+    answerer = GraphAnswerer(FactGraph(), FakeUfalClient(),
+                             ExtractiveAnswerer(AnswererConfig()),
+                             query_mode="templates", clock=lambda: NOW)
+    answerer._gazetteer_path = str(tmp_path / "gaz.jsonl")   # učení do tmp
+    iris = IrisAutomaton(answerer, clock=lambda: NOW)
+    out = iris.turn("Zapamatuj si, že Pavla a Matěj bydlí na Barrandově "
+                    "v Praze.")
+    assert "Zapamatováno" in out.text
+    assert "Barrandově" in iris.turn("Kde bydlí Matěj?").text
+    assert iris.turn("Bydlí Pavla v Praze?").text == "Ano"
+    assert iris.turn("Bydlí Matěj v Česku?").text == "Ano"   # naučený řetěz
+    learned = (tmp_path / "gaz.jsonl").read_text(encoding="utf-8")
+    assert "Barrandově" in learned and "Praze" in learned
+
+
 def test_rain_in_prague_answers_by_containment():
     """E2E zadavatele: „V Praze prší." → „Pršelo v Čechách?" → Ano
     (Praha ⊂ Čechy); „na Moravě?" → poctivé nenašel — oblast je FILTR

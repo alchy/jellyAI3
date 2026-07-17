@@ -60,6 +60,29 @@ def area_keys(parents):
     return set(parents.values()) | set(parents)
 
 
+def learn_containment(parents, path, inner, outer):
+    """UČENÍ ZA POCHODU: vnořená místa výroku („na Barrandově v Praze")
+    učí kontejnment — vnitřní ⊂ vnější. Zapisuje do gazetteeru (záznam
+    subsystému) i do živého slovníku; obrácené pořadí („v Praze na
+    Barrandově") pozná podle už známého řetězu a otočí se. Existující
+    znalost se nepřepisuje.
+
+    Returns:
+        bool: True, když se subsystém něco nového naučil.
+    """
+    if place_within(outer, inner, parents):
+        inner, outer = outer, inner          # už víme, že to je naopak
+    key, target = _key(inner), _key(outer)
+    if not key or not target or key == target or key in parents:
+        return False
+    parents[key] = target
+    if path:
+        with open(path, "a", encoding="utf-8") as fh:
+            fh.write(json.dumps({"place": inner, "in": outer},
+                                ensure_ascii=False) + "\n")
+    return True
+
+
 def place_within(name, area, parents):
     """Leží místo (libovolný pád) uvnitř oblasti? — výstup kontejnmentu.
 
