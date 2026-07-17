@@ -19,6 +19,9 @@ _TYPE_STYLE = {
     "institution": {"color": "#8a4a17"},
     "dílo": {"color": "#c74f7a", "size": 1.2},   # titul doplněný role ② (neighbor-spread)
     "fact": {"color": "#8a949f", "size": 0.7},
+    # kontextová asociace: tisíce slabých vazeb — bez popisku, drobná a matná,
+    # ať nezaplavují plátno textem „souvislost" (detail po kliknutí zůstává)
+    "asociace": {"color": "#4a5158", "size": 0.35},
 }
 
 
@@ -59,7 +62,9 @@ class ViewBaseView:
             ViewBaseView: self (pro řetězení).
         """
         self._canvas.detail_window()               # klik na uzel → box se všemi meta
-        for kind in {node.type for node in graph.nodes.values()} | {"fact"}:
+        kinds = ({node.type for node in graph.nodes.values()}
+                 | {"fact", "asociace"})
+        for kind in kinds:
             self._canvas.define_type(kind, **_TYPE_STYLE.get(kind, {"color": "#8a949f"}))
         for node in graph.nodes.values():
             label = labeler(node) if labeler else node.id
@@ -68,10 +73,14 @@ class ViewBaseView:
                           **dict(node_detail_rows(graph, node.id)))
         for index, fact in enumerate(graph.facts.values()):
             fid = f"fact:{fact.predicate}:{index}"     # unikátní id (bez kolizí)
-            # kontextová asociace není přímý vztah → titulек „souvislost"
-            label = "souvislost" if fact.predicate == "kontext" else fact.predicate
-            self.add_node(fid, label=label, type="fact",
-                          **dict(fact_detail_rows(fact)))
+            if fact.predicate == "kontext":
+                # asociace není přímý vztah: BEZ popisku (tisíce „souvislost"
+                # zaplavovaly plátno), drobná a matná; detail řekne zbytek
+                self.add_node(fid, label="", type="asociace",
+                              **dict(fact_detail_rows(fact)))
+            else:
+                self.add_node(fid, label=fact.predicate, type="fact",
+                              **dict(fact_detail_rows(fact)))
             for participant in fact.participants:
                 self.add_edge(fid, participant.node, role=participant.role)
         return self
