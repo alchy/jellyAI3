@@ -397,7 +397,7 @@ class IrisAutomaton:
         strip = lang["reminder_strip"]
         while words and deaccent(words[0].lower()) in strip:
             words.pop(0)
-        return " ".join(words)
+        return " ".join(words).rstrip(".")   # větná tečka do úkolu nepatří
 
     def _warm_interval(self, interval, warmth=0.5):
         """Rozsvítí časové uzly grafu spadající do intervalu (Chronos osa).
