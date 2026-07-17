@@ -158,7 +158,7 @@ class GraphConfig:
     language: str = "cs"
     spread_depth: int = 2
     spread_falloff: float = 0.35
-    query_mode: str = "udpipe"
+    query_mode: str = "hybrid"
 
 
 @dataclass
