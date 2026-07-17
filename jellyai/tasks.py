@@ -52,6 +52,10 @@ def build_fact_graph(config):
     from jellyai.graph.recover import recover_entities
     recover_entities(annotations, graph)      # role ②: doplnit tituly, co NER minul
     resolve_entities(graph)   # recover bere podměty ze surového povrchu → srovnat znovu
+    from jellyai.graph.hygiene import lemma_upos_votes, scrub
+    dropped_p, dropped_f = scrub(graph, lemma_upos_votes(annotations))
+    print(f"Hygiena: −{dropped_p} mis-tag účastníků, −{dropped_f} faktů "
+          f"(korpusová evidence lemmat)")
     graph.save(config.graph.graph_path)
     return graph
 
