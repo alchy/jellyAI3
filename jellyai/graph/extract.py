@@ -90,7 +90,10 @@ def _node_for(token, entities, canon=None):
             text, typ = best["text"], _entity_type(best)
             if typ == "person" and canon:
                 text = canon.get(text, text)
-            return text, typ
+            # NER občas zahrne přilepenou uvozovku do textu entity („Karla“")
+            text = text.strip("„“”‚’'\"»«›‹")
+            if text:
+                return text, typ
     lemma = _clean_lemma(token.get("lemma", ""))
     if not lemma:
         return None
@@ -309,10 +312,12 @@ _INSTANCE_DEPRELS = ("appos", "nmod", "amod", "flat")
 def _surface_node(tok, entities, canon):
     """Uzel s preferencí POVRCHU u vlastních jmen: PROPN bez NER entity si
     nechá form („Vějíř"), ne lemma („vějíř") — titul nesmí kolidovat s obecným
-    pojmem (lowercase uzel by ukradl rozřešení tématu)."""
+    pojmem (lowercase uzel by ukradl rozřešení tématu). Přilepené uvozovky
+    z tokenizace („vidí“") do id nepatří."""
     node = _node_for(tok, entities, canon)
     if node and tok.get("upos") == "PROPN" and node[1] in ("concept", "number"):
-        return (tok.get("form", node[0]), "dílo")
+        surface = tok.get("form", node[0]).strip("„“”‚’'\"»«›‹")
+        return (surface or node[0], "dílo")
     return node
 
 

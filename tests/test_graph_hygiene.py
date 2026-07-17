@@ -184,6 +184,92 @@ def test_entity_scrub_keeps_agreeing_and_uncertain_names():
     assert kept == ["Karla Čapka", "Marii Curie"]
 
 
+def _animacy(annotations_spec):
+    """Fake anotace pro hlasování životnosti: [(form, lemma, animacy), …]."""
+    from jellyai.graph.hygiene import noun_animacy_votes
+    sent = [{"form": f, "lemma": l, "upos": "NOUN",
+             "feats": {"Gender": "Masc", "Animacy": a}}
+            for f, l, a in annotations_spec]
+    return noun_animacy_votes({("doc", 0): {"sentences": [sent]}})
+
+
+def test_semantics_drops_person_under_inanimate_kind():
+    """druh(Dorothea, vztah) — osoba nemůže být instancí neživotné věci
+    („Ze vztahu Dorothey…": nesklonné jméno bez pádu proklouzlo pádovým
+    guardům; životnost je druhá korpusová evidence)."""
+    from jellyai.graph.hygiene import scrub_semantics
+    g = FactGraph()
+    g.add_fact(make_fact("druh", [Participant("subj", "Dorothea", "person"),
+                                  Participant("pred", "vztah", "concept")]))
+    g.add_fact(make_fact("druh", [Participant("subj", "Dorothea", "person"),
+                                  Participant("pred", "hraběnka", "concept")]))
+    votes = _animacy([("vztahu", "vztah", "Inan")] * 3)
+    assert scrub_semantics(g, votes) == 1
+    kept = {p.node for f in g.facts.values() for p in f.participants}
+    assert "hraběnka" in kept and "vztah" not in kept
+
+
+def test_semantics_keeps_mistyped_inanimate_subject():
+    """druh(Týdenník, časopis) — subjekt mylně typovaný person, ale sám
+    hlasuje neživotně: obě strany neživotné = konzistentní zařazení, drží."""
+    from jellyai.graph.hygiene import scrub_semantics
+    g = FactGraph()
+    g.add_fact(make_fact("druh", [Participant("subj", "Týdenník", "person"),
+                                  Participant("pred", "časopis", "concept")]))
+    votes = _animacy([("časopis", "časopis", "Inan")] * 3
+                     + [("týdenník", "týdenník", "Inan")] * 3)
+    assert scrub_semantics(g, votes) == 0
+
+
+def test_semantics_drops_relation_without_object():
+    """Reifikovaný vztah („žena") bez obj protistrany je troska parseru —
+    fakt jen s časy nic nenese; vztah s obj zůstává."""
+    from jellyai.graph.hygiene import scrub_semantics
+    g = FactGraph()
+    g.add_fact(make_fact("žena", [Participant("subj", "českým", "concept"),
+                                  Participant("time", "1844", "time")]))
+    g.add_fact(make_fact("bratr", [Participant("subj", "Karel Čapek", "person"),
+                                   Participant("obj", "Josef Čapek", "person")]))
+    assert scrub_semantics(g, {}) == 1
+    assert {f.predicate for f in g.facts.values()} == {"bratr"}
+
+
+def test_case_fallback_two_unanimous_votes():
+    """Pád tvaru je morfologie — 2 jednomyslné hlasy stačí: „Masaryka"
+    (PROPN Gen×2) proti lokálním mis-tagům NOUN Nom rozbije slepenec
+    „Masaryka Svatopluk Beneš" (fragment popisku)."""
+    from jellyai.graph.hygiene import form_case_votes, scrub_entities
+    gen = [[{"form": "Masaryka", "upos": "PROPN", "start": 100 + i,
+             "end": 108 + i, "feats": {"Case": "Gen"}}] for i in range(2)]
+    annotations = {("doc", 0): {"sentences": [[
+        {"form": "Masaryka", "upos": "NOUN", "start": 0, "end": 8,
+         "feats": {"Case": "Nom"}},               # mis-tag bez důvěry
+        {"form": "Svatopluk", "upos": "PROPN", "start": 9, "end": 18,
+         "feats": {"Case": "Nom"}},
+        {"form": "Beneš", "upos": "PROPN", "start": 19, "end": 24,
+         "feats": {"Case": "Nom"}},
+    ]], "entities": [
+        {"text": "Masaryka Svatopluk Beneš", "type": "P", "start": 0,
+         "end": 24},
+        {"text": "Svatopluk Beneš", "type": "P", "start": 9, "end": 24},
+    ]}}
+    annotations.update({("doc", i + 1): {"sentences": [s], "entities": []}
+                        for i, s in enumerate(gen)})
+    dropped = scrub_entities(annotations, form_case_votes(annotations))
+    kept = [e["text"] for e in annotations[("doc", 0)]["entities"]]
+    assert dropped == 1
+    assert kept == ["Svatopluk Beneš"]
+
+
+def test_clean_lemma_strips_glued_quotes():
+    """Tokenizace občas přilepí uvozovku k lemmatu („hřích“") — uzel grafu
+    nesmí nést interpunkci jména."""
+    from jellyai.answerer.selection import _clean_lemma
+    assert _clean_lemma("hřích“") == "hřích"
+    assert _clean_lemma("„tábor") == "tábor"
+    assert _clean_lemma("R.U.R.") == "R.U.R."
+
+
 def test_scrub_drops_fact_left_without_partner():
     """Když po vyřazení účastníka zbude faktu jediný účastník, fakt padá
     (fakt bez protistrany nic nenese)."""

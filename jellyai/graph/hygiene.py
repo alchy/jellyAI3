@@ -91,13 +91,18 @@ def name_case_votes(annotations):
     return votes
 
 
+_MIN_CASE_VOTES = 2   # pád tvaru je morfologie (skoro deterministická) —
+#                       stačí 2 jednomyslné hlasy („Masaryka" Gen×2 proti
+#                       mis-tagům NOUN); homografy rozštěpí dominanci samy
+
+
 def _dominant_case(votes, form):
-    """Dominantní pád tvaru z korpusu (≥3 hlasy, ≥80 %); jinak None."""
+    """Dominantní pád tvaru z korpusu (≥2 hlasy, ≥80 %); jinak None."""
     counter = votes.get(form.lower())
     if not counter:
         return None
     total = sum(counter.values())
-    if total < _MIN_VOTES:
+    if total < _MIN_CASE_VOTES:
         return None
     case, count = counter.most_common(1)[0]
     return case if count / total >= _DOMINANCE else None
@@ -174,6 +179,77 @@ def scrub_entities(annotations, case_votes):
                     continue
             kept.append(entity)
         annotation["entities"] = kept
+    return dropped
+
+
+def noun_animacy_votes(annotations):
+    """Hlasy o ŽIVOTNOSTI substantiv: slovo (tvar i lemma) → Counter.
+
+    Česká maskulina nesou Animacy přímo ve feats; feminina osoby designují
+    rodem — hlasuje se proto jen nad maskuliny a feminina se nesoudí.
+    Klíčem je tvar I lemma (uzly grafu nesou obojí).
+    """
+    votes = defaultdict(Counter)
+    for annotation in annotations.values():
+        for sent in annotation.get("sentences", []):
+            for token in sent:
+                feats = token.get("feats") or {}
+                if token.get("upos") != "NOUN" \
+                        or feats.get("Gender") != "Masc" \
+                        or not feats.get("Animacy"):
+                    continue
+                for key in {(token.get("form") or "").lower(),
+                            (token.get("lemma") or "").lower()}:
+                    if key:
+                        votes[key][feats["Animacy"]] += 1
+    return votes
+
+
+def _inanimate(votes, node_id):
+    """Uzel je v korpusu PŘEVÁŽNĚ neživotné substantivum (≥2 hlasy, ≥80 %)."""
+    counter = votes.get(node_id.lower())
+    if not counter:
+        return False
+    total = sum(counter.values())
+    return total >= _MIN_CASE_VOTES \
+        and counter.get("Inan", 0) / total >= _DOMINANCE
+
+
+def scrub_semantics(graph, animacy_votes):
+    """Sémantické guardy faktů podle korpusové morfologie (in-place).
+
+    * **druh-fakt s osobou pod neživotným druhem** — osoba nemůže být
+      instancí neživotné věci: „druh(Dorothea, vztah)" (z „Ze vztahu
+      Dorothey…" — nesklonné jméno bez pádu proklouzlo pádovým guardům)
+      či „druh(Abraham, chléb)". Subjekt, který sám hlasuje neživotně
+      („Týdenník" mylně typovaný person), fakt drží — obě strany neživotné
+      jsou konzistentní zařazení.
+    * **reifikovaný vztah bez protistrany** — vztahové jméno jako predikát
+      („žena") vyžaduje obj účastníka; fakt jen s časy je troska parseru.
+
+    Returns:
+        int: Počet vyřazených faktů.
+    """
+    relational = frozenset(current()["relational_nouns"])
+    kept, dropped = {}, 0
+    for key, fact in graph.facts.items():
+        roles = {p.role for p in fact.participants}
+        if fact.predicate in relational and "obj" not in roles:
+            dropped += 1
+            continue
+        if fact.predicate == "druh":
+            subj = next((p for p in fact.participants
+                         if p.role == "subj"), None)
+            pred = next((p for p in fact.participants
+                         if p.role == "pred"), None)
+            if subj is not None and pred is not None \
+                    and subj.type == "person" \
+                    and _inanimate(animacy_votes, pred.node) \
+                    and not _inanimate(animacy_votes, subj.node):
+                dropped += 1
+                continue
+        kept[key] = fact
+    graph.replace_facts(kept)
     return dropped
 
 

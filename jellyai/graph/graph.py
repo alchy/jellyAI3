@@ -284,7 +284,8 @@ def _associate_context(graph, annotation, subject, canon, extra=(), source=None)
                and o["start"] <= es and ee <= o["end"] for o in entities):
             continue                     # fragment uvnitř delší entity
         text = canon.get(e["text"], e["text"]) if typ == "person" else e["text"]
-        if text == subject[0]:
+        text = text.strip("„“”‚’'\"»«›‹")   # NER text s přilepenou uvozovkou
+        if not text or text == subject[0]:
             continue
         graph.add_fact(make_fact("kontext", [
             Participant("subj", subject[0], subject[1]),

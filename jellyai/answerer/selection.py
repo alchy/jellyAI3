@@ -33,12 +33,13 @@ class Candidate:
 
 
 def _clean_lemma(lemma):
-    """Ořízne technické přípony lemmatu (např. „robot-2", „Praha_;G")."""
+    """Ořízne technické přípony lemmatu (např. „robot-2", „Praha_;G")
+    a přilepené uvozovky z tokenizace („hřích“" → „hřích")."""
     for sep in ("-", "_", "`"):
         i = lemma.find(sep)
         if i > 0:
             lemma = lemma[:i]
-    return lemma
+    return lemma.strip("„“”‚’'\"»«›‹")
 
 
 def _tokens_in_span(entity, tokens):

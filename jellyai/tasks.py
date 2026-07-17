@@ -59,6 +59,10 @@ def build_fact_graph(config):
     dropped_p, dropped_f = scrub(graph, lemma_upos_votes(annotations))
     print(f"Hygiena: −{dropped_p} mis-tag účastníků, −{dropped_f} faktů "
           f"(korpusová evidence lemmat)")
+    from jellyai.graph.hygiene import noun_animacy_votes, scrub_semantics
+    dropped_s = scrub_semantics(graph, noun_animacy_votes(annotations))
+    print(f"Hygiena sémantiky: −{dropped_s} faktů "
+          f"(osoba pod neživotným druhem, vztah bez protistrany)")
     graph.save(config.graph.graph_path)
     return graph
 
