@@ -63,6 +63,19 @@ QL:   Specifikuj období zaostření — mám tato období: (aktivační okno)
 6. Vzorů bude „přehršel" a **doplňují se během testování** — karty pro
    upřesnění osoby, souvislosti, vztahu (ke komu/čemu), oblasti, roku,
    století, celého jména…; i pro stavy „nemám dost dat", „mám dat příliš".
+6b. **Karty se modelují průběžně podle složitosti — komplexita roste**
+    (doplněk uživatele): začíná se jednoduchými (first-match dle priority),
+    postupně **matching dle otázky** — automat smí vyhodnotit VÍCE
+    kandidátních karet a vzít tu s největším benefitem pro daný dotaz.
+    Benefit = specificita triggeru (kolik podmínek sedí a jak těsně) ×
+    priorita × očekávaný zisk zaostření; výhledově i spekulativní vyzkoušení
+    karty (simuluj akci, změř nárůst aktivace správným směrem).
+6c. **Benefit se MĚŘÍ jako nárůst aktivace** (potvrzení uživatele): po akci
+    karty se měří Δ zaostření (koncentrace jasu na relevantních kandidátech);
+    automat vede telemetrii karet (použití + zisk, součást API metadat).
+    Díky stavovému automatu lze karty **dynamicky průběžně přidávat** a
+    pokrývat vzory dotazů — vývoj karet řídí data (run_focus nad dialogovými
+    scénáři), ne dojem.
 7. **Výměna jazyka = přepnutí adresáře** s kartami + jazykovým JSON
    (stávající `jellyai/lang/cs.json` princip se rozšiřuje na celý automat).
    Automat využívá poznatky z českého korpusu, ale není na něj fixován.

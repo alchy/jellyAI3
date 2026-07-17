@@ -52,5 +52,29 @@
                        "udalo": "udát", "prihodilo": "přihodit"},
   "date_part_forms": {"rok": "rok", "roku": "rok", "roce": "rok", "letech": "rok",
                       "mesic": "měsíc", "mesici": "měsíc",
-                      "den": "den", "dne": "den", "dni": "den"}
+                      "den": "den", "dne": "den", "dni": "den"},
+  "temporal": {
+    "day_words": {"predevcirem": -2, "vcera": -1, "dnes": 0, "zitra": 1, "pozitri": 2},
+    "units": {"hodina": "hour", "hodinu": "hour", "hodiny": "hour", "hodin": "hour",
+              "hodinou": "hour", "hodinami": "hour",
+              "den": "day", "dne": "day", "dni": "day", "dny": "day", "dnu": "day",
+              "dnem": "day", "dnech": "day",
+              "tyden": "week", "tydne": "week", "tydnu": "week", "tydnem": "week",
+              "tydny": "week", "tydnech": "week",
+              "mesic": "month", "mesice": "month", "mesici": "month", "mesicem": "month",
+              "rok": "year", "roku": "year", "roce": "year", "rokem": "year",
+              "roky": "year", "let": "year", "lety": "year", "letech": "year",
+              "stoleti": "century", "stoletich": "century"},
+    "back_words": ["pred"],
+    "forward_words": ["za"],
+    "current_words": ["tento", "tuto", "toto", "tomto", "teto", "letos", "letosni"],
+    "numerals": {"jeden": 1, "jednu": 1, "jednou": 1, "jednim": 1, "jedne": 1,
+                 "dva": 2, "dve": 2, "dvema": 2, "tri": 3, "tremi": 3,
+                 "ctyri": 4, "ctyrmi": 4, "pet": 5, "peti": 5, "sest": 6,
+                 "sesti": 6, "sedm": 7, "sedmi": 7, "osm": 8, "osmi": 8,
+                 "devet": 9, "deviti": 9, "deset": 10, "deseti": 10},
+    "months": {"leden": 1, "unor": 2, "brezen": 3, "duben": 4, "kveten": 5,
+               "cerven": 6, "cervenec": 7, "srpen": 8, "zari": 9, "rijen": 10,
+               "listopad": 11, "prosinec": 12}
+  }
 }

@@ -34,6 +34,14 @@ def parse_date(text):
         dict: Podmnožina {„rok": str, „měsíc": str (nominativ), „den": str}.
     """
     out = {}
+    # numerické datum „21.1.1900" — den.měsíc.rok bez mezer i s mezerami
+    numeric = re.search(r"\b([12]?\d|3[01])\.\s?(1[0-2]|0?[1-9])\.\s?(1\d{3}|20\d{2})\b",
+                        text)
+    if numeric:
+        month_names = list(_MONTHS.values())
+        return {"den": numeric.group(1),
+                "měsíc": month_names[int(numeric.group(2)) - 1],
+                "rok": numeric.group(3)}
     year = re.search(r"\b(1\d{3}|20\d{2})\b", text)
     if year:
         out["rok"] = year.group(1)
