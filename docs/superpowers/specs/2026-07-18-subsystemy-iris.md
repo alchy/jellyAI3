@@ -133,9 +133,9 @@ Subsystémy registrují SCHÉMATA svých záznamů; Mnemos drží mechaniku
 
 | Fáze | Obsah | Riziko |
 |---|---|---|
-| **S0** | Port `Subsystem` + registr v Iris; Chronos/Mnemos adaptace BEZE ZMĚNY chování (mechanický přesun do `jellyai/iris/subsystems/`) | nízké — benchmarky hlídají |
-| **S1** | Chronos v2: day_parts + definice uživatele + reminder-default/reschedule karty + registr kanálů + okno Reminder | střední (UI) |
-| **S2** | Brána Q formálně: `claim()` v parseru (temporal filtr zobecnit); tvrdý interval (#10) jako první constraint-konzument | střední |
+| **S0** | ✅ HOTOVO — balíček `jellyai/iris/subsystems/` s portem, Chronos/Mnemos přesunuty beze změny chování | nízké |
+| **S1** | ✅ HOTOVO (jádro) — day_parts, „za chvíli/čtvrt hodiny", reminder-default + přeplánování, okno Reminder, registr kanálů; zbývá: definice uživatele („ráno je v 8" → S5), kanály alarm/email | střední (UI) |
+| **S2** | ✅ HOTOVO (jádro) — tvrdý interval (#10): time_filter v answereru, explicitní datum jako primitivum, „příští týden"; dotaz na plán (reminder-list). Zbývá: formální `claim()` v parseru, správa plánu (BACKLOG #27) | střední |
 | **S3** | Topos v1 (§5) + etalonové řádky | střední |
 | **S4** | Brána E: registr rozpoznávačů v extraktu (refaktor extract.py na pipeline producentů; parse_date → Chronos.extract) | vyšší — jistí etalon+coverage |
 | **S5** | Mnemos brána zápisu pro subsystémy (§6); učení „ráno je v 8" E2E | střední |
