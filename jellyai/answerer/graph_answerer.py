@@ -10,6 +10,7 @@ from jellyai.graph.graph import parse_date
 from jellyai.lang import current
 from jellyai.answerer.question import analyze_question
 from jellyai.answerer.pattern import question_pattern, SubQuery
+from jellyai.answerer.query import build_query
 from jellyai.answerer.template import _to_nominative
 from jellyai.graph.activation import ActivationField
 from jellyai.graph.canon import _stem, name_gender, deaccent
@@ -44,7 +45,7 @@ class GraphAnswerer(Answerer):
     """
 
     def __init__(self, graph, client, fallback, *, context_decay=0.55,
-                 spread_depth=2, spread_falloff=0.35):
+                 spread_depth=2, spread_falloff=0.35, use_templates=False):
         """Vytvoří answerer.
 
         Args:
@@ -65,6 +66,8 @@ class GraphAnswerer(Answerer):
         self.visited = []        # uzly protnuté (rekurzivním) matchem → rozsvícení
         self.context = ActivationField(decay=context_decay)   # těžiště (id uzlu → jas)
         self.source_context = ActivationField(decay=context_decay)  # attention nad ZDROJI
+        self._predicates = {f.predicate for f in graph.facts.values()}  # slovník QL
+        self.use_templates = use_templates   # šablonový parser jako primární
         self.history = []        # trajektorie konverzace (tahy s trasou a těžištěm)
 
     def reset(self):
@@ -169,7 +172,13 @@ class GraphAnswerer(Answerer):
             tuple: (téma | None, hodnota | None, fakt | None).
         """
         self.visited = []                    # uzly protnuté (i)rekurzí → rozsvítit
-        pat = question_pattern(question, self.client)
+        # ŠABLONOVÝ PARSER (pseudo-QL nad slovníkem grafu) — primární pro otázky,
+        # když je zapnutý (odolný vůči diakritice i mis-taggingu); jinak/při
+        # nesestaveném vzoru ML rozbor UDPipe
+        pat = None
+        if self.use_templates:
+            pat = build_query(question, self._predicates)
+        pat = pat or question_pattern(question, self.client)
         if pat.known:
             known_set = set()
             for _, known in pat.known:

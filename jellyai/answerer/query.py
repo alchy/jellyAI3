@@ -1,0 +1,169 @@
+"""Šablonový parser otázek → pseudo-QL `Pattern`, bez UDPipe.
+
+Mechanismus: **otázka → identifikace vzoru → transformace do pseudo query
+language → dotaz do grafu.** Slovník dotazu je **sám graf** (predikáty, které
+fakty nesou) plus jazykové tabulky (tázací slova, spona, vztahová jména,
+synonyma). Diakritika ani mis-tagging ML parseru nehrají roli — korpus staví
+graf, dotaz jede deterministickými šablonami.
+
+Slovesné tvary se párují s predikáty grafu **prefixem** (napsal≡napsat,
+narodil≡narodit) — český tvar se liší až koncovkou, kmen (prefix) drží.
+`Pattern`/`SubQuery` jsou sdílené s `pattern.py`, takže answerer se nemění.
+"""
+
+import re
+
+from jellyai.answerer.pattern import Pattern, SubQuery
+from jellyai.graph.canon import deaccent
+from jellyai.lang import current
+
+_COPULA = {"je", "byl", "byla", "bylo", "byli", "byly", "jsou", "byt",
+           "jsem", "jsi", "jste", "jsme"}
+_RELATIVE = {"ktery", "ktera", "ktere", "kteri", "jenz", "jez"}
+_SKIP = {"se", "si", "v", "ve", "na", "o", "s", "z", "ze", "do", "u", "k"}
+# tázací slovo (bezdiakritické) → (díra role, díra typ) — pseudo-QL díra
+_HOLE = {
+    "kdo": ("subj", "person"), "koho": ("obj", "person"), "co": ("obj", None),
+    "kde": ("loc", "geo"), "kam": ("loc", "geo"), "odkud": ("loc", "geo"),
+    "kdy": ("time", "time"), "kolik": ("num", "number"),
+    "jaky": ("attr", None), "jaka": ("attr", None), "jake": ("attr", None),
+    "jakou": ("attr", None), "ktery": ("attr", None), "ci": ("subj", "person"),
+}
+
+
+def _norm(token):
+    """Bezdiakritický klíč tokenu malými písmeny."""
+    return deaccent(token.lower())
+
+
+def _verb_match(token, predicates):
+    """Predikát grafu, jehož kmen je prefixem tvaru dotazu (napsal→napsat).
+
+    Český slovesný tvar sdílí s lemmatem počáteční kmen (liší se koncovka);
+    shoda = delší prefix pokrývající většinu kratšího slova (min 4 znaky).
+    """
+    low = _norm(token)
+    # slovesný tvar v otázce je malými písmeny; velké písmeno = vlastní jméno
+    # („Němec" nesmí matchnout sloveso „neměnit" přes prefix „nem")
+    if len(low) < 4 or low in _COPULA or token[:1].isupper():
+        return None
+    best = None
+    for pred in predicates:
+        p = _norm(pred)
+        common = 0
+        for a, b in zip(low, p):
+            if a != b:
+                break
+            common += 1
+        if common >= 4 and common >= min(len(low), len(p)) - 2:
+            if best is None or common > best[1]:  # pylint: disable=unsubscriptable-object
+                best = (pred, common)
+    return best[0] if best else None
+
+
+def build_query(question, predicates):  # pylint: disable=too-many-locals,too-many-return-statements
+    """Otázku (končící „?") přeloží šablonou nad slovníkem grafu na `Pattern`.
+
+    Args:
+        question (str): Dotaz uživatele.
+        predicates (set[str]): Predikáty, které graf zná (jeho slovník).
+
+    Returns:
+        Pattern | None: Neúplný fakt s dírou; None když věta není otázka nebo
+        z ní nelze vzor sestavit (pak volající spadne na UDPipe fallback).
+    """
+    if "?" not in question:
+        return None
+    tokens = re.findall(r"[\w.]+", question)
+    if not tokens:
+        return None
+
+    hole_role, hole_type = None, None
+    for tok in tokens:                         # díra = první tázací slovo
+        if _norm(tok) in _HOLE:
+            hole_role, hole_type = _HOLE[_norm(tok)]
+            break
+
+    relational = current()["relational_nouns"]
+    has_copula = any(_norm(t) in _COPULA for t in tokens)
+    known = _collect_known(tokens, predicates, relational)
+
+    # 1) vztahová otázka: „Kdo byl bratr X?" → vztahové jméno = predikát
+    for role, term in list(known):
+        head = term.split()[0] if isinstance(term, str) and term else None
+        if head and _norm(head) in relational:
+            rest = " ".join(term.split()[1:])
+            if rest:
+                return Pattern(_norm(head), [("obj", rest)], "subj", "person")
+        if isinstance(term, SubQuery):         # „bratr autora který napsal X"
+            rel = next((t for t in tokens if _norm(t) in relational), None)
+            if rel:
+                return Pattern(_norm(rel), [("obj", term)], "subj", "person")
+
+    # 2) predikát ze slovníku grafu (slovesný tvar → lemma prefixem)
+    verb = next((_verb_match(t, predicates) for t in tokens
+                 if _verb_match(t, predicates)), None)
+    if verb is not None and known:
+        # role známé entity je komplement díry: díra subj → entita obj,
+        # jinak entita je podmět tématu („Kde se narodil X" → subj=X, díra loc)
+        role = "obj" if hole_role == "subj" else "subj"
+        known = [(role if isinstance(term, str) else r, term)
+                 for r, term in known]
+        return Pattern(verb, known, hole_role, hole_type)
+
+    # 3) sponová identita: „Kdo je X?" / „Jaký je X?"
+    if has_copula and known:
+        entity = known[0][1]
+        role = "attr" if hole_role == "attr" else "pred"
+        return Pattern("být", [("subj", entity)], role, hole_type)
+
+    return None
+
+
+def _collect_known(tokens, predicates, relational):
+    """Známé účastníky = spojité běhy obsahových tokenů (kandidáti na entitu/
+    vztah); tázací/spona/předložka/sloveso běh ukončí, „který" → pod-dotaz.
+    Vztahové jméno se ponechá NA ZAČÁTKU běhu (řeší ho vztahová šablona)."""
+    known, run = [], []
+    i = 0
+    while i < len(tokens):
+        tok = tokens[i]
+        low = _norm(tok)
+        if low in _RELATIVE:                   # „…autora KTERÝ napsal X"
+            if run:
+                known.append(("obj", " ".join(run)))
+                run = []
+            sub = _subquery(tokens[i + 1:], predicates)
+            if sub is not None:
+                if known:
+                    known[-1] = (known[-1][0], sub)
+                else:
+                    known.append(("obj", sub))
+            break
+        boundary = (low in _HOLE or low in _COPULA or low in _SKIP
+                    or _verb_match(tok, predicates) is not None)
+        if boundary and low not in relational:
+            if run:
+                known.append(("obj", " ".join(run)))
+                run = []
+            i += 1
+            continue
+        run.append(tok)
+        i += 1
+    if run:
+        known.append(("obj", " ".join(run)))
+    return known
+
+
+def _subquery(rest, predicates):
+    """Z „…který PREDIKÁT PŘEDMĚT" složí SubQuery(predikát, obj=předmět)."""
+    verb, obj = None, []
+    for tok in rest:
+        match = _verb_match(tok, predicates)
+        if verb is None and match:
+            verb = match
+        elif verb is not None and _norm(tok) not in _COPULA | _SKIP:
+            obj.append(tok)
+    if verb is None or not obj:
+        return None
+    return SubQuery(verb, [("obj", " ".join(obj))], "subj")
