@@ -1,4 +1,4 @@
-# ARCHITEKTURA jellyAI3 — nalejvárna (stav 2026-07-18)
+# ARCHITEKTURA jellyAI3 — nalejvárna (stav 2026-07-18 večer)
 
 Orientační mapa celku pro sladění. Detaily: HANDOVER.md (jak pracovat),
 BACKLOG.md (co dál), specs/ (proč to tak je).
@@ -54,8 +54,15 @@ BACKLOG.md (co dál), specs/ (proč to tak je).
    - **Mnemos** (paměť uživatele): konstatování → fakta do TÉHOŽ grafu
      s časovou kotvou (deník memory.jsonl, replay po startu); připsané
      fakty korpusovým osobám z potvrzení.
-   - **Topos** (prostor, plán S3): kontejnment míst (Praha ⊂ Čechy) —
-     zrcadlo Chronos intervalů na ose prostoru.
+   - **Topos** (prostor): kontejnment míst — gazetteer
+     (`data/sub_topos_gazetteer.jsonl`: kurátorský seed + diktát uživatele
+     + UČENÍ ZA POCHODU z vnořených míst výroku „na Barrandově v Praze");
+     místní filtr odpovědí („Pršelo v Čechách?" — oblast je filtr, ne
+     účastník), slovesná třída přesunu („Kde putoval Ježíš?"); klíče míst
+     zvládají pády, palatalizaci (Praze↔Praha) i epentezi (Plzni↔Plzeň).
+     Zrcadlo Chronosu: interval na ose času ⟷ kontejnment strom na ose
+     prostoru; „u Domažlic" je SOUSEDSTVÍ (záznam near, dotazy později);
+     souřadnice/geofence = spec topos-geo (mobil jako senzor, PWA).
 5. **Jazyk** (`jellyai/lang/cs.json`) — VŠECHNA čeština jako data:
    tázací slova, spony, časové tabulky, fráze připomínek… Nový jazyk =
    nový JSON.
@@ -68,8 +75,14 @@ BACKLOG.md (co dál), specs/ (proč to tak je).
 
 1. `turn()`: odpálí dozrálé připomínky (předřadí odpovědi).
 2. Hodinová otázka? → Chronos odpoví sám. Volba z nabídky? → přehraje
-   zaostřenou otázku. Konstatování? → Mnemos (karty určí druh) → fakt.
-   Žádost o připomenutí / dotaz na plán? → Chronos.
+   zaostřenou otázku. Explicitní příkaz paměti („zapamatuj si/nezapomeň")
+   → Mnemos (strukturované → fakt, přísloví → doslovná poznámka).
+   Konstatování? → Mnemos (karty určí druh; místa za „v/ve/na" dostanou
+   roli loc a vnořená místa UČÍ Topos kontejnment). Připomínky s chytrými
+   defaulty (událost v pět → předstih 2 h, dnes → +3 h, zítra → ráno,
+   příští týden → neděle večer; vždy nabídka změny), správa plánu
+   (zruš/posuň/přeplánuj), výpis plánu, vzpomínání („Co jsem ti řekl
+   včera?") → Chronos × Mnemos × Topos.
 3. Jinak: Chronos rozsvítí časové uzly intervalu otázky (soft) a nastaví
    tvrdý filtr → pseudo-QL přeloží otázku na pattern (entity vs. slovesa
    rozhoduje slovník grafu) → `_resolve_topic` rozřeší jména (patra
@@ -88,6 +101,7 @@ BACKLOG.md (co dál), specs/ (proč to tak je).
 | graf | `data/graph.pkl` | jediná báze (korpus+uživatel) |
 | deník Mnemos | `data/memory.jsonl` | trvalá paměť uživatele |
 | sklad Chronos | `data/reminders.jsonl` | krátkodobá (odpálené mizí) |
+| gazetteer Topos | `data/sub_topos_gazetteer.jsonl` | pseudo-mapa (kontejnment + near) |
 | karty chování | `jellyai/iris/patterns/cs/*.json` | chování Iris |
 | jazyk | `jellyai/lang/cs.json` | veškerá čeština |
 
@@ -102,5 +116,5 @@ statická znalost `notitia_*`.
 - **Jeden graf, jedno pole** — subsystémy ovlivňují odpovědi VÝHRADNĚ
   aktivací (reflektory) a filtry z bran; žádné boční kanály.
 - **Korpusová evidence** — hlasování přes celek poráží lokální tag.
-- **Vše měřeno** — 445 testů + 4 benchmarky (etalon 28/28, focus 12/12,
+- **Vše měřeno** — 457 testů + 4 benchmarky (etalon 29/29, focus 12/12,
   dialog 21/21, coverage) jsou brány každé změny.

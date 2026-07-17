@@ -1,4 +1,4 @@
-# HANDOVER — předání projektu jellyAI3 (2026-07-18)
+# HANDOVER — předání projektu jellyAI3 (2026-07-18, večerní stav)
 
 Tento dokument předává práci další session (jiná instance, pravděpodobně menší
 model). Čti ho CELÝ před první změnou kódu. Doplňuje `docs/BACKLOG.md`
@@ -31,15 +31,15 @@ model). Čti ho CELÝ před první změnou kódu. Doplňuje `docs/BACKLOG.md`
 
 ## 2. Stav (2026-07-18, commit 5e825a5)
 
-- **Metriky:** 442 testů, etalon 28/28 (+5 gap řádků), focus 12/12,
-  dialog 21/21 — vše 100 %. Graf: 7459 uzlů / 19117 faktů.
+- **Metriky:** 457 testů, etalon 29/29 (+5 gap řádků), focus 12/12,
+  dialog 21/21 — vše 100 %.
 - **Hotovo:** faktový graf; pseudo-QL šablony (hybrid, UDPipe jen fallback);
   Iris karty + QueryAssurance; Chronos; Mnemos (deník `data/memory.jsonl`,
   připsané fakty s elidovaným subjektem); hygiena (upos/pád/životnost/
   uvozovky/lemma hlasování); kanonizace v1+v2 (nominativizace id);
   instanční vrstva fáze 1 (srůst jen z textového tvrzení „X řečený Y");
   REST :8084; web 3 okna (viewBase — vlastní repo uživatele);
-  subsystémový půdorys S0–S2 (`jellyai/iris/subsystems/`, spec
+  subsystémový půdorys S0–S3 (`jellyai/iris/subsystems/`, spec
   `2026-07-18-subsystemy-iris.md`): připomínky s vlastním vláknem hodin,
   okno Reminder, kanály, tvrdý časový filtr.
 - **Klíčová měření** (nedělej znovu, věř jim): kontextový otisk NEROZLIŠÍ
@@ -51,7 +51,7 @@ model). Čti ho CELÝ před první změnou kódu. Doplňuje `docs/BACKLOG.md`
 
 ```bash
 .venv/bin/python -m pytest -q                     # musí: N passed, 0 failed
-.venv/bin/python benchmark/run_etalon.py          # musí: JÁDRO 28/28 (100 %)
+.venv/bin/python benchmark/run_etalon.py          # musí: JÁDRO 29/29 (100 %)
 .venv/bin/python benchmark/run_focus.py           # musí: 12/12
 .venv/bin/python benchmark/run_dialog.py          # musí: 18/18
 .venv/bin/python benchmark/run_coverage.py        # diagnostika (sleduj trend)
@@ -79,7 +79,7 @@ model). Čti ho CELÝ před první změnou kódu. Doplňuje `docs/BACKLOG.md`
 |---|---|
 | `jellyai/iris/automaton.py` | jádro Iris: turn() — hodiny→volba→focus-shift→konstatování→odpověď→karty |
 | `jellyai/iris/patterns.py` + `patterns/cs/*.json` | balíček karet (deck.best = benefit-výběr) |
-| `jellyai/iris/mnemos.py`, `chronos.py` | paměť (deník JSONL), čas (intervaly, injektované „teď") |
+| `jellyai/iris/subsystems/{chronos,mnemos,topos}.py` | čas (intervaly, připomínky+plán, tep hodin, tvrdý filtr), paměť (deník, memorize/recall), prostor (gazetteer, kontejnment, učení za pochodu) |
 | `jellyai/answerer/query.py` | pseudo-QL šablonový parser otázek (bez UDPipe) |
 | `jellyai/answerer/graph_answerer.py` | match nad grafem, _resolve_topic (patra evidence), aktivační pole |
 | `jellyai/graph/extract.py` | extrakce faktů z anotací (spony, apozice, aliasy „řečený") |

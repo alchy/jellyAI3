@@ -86,11 +86,16 @@ se automat ptá místo hádání; bez odpovědi přizná „nenašel" a nabídne
 kandidáty. Otázky překládá **šablonový parser pseudo-QL**
 (`jellyai/answerer/query.py`, režim `GraphConfig.query_mode = "hybrid"`).
 
-Subsystémy: **Chronos** (časová kotva: „dnes/včera/tento měsíc/v 19. století"
-→ absolutní intervaly; hodinové otázky), **Mnemos** (paměť uživatele v témže
-grafu, deník JSONL), **focus-shift** („v kontextu Bible" posvítí na doménu
-a přehraje otázku), **jmenné rodiny** (instanční vrstva — nabídka při
-nejednoznačném jménu).
+Subsystémy (`jellyai/iris/subsystems/`): **Chronos** (intervaly „dnes/v 19.
+století/minulý týden", tvrdý časový filtr odpovědí, hodinové otázky,
+PŘIPOMÍNKY — „připomeň mi za deset minut / zítra / v září…" s chytrými
+defaulty, vlastní vlákno hodin, okno ⏰ Reminder, správa plánu „zruš/posuň/
+přeplánuj" i výpis „Mám něco v plánu?"), **Mnemos** (paměť uživatele
+v témže grafu: konstatování, explicitní „zapamatuj si/nezapomeň…",
+poznámky-přísloví doslovně, vzpomínání „Co jsem ti řekl včera?"),
+**Topos** (kontejnment míst — gazetteer `data/sub_topos_gazetteer.jsonl`,
+místní filtr „Pršelo v Čechách?", učení za pochodu z vnořených míst
+výroku), **focus-shift** a **jmenné rodiny** (instanční vrstva).
 
 ```bash
 .venv/bin/python services/iris_service.py --port 8084 --model data/graph.pkl
@@ -104,8 +109,8 @@ curl -s localhost:8084/schema     # na co se lze ptát (predikáty, role, karty)
 
 ## Benchmarky — objektivní řízení změn
 
-Každá změna se měří; normativy neklesají (guardrail). Stav: **431 testů,
-etalon 28/28 (+5 sledovaných gapů), focus 12/12, dialog 18/18 — vše 100 %.**
+Každá změna se měří; normativy neklesají (guardrail). Stav: **457 testů,
+etalon 29/29 (+5 sledovaných gapů), focus 12/12, dialog 21/21 — vše 100 %.**
 
 ```bash
 .venv/bin/python -m pytest -q               # jednotkové testy
