@@ -1,0 +1,29 @@
+[Unit]
+Description=jellyAI3 — české QA nad faktovým grafem + viewBase
+After=network.target
+
+[Service]
+Type=simple
+User=jelly
+Group=jelly
+WorkingDirectory=/www/jelly
+# `cli.py web` = viewBase web na 127.0.0.1:8080; líně si nastartuje jako child
+# procesy Iris (127.0.0.1:8084) + ÚFAL služby udpipe(8092)/morpho(8093).
+# Porty ÚFAL služeb jsou v config.py (ServicesConfig) — přemapuj při kolizi.
+ExecStart=/www/jelly/.venv/bin/python /www/jelly/cli.py web
+# E-mailový kanál Chronos připomínek (volitelné). Odesílatel MUSÍ být na doméně
+# s DKIM/SPF, jinak Yahoo/Gmail mail zahodí. Bez JELLY_REMINDER_EMAIL je kanál vypnutý.
+Environment=JELLY_REMINDER_EMAIL=jindrich.nemec@yahoo.com
+Environment=JELLY_REMINDER_FROM=jelly@lordaudio.eu
+# Chronos plánuje připomínky v tomto pásmu.
+Environment=TZ=Europe/Prague
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=full
+ProtectHome=yes
+ReadWritePaths=/www/jelly/data
+
+[Install]
+WantedBy=multi-user.target
