@@ -303,17 +303,37 @@ def cmd_web(config, view=None, client=None):
             _label_cache[node.id] = _to_nominative(node.id, morpho) or node.id
         return _label_cache[node.id]
 
+    from jellyai.iris.subsystems.mnemos import forget_entity, remember, replay
+    from jellyai.lang import current
+    user_entity = current()["user_entity"]
+    graph = None                     # webová kopie grafu (sdílená load i během)
     if view is None:
         # lazy import: viewBase je volitelný, jádro ho nepotřebuje
         from jellyai.viz.viewbase_view import ViewBaseView
-        view = ViewBaseView("jellyAI3").from_graph(load_fact_graph(config),
-                                                   labeler=base_form_label)
+        graph = load_fact_graph(config)
+        # PAMĚŤ DO VIZUALIZACE: přehraj deník Mnemos do grafu PŘED stavbou
+        # plátna (jako to dělá automat na straně Iris). Vizualizace pak ukáže
+        # i fakty uživatele, místa (Topos) a časové kotvy (Chronos) — a protože
+        # je přidává from_graph, nesou i ATRIBUTY (node_detail_rows/fact_detail_rows),
+        # ne jen holé uzly. (Web a Iris tak mají shodný výchozí graf.)
+        replay(graph, config.graph.memory_path, user_entity)
+        view = ViewBaseView("jellyAI3").from_graph(graph, labeler=base_form_label)
 
     pulse = TracePulse()             # aktivace („context window") → jas + provoz tras
 
     def on_query(question):
         # temperature > 0 → fuzzy: k odpovědi i další kontext s menší vahou
         out = client.query(question, temperature=0.35)
+        # ŽIVÝ RŮST GRAFU: co Iris v tomto tahu uložil (Mnemos), přehraj do
+        # webové kopie grafu a přidej NOVÉ fakty na plátno TÝMŽ wrapperem jako
+        # při loadu (feed_fact → uzly i s atributy). DRY: load i interakce.
+        mem = out.get("memorized")
+        if mem and graph is not None and hasattr(view, "feed_fact"):
+            before = set(graph.facts)
+            remember(graph, mem, user_entity)
+            for key, fact in graph.facts.items():
+                if key not in before:
+                    view.feed_fact(graph, fact, labeler=base_form_label)
         nodes = [tuple(n) for n in out.get("activation", {}).get("nodes", [])]
         scores = {node: float(jas) for node, jas in nodes}
         trace = out.get("trace")
@@ -341,6 +361,17 @@ def cmd_web(config, view=None, client=None):
         if out.get("alternatives"):  # souvislosti (krmivo pro budoucí kompozitor)
             reply += f"\n   souvislosti: {', '.join(out['alternatives'][:4])}"
         view.write(reply)            # odpověď (+ metadata) v prohlížeči
+        # ŽIVÉ ZAPOMENUTÍ (AŽ PO aktivaci — jinak by update_node smazané uzly
+        # znovu oživil): „zapomeň na Ronika" → odeber entitu i její fakty
+        # z plátna přes remove akce, symetricky k feed_fact.
+        forgotten = out.get("forgotten")
+        if forgotten and graph is not None and hasattr(view, "remove_facts"):
+            before_facts = set(graph.facts)
+            before_nodes = set(graph.nodes)
+            forget_entity(graph, None, forgotten, user_entity)   # web graf, bez deníku
+            view.remove_facts([k for k in before_facts if k not in graph.facts])
+            for nid in before_nodes - set(graph.nodes):
+                view.remove_node(nid)
         # --- debug výpis konverzace (do logu serveru; flush kvůli RT) ---
         top = ", ".join(f"{n}={v:.2f}" for n, v in nodes[:6])
         print(
@@ -371,7 +402,7 @@ def cmd_web(config, view=None, client=None):
         view.open_docs_panel()       # okno 3: aktivní dokumenty
     if hasattr(view, "open_nodes_panel"):
         view.open_nodes_panel()      # okno 2: aktivační okno uzlů
-    view.serve(open_browser=True)
+    view.serve(open_browser=False)   # server (systemd) — žádný prohlížeč lokálně
 
 
 def _build_parser():

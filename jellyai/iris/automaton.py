@@ -34,16 +34,29 @@ from jellyai.iris.subsystems.chronos import (TimeInterval, clock_answer,
                                              format_due, resolve_due,
                                              resolve_plan, resolve_temporal,
                                              resolve_weekday)
-from jellyai.iris.subsystems.mnemos import (forget, forget_interval,
-                                            note_statement,
-                                            parse_statement, persist,
-                                            remember, replay)
+from jellyai.iris.subsystems.mnemos import (forget, forget_entity,
+                                            forget_interval, name_stem,
+                                            note_statement, parse_statement,
+                                            persist, remember, replay)
 from jellyai.iris.patterns import PatternDeck
 from jellyai.iris.presenter import activation_window, docs_window
 from jellyai.iris.state import FocusState, PendingFocus
 from jellyai.lang import current
 
 _PICK_WARMTH = 2.0        # jas vybraného kandidáta (volba = silné zaostření)
+
+
+class ReminderMessage(str):
+    """Text dozrálé připomínky, který navíc nese ADRESÁTA e-mailu (None =
+    default). Je to podtřída `str` → všude jinde (konzole, okno, spojení
+    v `turn()`, JSON) se chová jako obyčejný řetězec; jen e-mailový kanál
+    si přečte `.recipient`. Tím se adresát dostane k odesílání bez zásahu
+    do generického rozhraní kanálů."""
+
+    def __new__(cls, text, recipient=None):
+        obj = super().__new__(cls, text)
+        obj.recipient = recipient
+        return obj
 
 
 @dataclass
@@ -74,6 +87,10 @@ class IrisResponse:
     trace: dict = None
     sources: list = field(default_factory=list)
     alternatives: list = field(default_factory=list)
+    memorized: dict = None    # konstatování uložené v tomto tahu (Mnemos) —
+                              # vizualizace ho přidá do grafu i s atributy
+    forgotten: str = None     # jméno entity zapomenuté v tomto tahu —
+                              # vizualizace ji (i její fakty) z plátna odebere
 
 
 class IrisAutomaton:
@@ -203,6 +220,9 @@ class IrisAutomaton:
             managed = self._plan_manage(text)
             if managed is not None:
                 return managed
+            sent = self._send_command(text)   # „pošli Jindrovi…" (s adresátem)
+            if sent is not None:
+                return sent
             low = deaccent(text.lower())
             phrase = next((p for p in current()["reminder_phrases"]
                            if p in low), None)
@@ -220,7 +240,7 @@ class IrisAutomaton:
             statement = parse_statement(text, self.clock(), self.deck,
                                         is_node=self._known_word)
             if statement is not None and statement.get("needs_subject"):
-                subject, rest = self._statement_subject(statement["objects"])
+                subject, rest = self._statement_subject(statement["objects"], statement.get("places", ()))
                 if subject is None:
                     statement = None     # není komu připsat → nepřipisovat
                 else:
@@ -329,8 +349,12 @@ class IrisAutomaton:
         if card is not None:
             for _ in due:
                 self._note_card(card.name)
-        return [card.dialog.format(task=item["task"]) if card
-                else item["task"] for item in due]
+        # ReminderMessage nese adresáta (record["recipient"]) k e-mailovému
+        # kanálu; jinak se chová jako řetězec (konzole/okno/join beze změny).
+        return [ReminderMessage(
+                    card.dialog.format(task=item["task"]) if card
+                    else item["task"], recipient=item.get("recipient"))
+                for item in due]
 
     def _recall_query(self, text):
         """„Co jsem ti řekl (včera / dnes / minulý týden)?" — výpis toho,
@@ -393,8 +417,13 @@ class IrisAutomaton:
         if interval is not None:
             pending = [r for r in pending
                        if interval.contains(datetime.fromisoformat(r["due"]))]
-        tasks = [f"{format_due(datetime.fromisoformat(r['due']), now)} — "
-                 f"{r['task']}" for r in pending]
+        tasks = []
+        for r in pending:
+            line = (f"{format_due(datetime.fromisoformat(r['due']), now)} — "
+                    f"{r['task']}")
+            if r.get("recipient"):        # adresovaná připomínka → komu půjde
+                line += f" → {r['recipient']}"
+            tasks.append(line)
         card = self.deck.best("reminder.list", {"candidates": tasks})
         if card is None:
             return None
@@ -439,6 +468,7 @@ class IrisAutomaton:
         remainder = " ".join(rest).rstrip(".,")
         if not remainder:
             return None
+        forgotten_entity = None       # jméno pro živé odebrání z vizualizace
         if deaccent(rest[0].lower()).rstrip(".") == "co":
             # „zapomeň, CO jsem dnes/včera řekl" — období vybírá Chronos
             interval = resolve_temporal(remainder, self.clock())
@@ -450,16 +480,25 @@ class IrisAutomaton:
             statement = parse_statement(remainder, self.clock(), self.deck,
                                         is_node=self._known_word)
             if statement is None:
-                return None
-            removed = forget(self.answerer.graph, self.memory_path,
-                             statement["predicate"], statement["objects"],
-                             current()["user_entity"])
+                # ne konstatování → ZAPOMENUTÍ CELÉ ENTITY („zapomeň na Ronika"):
+                # smaž všechny fakty, kde jméno (kmen napříč pády) vystupuje
+                removed = forget_entity(self.answerer.graph, self.memory_path,
+                                        remainder, current()["user_entity"])
+                if not removed:
+                    return None
+                forgotten_entity = remainder    # → vizualizace odebere entitu
+            else:
+                removed = forget(self.answerer.graph, self.memory_path,
+                                 statement["predicate"], statement["objects"],
+                                 current()["user_entity"])
         card = self.deck.best("memory.forget",
                               {"candidates": removed})
         if card is None:
             return None
         message = card.dialog.format(facts="; ".join(removed))
-        return self._plan_response(card, message, text)
+        resp = self._plan_response(card, message, text)
+        resp.forgotten = forgotten_entity      # None nebo jméno (pro vizualizaci)
+        return resp
 
     def _memorize_command(self, text, phrase):
         """EXPLICITNÍ příkaz paměti („zapamatuj si, že…", „nezapomeň, …",
@@ -468,7 +507,9 @@ class IrisAutomaton:
         (přísloví) se uloží DOSLOVNĚ jako poznámka (karta memory-note) —
         příkaz „pamatuj" znamená persistenci vždy."""
         words = phrase.split()
-        tokens = re.findall(r"[\w:.]+", text)
+        # e-mail (@) jako CELEK — jinak by ho re-join přes mezery rozbil dřív,
+        # než ho uvidí email-aware parse_statement (spadlo by to do poznámky)
+        tokens = re.findall(r"[\w.+-]+@[\w.-]+\.\w+|[\w:.]+", text)
         lows = [deaccent(t.lower()).rstrip(".") for t in tokens]
         start = None
         for i in range(len(lows) - len(words) + 1):
@@ -486,7 +527,7 @@ class IrisAutomaton:
         statement = parse_statement(remainder, self.clock(), self.deck,
                                     is_node=self._known_word)
         if statement is not None and statement.get("needs_subject"):
-            subject, others = self._statement_subject(statement["objects"])
+            subject, others = self._statement_subject(statement["objects"], statement.get("places", ()))
             if subject is None:
                 statement = None
             else:
@@ -667,7 +708,7 @@ class IrisAutomaton:
         return response
 
     def _set_reminder(self, task, due, text, record=None, event=None,
-                      offered=False):
+                      offered=False, recipient=None):
         """Uloží připomínku do skladu (nebo PŘEPLÁNUJE existující záznam)
         a potvrdí kartou — `reminder.set` (doslovný termín), NEBO
         `reminder.heads-up` (odvozený default s nabídkou upřesnění;
@@ -685,6 +726,8 @@ class IrisAutomaton:
                 record = {"due": due.isoformat(), "task": task}
                 if event is not None:
                     record["event"] = event.isoformat()
+                if recipient is not None:      # adresát e-mailu (jinak default)
+                    record["recipient"] = recipient
                 self.reminders.append(record)
             self.reminders.sort(key=lambda item: item["due"])
             self._save_reminders()
@@ -738,6 +781,80 @@ class IrisAutomaton:
             words.pop(0)
         return " ".join(words).rstrip(".")   # větná tečka do úkolu nepatří
 
+    def _resolve_person_email(self, name):
+        """E-mail osoby z GRAFU: fakt s účastníkem typu `email` a subjektem,
+        jehož kmen odpovídá jménu (shoda napříč pády: Jindrovi→Jindra).
+        E-mail žije v grafu jako typovaná hodnota (Mnemos), ne v kódu."""
+        target = name_stem(name)
+        for fact in self.answerer.graph.facts.values():
+            email = next((p.node for p in fact.participants
+                          if p.type == "email"), None)
+            if email is None:
+                continue
+            if any(p.role == "subj" and name_stem(p.node) == target
+                   for p in fact.participants):
+                return email
+        return None
+
+    def _send_command(self, text):
+        """„Pošli Jindrovi zítra ráno upozornění XYZ" → připomínka s ADRESÁTEM.
+
+        Adresát = jméno za slovem „pošli" (ne zájmeno); e-mail se dohledá
+        v grafu (typovaný fakt uložený přes Mnemos). BEZ pojmenovaného
+        adresáta jde připomínka na DEFAULT (adresu doplní e-mailový kanál).
+        Termín z Chronosu (resolve_plan/due), úkol = text bez fráze, adresáta
+        a časových výrazů. Jméno bez známého e-mailu → upřímná výzva.
+
+        Returns:
+            IrisResponse | None: Potvrzení/výzva, nebo None (není příkaz pošli).
+        """
+        lang = current()
+        low = deaccent(text.lower())
+        tokens = [t.rstrip(".") for t in re.findall(r"[\w:@.+-]+", low)]
+        send_words = set(lang.get("send_phrases", ()))
+        idx = next((i for i, t in enumerate(tokens) if t in send_words), None)
+        if idx is None:
+            return None
+        pronouns = set(lang.get("recipient_pronouns", ()))
+        recipient_email = recipient_name = None
+        nxt = tokens[idx + 1] if idx + 1 < len(tokens) else None
+        if nxt is not None and nxt not in pronouns and not nxt.isdigit():
+            recipient_name = nxt
+            recipient_email = self._resolve_person_email(nxt)
+            if recipient_email is None:      # jméno znám, e-mail ne → zeptej se
+                return self._info(
+                    f"Neznám e-mail pro {nxt}. Řekni mi třeba: zapamatuj si "
+                    f"že {nxt} má email nekdo@nekde.cz", text)
+        phrase = tokens[idx] + (f" {recipient_name}" if recipient_name else "")
+        task = self._reminder_task(text, phrase) or "upozornění"
+        plan = resolve_plan(text, self.clock())
+        if plan is not None:
+            resp = self._set_reminder(task, plan["due"], text,
+                                      event=plan.get("event"),
+                                      offered=plan["offered"],
+                                      recipient=recipient_email)
+        else:
+            due = resolve_due(text, self.clock())
+            if due is None:                  # bez termínu → výchozí ofset
+                minutes = lang["temporal"].get("default_reminder_minutes", 15)
+                due = self.clock() + timedelta(minutes=minutes)
+            resp = self._set_reminder(task, due, text, recipient=recipient_email)
+        # potvrzení ať PŘIZNÁ adresáta („pošli Jindrovi" ≠ „připomenu ti")
+        if resp is not None and recipient_name:
+            resp.text = resp.text.replace(
+                "Připomenu", f"Pošlu {recipient_name.capitalize()}", 1)
+        return resp
+
+    def _info(self, message, text):
+        """Prostá informační odpověď bez karty (výzva k doplnění kontaktu)."""
+        response = IrisResponse(
+            text=message, kind="answer", assurance=1.0,
+            activation_window=activation_window(self.answerer),
+            docs_window=docs_window(self.answerer),
+            used={"components": ["chronos"], "patterns": []})
+        self.state.remember(text, response)
+        return response
+
     def _warm_interval(self, interval, warmth=0.5):
         """Rozsvítí časové uzly grafu spadající do intervalu (Chronos osa).
 
@@ -756,10 +873,16 @@ class IrisAutomaton:
         entry["used"] += 1
         entry["gain"] += round(gain, 4)
 
-    def _statement_subject(self, objects):
-        """Podmět připsaného tvrzení: EXPLICITNÍ osoba ve výroku (nejdelší
-        rozpětí objektů rozřešitelné na person uzel) má přednost; jinak
-        nejteplejší osoba konverzačního těžiště (o kom se právě mluvilo).
+    def _statement_subject(self, objects, places=()):
+        """Podmět připsaného tvrzení: EXPLICITNÍ osoba ve výroku má přednost;
+        jinak nejteplejší osoba konverzačního těžiště (o kom se právě mluvilo).
+
+        Pořadí: (1) rozpětí rozřešitelné na EXISTUJÍCÍ person uzel, (2) explicitní
+        JMÉNO (velké písmeno) ještě NEznámé grafu — nová 3. osoba, kterou zápis
+        teprve vytvoří (např. „Ronik bydlí v Petrovicích"), (3) fallback na
+        aktivaci/těžiště — ten platí jen pro ELIDOVANÝ podmět („ano, měl rád
+        knedlíky"). Bez kroku (2) by nová jmenovaná osoba spadla na fallback a
+        výrok by se nesmyslně připsal uživateli/nejteplejší osobě.
 
         Returns:
             tuple: (id osoby | None, objekty bez rozpětí podmětu).
@@ -773,6 +896,12 @@ class IrisAutomaton:
                 found = self.answerer.graph.nodes.get(node)
                 if found is not None and found.type == "person":
                     return node, objects[:i] + objects[i + size:]
+        places = set(places)
+        for i, obj in enumerate(objects):     # explicitní nové jméno > kontext
+            if (obj not in places and obj[:1].isupper()
+                    and obj.replace("-", "").isalpha() and len(obj) > 1
+                    and self.answerer.graph.nodes.get(obj) is None):
+                return obj, objects[:i] + objects[i + 1:]
         for candidate in self.answerer._context_candidates():  # pylint: disable=protected-access
             node = self.answerer.graph.nodes.get(candidate)
             if node is not None and node.type == "person":
@@ -793,12 +922,78 @@ class IrisAutomaton:
                            for word in node.id.lower().split()}
         return token.lower() in self._words
 
+    def _nominativize_name(self, token, client):
+        """Nominativ jména přes morfo LEMMA (Karlem→Karel) — TÝŽ princip jako
+        korpusová `nominativize` (PROPN lemma = nominativ). Bezpečné tam, kde
+        holý kmen ne: Pavel→Pavel, Pavla→Pavla (různí lidé mají různé lemma).
+        Mění JEN jednoslovný kapitalizovaný tvar s KAPITALIZOVANÝM lemmatem
+        (vlastní jméno); e-mail, obecné slovo, víceslovný text i neznámé jméno
+        (lemma == tvar, malé lemma) se nechají."""
+        if not token or " " in token or not token[:1].isupper():
+            return token
+        try:
+            analysis = client.analyze(token)
+        except Exception:  # pylint: disable=broad-exception-caught
+            return token
+        if not analysis:
+            return token
+        lemma = (analysis[0].get("lemma") or "").split("_")[0]
+        if lemma and lemma[:1].isupper() and lemma != token:
+            return lemma
+        return token
+
+    def _nominativize_statement(self, text, statement):
+        """Nominativizuje jména a MÍSTA výroku před zápisem. MÍSTA přes UDPipe
+        (kontext věty jednoznačně určí pád — Brně→Brno; toponyma nemají past
+        rodu jako Pavla/Pavel). JMÉNA přes morpho lemma (Karlem→Karel), kde by
+        UDPipe naopak různé lidi slil (Pavla→Pavel). Vrací (příp. upravenou)
+        kopii statementu."""
+        client = getattr(self.answerer, "client", None)
+        if client is None:
+            return statement
+        statement = dict(statement)
+        places = set(statement.get("places", ()))
+        try:
+            parsed = client.parse(text)
+        except Exception:  # pylint: disable=broad-exception-caught
+            parsed = []
+        place_lemma = {}
+        for sent in parsed:
+            for tok in sent:
+                form = tok.get("form") or ""
+                if form in places and tok.get("upos") in ("PROPN", "NOUN"):
+                    lemma = (tok.get("lemma") or "").split("_")[0]
+                    # nominativ místa nebývá KRATŠÍ než tvar (Brně→Brno 4=4,
+                    # Praze→Praha 5=5); kratší = zmršení (Lhotě→Lhot) → zahoď
+                    if (lemma and lemma[:1].isupper() and lemma != form
+                            and len(lemma) >= len(form)):
+                        place_lemma[form] = lemma
+
+        def nom(word):
+            if word in place_lemma:
+                return place_lemma[word]
+            if word in places:
+                return word              # místo bez verdiktu — morfo by spletlo
+            return self._nominativize_name(word, client)   # jméno přes morpho
+
+        statement["objects"] = [nom(o) for o in statement["objects"]]
+        statement["places"] = [place_lemma.get(p, p)
+                               for p in statement.get("places", ())]
+        if statement.get("subject"):
+            statement["subject"] = nom(statement["subject"])
+        return statement
+
     def _memorize(self, text, statement):
         """Uloží konstatování do grafu (Mnemos) a rozsvítí jeho uzly.
 
         Uložení JE zaostření: nové téma svítí, takže navazující otázka
         („Kdy jsem měl…?") jede po zahřáté aktivaci.
         """
+        # NOMINATIVIZACE PŘED zápisem (do grafu I deníku → merge pádů, konzistence
+        # po restartu i ve vizualizaci): MÍSTA přes UDPipe (kontext věty: Brně→Brno;
+        # u toponym není past Pavla/Pavel), JMÉNA přes morpho lemma (bezpečné:
+        # Pavla≠Pavel, kdežto UDPipe by je slil).
+        statement = self._nominativize_statement(text, statement)
         detail = remember(self.answerer.graph, statement,
                           current()["user_entity"])
         if self.memory_path:
@@ -829,7 +1024,8 @@ class IrisAutomaton:
             activation_window=activation_window(self.answerer),
             docs_window=docs_window(self.answerer),
             used={"components": ["mnemos", "chronos"],
-                  "patterns": patterns})
+                  "patterns": patterns},
+            memorized=statement)   # vizualizace ho přidá do grafu i s atributy
         self.state.remember(text, response)
         return response
 

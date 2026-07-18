@@ -105,12 +105,26 @@ class UfalClient:
         self._handles = {}
 
     def _ensure(self, name, port, model):
-        """Zajistí, že služba `name` běží (líně ji spustí při první potřebě)."""
-        if name not in self._handles:
-            self._handles[name] = _ServiceHandle(
-                _SERVICE_SCRIPTS[name], model, self.config.host, port,
-                self.config.startup_timeout,
-            )
+        """Zajistí, že služba `name` běží (líně ji spustí při první potřebě).
+
+        Health-first (jako IrisClient): když na portu UŽ někdo poslouchá
+        (službu nastartoval jiný proces — např. web drží morpho pro popisky,
+        iris ji chce pro skloňování), SDÍLÍ ji místo spuštění duplikátu.
+        Bez toho by druhý proces nesbindoval port a spadl na timeoutu.
+        """
+        if name in self._handles:
+            return self._handles[name]
+        try:
+            with urllib.request.urlopen(
+                    f"http://{self.config.host}:{port}/health", timeout=1):
+                self._handles[name] = None   # cizí instance — nevlastníme ji
+                return None
+        except Exception:  # noqa: BLE001 — neběží → nastartujeme vlastní
+            pass
+        self._handles[name] = _ServiceHandle(
+            _SERVICE_SCRIPTS[name], model, self.config.host, port,
+            self.config.startup_timeout,
+        )
         return self._handles[name]
 
     def entities(self, text):
@@ -160,9 +174,10 @@ class UfalClient:
                      "/generate", {"lemma": lemma, "tag": tag})["forms"]
 
     def close(self):
-        """Složí všechny spuštěné služby."""
+        """Složí všechny NÁMI spuštěné služby (None = cizí, nesaháme na ni)."""
         for handle in self._handles.values():
-            handle.close()
+            if handle is not None:
+                handle.close()
         self._handles = {}
 
 

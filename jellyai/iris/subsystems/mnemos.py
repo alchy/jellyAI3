@@ -26,6 +26,26 @@ from jellyai.graph.extract import make_fact, Participant
 from jellyai.iris.subsystems.chronos import resolve_temporal
 from jellyai.lang import current
 
+# Hodnoty MIMO přirozený jazyk (e-mail) tokenizér rozbije (@, tečky) a tagger
+# neklasifikuje. Regexp je proto rozpozná JAKO CELEK a obejde jazykovou cestu —
+# adresa se nese jako jeden token typu "email".
+EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+\w")
+
+# Kmen jména pro shodu napříč pády ("Jindra"≈"Jindrovi" → "jindr"). POZOR:
+# záměrně NE cluster_key — ten slučuje i různé lidi (Pavel≡Pavla → jeden kmen),
+# což by u adresáta/forgetu smazalo/poslalo špatné osobě. Konzervativní ořez
+# koncovek drží Pavel≠Pavla (Pavel končí na -l, neubírá se).
+_NAME_SUFFIXES = ("ovi", "ovy", "ove", "ova", "em", "um", "y", "u", "a", "e", "i", "o")
+
+
+def name_stem(name):
+    """Deakcentovaný kmen jména bez pádové koncovky (shoda adresáta v pádech)."""
+    stem = deaccent(str(name)).lower().strip()
+    for suffix in _NAME_SUFFIXES:
+        if stem.endswith(suffix) and len(stem) - len(suffix) >= 2:
+            return stem[:-len(suffix)]
+    return stem
+
 
 def _l_form(token):
     """Kmen l-ového příčestí („měl"/„měla"/„měli" → „měl"); jinak None."""
@@ -80,6 +100,13 @@ def utterance_features(tokens, norms, is_node=None):
     features = set()
     if any(n in lang["first_person"] for n in norms):
         features.add("first_person")
+    if any(EMAIL_RE.fullmatch(t) for t in tokens):
+        # Hodnota MIMO přirozený jazyk (e-mail): výrok je přiřazení atributu,
+        # NE slovesné/sponové konstatování. Slovní rysy se proto POTLAČÍ, aby
+        # spurious signály (slovo „email" končí na -l → vypadá jako l-příčestí)
+        # nepřebily kartu atributu. Rys email pak zbývá jediná pasující cesta.
+        features.add("email")
+        return features
     if any(n in lang["copula_forms"] for n in norms):
         features.add("copula")
     finite = _finite_verb(tokens, norms, is_node)
@@ -122,9 +149,11 @@ def parse_statement(text, now, deck=None, is_node=None):
         deck = PatternDeck.for_language("cs")
         deck.load()
     lang = current()
-    # koncová větná tečka pryč; tečkované zkratky (R.U.R.) zůstávají
-    tokens = [t.rstrip(".") if "." not in t[:-1] else t
-              for t in re.findall(r"[\w.]+", text)]
+    # koncová větná tečka pryč; tečkované zkratky (R.U.R.) zůstávají; e-mailová
+    # adresa se BERE JAKO CELEK (regexp má přednost před dělením na tečkách/@)
+    raw = re.findall(r"[\w.+-]+@[\w.-]+\.\w+|[\w.]+", text)
+    tokens = [t if EMAIL_RE.fullmatch(t)
+              else (t.rstrip(".") if "." not in t[:-1] else t) for t in raw]
     tokens = [t for t in tokens if t]
     norms = [deaccent(t.lower()) for t in tokens]
     card = deck.best("utterance.statement",
@@ -141,6 +170,10 @@ def parse_statement(text, now, deck=None, is_node=None):
         predicate = card.action.get("predicate")
     if predicate is None:
         return None
+    # KATALOG oprav zmršených predikátů (bezdiakritické „bydli"→ořez→„bydl"):
+    # cílená ruční tabulka pro konkrétní tvary, ne univerzální algoritmus
+    # (ten rozbíjel klasifikaci). Platí i pro dotaz — týž parser → shoda write/query.
+    predicate = lang.get("predicate_catalog", {}).get(predicate, predicate)
     interval = resolve_temporal(text, now)
     time_label = None
     if interval is None:
@@ -151,6 +184,21 @@ def parse_statement(text, now, deck=None, is_node=None):
             time_label = f"{_date_label(interval)} {now.hour}:{now.minute:02d}"
     if time_label is None:
         time_label = _date_label(interval)
+    if kind == "attribute":
+        # ATRIBUT s hodnotou mimo jazyk (e-mail): hodnota = adresa (regexp),
+        # podmět = explicitní jméno ve výroku (nový person uzel — nemusí být
+        # v korpusu), jinak identita uživatele. Predikát nese karta.
+        value = next((t for t in tokens if EMAIL_RE.fullmatch(t)), None)
+        if value is None:
+            return None
+        stop = (set(lang["first_person"]) | set(lang["copula_forms"])
+                | set(lang["query_skip_words"]) | set(lang["confirmation_words"]))
+        name = next((t for t, n in zip(tokens, norms)
+                     if t[:1].isupper() and not EMAIL_RE.fullmatch(t)
+                     and n not in stop and len(t) > 1), None)
+        return {"kind": "attribute", "predicate": predicate, "objects": [value],
+                "subject": name or lang["user_entity"], "places": [],
+                "time": time_label, "card": card.name, "needs_subject": False}
     temporal_words = (set(lang["temporal"].get("day_words", ()))
                       | set(lang["temporal"].get("units", ()))
                       | set(lang["temporal"].get("now_words", ())))
@@ -223,6 +271,14 @@ def remember(graph, statement, user_entity):
         participants = [Participant("subj", statement["subject"], "person")]
         participants += [_part("obj", obj, "concept") for obj in objects]
         participants.append(Participant("theme", user_entity, "person"))
+    elif statement["kind"] == "attribute":
+        # ATRIBUT osoby (e-mail): hodnota dostane TYP `email` (regexp), aby
+        # ji šlo z grafu dohledat mimo přirozený jazyk; uživatel je zdroj.
+        participants = [Participant("subj", statement["subject"], "person")]
+        participants += [Participant("obj", obj,
+                                     "email" if EMAIL_RE.match(obj) else "concept")
+                         for obj in objects]
+        participants.append(Participant("theme", user_entity, "person"))
     elif statement["kind"] == "event":
         # prézentní děj („Venku prší"): účastníci jsou obsahová slova,
         # uživatel je pozorovatel — zjišťovací „Prší venku?" pak sedí
@@ -236,7 +292,7 @@ def remember(graph, statement, user_entity):
     participants.append(Participant("time", statement["time"], "time"))
     graph.add_fact(make_fact(statement["predicate"], participants))
     detail = f"{statement['predicate']}: {', '.join(objects)} ({statement['time']})"
-    if statement["kind"] == "attributed":
+    if statement["kind"] in ("attributed", "attribute"):
         detail = f"{statement['subject']} — {detail}"
     return detail
 
@@ -271,6 +327,53 @@ def forget(graph, path, predicate, objects, user_entity):
                 row = json.loads(line)
                 if row.get("predicate") == predicate \
                         and target <= set(row.get("objects", [])):
+                    continue
+                lines.append(line)
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.writelines(lines)
+    return removed
+
+
+def forget_entity(graph, path, name, user_entity):
+    """Zapomene CELOU entitu („zapomeň na Ronika"): odstraní z grafu VŠECHNY
+    fakty, kde uzel vystupuje (shoda KMENE jména napříč pády — Ronika→Ronik),
+    a odpovídající řádky deníku (entita jako subjekt nebo v objektech).
+
+    Args:
+        graph (FactGraph): Cílový graf.
+        path (str | None): Deník paměti (None = jen graf, bez zápisu).
+        name (str): Jméno entity (v libovolném pádu).
+        user_entity (str): Id uzlu uživatele (nikdy se nemaže tímto povelem).
+
+    Returns:
+        list[str]: Popisy odstraněných faktů (prázdné = entita nenalezena).
+    """
+    target = name_stem(name)
+    node_id = next((nid for nid in graph.nodes
+                    if nid != user_entity and name_stem(nid) == target), None)
+    if node_id is None:
+        return []
+    removed, kept = [], {}
+    for key, fact in graph.facts.items():
+        if any(part.node == node_id for part in fact.participants):
+            others = [p.node for p in fact.participants
+                      if p.node != node_id and p.role != "time"]
+            removed.append(f"{fact.predicate}: {node_id}"
+                           + (f" ({', '.join(others[:4])})" if others else ""))
+            continue
+        kept[key] = fact
+    if removed:
+        graph.replace_facts(kept)
+    if path and os.path.exists(path):
+        lines = []
+        with open(path, encoding="utf-8") as fh:
+            for line in fh:
+                if not line.strip():
+                    continue
+                row = json.loads(line)
+                if name_stem(row.get("subject", "")) == target \
+                        or any(name_stem(o) == target
+                               for o in row.get("objects", [])):
                     continue
                 lines.append(line)
         with open(path, "w", encoding="utf-8") as fh:

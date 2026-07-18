@@ -126,9 +126,12 @@ class ServicesConfig:
         annotations_path (str): Kam ukládat offline anotace pasáží.
     """
     host: str = "127.0.0.1"
-    nametag_port: int = 8081
-    udpipe_port: int = 8082
-    morpho_port: int = 8083
+    # POZOR (deploy jelly.ithosaudio.eu): výchozí 8081/8082/8083 kolidují
+    # s běžícími službami na tomto stroji (uniforms/cudlik/learn) → přemapováno
+    # do volného bloku 809x. web(8080) a iris(8084) jsou volné, ponechány.
+    nametag_port: int = 8091
+    udpipe_port: int = 8092
+    morpho_port: int = 8093
     iris_port: int = 8084
     web_port: int = 8080     # viewBase web — cíl pushů Chronos (REST event)
     nametag_model: str = "data/models/czech-cnec.ner"
