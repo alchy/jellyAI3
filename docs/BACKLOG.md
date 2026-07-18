@@ -33,6 +33,41 @@
 | 19 | Experiment | Hybridní aktivace uzel × hrana. | Metrika → prototyp za flagem. | 17 |
 | 20 | Vize | Osobnost/hlas databáze (persona nad Echo). | Závisí na Echo (kompozice). | 18 |
 
+## Otevřené z runtime Mnemos — nevyřešené (2026-07-18, deploy jelly.ithosaudio.eu)
+
+Body, které se za běhu (Mnemos, ne korpus) NEPODAŘILO zlomit. Kořen je společný:
+morfologie na IZOLOVANÉM tvaru (mimo větný kontext) je nespolehlivá, a náš
+lehký Mnemos parser (`_l_form`/`_finite_verb`) je na hraně.
+
+| # | Oblast | Problém | Co jsme zkusili / proč to nešlo | Priorita |
+|---|--------|---------|--------------------------------|----------|
+| 31 | Mnemos parser | **Jméno končící na -l** (Emil, Karel, Pavel, Michal…) `_l_form` mylně bere jako l-příčestí → stane se PREDIKÁTEM („Emil bydlel"→ predikát „emil"). | `_l_form` „vlastní pravidlo" (samohláska před -l) rozlišilo bydli≠bydlel, ale „bydli" pak nespadlo ani do finite_verb (přítomné koncovky mají „í") → výrok se NEULOŽIL. Vráceno. | **1** |
+| 32 | Mnemos sloveso | **Bezdiakritické „bydli"→ořez→„bydl"** (zmršený predikát). | Morpho lemma „bydli"→„bydlet" ✓ (izolovaně!), ale predikát je už „bydl" (morpho „bydl"→„byst" ✗). UDPipe kontext „bydli"→„bydnout" ✗. ŘEŠENO cíleným katalogem `cs.json predicate_catalog` (bydl→bydlet) — jen pro známé tvary, ne obecně. Obecné řešení chybí. | 2 |
+| 33 | Mnemos typy | **Jména jako „pojem", ne „osoba"** (Honza/Pavla). Mnemos při dějovém výroku typuje objekty natvrdo concept (nedělá NER jako korpus s NameTagem). | Zkusili PROPN z UDPipe → nespolehlivé (Honza mis-tagnut jako ADP, Pavla ok). Vráceno. | 2 |
+| 34 | Answerer | **„Kdo bydlí s Karlem?" → uživatel** (theme drift): `theme=uživatel` je na KAŽDÉM faktu 1. osoby → chronicky přehřátý → přebíjí „kdo". | Na čistém memory OK; při nasbírané paměti drift. Souvisí s rankingem (#25) a s tím, že user je theme. | 2 |
+| 35 | Mnemos místa | **Skloněné místo občas nezlomeno** (Brně→Brno OK přes UDPipe, ale morpho izolovaně „Brně"→NNMS1 nominativ špatně; UDPipe zas slévá Pavla→Pavel). | Kompromis: MÍSTA přes UDPipe (kontext), JMÉNA přes morpho (Pavla≠Pavel). Délková pojistka proti zmršení (Lhotě→Lhot). Zbývají tvary, co netrefí ani jedno. | 3 |
+
+### 💡 Doporučení (user): **vlastní lematika / kořenový parser + identifikátor tvaru a slovních druhů**
+
+Morpho (izolovaně) i UDPipe (kontext, ale slévá rody) i naše `_l_form` selhávají
+každý jinak. Body #31–#35 mají společnou příčinu: **chybí spolehlivý určovač
+tvaru** za běhu. Zvážit VLASTNÍ lehký modul (bez ÚFAL služeb pro Mnemos zápis):
+
+- **kořenový parser / stemmer** české flexe (kmen + koncovka), navázaný na
+  `cluster_key` (už existuje pro korpus) — ale s pojistkou rodu/životnosti,
+  aby neslil Pavel≠Pavla (kde cluster_key sám selhává);
+- **identifikátor slovního druhu a tvaru** (osoba vs. sloveso vs. místo) z
+  koncovek + kapitalizace + malé tabulky výjimek (`predicate_catalog` je zárodek);
+- explicitní **katalog výjimek** pro známé zmršené tvary (rozšiřovat, ne
+  univerzalizovat — univerzální `_l_form` fix rozbil klasifikaci).
+
+Cíl: nominativ jmen i míst, správný typ (osoba/místo/pojem) a čistý predikát
+(bydlet) BEZ nespolehlivé morfo/UDPipe magie na izolovaných tvarech.
+
+| # | Oblast | Bod | Poznámka | Priorita |
+|---|--------|-----|----------|----------|
+| 36 | Viz / infra | **Zabalit font lokálně** do `viewbase/static` — troika-three-text tahá glyfy z `cdn.jsdelivr.net` (unicode-font-resolver) přes `fetch()`; za striktní CSP (`connect-src 'self'`) jsou titulky uzlů neviditelné. Self-host = žádná externí závislost ani nutnost povolovat CDN (důležité pro air-gapped/offline). | Předgenerovat/uložit font(y) do static a resolver přesměrovat na lokální cestu; pak CSP nechat přísnou. | 3 |
+
 ## Hotovo (archiv — detaily v git logu)
 
 | # | Bod | Výsledek |
