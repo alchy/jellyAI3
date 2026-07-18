@@ -24,7 +24,7 @@ shift || true
 
 case "$cmd" in
   setup)
-    python3.11 -m venv "$ROOT/.venv"
+    python3 -m venv "$ROOT/.venv"   # 3.11 není v systému; requires-python>=3.11 → 3.12 OK
     "$PY" -m pip install --quiet --upgrade pip
     "$PY" -m pip install --quiet -r "$ROOT/requirements.txt"
     echo "✅ Prostředí připraveno v $ROOT/.venv"

@@ -49,9 +49,63 @@ class ViewBaseView:
         self._canvas = vb.Canvas(title=title, theme=theme)
         self._handle = None
         self._terminal_id = None
+        self._fact_seq = 0            # unikátní id faktových uzlů (load i běh)
+        self._defined_types = set()   # typy s už definovaným stylem
+        self._fact_ids = {}           # klíč faktu → id uzlu (pro živé mazání)
+
+    def _ensure_type(self, kind):
+        """Definuje styl typu uzlu právě jednou (viewBase chce define_type
+        před add_node); neznámý typ dostane neutrální barvu."""
+        kind = kind or "concept"
+        if kind not in self._defined_types:
+            self._canvas.define_type(
+                kind, **_TYPE_STYLE.get(kind, {"color": "#8a949f"}))
+            self._defined_types.add(kind)
+
+    def feed_node(self, graph, node_id, labeler=None):
+        """Přidá/aktualizuje ENTITNÍ uzel I S ATRIBUTY (node_detail_rows:
+        typ, váha, sousední fakty). Idempotentní."""
+        node = graph.nodes.get(node_id)
+        kind = node.type if node is not None else "concept"
+        self._ensure_type(kind)
+        label = labeler(node) if (labeler and node is not None) else node_id
+        self.add_node(node_id, label=label, type=kind or "concept",
+                      **dict(node_detail_rows(graph, node_id)))
+
+    def feed_fact(self, graph, fact, labeler=None):
+        """JEDINÝ wrapper pro přidání faktu do plátna — I S ATRIBUTY. Přidá
+        uzly účastníků (feed_node) + faktový uzel (fact_detail_rows) + hrany.
+
+        DRY: totéž volá `from_graph` PŘI LOADU i `on_query` PŘI INTERAKCI
+        (nová vzpomínka Mnemos), takže atributy se krmí v obou cestách stejně.
+
+        Returns:
+            str: Id vytvořeného faktového uzlu.
+        """
+        for participant in fact.participants:
+            self.feed_node(graph, participant.node, labeler=labeler)
+        self._fact_seq += 1
+        fid = f"fact:{fact.predicate}:{self._fact_seq}"   # unikátní i za běhu
+        key = getattr(fact, "id", None) or (fact.predicate, fact.participants)
+        self._fact_ids[key] = fid       # mapa pro živé ZAPOMENUTÍ (remove_facts)
+        if fact.predicate == "kontext":
+            # asociace není přímý vztah: BEZ popisku (tisíce „souvislost"
+            # zaplavovaly plátno), drobná a matná; detail řekne zbytek
+            self._ensure_type("asociace")
+            self.add_node(fid, label="", type="asociace",
+                          **dict(fact_detail_rows(fact)))
+        else:
+            self._ensure_type("fact")
+            self.add_node(fid, label=fact.predicate, type="fact",
+                          **dict(fact_detail_rows(fact)))
+        for participant in fact.participants:
+            self.add_edge(fid, participant.node, role=participant.role)
+        return fid
 
     def from_graph(self, graph, labeler=None):
-        """Naplní plátno uzly a hranami faktového grafu (entity + faktové uzly).
+        """Naplní plátno faktovým grafem (entity + faktové uzly, vše s atributy).
+
+        Používá týž wrapper `feed_fact` jako živé přidávání za běhu (DRY).
 
         Args:
             graph (FactGraph): Zdrojový graf.
@@ -62,27 +116,11 @@ class ViewBaseView:
             ViewBaseView: self (pro řetězení).
         """
         self._canvas.detail_window()               # klik na uzel → box se všemi meta
-        kinds = ({node.type for node in graph.nodes.values()}
-                 | {"fact", "asociace"})
-        for kind in kinds:
-            self._canvas.define_type(kind, **_TYPE_STYLE.get(kind, {"color": "#8a949f"}))
-        for node in graph.nodes.values():
-            label = labeler(node) if labeler else node.id
-            # meta = co o uzlu držíme (typ, váha, fakty) → naplní detailní okno
-            self.add_node(node.id, label=label, type=node.type,
-                          **dict(node_detail_rows(graph, node.id)))
-        for index, fact in enumerate(graph.facts.values()):
-            fid = f"fact:{fact.predicate}:{index}"     # unikátní id (bez kolizí)
-            if fact.predicate == "kontext":
-                # asociace není přímý vztah: BEZ popisku (tisíce „souvislost"
-                # zaplavovaly plátno), drobná a matná; detail řekne zbytek
-                self.add_node(fid, label="", type="asociace",
-                              **dict(fact_detail_rows(fact)))
-            else:
-                self.add_node(fid, label=fact.predicate, type="fact",
-                              **dict(fact_detail_rows(fact)))
-            for participant in fact.participants:
-                self.add_edge(fid, participant.node, role=participant.role)
+        for fact in graph.facts.values():
+            self.feed_fact(graph, fact, labeler=labeler)
+        for node in graph.nodes.values():          # osamocené entity (bez faktu)
+            if not self._canvas.has_node(node.id):
+                self.feed_node(graph, node.id, labeler=labeler)
         return self
 
     def focus(self, node_id):
@@ -100,15 +138,32 @@ class ViewBaseView:
         """Přidá hranu (idempotentní — duplicity nevadí)."""
         self._canvas.ensure_edge(src, dst, **meta)
 
+    def remove_node(self, node_id):
+        """Odebere uzel z plátna (i s incidenčními hranami). Neznámý = ignorováno."""
+        try:
+            self._canvas.remove_node(node_id)
+        except Exception:  # pylint: disable=broad-exception-caught
+            pass
+
+    def remove_facts(self, fact_keys):
+        """Živé ZAPOMENUTÍ: odebere faktové uzly odpovídající klíčům faktů
+        (z mapy vytvořené `feed_fact`). Symetrie k `feed_fact` — používá
+        `on_query` po povelu „zapomeň na …", aby fakt zmizel i z plátna."""
+        for key in fact_keys:
+            fid = self._fact_ids.pop(key, None)
+            if fid is not None:
+                self.remove_node(fid)
+
     def update_node(self, node_id, **attrs):
-        """Živě změní uzel (push přes WebSocket). Uzel, který plátno ještě
-        nezná (Mnemos ho přidal za běhu — „uživatel", nová vzpomínka, čas),
-        se rovnou PŘIDÁ: paměť uživatele roste do grafu i vizuálně."""
+        """Živě změní EXISTUJÍCÍ uzel (push přes WebSocket). Uzel, který plátno
+        nezná — ještě nebyl nakrmen přes `feed_fact`, NEBO byl ZAPOMENUT — se
+        PŘESKOČÍ. Dřív ho fallback rovnou přidával jako holý „concept", jenže to
+        aktivací VZKŘÍSILO právě zapomenuté uzly (a bez atributů). Přidávání teď
+        patří výhradně feed_fact (uzly i s atributy); update jen aktualizuje."""
         try:
             self._canvas.update_node(node_id, **attrs)
         except ValueError:
-            self._canvas.ensure_node(node_id, label=node_id, type="concept",
-                                     **attrs)
+            pass    # neznámý/zapomenutý uzel — aktivace ho NESMÍ přidat zpět
 
     def flow(self, path):
         """Animuje světelné částice po trase (topic → answer). viewBase si cestu

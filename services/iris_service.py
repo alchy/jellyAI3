@@ -74,7 +74,9 @@ def make_routes(automaton, deck):
                 "pattern": pattern_to_json(automaton.answerer.last_pattern),
                 "activation": {"nodes": r.activation_window,
                                "docs": r.docs_window},
-                "used": r.used}
+                "used": r.used,
+                "memorized": r.memorized,    # nová vzpomínka → do vizualizace
+                "forgotten": r.forgotten}    # zapomenutá entita → z vizualizace
 
     def graphql(payload):
         """`/graphql` {predicate, known, hole…} → přímé vykonání patternu."""
@@ -141,7 +143,35 @@ def _channels(config):
     def window(message):
         _web_event(host, port, "reminder_window", message)
 
-    return {"console": console, "window": window}
+    channels = {"console": console, "window": window}
+
+    # E-MAILOVÝ KANÁL (rozšiřovací bod dle spec) — pošle text připomínky mailem
+    # přes lokální Postfix (127.0.0.1:25). Aktivní jen když je nastaven adresát
+    # v env `JELLY_REMINDER_EMAIL`. Odesílatel `JELLY_REMINDER_FROM` MUSÍ být
+    # @lordaudio.eu (OpenDKIM podepisuje *@lordaudio.eu, SPF alignment) kvůli
+    # doručitelnosti. Selhání SMTP notify obalí try/except → hodiny nespadnou.
+    default_recipient = os.environ.get("JELLY_REMINDER_EMAIL")
+    sender = os.environ.get("JELLY_REMINDER_FROM", "jelly@lordaudio.eu")
+
+    def email(message):
+        # ADRESÁT: z připomínky (ReminderMessage.recipient — „pošli Jindrovi…"),
+        # jinak DEFAULT z env. Bez obojího se nic neposílá.
+        to = getattr(message, "recipient", None) or default_recipient
+        if not to:
+            return
+        import smtplib
+        from email.message import EmailMessage
+        msg = EmailMessage()
+        msg["From"] = sender
+        msg["To"] = to
+        msg["Subject"] = "Připomínka — jellyAI3 (Iris)"
+        msg.set_content(str(message))
+        with smtplib.SMTP("127.0.0.1", 25, timeout=15) as smtp:
+            smtp.send_message(msg)
+        print(f"[email] připomínka odeslána na {to}", flush=True)
+
+    channels["email"] = email
+    return channels
 
 
 def main():

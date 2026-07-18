@@ -33,7 +33,9 @@ def test_config_has_v3_defaults():
     cfg = Config()
     assert cfg.answerer.mode == "extractive"
     assert cfg.services.host == "127.0.0.1"
-    assert cfg.services.udpipe_port == 8082
+    # Porty ÚFAL služeb přemapovány z 8081-8083 (kolize s uniforms/cudlik/learn
+    # na produkčním stroji) do volného bloku 809x — viz DEPLOY-ithosaudio.md.
+    assert cfg.services.udpipe_port == 8092
     assert cfg.services.annotations_path == "data/annotations.pkl"
 
 
