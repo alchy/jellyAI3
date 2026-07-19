@@ -31,9 +31,10 @@ from jellyai.answerer.selection import _clean_lemma
 from jellyai.graph.canon import deaccent
 from jellyai.graph.graph import parse_date
 from jellyai.iris.assurance import assurance
-from jellyai.iris.subsystems.chronos import (TimeInterval, clock_answer,
-                                             format_due, resolve_due,
-                                             resolve_plan, resolve_temporal,
+from jellyai.iris.subsystems.chronos import (TimeInterval, claim_words,
+                                             clock_answer, format_due,
+                                             resolve_due, resolve_plan,
+                                             resolve_temporal,
                                              resolve_weekday)
 from jellyai.iris.subsystems.mnemos import (forget, forget_entity,
                                             forget_interval, name_stem,
@@ -749,11 +750,13 @@ class IrisAutomaton:
         self.state.remember(text, response)
         return response
 
-    def _reminder_task(self, text, phrase):
+    def _reminder_task(self, text, phrase, extra_drop=frozenset()):
         """Úkol připomínky: text bez fráze, časových výrazů a úvodních spojek.
 
         Časové běhy se mažou i s předložkou před nimi („v 18:30"); vnitřní
-        předložky úkolu zůstávají („vybrat maso Z trouby").
+        předložky úkolu zůstávají („vybrat maso Z trouby"). `extra_drop`
+        maže jednotlivé tokeny kdekoli (adresát a zprávové jméno příkazu
+        „Pošli zítra MAIL MARCI…" do těla úkolu nepatří, #54).
         """
         lang = current()
         temporal = lang["temporal"]
@@ -780,6 +783,8 @@ class IrisAutomaton:
                 keep[i] = False
                 if i and lows[i - 1] in ("v", "ve"):
                     keep[i - 1] = False
+            if low in extra_drop:                      # adresát/zpráva pryč
+                keep[i] = False
         words = [t for t, k in zip(tokens, keep) if k]
         strip = lang["reminder_strip"]
         while words and deaccent(words[0].lower()) in strip:
@@ -789,49 +794,75 @@ class IrisAutomaton:
     def _resolve_person_email(self, name):
         """E-mail osoby z GRAFU: fakt s účastníkem typu `email` a subjektem,
         jehož kmen odpovídá jménu (shoda napříč pády: Jindrovi→Jindra).
+        Kratší pád smí být PREFIXEM kmene (Marci→marc ⊂ marcel, #54) —
+        přesná shoda má přednost, víceznačný prefix poctivě nerozhoduje.
         E-mail žije v grafu jako typovaná hodnota (Mnemos), ne v kódu."""
         target = name_stem(name)
+        prefix_hit, ambiguous = None, False
         for fact in self.answerer.graph.facts.values():
             email = next((p.node for p in fact.participants
                           if p.type == "email"), None)
             if email is None:
                 continue
-            if any(p.role == "subj" and name_stem(p.node) == target
-                   for p in fact.participants):
-                return email
-        return None
+            for p in fact.participants:
+                if p.role != "subj":
+                    continue
+                stem = name_stem(p.node)
+                if stem == target:
+                    return email
+                if len(target) >= 3 and (stem.startswith(target)
+                                         or target.startswith(stem)):
+                    if prefix_hit is not None and prefix_hit != email:
+                        ambiguous = True
+                    prefix_hit = email
+        return None if ambiguous else prefix_hit
 
     def _send_command(self, text):
         """„Pošli Jindrovi zítra ráno upozornění XYZ" → připomínka s ADRESÁTEM.
 
-        Adresát = jméno za slovem „pošli" (ne zájmeno); e-mail se dohledá
-        v grafu (typovaný fakt uložený přes Mnemos). BEZ pojmenovaného
-        adresáta jde připomínka na DEFAULT (adresu doplní e-mailový kanál).
-        Termín z Chronosu (resolve_plan/due), úkol = text bez fráze, adresáta
-        a časových výrazů. Jméno bez známého e-mailu → upřímná výzva.
+        Adresát = první NEnárokovaný token za „pošli", který vypadá jako
+        JMÉNO (kapitalizace v původním textu): časová slova si bere
+        Chronos (claim_words — „Pošli ZÍTRA mail Marci", #54), zprávová
+        jména drží tabulka message_nouns; zájmeno/číslo/malopísmenné
+        slovo úkolu adresátem nejsou → DEFAULT kanál. E-mail se dohledá
+        v grafu (typovaný fakt Mnemos) i pro skloněné jméno (kmenový
+        prefix Marci→Marcela). Termín z Chronosu (resolve_plan/due).
+        Jméno bez známého e-mailu → upřímná výzva.
 
         Returns:
             IrisResponse | None: Potvrzení/výzva, nebo None (není příkaz pošli).
         """
         lang = current()
-        low = deaccent(text.lower())
-        tokens = [t.rstrip(".") for t in re.findall(r"[\w:@.+-]+", low)]
+        raw = [t.rstrip(".") for t in re.findall(r"[\w:@.+-]+", text)]
+        tokens = [deaccent(t.lower()) for t in raw]
         send_words = set(lang.get("send_phrases", ()))
         idx = next((i for i, t in enumerate(tokens) if t in send_words), None)
         if idx is None:
             return None
         pronouns = set(lang.get("recipient_pronouns", ()))
+        claimed = claim_words(lang)          # nárok Chronosu (#26 S2)
+        message = set(lang.get("message_nouns", ()))
         recipient_email = recipient_name = None
-        nxt = tokens[idx + 1] if idx + 1 < len(tokens) else None
-        if nxt is not None and nxt not in pronouns and not nxt.isdigit():
-            recipient_name = nxt
-            recipient_email = self._resolve_person_email(nxt)
+        for j in range(idx + 1, len(tokens)):
+            tok = tokens[j]
+            if tok in claimed or tok in message:
+                continue                     # čas/zpráva — hledej jméno dál
+            if tok not in pronouns and not tok.isdigit() \
+                    and raw[j][:1].isupper():
+                recipient_name = raw[j]
+            break                            # první nenárokovaný token rozhodl
+        if recipient_name is not None:
+            recipient_email = self._resolve_person_email(recipient_name)
             if recipient_email is None:      # jméno znám, e-mail ne → zeptej se
                 return self._info(
-                    f"Neznám e-mail pro {nxt}. Řekni mi třeba: zapamatuj si "
-                    f"že {nxt} má email nekdo@nekde.cz", text)
-        phrase = tokens[idx] + (f" {recipient_name}" if recipient_name else "")
-        task = self._reminder_task(text, phrase) or "upozornění"
+                    f"Neznám e-mail pro {recipient_name}. Řekni mi třeba: "
+                    f"zapamatuj si že {recipient_name} má email "
+                    f"nekdo@nekde.cz", text)
+        extra = set(message)
+        if recipient_name is not None:
+            extra.add(deaccent(recipient_name.lower()))
+        task = self._reminder_task(text, tokens[idx],
+                                   extra_drop=extra) or "upozornění"
         plan = resolve_plan(text, self.clock())
         if plan is not None:
             resp = self._set_reminder(task, plan["due"], text,

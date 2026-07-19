@@ -92,6 +92,8 @@
   "reminder_phrases": ["pripomen mi", "pripomen mne", "upozorni me",
                        "pripomenes mi", "pripominka"],
   "send_phrases": ["posli", "poslete", "odesli"],
+  "message_nouns": ["mail", "email", "e-mail", "zpravu", "zprava", "vzkaz",
+                    "upozorneni", "pripominku", "pozdrav"],
   "recipient_pronouns": ["mi", "mne", "me", "mu", "ji", "nam", "jim", "si"],
   "plan_cancel_words": ["zrus", "zrusit", "smaz", "smazat", "odvolej"],
   "plan_move_words": ["posun", "posunout", "presun", "presunout",

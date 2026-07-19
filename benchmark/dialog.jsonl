@@ -15,3 +15,4 @@
 {"name": "kratke-sloveso-ji", "gap": "#45: dvojznakové sloveso „jí“ pod délkovým guardem _finite_verb — výrok se ztratí a dotaz pak odpovídá identitou", "turns": [{"u": "Roník je pes.", "expect": ["Zapamatováno"]}, {"u": "Roník jí granule.", "expect": ["Zapamatováno"]}, {"u": "Co jí Roník?", "expect": ["granule"]}]}
 {"name": "co-dela-cinnost", "turns": [{"u": "Jindra uklízí v Počernicích.", "expect": ["Zapamatováno", "uklízí"]}, {"u": "Co dělá Jindra?", "expect": ["uklízí"], "kind": "answer"}]}
 {"name": "souveti-multi-memorize", "turns": [{"u": "Roník jí i vegetariánskou stravu, má však rád i maso.", "expect": ["Zapamatováno", "jí", "má", "maso"]}, {"u": "Co má Roník?", "expect": ["maso"], "kind": "answer"}]}
+{"name": "posli-mail-adresat", "turns": [{"u": "Marcela má email marcela.duffkova@seznam.cz.", "expect": ["Zapamatováno"]}, {"u": "Pošli zítra mail Marci, že ji pozdravuji.", "expect": ["Pošlu Marci"], "reject": ["Neznám e-mail", "zitra"]}]}

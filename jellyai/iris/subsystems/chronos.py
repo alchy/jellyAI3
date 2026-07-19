@@ -116,6 +116,26 @@ class TimeInterval:
         return lo < self.end and self.start < hi
 
 
+def claim_words(lang=None):
+    """NÁROK Chronosu na tokeny (zárodek formálního claim(), #26 S2).
+
+    Slovník časových slov subsystému — kdo parsuje příkaz („Pošli ZÍTRA
+    mail Marci"), přeskočí je: nejsou jméno ani obsah, patří Chronosu
+    (BACKLOG #54). Sjednocuje tabulky temporal + day_parts + weekday_forms.
+
+    Returns:
+        frozenset[str]: Deakcentované tvary, které si Chronos bere.
+    """
+    lang = lang or current()
+    temporal = lang.get("temporal", {})
+    words = {w for key in ("day_words", "units", "now_words", "last_words",
+                           "next_words", "current_words")
+             for w in temporal.get(key, ())}
+    words |= set(lang.get("day_parts", ()))
+    words |= set(lang.get("weekday_forms", ()))
+    return frozenset(words)
+
+
 def clock_answer(text, now):
     """Přímá odpověď z hodin: „Co je za den?", „Kolik je hodin?".
 
