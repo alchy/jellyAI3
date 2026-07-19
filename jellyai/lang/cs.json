@@ -82,6 +82,8 @@
   "note_predicate": "poznamenat",
   "predicate_catalog": {"bydl": "bydlet", "bydlel": "bydlet",
                         "prsi": "prší", "snezi": "sněží"},
+  "negation_prefix": "ne",
+  "negative_existence_answer": "Ne, od {time} {predicate}.",
   "reminder_phrases": ["pripomen mi", "pripomen mne", "upozorni me",
                        "pripomenes mi", "pripominka"],
   "send_phrases": ["posli", "poslete", "odesli"],

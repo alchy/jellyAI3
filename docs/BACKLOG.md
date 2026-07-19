@@ -1,9 +1,9 @@
 # BACKLOG — otevřené body (živý dokument)
 
 > Aktualizuj při každém uzavření/přidání bodu. Stav ke commitu: viz git log.
-> Metriky teď (2026-07-19 večer): **477 testů, etalon 29/29 (3 gap-fixed /
-> 5 gap), focus 12/12, dialog 21/21, ZÁPIS 29/29 (12 gap-fixed / 0 — řádek
-> #35 jen s `--nom`) — jádra 100 %.**
+> Metriky teď (2026-07-19 večer): **483 testů, etalon 29/29 (3 gap-fixed /
+> 5 gap), focus 12/12, dialog 25/25 (12 scénářů), ZÁPIS 29/29 (12 gap-fixed
+> / 0 — řádek #35 jen s `--nom`) — jádra 100 %.**
 >
 > **➡️ PŘEDÁNÍ PRÁCE: čti nejdřív `docs/HANDOVER.md`** — zákony projektu,
 > testovací smyčka, implementační tipy ke každému otevřenému bodu, pasti.
@@ -22,7 +22,7 @@
 | 25 | Answerer | **Ranking identit** (etalon gap „Kdo je jezis?"→Kristus): šumová spona `být(Ježíš, Bůh)` ze „Syn Boha" přebíjí `jmenovat(Kristus)`/`druh(Mesiáš)`. | Preferuj DATOVOU cestu: „syn Boha" je vztah (genitiv), ne identita — guard v extrakci spony; případně karta (nabídka pater), NE natvrdo v kódu. | 2 |
 | 39 | Data | **Provenience faktů** — zdroj + hladina důvěry na každém faktu, hromadný retract podle zdroje („zapomeň všechno z toho hovoru"). Zavést konvencí TEĎ, dokud jsou zapisovatelé dva (korpus, uživatel) — než přibudou #30 Ollama, #7 učení dialogem a STT audio (#42). | Zobecnění dvou bází + provenience-arbitráže homonym; souvisí #17. Z dialogu 2026-07-19. | 4 |
 | 5 | Iris karty | **Zbytek**: `clarify-period`/`clarify-relation` karty (potřebují své eventy v turn()); glow-dominantní řazení výčtu po volbě oblasti. | Vzor: jak turn() hlásí `data.overflow` s `area_lit` guardem. | 3 |
-| 24 | Mnemos | **Negace dějů** — „Prší?" s faktem `neprší(čas T)` → „Ne, od T neprší" (negovaný fakt je evidence opaku). | Negační prefix do cs.json; párování predikát↔negace mechanismem, text kartou; promyslet s #10. POVÝŠENO (dialog 2026-07-19): blokuje #41 (výjimku dědění nelze vyslovit bez negace), chybí poctivé „Ne" u existence (dnes jen Ano/nenašel). ČÁST HOTOVÁ (2026-07-19): „Už" se už do objektů neukládá (`particle_words`), gap řádek #37 FIXED. | **3** |
+| 24 | Mnemos | ✅ **HOTOVO** (2026-07-19): **Negace dějů** — „Prší?" s faktem `neprší(T)` → „Ne, od T neprší." Mechanismus: `_existence` sbírá evidenci OBOU polarit (`negation_prefix` z cs.json), vyhrává NEJNOVĚJŠÍ (datovaná > nedatovaný korpus; remíza → pozdější zápis, deník je chronologický); text šablonou `negative_existence_answer` (jazyk jako data). Parser: negační pár v `_verb_match` s jádrem ≥ 3 znaky — POUČENÍ: šumový predikát „nes" udělal z předložky „s" sloveso a rozbil „Válku s mloky" (etalon regresi chytil okamžitě). Částice (Už) hotové dřív. Scénář negace-deje v dialog benchmarku. | ODBLOKOVÁNO #41 (výjimky dědění lze vyslovit). Zbývá drobnost: inverzní „Neprší?" nad jen-pozitivní evidencí → nenašel (nepáruje zpětně) — řešit s #41. | ✓ |
 | 11 | Metron | „Kolikrát letos pršelo?" = díra typu počet-výskytů; zavře gap „Kolik měla dětí BN?". | Tázací tabulka cs.json + počítání faktů (s filtrem #10). | 6 |
 | 7 | Mnemos | **Učení pojmů dialogem** — „Co jsou závody aut?" → karta `data-empty` → vysvětlení rozloží extrakční pipeline → fakty do deníku. | KRITICKY PROMYSLET: verzování deníku, zdroj=uživatel, nikdy tiše nepřepsat korpus. | 7 |
 | 41 | Graf — koncept | **Oceán vrstev (dědění po druh-hranách)** — aktivace a odpovědi dědí po is-a řetězu s útlumem: „Psi mají rádi maso" → Ronik(pes) dědí slaběji; přímý fakt VŽDY poráží zděděný (defeasible inheritance). Hloubka = vzdálenost v řetězu druh-hran (EMERGENTNÍ, ne kurátorovaná patra). Zárodky už stojí: `druh`/`_is_a`, `_typed_match`, Topos kontejnment (= tatáž mechanika pro prostor), sharpener #13. Dává datový model bodu #7 (učení pojmů). | ZÁVISÍ na #24 (výjimky) a #37 (guardrail). Pasti: strmý útlum, doména/provenience hlídá homonymii (kohout zvíře × vodovodní), nedědit přes homonymní uzly. Koncept user (dialog 2026-07-19, Z1b). | po #24 |

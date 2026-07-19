@@ -9,3 +9,4 @@
 {"name": "jan-vztah", "turns": [{"u": "Kdo je Jan Křtitel?", "kind": "answer", "expect": ["prorok"]}, {"u": "Jaký měl vztah k Ježíšovi?", "kind": "answer", "expect": ["poslat"]}]}
 {"name": "reminder-maso", "turns": [{"u": "Připomeň mi za deset minut vybrat maso z trouby.", "kind": "answer", "expect": ["12:10", "maso"]}]}
 {"name": "reminder-rohliky", "turns": [{"u": "Připomeň mi, že mám koupit rohlíky.", "kind": "answer", "expect": ["12:15", "rohlíky"]}, {"u": "až zítra ráno", "kind": "answer", "expect": ["Připomenu", "7:00"]}]}
+{"name": "negace-deje", "turns": [{"u": "Venku prší.", "expect": ["Zapamatováno"]}, {"u": "Prší?", "expect": ["Ano"], "kind": "answer"}, {"u": "Už neprší.", "expect": ["Zapamatováno"]}, {"u": "Prší?", "expect": ["Ne, od", "neprší"], "reject": ["Ano"], "kind": "answer"}]}

@@ -116,6 +116,17 @@ def _verb_match(token, predicates, first=False):
     normalized = {_norm(p): p for p in predicates}
     if low in normalized:
         return normalized[low]
+    # NEGAČNÍ PÁR (#24): tvar je slovesem, i když graf zná jen jeho OPAK
+    # („Prší?" nad pamětí s jediným faktem `neprší`); vrací se protějšek
+    # bez/s prefixem — párování evidence dělá answererova _existence.
+    # Jádro páru MUSÍ mít ≥ 3 znaky (konvence _l_form/_finite_verb) — jinak
+    # šumový predikát „nes" udělá z předložky „s" sloveso a rozbije span
+    prefix = current().get("negation_prefix", "")
+    if prefix and len(low) >= 3 and prefix + low in normalized:
+        return normalized[prefix + low][len(prefix):]
+    if prefix and low.startswith(prefix) and len(low) - len(prefix) >= 3 \
+            and low[len(prefix):] in normalized:
+        return prefix + normalized[low[len(prefix):]]
     stripped = low.rstrip("aioy")
     if stripped.endswith("l") and stripped in normalized:
         return normalized[stripped]

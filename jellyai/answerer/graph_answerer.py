@@ -51,6 +51,23 @@ def _synonym_ring(predicate):
     return ring
 
 
+def _evidence_date(fact):
+    """Řadicí klíč datované evidence (rok, měsíc, den); None = nedatováno.
+
+    Denní přesnost stačí — jemnější remízy rozhoduje pořadí zápisu
+    (deník paměti je chronologický)."""
+    months = current()["temporal"]["months"]
+    for part in fact.participants:
+        if part.role != "time":
+            continue
+        parts = parse_date(part.node)
+        if "rok" not in parts:
+            continue
+        month = months.get(deaccent(parts.get("měsíc", "")), 0)
+        return (int(parts["rok"]), month, int(parts.get("den", 0)))
+    return None
+
+
 def _event_text(fact, exclude=()):
     """Děj jako odpověď: SLOVESO první, pak účastníci. „Co se stalo?" se ptá
     na děj — faktový uzel je děj reifikovaný, holý podmět odpovědí není."""
@@ -723,37 +740,67 @@ class GraphAnswerer(Answerer):
         return not any(self.time_filter.contains_date(parse_date(t))
                        for t in times)
 
+    def _existence_candidates(self, predicate, known_set):
+        """Fakty svědčící pro existenci: predikát v synonymním ringu, známí
+        účastníci podmnožinou, Chronos/Topos filtry respektovány.
+
+        Yields:
+            tuple: (pořadí v grafu, fakt) — pořadí je rozhodčí remízy datace
+            (deník paměti je chronologický, korpus předchází paměť).
+        """
+        rings = {pred for pred, _ in _synonym_ring(predicate)}
+        for seq, fact in enumerate(self.graph.facts.values()):
+            if fact.predicate not in rings or self._time_excluded(fact) \
+                    or self._place_excluded(fact):
+                continue
+            if known_set and not known_set <= {p.node
+                                               for p in fact.participants}:
+                continue
+            yield seq, fact
+
     def _existence(self, predicate, known_set):
         """Zjišťovací (ano/ne) otázka: existuje fakt s predikátem a všemi
         známými účastníky? → „Ano"; jinak nic (fallback „nenašel" čte se jako
         nevím). Kontextem se u zjišťovací otázky NEhádá.
 
+        NEGACE (#24): negovaný predikát (`negation_prefix` + predikát) je
+        evidence OPAKU — „Prší?" s faktem `neprší(T)` → „Ne, od T neprší."
+        Rozhoduje NEJNOVĚJŠÍ evidence: datovaná > nedatovaná (korpus),
+        remíza datace → pozdější zápis. Text záporu nese šablona
+        `negative_existence_answer` v jazykových datech.
+
         Returns:
-            tuple: (téma | None, ["Ano"] | [], fakt | None).
+            tuple: (téma | None, [text] | [], fakt | None).
         """
         if predicate is None:
             return None, [], None
-        if not known_set:
-            # bez pojmenovaných účastníků („Pršelo dnes?"): existuje fakt
-            # s predikátem vůbec? Téma = první entitní účastník nálezu
-            rings = {pred for pred, _ in _synonym_ring(predicate)}
-            for fact in self.graph.facts.values():
-                if fact.predicate in rings and not self._time_excluded(fact) \
-                        and not self._place_excluded(fact):
-                    self.visited.extend(p.node for p in fact.participants)
-                    topic = next((p.node for p in fact.participants
-                                  if p.role in ("subj", "obj")), None)
-                    return topic, ["Ano"], fact
+        lang = current()
+        prefix = lang.get("negation_prefix", "")
+        negated = (prefix + predicate) if prefix \
+            and not predicate.lower().startswith(prefix) else None
+        best = None            # ((datum, pořadí), fakt, je_negace)
+        for is_negative, root in ((False, predicate), (True, negated)):
+            if root is None:
+                continue
+            for seq, fact in self._existence_candidates(root, known_set):
+                key = (_evidence_date(fact) or (0, 0, 0), seq)
+                if best is None or key > best[0]:
+                    best = (key, fact, is_negative)
+        if best is None:
             return None, [], None
-        node0 = next(iter(known_set))
-        for pred, _ in _synonym_ring(predicate):
-            for fact in self.graph.facts_of(node0, predicate=pred):
-                if known_set <= {p.node for p in fact.participants} \
-                        and not self._time_excluded(fact) \
-                        and not self._place_excluded(fact):
-                    self.visited.extend(p.node for p in fact.participants)
-                    return node0, ["Ano"], fact
-        return None, [], None
+        _, fact, is_negative = best
+        self.visited.extend(p.node for p in fact.participants)
+        topic = next(iter(known_set)) if known_set else next(
+            (p.node for p in fact.participants
+             if p.role in ("subj", "obj")), None)
+        if not is_negative:
+            return topic, ["Ano"], fact
+        time_label = next((p.node for p in fact.participants
+                           if p.role == "time"), None)
+        template = lang.get("negative_existence_answer", "Ne")
+        text = template.format(time=time_label, predicate=fact.predicate) \
+            if time_label else "Ne"
+        return topic, [text], fact
 
     def _typed_match(self, predicate, known_set):
         """Join výběrové otázky: koncepty z `known_set` se stanou typovým
