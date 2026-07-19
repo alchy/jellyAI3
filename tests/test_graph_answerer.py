@@ -226,3 +226,33 @@ def test_run_pattern_executes_direct_ql():
                                                 [("subj", "Božena Němcová"),
                                                  ("obj", "Babička")], None, None))
     assert values == ["Ano"]
+
+
+def test_identity_voting_multi_layer_beats_noisy_copula():
+    """#25 hlasování přes patra: kandidát identity s VÍCE nezávislými patry
+    (druh + jmenovat) přebije jednopatrovou šumovou sponu z přímé řeči
+    (být(Ježíš, Bůh) ze „Ty jsi…"). Korpusová evidence > jeden fakt."""
+    g = FactGraph()
+    g.add_fact(make_fact("být", [Participant("subj", "Ježíš", "person"),
+                                 Participant("pred", "Bůh", "person")]))
+    g.add_fact(make_fact("druh", [Participant("subj", "Ježíš", "person"),
+                                  Participant("pred", "Mesiáš", "concept")]))
+    g.add_fact(make_fact("jmenovat", [Participant("subj", "Ježíš", "person"),
+                                      Participant("pred", "Mesiáš", "concept")]))
+    a = GraphAnswerer(g, FakeUfalClient(), ExtractiveAnswerer(AnswererConfig()))
+    text = a.answer("Kdo je Ježíš?", []).text
+    assert "Mesiáš" in text
+    assert "Bůh" not in text
+
+
+def test_identity_single_layer_keeps_copular_first():
+    """Bez vícepatrového vítěze platí dnešní pořadí pater: spona před
+    druhem („Kdo je Karel Čapek?" → spisovatel, ne apoziční druh)."""
+    g = FactGraph()
+    g.add_fact(make_fact("být", [Participant("subj", "Karel Čapek", "person"),
+                                 Participant("pred", "spisovatel", "concept")]))
+    g.add_fact(make_fact("druh", [Participant("subj", "Karel Čapek", "person"),
+                                  Participant("pred", "novinář", "concept")]))
+    a = GraphAnswerer(g, FakeUfalClient(), ExtractiveAnswerer(AnswererConfig()))
+    text = a.answer("Kdo je Karel Čapek?", []).text
+    assert "spisovatel" in text

@@ -105,6 +105,7 @@ class GraphAnswerer(Answerer):
         self.last_trace = None   # trasa poslední odpovědi (téma → fakt → hodnota)
         self.last_pattern = None  # poslední vykonaný pseudo-QL Pattern (API)
         self.last_query_card = None  # vzorová karta tahu (telemetrie #38)
+        self.pick_focus = None   # zvolená oblast overflow dialogu (#5) — 1 tah
         self.last_resolution = None  # evidence rozlišení (vstup QueryAssurance)
         self.last_overflow = []  # oblasti (theme) přetékajícího výčtu
         self._prev_trace = None  # trasa PŘEDCHOZÍHO tahu (drill „Kdy?")
@@ -143,6 +144,7 @@ class GraphAnswerer(Answerer):
         self.last_trace = None
         self.last_pattern = None
         self.last_resolution = None
+        self.pick_focus = None
         self.domain_docs = frozenset()
 
     def _span_is_node(self, span):
@@ -429,6 +431,35 @@ class GraphAnswerer(Answerer):
             return self._existence(pat.predicate, known_set)
         return self._answer_from(pat, known_set)
 
+    def _identity_vote(self, known_set, hole_role, hole_type):
+        """HLASOVÁNÍ PŘES PATRA (#25): kandidát identity skóruje počtem
+        NEZÁVISLÝCH pater evidence (spona být / druh / jmenovat).
+
+        Bible je plná řečových spon („Ty jsi Bůh/Šimon/David…" v přímé
+        řeči) — jeden sponový fakt identitu neurčuje. Kandidát doložený
+        VÍCE patry (druh(Mesiáš) + jmenovat(Mesiáš)) přebije jednopatrový
+        šum; bez vícepatrového vítěze platí dnešní pořadí (spona první,
+        pak slabší patra) — zákon 5: korpusová evidence > jeden fakt.
+
+        Returns:
+            tuple: (list hodnot, fakt | None) — jako `_match`.
+        """
+        layers = ("být", "druh", current()["name_predicate"])
+        votes, first, facts = {}, {}, {}
+        for layer in layers:
+            values, fact = self._match(layer, known_set, hole_role, hole_type)
+            for order, value in enumerate(values):
+                votes.setdefault(value, set()).add(layer)
+                first.setdefault(value, (layers.index(layer), order))
+                facts.setdefault(value, fact)
+        multi = [v for v, layer_set in votes.items() if len(layer_set) >= 2]
+        if multi:
+            multi.sort(key=lambda v: first[v])
+            return multi, facts[multi[0]]
+        being = [v for v in votes if "být" in votes[v]]
+        being.sort(key=lambda v: first[v])
+        return being, facts[being[0]] if being else None
+
     def _answer_from(self, pat, known_set):
         """Z množiny známých uzlů dořeší díru patternu (vč. 2-skokového drillu).
 
@@ -445,7 +476,13 @@ class GraphAnswerer(Answerer):
             return (date_nodes[0], values, fact) if values else (None, [], None)
         if pat.predicate is None:
             return None, [], None            # bez predikátu se nehádá (žádný wildcard)
-        values, fact = self._match(pat.predicate, known_set, pat.hole_role, pat.hole_type)
+        if pat.predicate == "být" and pat.hole_role in ("pred", "attr"):
+            # HLASOVÁNÍ PŘES PATRA (#25): identita se neřeší jedním faktem
+            values, fact = self._identity_vote(known_set, pat.hole_role,
+                                               pat.hole_type)
+        else:
+            values, fact = self._match(pat.predicate, known_set,
+                                       pat.hole_role, pat.hole_type)
         if not values and pat.hole_role in ("pred", "attr"):
             # druhové zařazení (apozice) je slabší evidence než spona „být" —
             # čte se, až když spona mlčí („Co je R.U.R.?" → druh drama);
@@ -564,6 +601,12 @@ class GraphAnswerer(Answerer):
                         continue
                     base = fact.weight + (10 if exact else 0) \
                         + self._source_bonus(fact)
+                    if self.pick_focus is not None \
+                            and any(q.node == self.pick_focus
+                                    for q in fact.participants):
+                        # VOLBA OBLASTI DOMINUJE (#5): uživatel oblast
+                        # VYBRAL — fakt s ní přebíjí váhu i role ostatních
+                        base += 10000
                     # aktivace VŠECH účastníků faktu (poloviční) — volba
                     # oblasti („učedníkům") pak zvedne výroky JEJÍHO faktu
                     glow = self.context.scores.get(part.node, 0.0) \
@@ -1008,6 +1051,7 @@ class GraphAnswerer(Answerer):
             self._warm_sources(fact)         # attention nad soubory (+ jejich graf)
             self._remember(qa, topic, focus)
             self._log_turn(question, topic, fact.predicate, text)
+            self.pick_focus = None           # volba oblasti platí jeden tah (#5)
             return Answer(text=text, sources=["graf"], score=1.0,
                           alternatives=self._alternatives(qa, topic, focus,
                                                           reverse, temperature),
@@ -1016,6 +1060,7 @@ class GraphAnswerer(Answerer):
         # jsme odpověď nenašli (jinak by po pár marných dotazech spadla k nule).
         # Pohasíná se jen při úspěchu (v _remember spolu s rozsvícením nového tématu).
         self._log_turn(question, topic, None, None)
+        self.pick_focus = None               # volba oblasti platí jeden tah (#5)
         return self.fallback.answer(question, retrieved)
 
     def _alternatives(self, qa, topic, value, reverse, temperature):  # pylint: disable=too-many-arguments,too-many-positional-arguments

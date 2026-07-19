@@ -213,9 +213,15 @@ class IrisAutomaton:
         pick = self._resume_pick(text)
         if pick is not None:
             chosen, text = pick
+            area_pick = self.state.pending.term is None
             used_patterns.append(self.state.pending.card)
             self.state.pending = None
             self.answerer.context.warm(chosen, _PICK_WARMTH)
+            if area_pick:
+                # VOLBA OBLASTI (overflow) DOMINUJE (#5): fakty s vybraným
+                # uzlem mají při přehrání otázky přednost — aktivace sama
+                # remízy jen řadí a nestačí („Amen" přebilo celníka)
+                self.answerer.pick_focus = chosen
         elif "?" not in text:
             # PŘIPOMÍNKY (Chronos): doplnění času rozpracované žádosti,
             # nebo nová žádost frází z jazykové tabulky; scénáře nesou
