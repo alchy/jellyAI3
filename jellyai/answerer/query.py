@@ -238,6 +238,11 @@ def _card_query(question, predicates, is_node=None, is_word=None):
         pattern.date_part = lang["date_part_forms"].get(part.norm)
         if pattern.date_part and pattern.hole_role == "attr":
             pattern.hole_role, pattern.hole_type = "time", "time"
+    cop = ref(spec.get("copula"))
+    if cop is not None and pattern.hole_role != "attr":
+        # kanonické sponové pravidlo: attr díra („Jaký je X?") zůstává,
+        # každá jiná („Kdo/Co je X?") míří na identitu — pred
+        pattern.hole_role = "pred"
     override = spec.get("hole_role")
     if override is not None and not str(override).startswith("$"):
         # LITERÁLNÍ role díry na kartě („relation") — operátor spojení
@@ -252,6 +257,12 @@ def _card_query(question, predicates, is_node=None, is_word=None):
             # NEZNÁMÉ sloveso (překlep „sworil") — karta se nehlásí;
             # otázka jde šablonou/UDPipe fallbackem, který má vlastní léky
             return None
+    elif isinstance(spec.get("predicate"), str) \
+            and not spec["predicate"].startswith("$"):
+        # LITERÁLNÍ predikát na kartě („být" u sponové identity) —
+        # jazykové slovo zůstává v datech karty, ne v kódu; nevyplněná
+        # $-reference literál není (karta se pak poctivě nehlásí)
+        pattern.predicate = spec["predicate"]
     # role známého plyne z díry (subj-díra → známý je obj, jinak subj);
     # explicitní pár ["role", "$N"] na kartě má přednost
     default_role = "obj" if pattern.hole_role == "subj" else "subj"
@@ -269,11 +280,14 @@ def _card_query(question, predicates, is_node=None, is_word=None):
         # bez predikátu jen karta, která roli díry určila sama (relation);
         # jinak platí past 11 — neznámé sloveso jde fallbackem
         return None
-    # rod slovesného tvaru filtruje kandidáty těžiště při pro-dropu
-    # („Jakou hru napsal?" → mužské téma) — stejně jako u šablon
+    # rod slovesného/sponového tvaru filtruje kandidáty při pro-dropu
+    # a u identity („byla" → Fem) — stejně jako u šablon; spona má
+    # přednost (u sponových karet je slovesným slotem podstatné jméno)
+    gender_tok = cop if cop is not None else verb
     return Query(pattern=pattern, qtype=qtype, verb_lemma=pattern.predicate,
-                 gender=_verb_gender(surface(verb)) if verb is not None
-                 else None)
+                 is_copula=cop is not None,
+                 gender=_verb_gender(surface(gender_tok))
+                 if gender_tok is not None else None)
 
 
 def build_query(question, predicates, is_node=None, is_word=None,

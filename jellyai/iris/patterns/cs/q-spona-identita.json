@@ -1,0 +1,23 @@
+{
+  "name": "q-spona-identita",
+  "trigger": {
+    "event": "utterance.query",
+    "priority": 4,
+    "pattern": [
+      "%{TAZACI}",
+      "%{SPONA}",
+      "%{ENTITA}"
+    ]
+  },
+  "action": {
+    "query": {
+      "hole": "$1",
+      "copula": "$2",
+      "predicate": "být",
+      "known": [
+        ["subj", "$3"]
+      ]
+    }
+  },
+  "teach": "Sponová identita „Kdo je X?“ / „Jaký je X?“ / „Kdo byla Božena Němcová?“ (#46 fáze 2d): predikát „být“ nese karta literálem (jazyk v datech), entita je podmět. Kanonické sponové pravidlo: attr díra („Jaký“) zůstává attr, každá jiná („Kdo“, „Co“) míří na identitu — pred. Rod nese tvar spony (byla → Fem) a filtruje kandidáty osob; is_copula vede odpovědní vrstvu na patra jmenovat/druh."
+}

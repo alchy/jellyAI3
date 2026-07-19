@@ -1,0 +1,26 @@
+{
+  "name": "q-spona-vztazne-jmeno",
+  "trigger": {
+    "event": "utterance.query",
+    "priority": 5,
+    "pattern": [
+      "%{TAZACI}",
+      "%{SPONA}",
+      "%{VZTAZNE_JMENO}",
+      "%{ENTITA}"
+    ]
+  },
+  "action": {
+    "query": {
+      "hole": "$1",
+      "copula": "$2",
+      "predicate": "$3",
+      "hole_role": "subj",
+      "hole_type": "person",
+      "known": [
+        ["obj", "$4"]
+      ]
+    }
+  },
+  "teach": "Vztažné jméno se sponou „Kdo byl bratr Karla Čapka?“ (#46 fáze 2d): vztažné jméno (bratr — třída vztazne_jmeno z relational_nouns) je PREDIKÁT, entita je obj a dírou je druhý účastník vztahu (subj/person — roli určuje karta literálem, tázací slovo nese jen qtype). Rekurzivní tvary („bratr autora, který napsal…“) karta nebere — ukotvení selže na vztažné větě a jedou poziční šablonou se SubQuery."
+}

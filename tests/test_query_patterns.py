@@ -136,16 +136,6 @@ def test_selection_question_card_builds_typed_pattern():
     assert elided.pattern.known == [("obj", "hru")]
 
 
-def test_selection_card_does_not_steal_other_questions():
-    """Pasti 9–11: výběrový vzor nesmí ukrást sponovou identitu
-    („Jaký je robot?" nemá l-ové příčestí — !spona)."""
-    from jellyai.answerer.query import _card_query
-
-    spona = _card_query("Jaký je robot?", {"být"},
-                        is_node=lambda s: s == "robot", is_word=None)
-    assert spona is None         # sponová identita zůstává šabloně
-
-
 def test_relation_operator_card_builds_relation_pattern():
     """Fáze 2d: „Jaký měl X vztah k Y?" jako karta — „vztah" není entita,
     ale OPERÁTOR spojení (třída vztah_dotazu z relation_query_nouns):
@@ -185,6 +175,56 @@ def test_first_person_card_maps_user_subject():
     assert bez_filtru is not None
     assert bez_filtru.pattern.known == [("obj", "knedlíky"),
                                         ("subj", "uživatel")]
+
+
+def test_copular_identity_card():
+    """Fáze 2d: sponová identita „Kdo je X?" / „Jaký je X?" jako karta —
+    predikát „být" nese karta LITERÁLEM (data, ne kód), attr díra zůstává
+    attr, každá jiná se překlápí na pred (kanonické sponové pravidlo);
+    rod nese tvar spony (byla → Fem), is_copula pro odpovědní vrstvu."""
+    from jellyai.answerer.query import _card_query
+
+    q = _card_query("Kdo je robot?", set(),
+                    is_node=lambda s: s == "robot", is_word=None)
+    assert q is not None
+    assert q.pattern.predicate == "být"
+    assert q.pattern.hole_role == "pred" and q.pattern.hole_type == "person"
+    assert q.pattern.known == [("subj", "robot")]
+    assert q.qtype == "Kdo" and q.is_copula and q.gender is None
+
+    jaky = _card_query("Jaký je robot?", set(),
+                       is_node=lambda s: s == "robot", is_word=None)
+    assert jaky is not None
+    assert jaky.pattern.hole_role == "attr" and jaky.pattern.hole_type is None
+    assert jaky.qtype == "Jaký"
+
+    byla = _card_query("Kdo byla Božena Němcová?", set(),
+                       is_node=lambda s: s == "Božena Němcová", is_word=None)
+    assert byla is not None
+    assert byla.pattern.known == [("subj", "Božena Němcová")]
+    assert byla.gender == "Fem" and byla.is_copula
+
+
+def test_copular_relational_noun_card():
+    """Fáze 2d: „Kdo byl bratr Karla Čapka?" jako karta — vztažné jméno
+    je predikát (bratr), entita obj, díra subj/person; rod z tvaru spony.
+    Rekurze („bratr autora, který napsal…") zůstává poziční šabloně —
+    karty nevnořují (spec §7)."""
+    from jellyai.answerer.query import _card_query
+
+    q = _card_query("Kdo byl bratr Karla Čapka?", {"bratr"},
+                    is_node=lambda s: s == "Karla Čapka", is_word=None)
+    assert q is not None
+    assert q.pattern.predicate == "bratr"
+    assert q.pattern.hole_role == "subj" and q.pattern.hole_type == "person"
+    assert q.pattern.known == [("obj", "Karla Čapka")]
+    assert q.qtype == "Kdo" and q.is_copula and q.gender == "Masc"
+
+    rekurze = _card_query("Kdo byl bratr autora, který napsal R.U.R.?",
+                          {"bratr", "napsat"},
+                          is_node=lambda s: s in ("autora", "R.U.R."),
+                          is_word=None)
+    assert rekurze is None       # SubQuery zůstává poziční šabloně
 
 
 def test_date_drill_card_builds_time_pattern():
