@@ -461,3 +461,37 @@ def test_compound_sentence_salvages_first_clause():
     assert fact is not None and fact["kind"] == "event"
     assert fact["predicate"] == "jí"
     assert "Roník" in fact["objects"]
+
+
+def test_co_dela_person_answers_activity():
+    """Nález z GUI (2026-07-19): „Jindra uklízí v Počernicích." + „Co dělá
+    Jindra?" → činnost. Otázka na ČINNOST je generická událostní díra
+    (odpověď = predikát faktů tématu, mechanismus _event_answer) — tabulky
+    generic_event_verbs/event_verb_forms jen neznaly „dělat"."""
+    from config import AnswererConfig as AC
+    from jellyai.answerer.extractive import ExtractiveAnswerer as EA
+    from jellyai.answerer.graph_answerer import GraphAnswerer as GA
+    from jellyai.iris.automaton import IrisAutomaton
+    from jellyai.ufal_client import FakeUfalClient
+
+    answerer = GA(FactGraph(), FakeUfalClient(), EA(AC()),
+                  query_mode="templates", clock=lambda: NOW)
+    iris = IrisAutomaton(answerer, clock=lambda: NOW)
+    assert "Zapamatováno" in iris.turn("Jindra uklízí v Počernicích.").text
+    response = iris.turn("Co dělá Jindra?")
+    assert "uklízí" in response.text
+
+
+def test_lemma_numbering_stripped_in_nominativization():
+    """Nález z GUI: morpho lemma nese rozlišovací číslování („Jindra-1_;Y")
+    — do uzlu nesmí prosáknout („Jindra-1" pak rozbije rozřešení „Jindra")."""
+    from jellyai.iris.automaton import IrisAutomaton
+
+    class _StubClient:
+        def analyze(self, token):
+            return [{"lemma": "Jindra-1_;Y", "tag": "NNMS1-----A----"}]
+
+    answerer = GraphAnswerer(FactGraph(), AnswererConfig(),
+                             ExtractiveAnswerer(AnswererConfig()))
+    iris = IrisAutomaton(answerer, clock=lambda: NOW)
+    assert iris._nominativize_name("Jindru", _StubClient()) == "Jindra"

@@ -48,7 +48,12 @@ tagger jako vokativ mužského jména „Marcel" a ze ženy udělal muže.
 
 Proto první vrstva, **lexer** (`jellyai/lang/lexer.py`), dvojznačnost
 zásadně NEROZHODUJE. Každému tokenu přiřadí **množinu hypotéz** — druhy
-slova, kterými by token mohl být:
+slova, kterými by token mohl být. (Pozor na čtení: názvy tříd jako
+`otaz`, `cas`, `funkcni` nejsou překlepy, ale krátké TECHNICKÉ
+identifikátory přesně v podobě, v jaké je píší vzory na kartách —
+`otaz` = tázací slovo, `cas` = časový výraz, `funkcni` = funkční slovo,
+`l_tvar` = l-ové příčestí. V kartách je ale obvykle zakrývají čitelné
+grok-zkratky `%{TAZACI}`, `%{SLOVESO_MINULE}` — viz kapitola 2.)
 
 | token | hypotézy | proč |
 |---|---|---|

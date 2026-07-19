@@ -27,6 +27,7 @@ import threading
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
+from jellyai.answerer.selection import _clean_lemma
 from jellyai.graph.canon import deaccent
 from jellyai.graph.graph import parse_date
 from jellyai.iris.assurance import assurance
@@ -1019,7 +1020,7 @@ class IrisAutomaton:
             # izolovaném tvaru („Marcele" → vok. „Marcel" místo dat.
             # „Marcela" — rodový flip): tvaru věř, lemma zahoď
             return token
-        lemma = (analysis[0].get("lemma") or "").split("_")[0]
+        lemma = _clean_lemma(analysis[0].get("lemma") or "")
         if lemma and lemma[:1].isupper() and lemma != token:
             return lemma
         return token
@@ -1044,7 +1045,7 @@ class IrisAutomaton:
             for tok in sent:
                 form = tok.get("form") or ""
                 if form in places and tok.get("upos") in ("PROPN", "NOUN"):
-                    lemma = (tok.get("lemma") or "").split("_")[0]
+                    lemma = _clean_lemma(tok.get("lemma") or "")
                     # nominativ místa nebývá KRATŠÍ než tvar (Brně→Brno 4=4,
                     # Praze→Praha 5=5); kratší = zmršení (Lhotě→Lhot) → zahoď.
                     # VÝJIMKA (#35): známé toponymní koncovky nominativu
