@@ -1,0 +1,8 @@
+{
+  "name": "q-kdo-sloveso-misto",
+  "trigger": {"event": "utterance.query", "priority": 5,
+              "pattern": ["otaz:kdo", "?:dalsi", "sloveso_fin",
+                          ":v|ve|na", "jmeno"]},
+  "action": {"query": {"hole": "$1", "predicate": "$3", "known": ["$5"]}},
+  "teach": "Tázací vzor „Kdo (další) BYDLÍ V MÍSTĚ?“ (#44 z živého dialogu): díra z tabulky interrogatives (kdo → subj/person), predikát je prézentní sloveso, místo je známý účastník — fakty paměti mají osobu jako obj a místo jako loc, match najde spolubydlící oběma směry. Volitelné „další“ jen rozšiřuje týž vzor."
+}

@@ -162,6 +162,79 @@ def _verb_match(token, predicates, first=False):
     return best[0] if best else None
 
 
+_QUERY_DECK = None
+
+
+def _query_deck():
+    """Balíček karet se vzorovými dotazy (lazy, čte se jednou za proces)."""
+    global _QUERY_DECK    # pylint: disable=global-statement
+    if _QUERY_DECK is None:
+        from jellyai.iris.patterns import PatternDeck
+        deck = PatternDeck.for_language("cs")
+        deck.load()
+        _QUERY_DECK = deck
+    return _QUERY_DECK
+
+
+def _card_query(question, predicates, is_word):
+    """Dotaz podle VZOROVÉ KARTY (#46 fáze 2): regulární sekvence tříd
+    lexeru na kartě (event `utterance.query`) → pseudo-QL `Pattern`.
+
+    Nový tázací tvar = nová karta, žádný Python. Vybírá se nejtěsnější
+    match (priorita, délka vzoru); predikát prochází TOUŽ normalizací
+    jako šablony (`_verb_match`) — zápis a dotaz se potkají. Díru nese
+    tabulka `interrogatives` (role, typ) přes tázací token vzoru.
+
+    Returns:
+        Query | None: Rozbor, nebo None (žádná karta nesedí → šablony).
+    """
+    from jellyai.lang.lexer import classify
+    from jellyai.lang.matcher import match_sequence
+    tagged = classify(question, is_node=is_word)
+    lang = current()
+    best = None
+    for card in _query_deck().cards:
+        if card.trigger.get("event") != "utterance.query":
+            continue
+        sequence = card.trigger.get("pattern")
+        if not sequence:
+            continue
+        binding = match_sequence(sequence, tagged)
+        if binding is None:
+            continue
+        key = (card.trigger.get("priority", 0), len(sequence))
+        if best is None or key > best[0]:
+            best = (key, card, binding)
+    if best is None:
+        return None
+    _, card, binding = best
+    spec = card.action.get("query", {})
+
+    def ref(value):
+        if isinstance(value, str) and value.startswith("$"):
+            return binding.get(int(value[1:]))
+        return None
+
+    pattern = Pattern()
+    qtype = None
+    hole = ref(spec.get("hole"))
+    if hole is not None:
+        entry = lang["interrogatives"].get(hole.norm)
+        if entry:
+            pattern.hole_role, pattern.hole_type, qtype = entry
+    verb = ref(spec.get("predicate"))
+    if verb is not None:
+        pattern.predicate = _verb_match(verb.form, predicates, first=True) \
+            or verb.form
+    for known_ref in spec.get("known", ()):
+        token = ref(known_ref)
+        if token is not None:
+            pattern.known.append(("obj", token.form))
+    if pattern.predicate is None or not pattern.known:
+        return None
+    return Query(pattern=pattern, qtype=qtype, verb_lemma=pattern.predicate)
+
+
 def build_query(question, predicates, is_node=None, is_word=None,
                 is_area=None):  # pylint: disable=too-many-locals,too-many-return-statements,too-many-branches
     """Otázku (končící „?") přeloží šablonou nad slovníkem grafu na `Query`.
@@ -183,6 +256,11 @@ def build_query(question, predicates, is_node=None, is_word=None,
     """
     if "?" not in question:
         return None
+    # VZOROVÉ KARTY mají přednost (#46 fáze 2): plně ukotvený match je
+    # těsnější než poziční šablony; nesedí-li žádná, jede se postaru
+    card_query = _card_query(question, predicates, is_word)
+    if card_query is not None:
+        return card_query
     tokens = re.findall(r"[\w.]+", question)
     if not tokens:
         return None

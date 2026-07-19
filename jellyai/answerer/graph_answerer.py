@@ -528,6 +528,15 @@ class GraphAnswerer(Answerer):
                 for part in fact.participants:
                     if part.node in known_set or len(part.node) < 2:
                         continue             # díra ≠ známé; 1-znak = artefakt NER
+                    if part.role == "theme" \
+                            and part.node == current()["user_entity"]:
+                        # POZOROVATEL není odpověď: uživatel v roli theme je
+                        # metadata zápisu Mnemos, ne účastník děje (#34)
+                        continue
+                    if part.role == "time" and hole_role != "time" \
+                            and hole_type != "time":
+                        # časová kotva odpovídá jen časové díře
+                        continue
                     if hole_type == "geo" and not exact \
                             and (node := self.graph.nodes.get(part.node)) \
                             and node.type == "person":

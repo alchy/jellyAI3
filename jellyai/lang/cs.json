@@ -3,7 +3,7 @@
   "min_stem": 3,
   "suffixes": ["ovými", "ových", "ovém", "ovou", "ové", "ová", "ova", "ovo",
                "ovi", "ovu", "ovy", "ého", "ému",
-               "ými", "ých", "ém", "ům", "ách", "emi", "ami", "ou", "em", "ěm",
+               "ými", "ých", "ích", "ém", "ům", "ách", "emi", "ami", "ou", "em", "ěm",
                "é", "á", "ý", "í", "ú", "ó", "e", "ě", "y", "u", "a", "o", "i"],
   "vowel_fold": {"á": "a", "é": "e", "í": "i", "ó": "o", "ú": "u", "ů": "u", "ý": "y", "ě": "e"},
   "vowels": "aeiouyáéíóúýěů",
@@ -47,7 +47,8 @@
     "jakeho": ["attr", null, "Jaký"], "jakem": ["attr", null, "Jaký"],
     "ktery": ["attr", null, "Který"], "ktera": ["attr", null, "Který"],
     "ktere": ["attr", null, "Který"], "kterou": ["attr", null, "Který"],
-    "kterem": ["attr", null, "Který"], "ci": ["subj", "person", "Čí"]
+    "kterem": ["attr", null, "Který"], "ci": ["subj", "person", "Čí"],
+    "cim": ["obj", null, "Čím"]
   },
   "copula_forms": ["je", "byl", "byla", "bylo", "byli", "byly", "jsou", "byt",
                    "jsem", "jsi", "jste", "jsme"],
