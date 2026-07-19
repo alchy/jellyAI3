@@ -1,0 +1,41 @@
+{"u": "Kdo je Karel?", "kind": null, "cat": "ne-výrok"}
+{"u": "Kde bydlí Marcela?", "kind": null, "cat": "ne-výrok"}
+{"u": "Josef Čapek", "kind": null, "cat": "ne-výrok"}
+{"u": "Knedlíky s gulášem.", "kind": null, "cat": "ne-výrok"}
+{"u": "Ahoj.", "kind": null, "cat": "ne-výrok"}
+{"u": "Dnes jsem měl knedlíky.", "kind": "episode", "predicate": "měl", "objects": ["knedlíky"], "time": "17. července 2026", "cat": "epizoda"}
+{"u": "Včera jsem měl guláš.", "kind": "episode", "predicate": "měl", "objects": ["guláš"], "time": "16. července 2026", "cat": "epizoda-čas"}
+{"u": "Předevčírem jsem měl rýži.", "kind": "episode", "predicate": "měl", "objects": ["rýži"], "time": "15. července 2026", "cat": "epizoda-čas"}
+{"u": "Minulý týden jsem byl v Brně.", "kind": "episode", "objects": ["Brně"], "reject_objects": ["Minulý"], "places": ["Brně"], "time": "6. července 2026", "cat": "epizoda-čas", "gap": "zbytek víceslovného časového výrazu („Minulý“) zůstává v objektech — filtr zná jen day_words/units/now_words"}
+{"u": "Byl jsem na Barrandově.", "kind": "episode", "predicate": "byl", "objects": ["Barrandově"], "places": ["Barrandově"], "time": "17. července 2026", "cat": "epizoda"}
+{"u": "Jsem unavený.", "kind": "episode", "predicate": "být", "objects": ["unavený"], "time": "17. července 2026", "cat": "epizoda-spona"}
+{"u": "Potkal jsem Karla.", "kind": "episode", "predicate": "potkal", "objects": ["Karla"], "cat": "epizoda", "gap": "#31 rodina: „Karla“ po ořezu koncovky vypadá jako l-tvar → epizodní karta ho vyloučí z objektů → objects prázdné → výrok se ZTRATÍ"}
+{"u": "Venku prší.", "kind": "event", "predicate": "prší", "objects": ["Venku"], "time": "17. července 2026 12:00", "cat": "děj"}
+{"u": "Karel bydlí v Praze.", "kind": "event", "predicate": "bydlí", "objects": ["Karel", "Praze"], "places": ["Praze"], "cat": "děj"}
+{"u": "Emil bydlí v Brně.", "kind": "event", "predicate": "bydlí", "objects": ["Emil", "Brně"], "places": ["Brně"], "nom_objects": ["Emil", "Brno"], "nom_places": ["Brno"], "cat": "děj-l-jméno"}
+{"u": "Pavel bydlí na Barrandově.", "kind": "event", "predicate": "bydlí", "objects": ["Pavel", "Barrandově"], "places": ["Barrandově"], "cat": "děj-l-jméno"}
+{"u": "Pavla a Matěj bydlí na Barrandově v Praze.", "kind": "event", "predicate": "bydlí", "objects": ["Pavla", "Matěj", "Barrandově", "Praze"], "places": ["Barrandově", "Praze"], "cat": "děj-více-míst"}
+{"u": "V Praze prší.", "kind": "event", "predicate": "prší", "objects": ["Praze"], "places": ["Praze"], "time": "17. července 2026 12:00", "cat": "děj"}
+{"u": "Máme doma psa.", "kind": "event", "predicate": "máme", "objects": ["doma", "psa"], "cat": "děj"}
+{"u": "Zítra jedeme do Prahy.", "kind": "event", "predicate": "jedeme", "objects": ["Prahy"], "time": "18. července 2026", "cat": "děj-čas", "note": "„do Prahy“ je směr — places záměrně jen za v/ve/na (brána E Toposu)"}
+{"u": "Sněží.", "kind": "event", "cat": "děj-bezúčastný", "gap": "jednoslovný děj bez účastníků se ztratí (prázdné objects → None); „Venku prší.“ projde jen díky „Venku“"}
+{"u": "Emil bydlel v Brně.", "kind": "attributed", "predicate": "bydlet", "objects": ["Emil", "Brně"], "places": ["Brně"], "cat": "minulý-děj", "gap": "#31: jméno na -l je první l-tvar → predikát „emil“, Emil vypadne z objektů; katalog bydlel→bydlet se nedostane ke slovu"}
+{"u": "Karel vařil guláš.", "kind": "attributed", "predicate": "vařil", "objects": ["Karel", "guláš"], "cat": "minulý-děj", "gap": "#31: predikátem se stane „karel“ místo „vařil“"}
+{"u": "Marcela bydlela v Petrovicích.", "kind": "attributed", "predicate": "bydlet", "objects": ["Marcela", "Petrovicích"], "places": ["Petrovicích"], "cat": "minulý-děj", "gap": "#31 i ženská jména: „Marcela“ po ořezu -a vypadá jako l-tvar → predikát „marcel“"}
+{"u": "Pršelo v Praze.", "kind": "attributed", "predicate": "pršel", "objects": ["Praze"], "places": ["Praze"], "time": "17. července 2026", "cat": "minulý-děj"}
+{"u": "Před hodinou pršelo v Brně.", "kind": "attributed", "predicate": "pršel", "objects": ["Brně"], "places": ["Brně"], "time": "17. července 2026", "cat": "minulý-děj-čas"}
+{"u": "Venku prsi.", "kind": "event", "objects": ["Venku"], "cat": "bez-diakritiky", "gap": "#32: bezdiakritické prézens („prsi“) nepadne do finite ani l-tvaru → výrok se ZTRATÍ"}
+{"u": "Karel bydli v Praze.", "kind": "event", "predicate": "bydlet", "objects": ["Karel", "Praze"], "places": ["Praze"], "cat": "bez-diakritiky", "gap": "#31+#32: „Karel“ je první l-tvar → predikát „karel“; katalog bydl→bydlet se nedostane ke slovu"}
+{"u": "Marcela bydli v Petrovicich.", "kind": "event", "predicate": "bydlet", "objects": ["Marcela", "Petrovicich"], "places": ["Petrovicich"], "cat": "bez-diakritiky", "gap": "#31+#32: kombinace — predikát „marcel“"}
+{"u": "Bydli v Praze.", "kind": "attributed", "predicate": "bydlet", "objects": ["Praze"], "places": ["Praze"], "cat": "bez-diakritiky", "note": "katalog predicate_catalog (bydl→bydlet) FUNGUJE, když jméno nepředchází"}
+{"u": "Už neprší.", "kind": "event", "predicate": "neprší", "reject_objects": ["Už"], "cat": "negace", "gap": "#24: „Už“ se ukládá jako objekt negovaného děje (deník: neprší (Už))"}
+{"u": "Venku neprší.", "kind": "event", "predicate": "neprší", "objects": ["Venku"], "cat": "negace"}
+{"u": "Karel je vtipný chlapek.", "kind": "observation", "predicate": "být", "objects": ["Karel", "vtipný", "chlapek"], "time": "17. července 2026", "cat": "pozorování"}
+{"u": "Ronik je pes.", "kind": "observation", "predicate": "být", "objects": ["Ronik", "pes"], "cat": "pozorování"}
+{"u": "Marcela je doktorka.", "kind": "observation", "predicate": "být", "objects": ["Marcela", "doktorka"], "cat": "pozorování"}
+{"u": "Praha je hlavní město.", "kind": "observation", "predicate": "být", "objects": ["Praha", "město"], "cat": "pozorování"}
+{"u": "Můj email je jindra@example.com.", "kind": "attribute", "predicate": "email", "objects": ["jindra@example.com"], "subject": "uživatel", "cat": "atribut", "gap": "přivlastňovací „Můj“ (kapitalizovaný začátek věty) se bere jako jméno subjektu místo identity uživatele"}
+{"u": "Karel má email karel@example.com.", "kind": "attribute", "predicate": "email", "objects": ["karel@example.com"], "subject": "Karel", "cat": "atribut"}
+{"u": "Ano, měl rád knedlíky.", "kind": "attributed", "predicate": "měl", "objects": ["knedlíky"], "reject_objects": ["Ano"], "needs_subject": true, "cat": "připsaný"}
+{"u": "Měla ráda růže.", "kind": "attributed", "predicate": "měl", "objects": ["růže"], "needs_subject": true, "cat": "připsaný"}
+{"u": "Marcela bydlí v Petrovicích.", "kind": "event", "predicate": "bydlí", "objects": ["Marcela", "Petrovicích"], "places": ["Petrovicích"], "nom_places": ["Petrovice"], "cat": "děj-nom", "gap": "#35: délková pojistka blokuje Petrovicích→Petrovice (nominativ kratší než tvar) — měřeno jen s --nom"}

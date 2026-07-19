@@ -1,7 +1,8 @@
 # BACKLOG — otevřené body (živý dokument)
 
 > Aktualizuj při každém uzavření/přidání bodu. Stav ke commitu: viz git log.
-> Metriky teď: **449 testů, etalon 28/28 (+5 gap), focus 12/12, dialog 21/21 — 100 %.**
+> Metriky teď (2026-07-19): **467 testů, etalon 29/29 (3 gap-fixed / 5 gap),
+> focus 12/12, dialog 21/21, ZÁPIS 29/29 (12 gap) — jádra 100 %.**
 >
 > **➡️ PŘEDÁNÍ PRÁCE: čti nejdřív `docs/HANDOVER.md`** — zákony projektu,
 > testovací smyčka, implementační tipy ke každému otevřenému bodu, pasti.
@@ -10,21 +11,27 @@
 
 | # | Oblast | Bod | Řešení / poznámka | Priorita |
 |---|--------|-----|-------------------|----------|
-| 26 | Subsystémy | **Refaktor na společný půdorys** — spec `2026-07-18-subsystemy-iris.md`: port Subsystem (poznání/kanonizace/aktivace/záznamy), tři brány (E extrakce, Q nárok v parseru, A reflektor), fáze S0–S5. Obsahuje Chronos v2 (reminder-default „za čtvrt hodiny" + přeplánování, day_parts ráno=7:00 + učení uživatelem, registr kanálů console/window/alarm/email, okno Reminder), Topos v1 (gazetteer, kontejnment, slovesná třída pohybu — „Kde putoval Ježíš?"), Mnemos jako brána zápisu pro subsystémy. | Fáze po jedné, každá měřená; S0 mechanická. STAV: S0+S1+S2-jádro HOTOVO (subsystems balíček, day_parts, reminder-default+přeplánování, okno Reminder+kanály, tvrdý filtr); zbývá S2-dočištění (formální claim() v parseru), S4 brána E, S5 učení definic (částečně: Topos se už učí za pochodu). S3 Topos jádro HOTOVO (viz archiv). | **1** |
+| 37 | Benchmark | ✅ **HOTOVO** (2026-07-19): **Zápisový etalon** — `benchmark/run_mnemos.py` + `mnemos.jsonl` (41 řádků, 11 kategorií). Měří TÝMŽ soukolím jako runtime (`parse_statement` + karty + `_known_word` veto, fixní hodiny jako dialog). Baseline: **jádro 29/29 (100 %), 12 gap řádků** (#31 ×4, #32 ×3, #24, #35, + 4 NOVÉ nálezy — viz sekce runtime). `--nom` režim měří i nominativizaci (vyžaduje ÚFAL služby). Testy kontraktu `tests/test_run_mnemos.py`. | Guardrail pro práci na #31–35/lematice. Deník neukládá surový výrok (jen parse) → sklizeň z provozu čeká na #38; sada zatím syntetická z dokumentovaných pastí. | ✓ |
+| 26 | Subsystémy | **Refaktor na společný půdorys** — spec `2026-07-18-subsystemy-iris.md`: port Subsystem (poznání/kanonizace/aktivace/záznamy), tři brány (E extrakce, Q nárok v parseru, A reflektor), fáze S0–S5. Obsahuje Chronos v2 (reminder-default „za čtvrt hodiny" + přeplánování, day_parts ráno=7:00 + učení uživatelem, registr kanálů console/window/alarm/email, okno Reminder), Topos v1 (gazetteer, kontejnment, slovesná třída pohybu — „Kde putoval Ježíš?"), Mnemos jako brána zápisu pro subsystémy. | Fáze po jedné, každá měřená; S0 mechanická. STAV: S0+S1+S2-jádro HOTOVO (subsystems balíček, day_parts, reminder-default+přeplánování, okno Reminder+kanály, tvrdý filtr); zbývá S2-dočištění (formální claim() v parseru), S4 brána E, S5 učení definic (částečně: Topos se už učí za pochodu). S3 Topos jádro HOTOVO (viz archiv). Směr S2 (dialog 2026-07-19): karty vstřebávají QL jako VZOROVÝ JAZYK nad tokeny (vzory = data, matching = mechanismus), pravidlo po pravidle s parity gate — NE interpret v JSONu. | **1** |
+| 38 | Provoz | **Triage telemetrie** — strukturovaná stopa tahu (otázka → evidence rozřešení → vystřelené karty → odpověď + assurance) do JSONL; `./jelly triage` shlukuje tahy s miss/nízkou assurance. Provoz pak plní #37 průběžně, místo ručního lovení pastí. | Rozšíření telemetrie karet (měří benefit) i na neúspěchy. Z dialogu 2026-07-19. | 2 |
+| 40 | Infra | **Verzovací handshake služeb** — git SHA + čas startu v metadatech Iris REST; web při připojení loguje, při neshodě křičí. Řeší třídu deploy-bolesti „napojeno na starou instanci". | Malé (odpoledne práce). Z dialogu 2026-07-19. | 2 |
 | 27 | Chronos | ✅ **HOTOVO**: správa plánu dialogem — „zruš všechno na zítra" (výběr intervalem/hodinou/textem, bez selektoru nutné „všechno"), „posuň všechny ze zítra na čtvrtek" (den v týdnu drží čas dne záznamu), „přeplánuj to ze 17 na 20"; poctivý miss. Karty reminder-cancel/move/manage-miss; weekday_forms v lang. | commit v main. | ✓ |
 | 28 | Viz / Paměť | **Okno „Paměť"** místo „Aktivní dokumenty" (zadání): přehled dokumentů VČETNĚ záznamů subsystémů — pojmenování `sub_chronos_<název>`, `sub_topos_<název>`, `sub_mnemos_<název>`; statická znalost `notitia_<název>` (kurátorský korpus). Sklady subsystémů (reminders.jsonl, memory.jsonl, budoucí gazetteer) se v okně ukazují jako dokumenty paměti s aktivací. | Přejmenování okna + doc-id konvence v buildu/skladech; souvisí s #17 (konsolidace data/). | 3 |
 | 9 | Viz / detail | Detail uzlu po rozkliknutí: **tvary/aliasy** (`graph.aliases`), kmen; vysvětlit řádky obj/subj (role, ve kterých se uzel účastní). | `viz/detail.py`; čistě prezentační — rychlá výhra, dobrý první úkol. | 4 |
 | 25 | Answerer | **Ranking identit** (etalon gap „Kdo je jezis?"→Kristus): šumová spona `být(Ježíš, Bůh)` ze „Syn Boha" přebíjí `jmenovat(Kristus)`/`druh(Mesiáš)`. | Preferuj DATOVOU cestu: „syn Boha" je vztah (genitiv), ne identita — guard v extrakci spony; případně karta (nabídka pater), NE natvrdo v kódu. | 2 |
+| 39 | Data | **Provenience faktů** — zdroj + hladina důvěry na každém faktu, hromadný retract podle zdroje („zapomeň všechno z toho hovoru"). Zavést konvencí TEĎ, dokud jsou zapisovatelé dva (korpus, uživatel) — než přibudou #30 Ollama, #7 učení dialogem a STT audio (#42). | Zobecnění dvou bází + provenience-arbitráže homonym; souvisí #17. Z dialogu 2026-07-19. | 4 |
 | 5 | Iris karty | **Zbytek**: `clarify-period`/`clarify-relation` karty (potřebují své eventy v turn()); glow-dominantní řazení výčtu po volbě oblasti. | Vzor: jak turn() hlásí `data.overflow` s `area_lit` guardem. | 3 |
-| 24 | Mnemos | **Negace dějů** — „Prší?" s faktem `neprší(čas T)` → „Ne, od T neprší" (negovaný fakt je evidence opaku); „Už" se do objektů nemá ukládat. | Negační prefix do cs.json; párování predikát↔negace mechanismem, text kartou; promyslet s #10. | 5 |
+| 24 | Mnemos | **Negace dějů** — „Prší?" s faktem `neprší(čas T)` → „Ne, od T neprší" (negovaný fakt je evidence opaku); „Už" se do objektů nemá ukládat. | Negační prefix do cs.json; párování predikát↔negace mechanismem, text kartou; promyslet s #10. POVÝŠENO (dialog 2026-07-19): blokuje #41 (výjimku dědění nelze vyslovit bez negace), chybí poctivé „Ne" u existence (dnes jen Ano/nenašel), deník už dnes má zmršené `neprší (Už)`. | **3** |
 | 11 | Metron | „Kolikrát letos pršelo?" = díra typu počet-výskytů; zavře gap „Kolik měla dětí BN?". | Tázací tabulka cs.json + počítání faktů (s filtrem #10). | 6 |
 | 7 | Mnemos | **Učení pojmů dialogem** — „Co jsou závody aut?" → karta `data-empty` → vysvětlení rozloží extrakční pipeline → fakty do deníku. | KRITICKY PROMYSLET: verzování deníku, zdroj=uživatel, nikdy tiše nepřepsat korpus. | 7 |
+| 41 | Graf — koncept | **Oceán vrstev (dědění po druh-hranách)** — aktivace a odpovědi dědí po is-a řetězu s útlumem: „Psi mají rádi maso" → Ronik(pes) dědí slaběji; přímý fakt VŽDY poráží zděděný (defeasible inheritance). Hloubka = vzdálenost v řetězu druh-hran (EMERGENTNÍ, ne kurátorovaná patra). Zárodky už stojí: `druh`/`_is_a`, `_typed_match`, Topos kontejnment (= tatáž mechanika pro prostor), sharpener #13. Dává datový model bodu #7 (učení pojmů). | ZÁVISÍ na #24 (výjimky) a #37 (guardrail). Pasti: strmý útlum, doména/provenience hlídá homonymii (kohout zvíře × vodovodní), nedědit přes homonymní uzly. Koncept user (dialog 2026-07-19, Z1b). | po #24 |
 | 8 | Graf — koncept | **Jméno není entita — fáze 2** (spec `2026-07-18-jmenny-uzel-instance.md`): instance per odstavec, rozpuštění dvou-osobových slepenců („Áronovi Mojžíš"), jmenovka jako uzel typu jméno; Toyota s #7. | VELKÉ. Čti spec + měření (otisk identitu nerozliší!); pozor na vakuovou kompatibilitu (případ „Le"). Pozn. (user): extrakční parser by měl mít mírný kontext okolí. | 8 |
 | 13 | Sharpener | Cross-distribuce + vyzařování focusu po hranách (kontext hrany slabší); váhy v configu; K-křivka run_focus. | — | 9 |
+| 42 | Vize | **Audio kanály** — STT (Vosk/Whisper) jako VSTUPNÍ kanál, TTS (Piper) jako VÝSTUPNÍ — oba přes registr kanálů (vzor console/window/alarm/email), NE jako subsystém. Zásada (dialog 2026-07-19, S1): doménoví experti (Chronos/Topos/Mnemos — srostlí s grafem) ≠ kanálové adaptéry (hrana, nezávislé). STT = zátěžový test tvarosloví (bez interpunkce, chyby rozpoznávání) → otevřít až po #37. | park s tématem audio; fakta ze STT dostanou provenienci (#39). | park |
 | 29 | Topos-geo | **Polohové připomínky + mobil** (spec `2026-07-18-topos-geo.md`): „až budu v Kauflandu" — geofence nad skladem připomínek; poloha přes POST /geo (PWA z mobilu — Geolocation API + Web Push), lokace místa učením za pochodu („Jsi teď v X?"), explicitně („X je tady") nebo geokódovacím adaptérem; WhatsApp jako druhý kanál (bez geo). Mobil = senzor + displej, mozek na serveru. | ZAPARKOVÁNO s celým tématem Topos — otevřít až po odzkoušení a potvrzení stávajícího. | park |
 | 12 | Topos | Hierarchie míst (Praha ⊂ Čechy), containment, „tady/poblíž". | Jádro HOTOVO v S3 (archiv); zbývá: „poblíž/sousedí" dotazy (near záznamy jsou), místo jako filtr i pro díry, gazetteer editor. | 9 |
 | 30 | Topos | **Kartografický adaptér (Ollama)**: lokální LLM přes API plní gazetteer (pseudo-mapu) — generuje kontejnment/sousedství JSONL řádky pro zadaná místa; VŽDY přes validaci (kurátorský filtr / potvrzení dialogem — halucinace). K tomu dotazy „Kde jsou Domažlice?" (odpověď z gazetteeru — rodičovský řetěz) a „Bydlí pan Tetříček v Domažlicích?" (Mnemos fakt + místní filtr, už funguje principem). | Adaptér jako zásuvný modul (vzor: registr kanálů); po dokončení konceptu Topos. | 12 |
-| 14 | Čistý řez | UDPipe pryč z query (gate splněn: etalon 28/28 v `--mode templates`), answerer → Iris pluginy, pohrobci → `conserved_`. | Mechanické; po něm zmizí závislost dotazů na ÚFAL službách. | 11 |
+| 14 | Čistý řez | UDPipe pryč z query (gate splněn: etalon 28/28 v `--mode templates`), answerer → Iris pluginy, pohrobci → `conserved_`. | Mechanické; po něm zmizí závislost dotazů na ÚFAL službách. POVÝŠENO (dialog 2026-07-19): KARANTÉNA ÚFAL — po řezu zbude závislost jen v anotaci korpusu + Mnemos fallbacku, „vachrlatost" se stane dvěma ohraničenými body. | **2** |
 | 2 | Hygiena dat | **Zbytek**: uzel „mle" (NOUN mangle — lemma↔form konzistence), kapitalizované slovesné predikáty (Chvalte), „dovoleno" v pred/attr. | Vzor: hlasování v hygiene.py. | 12 |
 | 15 | Coverage | Anaforický kbelík (~2 100 vět se zájmenným podmětem). | — | 13 |
 | 16 | Etalon gapy | BN copula-profese; Kolik dětí (→ #11); Kde působila; „Jaka babicka?". | Průběžně s příslušnými body. | 14 |
@@ -38,6 +45,16 @@
 Body, které se za běhu (Mnemos, ne korpus) NEPODAŘILO zlomit. Kořen je společný:
 morfologie na IZOLOVANÉM tvaru (mimo větný kontext) je nespolehlivá, a náš
 lehký Mnemos parser (`_l_form`/`_finite_verb`) je na hraně.
+
+**Od 2026-07-19 sekci MĚŘÍ zápisový etalon (#37, `benchmark/run_mnemos.py`)
+— 12 gap řádků.** Baseline navíc odhalil 4 NOVÉ nálezy (gap řádky v sadě):
+„Potkal jsem Karla." se ZTRATÍ (Karla po ořezu vypadá jako l-tvar → epizodní
+karta ho vyloučí z objektů → prázdno → None); „Sněží." se ZTRATÍ (děj bez
+účastníků → None); „Můj email je …" → subjekt „Můj" místo uživatele
+(kapitalizovaný začátek věty se bere jako jméno); „Minulý týden jsem byl
+v Brně." nechává zbytek „Minulý" v objektech (filtr časových slov nezná
+víceslovné výrazy). Plus potvrzeno: #31 platí i pro ženská jména („Marcela"
+po ořezu -a → predikát „marcel").
 
 | # | Oblast | Problém | Co jsme zkusili / proč to nešlo | Priorita |
 |---|--------|---------|--------------------------------|----------|
@@ -63,6 +80,10 @@ tvaru** za běhu. Zvážit VLASTNÍ lehký modul (bez ÚFAL služeb pro Mnemos z
 
 Cíl: nominativ jmen i míst, správný typ (osoba/místo/pojem) a čistý predikát
 (bydlet) BEZ nespolehlivé morfo/UDPipe magie na izolovaných tvarech.
+
+**Guardrail pro celou tuto sekci: #37 zápisový etalon — nejdřív měření, pak
+lematika** (dialog 2026-07-19). NEdělat teď (tamtéž): #19 hybridní aktivace,
+#20 Echo/persona, vytrhávání subsystémů do knihoven, S2 velkým třeskem.
 
 | # | Oblast | Bod | Poznámka | Priorita |
 |---|--------|-----|----------|----------|

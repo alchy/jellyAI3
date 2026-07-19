@@ -53,7 +53,8 @@ model). Čti ho CELÝ před první změnou kódu. Doplňuje `docs/BACKLOG.md`
 .venv/bin/python -m pytest -q                     # musí: N passed, 0 failed
 .venv/bin/python benchmark/run_etalon.py          # musí: JÁDRO 29/29 (100 %)
 .venv/bin/python benchmark/run_focus.py           # musí: 12/12
-.venv/bin/python benchmark/run_dialog.py          # musí: 18/18
+.venv/bin/python benchmark/run_dialog.py          # musí: 21/21
+.venv/bin/python benchmark/run_mnemos.py          # musí: ZÁPIS 29/29 (100 %)
 .venv/bin/python benchmark/run_coverage.py        # diagnostika (sleduj trend)
 ```
 
@@ -63,7 +64,10 @@ model). Čti ho CELÝ před první změnou kódu. Doplňuje `docs/BACKLOG.md`
   `benchmark/etalon.jsonl` (`{"q", "expect", "cat"}`; negativa přes
   `"reject"`); dialogové chování → scénář `benchmark/dialog.jsonl`
   (fixní hodiny `datetime(2026,7,17,12,0)` — determinismus); aktivace →
-  `benchmark/focus.jsonl` (uzly v top-K jasu).
+  `benchmark/focus.jsonl` (uzly v top-K jasu); ZÁPIS Mnemos (výrok→parse)
+  → řádek `benchmark/mnemos.jsonl` (`{"u", "kind", "predicate", "objects"
+  podmnožinou, "reject_objects", …}`; `kind: null` = nemá být rozpoznán;
+  `--nom` měří i nominativizaci — chce běžící ÚFAL služby).
 - **Gap řádky**: známý nedostatek se NEmaže, přidá se `"gap": "proč + odkaz
   na backlog"` — etalon ho reportuje zvlášť a hlídá, že se nezhorší.
 - **Očekávání smí následovat zlepšení**: když se id uzlů zlepší
