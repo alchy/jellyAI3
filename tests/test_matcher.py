@@ -93,3 +93,38 @@ def test_exclusion_class_keeps_copula_out():
     tagged = classify("Kdo napsal Babičku.")
     assert match_sequence(["otaz", "l_tvar!spona", "uzel+"], tagged,
                           is_span=lambda s: s == "Babičku") is not None
+
+
+def test_rest_element_captures_remaining_tokens():
+    """Prvek `*` (zbytek) — 0..n libovolných tokenů pro výrokové vzory."""
+    tagged = classify("Roník jí i vegetariánskou stravu.")
+    binding = match_sequence(["?jmeno", ":ji|sni|ma", "*"], tagged)
+    assert binding is not None
+    assert binding[1].form == "Roník"
+    assert binding[2].form == "jí"
+    assert [t.form for t in binding[3]] == ["i", "vegetariánskou", "stravu"]
+    prazdny = match_sequence([":ji", "*"], classify("jí."))
+    assert prazdny is not None and prazdny[2] is None
+
+
+def test_pattern_aliases_expand_like_grok():
+    """Vzorové ZKRATKY (zadání user, po vzoru logstash/grok): karty píšou
+    čitelná jména %{ENTITA}, %{SLOVESO_MINULE}; tabulka pattern_aliases
+    (data) je rozvine na prvky matcheru — i seznamem (splice) a rekurzivně.
+    Překlep jména musí spadnout, ne tiše projít."""
+    import pytest
+    from jellyai.lang.matcher import expand_pattern
+
+    aliases = {"ENTITA": "uzel+", "ZBYTEK": "*",
+               "SLOVESO_MINULE": "l_tvar!spona",
+               "MISTO_FRAZE": [":v|ve|na", "jmeno"],
+               "OTAZKA_KDE": ["otaz:kde", "%{SLOVESO_MINULE}"]}
+    assert expand_pattern(["%{SLOVESO_MINULE}", "%{ENTITA}"], aliases) \
+        == ["l_tvar!spona", "uzel+"]
+    assert expand_pattern(["otaz", "%{MISTO_FRAZE}"], aliases) \
+        == ["otaz", ":v|ve|na", "jmeno"]                  # splice seznamu
+    assert expand_pattern(["%{OTAZKA_KDE}"], aliases) \
+        == ["otaz:kde", "l_tvar!spona"]                    # rekurze
+    assert expand_pattern(["?%{ENTITA}"], aliases) == ["?uzel+"]
+    with pytest.raises(ValueError):
+        expand_pattern(["%{NEEXISTUJE}"], aliases)

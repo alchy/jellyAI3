@@ -125,14 +125,51 @@ def parse_statement(text, now, deck=None, is_node=None):
     # slovo na začátku vetuje zápis, dotaz jde dotazovou cestou
     if tagged and "otaz" in tagged[0].classes:
         return None
-    card = deck.best("utterance.statement",
-                      {"features": utterance_features(tagged)})
+    # VZOROVÉ karty výroků mají přednost (#46 fáze 3): sekvence tříd
+    # rozhodne tam, kde ploché rysy nevidí („Roník JÍ granule" — sloveso
+    # pod délkovým guardem pozná jen stavba věty); rysové karty zůstávají
+    from jellyai.lang.matcher import expand_pattern, match_sequence
+    aliases = lang.get("pattern_aliases", {})
+    card, binding = None, None
+    for pattern_card in deck.cards:
+        if pattern_card.trigger.get("event") != "utterance.statement":
+            continue
+        sequence = pattern_card.trigger.get("pattern")
+        if not sequence:
+            continue
+        found = match_sequence(expand_pattern(sequence, aliases), tagged)
+        if found is not None:
+            card, binding = pattern_card, found
+            break
+    # vzorová a rysová karta soutěží JEDNOU prioritou (deck ji už nese):
+    # e-mailový atribut (12) přebije krátké sloveso „má" (8)
+    feature_card = deck.best("utterance.statement",
+                             {"features": utterance_features(tagged)})
+    if card is None or (feature_card is not None
+                        and feature_card.trigger.get("priority", 0)
+                        > card.trigger.get("priority", 0)):
+        card, binding = feature_card, None
     if card is None or "memorize" not in card.action:
+        # SOUVĚTÍ (fáze 4 v1): nerozpoznaná věta s čárkou se zachrání po
+        # klauzulích — uloží se první rozpoznaná (částečný zápis > ztráta)
+        if "," in text:
+            for clause in text.split(","):
+                clause = clause.strip().rstrip(".")
+                if clause:
+                    parsed = parse_statement(clause + ".", now, deck, is_node)
+                    if parsed is not None:
+                        return parsed
         return None
     kind = card.action["memorize"]
     source = card.action.get("predicate_from")
     source_token = None      # povrchový tvar, ze kterého predikát vznikl
-    if source == "l_verb":
+    if source == "pattern":
+        # predikát ze SLOTU vzoru (katalog krátkých sloves na kartě)
+        slot = binding.get(int(card.action["predicate_slot"][1:])) \
+            if binding is not None else None
+        predicate = slot.form if slot is not None else None
+        source_token = predicate
+    elif source == "l_verb":
         # l-ové příčestí je uvnitř věty MALÝMI písmeny; kapitalizovaný kandidát
         # („Emil", „Marcela" po ořezu) je zpravidla jméno — predikátem se stává,
         # jen když jiný l-tvar není („Pršelo v Praze")

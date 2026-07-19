@@ -4,9 +4,9 @@
     "event": "utterance.query",
     "priority": 3,
     "pattern": [
-      "l_tvar",
-      "?uzel+",
-      "?uzel+"
+      "%{SLOVESO_MINULE}",
+      "?%{ENTITA}",
+      "?%{ENTITA}"
     ]
   },
   "action": {

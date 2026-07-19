@@ -14,11 +14,49 @@ Syntaxe prvku (řetězec):
     "uzel+"          SPAN 1..n tokenů, který orákulum `is_span` potvrdí
                      jako entitu grafu („Karel Čapek", „Válka s mloky");
                      hladově nejdelší, ustupuje kvůli zbytku vzoru
+    "*"              ZBYTEK — 0..n libovolných tokenů (výrokové vzory:
+                     účastníci se pak čistí běžným filtrem)
     "?…"             volitelný prvek (kterákoli z podob výše)
 
 Vazby: 1-based index PRVKU vzoru → TaggedToken; spanový prvek → list
 TaggedToken; volitelný nenaplněný → None.
 """
+
+
+def expand_pattern(sequence, aliases, _seen=frozenset()):
+    """Rozvine vzorové ZKRATKY (po vzoru grok/logstash) na prvky matcheru.
+
+    Karty píšou čitelná jména — `%{ENTITA}`, `?%{SLOVESO_MINULE}` — a
+    tabulka `pattern_aliases` (jazyková DATA) je rozvine: hodnota-řetězec
+    nahradí prvek, hodnota-seznam se vloží (splice), zkratky se smí
+    skládat rekurzivně. Neznámé jméno spadne (překlep nesmí tiše projít).
+
+    Args:
+        sequence (list[str]): Prvky vzoru, případně se zkratkami.
+        aliases (dict): Jméno → prvek | seznam prvků.
+
+    Returns:
+        list[str]: Rozvinutá sekvence prvků.
+    """
+    expanded = []
+    for element in sequence:
+        optional = element.startswith("?")
+        body = element[1:] if optional else element
+        if body.startswith("%{") and body.endswith("}"):
+            name = body[2:-1]
+            if name in _seen:
+                raise ValueError(f"cyklus ve vzorových zkratkách: {name}")
+            if name not in aliases:
+                raise ValueError(f"neznámá vzorová zkratka: %{{{name}}}")
+            value = aliases[name]
+            parts = value if isinstance(value, list) else [value]
+            parts = expand_pattern(parts, aliases, _seen | {name})
+            if optional:
+                parts = [p if p.startswith("?") else "?" + p for p in parts]
+            expanded.extend(parts)
+        else:
+            expanded.append(element)
+    return expanded
 
 
 def _element_matches(element, token):
@@ -54,6 +92,13 @@ def match_sequence(pattern, tagged, is_span=None):
         element = pattern[p]
         optional = element.startswith("?")
         body = element[1:] if optional else element
+        if body == "*":
+            for end in range(len(tagged), t - 1, -1):    # hladově, i prázdný
+                found = walk(p + 1, end,
+                             {**binding, p + 1: tagged[t:end] or None})
+                if found is not None:
+                    return found
+            return None
         if body == "uzel+":
             if is_span is not None:
                 # hladově nejdelší potvrzený span; ustupuje, aby zbytek

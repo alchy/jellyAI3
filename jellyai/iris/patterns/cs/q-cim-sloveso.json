@@ -1,8 +1,24 @@
 {
   "name": "q-cim-sloveso",
-  "trigger": {"event": "utterance.query", "priority": 5,
-              "pattern": ["otaz:cim", "sloveso_fin", "jmeno", "?jmeno"]},
-  "action": {"query": {"hole": "$1", "predicate": "$2",
-                       "known": ["$3", "$4"]}},
+  "trigger": {
+    "event": "utterance.query",
+    "priority": 5,
+    "pattern": [
+      "%{TAZACI_CIM}",
+      "%{SLOVESO}",
+      "%{JMENO}",
+      "?%{JMENO}"
+    ]
+  },
+  "action": {
+    "query": {
+      "hole": "$1",
+      "predicate": "$2",
+      "known": [
+        "$3",
+        "$4"
+      ]
+    }
+  },
   "teach": "Tázací vzor „ČÍM krmí Marcela (Roníka)?“ (#44): instrumentálová díra — čím → obj (tabulka interrogatives), jmenovaní účastníci jsou známí, odpovědí je zbývající účastník faktu (konzervami). Druhé jméno je volitelné."
 }

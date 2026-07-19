@@ -4,9 +4,9 @@
     "event": "utterance.query",
     "priority": 3,
     "pattern": [
-      "sloveso_fin",
-      "?uzel+",
-      "?uzel+"
+      "%{SLOVESO}",
+      "?%{ENTITA}",
+      "?%{ENTITA}"
     ]
   },
   "action": {

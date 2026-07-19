@@ -126,6 +126,14 @@ poctivým terminálem — to je lepší než zmršený zápis.
 
 ## 6. Migrace (každá fáze měřená — benchmarky jsou na to stavěné)
 
+> **STAV k 2026-07-20:** fáze 1 ✓ (lexer), 2a–c ✓ (matcher + 7 dotazových
+> karet, spany `uzel+`, vylučování `!`, #44 zavřen), 3 ✓ (vzory na
+> výrokových kartách — `pattern` v triggeru, priorita sdílená s rysovými;
+> krátká slovesa „jí/má" katalogem na kartě), 4 v1 ✓ (záchrana první
+> klauzule souvětí), + grok-ZKRATKY `%{...}` (tabulka `pattern_aliases`,
+> zadání user — čitelné, DRY, splice posouvá indexy $N). Fáze 5 (úklid
+> query.py) ČEKÁ na pokrytí zbylých šablon kartami — viz HANDOVER §5.
+
 1. **Lexer extrakcí** (žádná změna chování): dnešní kontroly obou cest se
    přestěhují do `classify(tokens) → TaggedToken[]`. Guard: 494 testů +
    všech 5 benchmarků beze změny.

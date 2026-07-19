@@ -1,0 +1,22 @@
+{
+  "name": "q-kratke-sloveso",
+  "trigger": {
+    "event": "utterance.query",
+    "priority": 6,
+    "pattern": [
+      "%{TAZACI}",
+      "%{KRATKE_SLOVESO}",
+      "%{ENTITA}"
+    ]
+  },
+  "action": {
+    "query": {
+      "hole": "$1",
+      "predicate": "$2",
+      "known": [
+        "$3"
+      ]
+    }
+  },
+  "teach": "Tázací protějšek krátkých sloves („Co jí Roník?“): katalogový literál místo třídy sloveso_fin (délkový guard), díra z interrogatives, entita spanem. Karta se nehlásí, dokud graf predikát nezná (_verb_match) — před prvním zápisem jde otázka poctivým fallbackem."
+}

@@ -441,3 +441,23 @@ def test_vocative_lemma_does_not_flip_gender():
     iris = IrisAutomaton(answerer, clock=lambda: NOW)
     assert iris._nominativize_name("Marcele", _StubClient()) == "Marcele"
     assert iris._nominativize_name("Karlem", _StubClient()) == "Karel"
+
+
+def test_short_verb_statement_via_pattern_card():
+    """#45 (fáze 3): „Roník jí granule." — dvojznakové sloveso pod délkovým
+    guardem zachraňuje VÝROKOVÝ VZOR na kartě (katalog ji/sni/ma literálem);
+    predikát ze slotu vzoru, účastníci běžným filtrem."""
+    fact = parse_statement("Roník jí granule.", NOW)
+    assert fact is not None and fact["kind"] == "event"
+    assert fact["predicate"] == "jí"
+    assert fact["objects"] == ["Roník", "granule"]
+
+
+def test_compound_sentence_salvages_first_clause():
+    """#45 (fáze 4 v1): souvětí s čárkou se už neztrácí celé — uloží se
+    první rozpoznaná klauzule (částečný zápis > ztráta výroku)."""
+    fact = parse_statement(
+        "Roník jí i vegetariánskou stravu, má však rád i maso.", NOW)
+    assert fact is not None and fact["kind"] == "event"
+    assert fact["predicate"] == "jí"
+    assert "Roník" in fact["objects"]

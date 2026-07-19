@@ -4,10 +4,10 @@
     "event": "utterance.query",
     "priority": 4,
     "pattern": [
-      "otaz",
-      "?:se",
-      "sloveso_fin",
-      "uzel+"
+      "%{TAZACI}",
+      "?%{SE}",
+      "%{SLOVESO}",
+      "%{ENTITA}"
     ]
   },
   "action": {

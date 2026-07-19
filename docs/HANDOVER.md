@@ -1,8 +1,10 @@
-# HANDOVER — předání projektu jellyAI3 (2026-07-18, večerní stav)
+# HANDOVER — předání projektu jellyAI3 (2026-07-20, po maratonu vzorové gramatiky)
 
 Tento dokument předává práci další session (jiná instance, pravděpodobně menší
 model). Čti ho CELÝ před první změnou kódu. Doplňuje `docs/BACKLOG.md`
-(CO dělat) o JAK pracovat a ČEHO se vyvarovat.
+(CO dělat) o JAK pracovat a ČEHO se vyvarovat. K architektuře jazyka čti
+POVINNĚ `docs/superpowers/specs/2026-07-19-vzorova-gramatika.md` — nová
+vrstva lexer+matcher+vzorové karty je páteř dalšího vývoje (#46).
 
 ## 1. Zákony projektu (neporušitelné)
 
@@ -24,24 +26,35 @@ model). Čti ho CELÝ před první změnou kódu. Doplňuje `docs/BACKLOG.md`
    (`jellyai/graph/hygiene.py` — vzor pro nové guardy).
 6. **Žádná zpětná kompatibilita.** Graf je prototyp — refaktoruj bez zátěže;
    nepoužívané cesty do `conserved_` (viz docs), ne mrtvý kód.
-7. **Po každé změně restart služeb** (drží starý kód i graf):
-   `pkill -f iris_service.py; lsof -ti :8080 | xargs kill; pkill -f "cli.py web"`
-   pak `./jelly web` (a případně
-   `.venv/bin/python services/iris_service.py --port 8084 --model data/graph.pkl`).
+7. **Po každé změně restart služeb** (drží starý kód i graf). PRACOVNÍ
+   POSTUP (ověřený 2026-07-19): Iris běží SAMOSTATNĚ — po změně jádra
+   stačí `kill $(lsof -ti :8084)` + start
+   `.venv/bin/python services/iris_service.py --port 8084 --model data/graph.pkl`
+   a GUI (:8080) běží dál (napojí se dalším dotazem). Web restartuj jen
+   při změně viz/cli vrstvy. DEV MOST: řádky připsané do
+   `data/web_inbox.txt` zpracuje web jako vstup dialogového okna —
+   testy jsou vidět v GUI (echo "Prší?" >> data/web_inbox.txt).
 
-## 2. Stav (2026-07-18, commit 5e825a5)
+## 2. Stav (2026-07-20 ráno, po 20 commitech z 19.–20. 7.)
 
-- **Metriky:** 457 testů, etalon 29/29 (+5 gap řádků), focus 12/12,
-  dialog 21/21 — vše 100 %.
-- **Hotovo:** faktový graf; pseudo-QL šablony (hybrid, UDPipe jen fallback);
-  Iris karty + QueryAssurance; Chronos; Mnemos (deník `data/memory.jsonl`,
-  připsané fakty s elidovaným subjektem); hygiena (upos/pád/životnost/
-  uvozovky/lemma hlasování); kanonizace v1+v2 (nominativizace id);
-  instanční vrstva fáze 1 (srůst jen z textového tvrzení „X řečený Y");
-  REST :8084; web 3 okna (viewBase — vlastní repo uživatele);
-  subsystémový půdorys S0–S3 (`jellyai/iris/subsystems/`, spec
-  `2026-07-18-subsystemy-iris.md`): připomínky s vlastním vláknem hodin,
-  okno Reminder, kanály, tvrdý časový filtr.
+- **Metriky:** 519 testů, etalon 29/29 v OBOU režimech (hybrid i
+  `--mode templates`), focus 12/12, dialog 27/27 (13 scénářů; GAP scénáře
+  2 opraveno / 0), ZÁPIS 34/34 (GAP 13 opraveno / 3) — jádra 100 %.
+- **Hotovo dříve:** faktový graf; pseudo-QL šablony; Iris karty +
+  QueryAssurance; Chronos (plánování kompletní); Topos jádro; Mnemos
+  (deník `data/memory.jsonl`); hygiena; kanonizace; instanční vrstva f. 1;
+  REST :8084; web 3 okna (viewBase); subsystémový půdorys S0–S3.
+- **Hotovo 19.–20. 7. (velký maraton):** ZÁPISOVÝ etalon (5. benchmark);
+  opravy #31 (l-jména), #35 (nominativ míst), části #32/#24; negace dějů
+  (#24: „Ne, od T neprší"); clarify-identity (#43); DEV most webu
+  (`data/web_inbox.txt`); sklizeň živého dialogu (částice, question_words
+  veto, vokativ guard); **#46 vzorová gramatika fáze 1–4**: lexer
+  (`jellyai/lang/lexer.py`, hypotézové třídy), matcher
+  (`jellyai/lang/matcher.py`, regulární vzory + spany uzel+ + zbytek * +
+  vylučování ! + grok-zkratky %{...} z `pattern_aliases`), vzorové karty
+  dotazů (event `utterance.query`, 7 karet — #44 zavřen) i výroků
+  (event `utterance.statement` s `pattern`, krátká slovesa „jí/má"),
+  klauzulová záchrana souvětí v1.
 - **Klíčová měření** (nedělej znovu, věř jim): kontextový otisk NEROZLIŠÍ
   identitu (Ježíš–Nazaretský 0.31 ≈ Jan–Křtitel 0.28 — první táž osoba,
   druzí dva lidé; manželé Němcovi 0.70). Proto srůst jmen jen z textového
@@ -60,6 +73,10 @@ model). Čti ho CELÝ před první změnou kódu. Doplňuje `docs/BACKLOG.md`
 
 - **Nikdy nespouštěj pytest přes `| tail` v řetězu s `&&`** — maska exit
   kódu už jednou pustila SyntaxError do main. Nejdřív celý běh, pak čti.
+- **Sahal jsi na query.py / vzorové karty? Spusť i PARITY GATE**
+  `run_etalon.py --mode templates` — musí být 29/29 stejně jako hybrid.
+  Karty mají před šablonami přednost; regrese znamená, že karta ukradla
+  otázku jiného smyslu (viz pasti 9–11).
 - **Nová feature = nový řádek benchmarku.** Odpovědní chování → řádek
   `benchmark/etalon.jsonl` (`{"q", "expect", "cat"}`; negativa přes
   `"reject"`); dialogové chování → scénář `benchmark/dialog.jsonl`
@@ -84,7 +101,9 @@ model). Čti ho CELÝ před první změnou kódu. Doplňuje `docs/BACKLOG.md`
 | `jellyai/iris/automaton.py` | jádro Iris: turn() — hodiny→volba→focus-shift→konstatování→odpověď→karty |
 | `jellyai/iris/patterns.py` + `patterns/cs/*.json` | balíček karet (deck.best = benefit-výběr) |
 | `jellyai/iris/subsystems/{chronos,mnemos,topos}.py` | čas (intervaly, připomínky+plán, tep hodin, tvrdý filtr), paměť (deník, memorize/recall), prostor (gazetteer, kontejnment, učení za pochodu) |
-| `jellyai/answerer/query.py` | pseudo-QL šablonový parser otázek (bez UDPipe) |
+| `jellyai/lang/lexer.py` | JEDEN určovač druhů slov: TaggedToken s MNOŽINOU hypotéz tříd (byt=spona i subst.) — #46 fáze 1 |
+| `jellyai/lang/matcher.py` | vykonavatel vzorů: regulární sekvence tříd, spany `uzel+`, zbytek `*`, vylučování `!`, grok-zkratky `%{…}` (tabulka `pattern_aliases`) |
+| `jellyai/answerer/query.py` | `_card_query` (vzorové karty event `utterance.query` — PŘEDNOST) → pseudo-QL šablony (fallback) → UDPipe (hybrid) |
 | `jellyai/answerer/graph_answerer.py` | match nad grafem, _resolve_topic (patra evidence), aktivační pole |
 | `jellyai/graph/extract.py` | extrakce faktů z anotací (spony, apozice, aliasy „řečený") |
 | `jellyai/graph/hygiene.py` | korpusová hlasování (upos/pád/životnost/lemma) + scruby + nominativize |
@@ -121,12 +140,21 @@ výčtu po volbě oblasti (dnes aktivace jen řadí remízy).
 
 ### #10 — HOTOVO v S2 (tvrdý filtr, tests/test_time_filter.py); navazuje S3 Topos (spec §5).
 
-### #24 Negace dějů
-Deník má `neprší (Už)`. Negační prefix „ne-" je jazykové pravidlo →
-cs.json (např. `"negation_prefix": "ne"`). Párování: predikát „prší" ↔
-„neprší" jsou OPAKY — „Prší?" s faktem neprší(čas T) → „Ne, od T neprší."
-Implementuj v answereru jako mechanismus (rozpoznání páru), text odpovědi
-kartou. Souvisí s #10 (od kdy).
+### #46 vzorová gramatika — kde pokračovat (čti spec!)
+Fáze 1–4 hotové. DALŠÍ KROKY v pořadí:
+(a) **fáze 2d**: převod zbylých šablon query.py na karty po jedné
+    (sponové/identitní otázky, výběrové „Jakou hru…", date drill,
+    vztahové) — VŽDY s parity gate `--mode templates`; kanonický copular
+    handler je subtilní, převáděj až naposled;
+(b) **fáze 4 v2**: klauzulátor pořádně — dnes jen záchrana první
+    klauzule; chybí: uložit VŠECHNY klauzule (multi-memorize v automatu),
+    dědění podmětu do druhé klauzule, vsuvka „To co X jí je Y" (gap řádek
+    v zápisovém etalonu);
+(c) **fáze 5**: smazat vyprázdněné větve query.py — AŽ karty pokryjí
+    i (a); dnes není bezpečně smazatelné nic;
+(d) zbylé zápisové gapy: „byt"≡„být" homograf (chce vzor [X SPONA Y]
+    s pozičním rozlišením — spona uprostřed, ne na konci), #35-nom řádek
+    (měř s --nom a běžícími službami).
 
 ### #11 Metron („Kolikrát letos pršelo?")
 Nová díra typu POČET VÝSKYTŮ: tázací tabulka cs.json („kolikrát") →
@@ -172,8 +200,24 @@ všechny benchmarky.
    `lsof -ti :8083 | xargs kill`.
 7. **Commit zprávy s uvozovkami**: použij `git commit -F - <<'MSG'` heredoc
    (inline -m s českými uvozovkami rozbíjí bash).
-8. **Nečti celé velké soubory** (`graph_answerer.py` ~950 řádků) — griduj
+8. **Nečti celé velké soubory** (`graph_answerer.py` ~1000 řádků) — griduj
    (`grep -n`) a čti okna. Kontext šetři na měření a testy.
+9. **Hypotézové třídy se KRYJÍ**: „byl" je l_tvar I spona — vzorová karta
+   s prvkem `l_tvar` ukradla identitní otázky („Kdo byl robot?").
+   Vylučuj prvkem `l_tvar!spona` (%{SLOVESO_MINULE}).
+10. **Volné orákulum spanů**: `_span_is_node` toleruje skip slova →
+    span „Pavla v" projde! Matcher proto zakazuje spany začínající/končící
+    třídou funkcni — NEOSLABUJ to.
+11. **Karta se NEHLÁSÍ, když predikát nezná** (`_verb_match` → None):
+    překlep „sworil" musí propadnout na UDPipe fallback. Kartová cesta
+    nikdy nebere povrchový tvar neznámého slovesa.
+12. **Vokativ z izolovaného taggeru je šum**: „Marcele" → vok. „Marcel"
+    (rodový flip). Nominativizace jmen tag s pádem 5 ZAHAZUJE.
+13. **ASCII uvozovky v JSON kartách/sadách** (stará past 3 platí dvojnásob):
+    „…" v teach/gap řetězcích VŽDY české — rozbité karty = desítky testů.
+14. **Grok-zkratky**: víceprvková zkratka (splice) POSOUVÁ indexy $N
+    v action — odkazy míří na ROZVINUTÉ prvky. Jednoprvkové zkratky
+    indexy nemění.
 
 ## 7. Pracovní smyčka (doporučený postup na 1 úkol)
 

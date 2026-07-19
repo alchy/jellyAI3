@@ -191,9 +191,10 @@ def _card_query(question, predicates, is_node=None, is_word=None):
         Query | None: Rozbor, nebo None (žádná karta nesedí → šablony).
     """
     from jellyai.lang.lexer import classify
-    from jellyai.lang.matcher import match_sequence
+    from jellyai.lang.matcher import expand_pattern, match_sequence
     tagged = classify(question, is_node=is_word)
     lang = current()
+    aliases = lang.get("pattern_aliases", {})
     best = None
     for card in _query_deck().cards:
         if card.trigger.get("event") != "utterance.query":
@@ -201,7 +202,8 @@ def _card_query(question, predicates, is_node=None, is_word=None):
         sequence = card.trigger.get("pattern")
         if not sequence:
             continue
-        binding = match_sequence(sequence, tagged, is_span=is_node)
+        binding = match_sequence(expand_pattern(sequence, aliases),
+                                 tagged, is_span=is_node)
         if binding is None:
             continue
         key = (card.trigger.get("priority", 0), len(sequence))
