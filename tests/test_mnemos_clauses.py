@@ -88,8 +88,7 @@ def test_multi_memorize_stores_both_clauses():
     klauzule je dotazatelná („Co má Roník?" → maso)."""
     g = FactGraph()
     answerer = GraphAnswerer(g, FakeUfalClient(),
-                             ExtractiveAnswerer(AnswererConfig()),
-                             query_mode="templates")
+                             ExtractiveAnswerer(AnswererConfig()))
     iris = IrisAutomaton(answerer, clock=lambda: NOW)
     stored = iris.turn(
         "Roník jí i vegetariánskou stravu, má však rád i maso.")

@@ -8,9 +8,9 @@ jsou známé neúspěchy (tracking); když gap začne procházet, je to POKROK
 (GAP-FIXED). Shoda je case-insensitive podřetězec; `reject` hlídá, že odpověď
 NEobsahuje šum/hádání (negativní očekávání — poctivost > recall).
 
-`--mode {udpipe,hybrid,templates}` přepne query cestu (měření parity pseudo-QL).
+Dotazová cesta je jediná — šablony (vzorové karty + pseudo-QL, řez #14);
+bývalý parity gate `--mode templates` je bezpředmětný.
 """
-import argparse
 import json
 import os
 
@@ -40,16 +40,9 @@ def _run_item(answerer, item):
 
 def main():
     """Projede etalon proti aktuálnímu grafu a vypíše PASS/FAIL/gap + skóre."""
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--mode", choices=("udpipe", "hybrid", "templates"),
-                        default=None, help="query režim (default: config)")
-    args = parser.parse_args()
     with open(ETALON, encoding="utf-8") as fh:
         items = [json.loads(line) for line in fh if line.strip()]
-    config = Config()
-    if args.mode:
-        config.graph.query_mode = args.mode
-    answerer = make_graph_answerer(config)
+    answerer = make_graph_answerer(Config())
     rows, passed, failed, gap_open, gap_fixed = [], 0, 0, 0, 0
     for item in items:
         answerer.reset()
@@ -70,8 +63,7 @@ def main():
     core = passed + failed
     pct = 100 * passed // core if core else 0
     print(f"\nJÁDRO: {passed}/{core} ({pct} %)   "
-          f"GAP: {gap_fixed} opraveno / {gap_open} otevřeno   "
-          f"[režim {config.graph.query_mode}]")
+          f"GAP: {gap_fixed} opraveno / {gap_open} otevřeno")
     return passed, failed, gap_fixed, gap_open
 
 

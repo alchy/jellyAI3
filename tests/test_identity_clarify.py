@@ -27,7 +27,7 @@ def _iris():
         Participant("obj", "obrazy", "concept")]))
     answerer = GraphAnswerer(g, FakeUfalClient(),
                              ExtractiveAnswerer(AnswererConfig()),
-                             query_mode="templates", clock=lambda: NOW)
+                             clock=lambda: NOW)
     return IrisAutomaton(answerer, clock=lambda: NOW)
 
 

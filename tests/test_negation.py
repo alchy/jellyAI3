@@ -33,7 +33,7 @@ def _answerer(*facts):
         g.add_fact(fact)
     return GraphAnswerer(g, FakeUfalClient(),
                          ExtractiveAnswerer(AnswererConfig()),
-                         query_mode="templates", clock=lambda: NOW)
+                         clock=lambda: NOW)
 
 
 def test_negated_fact_answers_no_with_since():

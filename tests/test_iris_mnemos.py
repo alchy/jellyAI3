@@ -84,8 +84,7 @@ def test_present_event_round_trip_via_iris():
     s prézentním predikátem, „dnes" je Chronos filtr, ne účastník)."""
     g = FactGraph()
     answerer = GraphAnswerer(g, FakeUfalClient(),
-                             ExtractiveAnswerer(AnswererConfig()),
-                             query_mode="templates")
+                             ExtractiveAnswerer(AnswererConfig()))
     iris = IrisAutomaton(answerer, clock=lambda: NOW)
     stored = iris.turn("Venku prší.")
     assert "Zapamatováno" in stored.text
@@ -107,8 +106,7 @@ def test_confirmation_attributes_fact_to_hot_person():
     entit otázky je zaostření i bez odpovědi) → „ano, měl rád knedlíky." →
     subjekt z konverzačního těžiště → fakt do paměti → táž otázka → Ano."""
     answerer = GraphAnswerer(_capek_graph(), FakeUfalClient(),
-                             ExtractiveAnswerer(AnswererConfig()),
-                             query_mode="templates")
+                             ExtractiveAnswerer(AnswererConfig()))
     iris = IrisAutomaton(answerer, clock=lambda: NOW)
     first = iris.turn("Měl Karel Čapek rád knedlíky?")
     assert first.text != "Ano"                   # poctivé nenašel
@@ -126,8 +124,7 @@ def test_explicit_person_in_statement_beats_context():
     g.add_fact(make_fact("být", [Participant("subj", "Josef Čapek", "person"),
                                  Participant("pred", "malíř", "concept")]))
     answerer = GraphAnswerer(g, FakeUfalClient(),
-                             ExtractiveAnswerer(AnswererConfig()),
-                             query_mode="templates")
+                             ExtractiveAnswerer(AnswererConfig()))
     iris = IrisAutomaton(answerer, clock=lambda: NOW)
     iris.turn("Kdo je Karel Čapek?")             # těžiště = KAREL
     stored = iris.turn("ano, Josef Čapek měl rád barvy.")
@@ -143,8 +140,7 @@ def test_attribution_without_hot_person_does_not_memorize():
     """Bez svítící osoby (i po neúspěšném tahu) se nic nepřipisuje —
     poctivé nenašel místo faktu přišitého komukoli."""
     iris = IrisAutomaton(GraphAnswerer(FactGraph(), FakeUfalClient(),
-                                       ExtractiveAnswerer(AnswererConfig()),
-                                       query_mode="templates"),
+                                       ExtractiveAnswerer(AnswererConfig())),
                          clock=lambda: NOW)
     out = iris.turn("ano, měl rád knedlíky.")
     assert "Zapamatováno" not in out.text
@@ -180,7 +176,7 @@ def test_explicit_memory_commands_structured_and_note(tmp_path):
     path = str(tmp_path / "memory.jsonl")
     answerer = GraphAnswerer(FactGraph(), FakeUfalClient(),
                              ExtractiveAnswerer(AnswererConfig()),
-                             query_mode="templates", clock=lambda: NOW)
+                             clock=lambda: NOW)
     iris = IrisAutomaton(answerer, clock=lambda: NOW, memory_path=path)
     assert "Zapamatováno" in iris.turn(
         "Zapamatuj si, že Karel je vtipný chlapek.").text
@@ -193,7 +189,7 @@ def test_explicit_memory_commands_structured_and_note(tmp_path):
     # persistence: nová instance přehraje deník a odpovídá dál
     fresh = GraphAnswerer(FactGraph(), FakeUfalClient(),
                           ExtractiveAnswerer(AnswererConfig()),
-                          query_mode="templates", clock=lambda: NOW)
+                          clock=lambda: NOW)
     again = IrisAutomaton(fresh, clock=lambda: NOW, memory_path=path)
     assert "Barrandově" in again.turn("Kde bydlí Pavel?").text
     assert any(f.predicate == "poznamenat"
@@ -208,7 +204,7 @@ def test_forget_selective_and_compound(tmp_path):
     path = str(tmp_path / "memory.jsonl")
     answerer = GraphAnswerer(FactGraph(), FakeUfalClient(),
                              ExtractiveAnswerer(AnswererConfig()),
-                             query_mode="templates", clock=lambda: NOW)
+                             clock=lambda: NOW)
     answerer._gazetteer_path = str(tmp_path / "gaz.jsonl")
     iris = IrisAutomaton(answerer, clock=lambda: NOW, memory_path=path)
     iris.turn("Nezapomeň, Pavel bydlí na Barrandově.")
@@ -235,7 +231,7 @@ def test_forget_interval_yesterday(tmp_path):
     path = str(tmp_path / "memory.jsonl")
     answerer = GraphAnswerer(FactGraph(), FakeUfalClient(),
                              ExtractiveAnswerer(AnswererConfig()),
-                             query_mode="templates",
+                             
                              clock=lambda: moment[0])
     iris = IrisAutomaton(answerer, clock=lambda: moment[0],
                          memory_path=path)
@@ -259,7 +255,7 @@ def test_recall_what_i_told_you_by_interval():
     moment = [NOW]
     answerer = GraphAnswerer(FactGraph(), FakeUfalClient(),
                              ExtractiveAnswerer(AnswererConfig()),
-                             query_mode="templates",
+                             
                              clock=lambda: moment[0])
     iris = IrisAutomaton(answerer, clock=lambda: moment[0])
     iris.turn("Dnes jsem měl knedlíky.")            # pátek 17. 7.
@@ -282,8 +278,7 @@ def test_full_dumpling_scenario_via_iris():
     odpověď z Mnemos faktu (Chronos ukotvil čas při uložení)."""
     g = FactGraph()
     answerer = GraphAnswerer(g, FakeUfalClient(),
-                             ExtractiveAnswerer(AnswererConfig()),
-                             query_mode="templates")
+                             ExtractiveAnswerer(AnswererConfig()))
     iris = IrisAutomaton(answerer, clock=lambda: NOW)
     stored = iris.turn("Dnes jsem měl knedlíky.")
     assert stored.kind == "answer" and "Zapamatováno" in stored.text
@@ -475,7 +470,7 @@ def test_co_dela_person_answers_activity():
     from jellyai.ufal_client import FakeUfalClient
 
     answerer = GA(FactGraph(), FakeUfalClient(), EA(AC()),
-                  query_mode="templates", clock=lambda: NOW)
+                  clock=lambda: NOW)
     iris = IrisAutomaton(answerer, clock=lambda: NOW)
     assert "Zapamatováno" in iris.turn("Jindra uklízí v Počernicích.").text
     response = iris.turn("Co dělá Jindra?")

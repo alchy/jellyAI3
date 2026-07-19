@@ -20,8 +20,7 @@ NOW = datetime(2026, 7, 17, 12, 0)
 
 def _iris(memory_path):
     answerer = GraphAnswerer(FactGraph(), FakeUfalClient(),
-                             ExtractiveAnswerer(AnswererConfig()),
-                             query_mode="templates")
+                             ExtractiveAnswerer(AnswererConfig()))
     return IrisAutomaton(answerer, clock=lambda: NOW,
                          memory_path=memory_path)
 

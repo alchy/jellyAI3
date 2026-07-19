@@ -28,8 +28,7 @@ def _brothers_graph():
 
 def _iris(graph):
     answerer = GraphAnswerer(graph, FakeUfalClient(),
-                             ExtractiveAnswerer(AnswererConfig()),
-                             query_mode="templates")
+                             ExtractiveAnswerer(AnswererConfig()))
     return IrisAutomaton(answerer)
 
 
@@ -94,8 +93,7 @@ def test_empty_deck_means_mechanism_only():
     (žádný dialog není zadrátovaný v kódu)."""
     from jellyai.iris.patterns import PatternDeck
     answerer = GraphAnswerer(_brothers_graph(), FakeUfalClient(),
-                             ExtractiveAnswerer(AnswererConfig()),
-                             query_mode="templates")
+                             ExtractiveAnswerer(AnswererConfig()))
     empty = PatternDeck.__new__(PatternDeck)
     empty.directory, empty.cards = None, []
     iris = IrisAutomaton(answerer, deck=empty)

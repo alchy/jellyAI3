@@ -1,0 +1,23 @@
+{
+  "name": "q-co-vime",
+  "trigger": {
+    "event": "utterance.query",
+    "priority": 5,
+    "pattern": [
+      "%{TAZACI}",
+      ":vime|vite|vis|vim",
+      "?%{FUNKCNI}",
+      "%{ENTITA}"
+    ]
+  },
+  "action": {
+    "query": {
+      "hole": "$1",
+      "predicate": "vědět",
+      "known": [
+        ["subj", "$4"]
+      ]
+    }
+  },
+  "teach": "Znalostní agregace „Co víme o Marii?“ (řez #14 — dřív UDPipe): predikát „vědět“ nese karta literálem (generic_event_verbs — answerer agreguje děje OKOLÍ tématu do hloubky 2, pseudo-n-gramy aktivace), entita je téma. Tvary vime/vite/vis/vim literálem — katalog na kartě."
+}

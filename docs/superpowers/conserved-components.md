@@ -8,6 +8,7 @@ cestu a jasně označené). Plně vratné.
 |---|---|---|---|
 | **B1 větný retrieval** (`SentenceRetriever`, vzdálenostní jádro) | zakonzervováno | živě smíšený výsledek, ne jasná výhra (`2026-07-16-vb1-results.md`) | `RetrieverConfig.granularity="sentence"` |
 | **gen-qa / qagen** (syntetická QA data) | zakonzervováno | vzniklo pro generátor V2b (jiná větev, datově limitovaný); dataset nikdo nekonzumuje | `./jelly gen-qa` (běží dál) |
+| **`question_pattern` — UDPipe rozbor otázky** (`answerer/pattern.py`, funkce + helpery; dataclassy Pattern/SubQuery zůstávají nosné) | zakonzervováno (řez #14, 2026-07-19) | šablony (vzorové karty + pseudo-QL) jsou jediná dotazová cesta — etalon 29/29 bez UDPipe; `query_mode` zrušen | přímý import `from jellyai.answerer.pattern import question_pattern` (testy `tests/test_pattern.py` běží dál) |
 
 **Nezakonzervováno (zůstává v hlavní cestě):**
 - Retrieval V1 (BM25/TF-IDF) + extraktivní answerer — robustní default.

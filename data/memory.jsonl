@@ -17,3 +17,7 @@
 {"kind": "event", "predicate": "krmí", "objects": ["Marcela", "Roníka"], "places": [], "time": "19. července 2026 19:54", "card": "statement-event", "needs_subject": false}
 {"kind": "observation", "predicate": "být", "objects": ["co", "Roníj", "jí", "strava"], "places": [], "time": "19. července 2026", "card": "statement-observation", "needs_subject": false}
 {"kind": "event", "predicate": "krmí", "objects": ["Marcela", "Roníka", "konzervami", "pro", "psy"], "places": [], "time": "19. července 2026 19:54", "card": "statement-event", "needs_subject": false}
+{"kind": "event", "predicate": "jí", "objects": ["Roník", "vegetariánskou", "stravu"], "places": [], "time": "19. července 2026 23:27", "card": "statement-kratke-sloveso", "needs_subject": false, "predicate_surface": "jí"}
+{"kind": "event", "predicate": "má", "objects": ["Roník", "rád", "maso"], "places": [], "time": "19. července 2026 23:27", "card": "statement-kratke-sloveso", "needs_subject": false, "predicate_surface": "má"}
+{"kind": "event", "predicate": "má", "objects": ["Roník", "dlouhé", "chlupy"], "places": [], "time": "19. července 2026 23:29", "card": "statement-kratke-sloveso", "needs_subject": false, "predicate_surface": "má"}
+{"kind": "event", "predicate": "má", "objects": ["Roník", "dlouhé", "chlupy"], "places": [], "time": "19. července 2026 23:29", "card": "statement-kratke-sloveso", "needs_subject": false, "predicate_surface": "má"}

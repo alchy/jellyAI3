@@ -37,7 +37,7 @@ def test_mnemos_place_roundtrip_with_containment():
     Plzeň ⊂ Čechy); „na Moravě?" poctivě ne."""
     answerer = GraphAnswerer(FactGraph(), FakeUfalClient(),
                              ExtractiveAnswerer(AnswererConfig()),
-                             query_mode="templates", clock=lambda: NOW)
+                             clock=lambda: NOW)
     iris = IrisAutomaton(answerer, clock=lambda: NOW)
     assert "Zapamatováno" in iris.turn("Marcela bydlí v Petrovicích.").text
     assert "Petrovicích" in iris.turn("Kde bydlí Marcela?").text
@@ -52,7 +52,7 @@ def test_nested_places_teach_containment(tmp_path):
     „Bydlí Matěj v Česku?" → Ano přes naučený řetěz."""
     answerer = GraphAnswerer(FactGraph(), FakeUfalClient(),
                              ExtractiveAnswerer(AnswererConfig()),
-                             query_mode="templates", clock=lambda: NOW)
+                             clock=lambda: NOW)
     seed = tmp_path / "gaz.jsonl"                            # čistý tmp seed
     seed.write_text('{"place": "Praha", "in": "Čechy"}\n'
                     '{"place": "Čechy", "in": "Česko"}\n', encoding="utf-8")
@@ -76,7 +76,7 @@ def test_rain_in_prague_answers_by_containment():
     Toposu, ne účastník existence."""
     answerer = GraphAnswerer(FactGraph(), FakeUfalClient(),
                              ExtractiveAnswerer(AnswererConfig()),
-                             query_mode="templates", clock=lambda: NOW)
+                             clock=lambda: NOW)
     iris = IrisAutomaton(answerer, clock=lambda: NOW)
     stored = iris.turn("V Praze prší.")
     assert "Zapamatováno" in stored.text

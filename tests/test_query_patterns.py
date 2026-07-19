@@ -33,7 +33,7 @@ def _answerer(*facts):
         g.add_fact(fact)
     return GraphAnswerer(g, FakeUfalClient(),
                          ExtractiveAnswerer(AnswererConfig()),
-                         query_mode="templates", clock=lambda: NOW)
+                         clock=lambda: NOW)
 
 
 def test_kdo_verb_place_finds_inhabitants_not_user():

@@ -38,7 +38,7 @@ def _kobyla_answerer():
         Participant("time", "21. ledna 1900", "time")]))
     return GraphAnswerer(g, FakeUfalClient(),
                          ExtractiveAnswerer(AnswererConfig()),
-                         query_mode="templates", clock=lambda: NOW)
+                         clock=lambda: NOW)
 
 
 def test_interval_hard_filters_existence():
@@ -61,7 +61,7 @@ def test_undated_facts_survive_filter():
         Participant("obj", "bosa", "concept")]))
     a = GraphAnswerer(g, FakeUfalClient(),
                       ExtractiveAnswerer(AnswererConfig()),
-                      query_mode="templates", clock=lambda: NOW)
+                      clock=lambda: NOW)
     out = a.answer("Chodila kovářova kobyla bosa v 19. století?", [])
     assert out.text == "Ano"
 
@@ -80,6 +80,6 @@ def test_dated_hole_answers_respect_filter():
         Participant("time", "4. února 1920", "time")]))
     a = GraphAnswerer(g, FakeUfalClient(),
                       ExtractiveAnswerer(AnswererConfig()),
-                      query_mode="templates", clock=lambda: NOW)
+                      clock=lambda: NOW)
     out = a.answer("Kde se narodila Božena v 19. století?", [])
     assert "Vídeň" in out.text and "Praha" not in out.text

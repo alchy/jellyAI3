@@ -57,8 +57,7 @@ def test_to_nominative_fixes_multiword_agreement():
         generate={
             ("Božena", "NNFS1-----A----"): ["Božena"],
             ("Němcová", "NNFS1-----A----"): ["Němcová"],
-        },
-    )
+        })
     assert _to_nominative("Boženy Němcové", client) == "Božena Němcová"
 
 

@@ -155,9 +155,6 @@ class GraphConfig:
         spread_depth (int): Do kolika skoků od trasy vyzařuje aktivace do okolí
             (0 = jen trasa; hloubka laděná testy — okolní ukotvení tématu).
         spread_falloff (float): Útlum vyzařování na skok (jas × falloff^dist).
-        query_mode (str): Cesta rozboru otázky — "udpipe" (ML rozbor),
-            "hybrid" (šablony pseudo-QL první, UDPipe fallback),
-            "templates" (šablony jediná cesta, bez UDPipe).
         memory_path (str): Deník paměti Mnemos (JSONL) — konstatování
             uživatele; přežívá restart služby i přestavbu grafu.
     """
@@ -166,7 +163,6 @@ class GraphConfig:
     language: str = "cs"
     spread_depth: int = 2
     spread_falloff: float = 0.35
-    query_mode: str = "hybrid"
     memory_path: str = "data/memory.jsonl"
     reminders_path: str = "data/reminders.jsonl"
 

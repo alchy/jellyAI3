@@ -90,8 +90,7 @@ def test_interval_in_question_warms_matching_time_nodes():
     g.add_fact(make_fact("narodit", [Participant("subj", "Božena Němcová", "person"),
                                      Participant("time", "2. května 1818", "time")]))
     iris = IrisAutomaton(GraphAnswerer(g, FakeUfalClient(),
-                                       ExtractiveAnswerer(AnswererConfig()),
-                                       query_mode="templates"),
+                                       ExtractiveAnswerer(AnswererConfig())),
                          clock=lambda: NOW)
     iris.turn("Co se stalo tento měsíc?")
     scores = iris.answerer.context.scores

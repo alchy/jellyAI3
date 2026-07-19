@@ -7,6 +7,12 @@ najdi fakt shodný ve známých rolích a vrať účastníka v roli díry, seřa
 Bez ručních qtype pravidel a bez slovníků: **vztahy jsou struktura** (relační jméno
 + genitivní osoba ve spone → predikát = to jméno), tázací slovo určuje díru. Jazykové
 je jen mapování tázacích lemmat a deprelů — tenká vrstva, ne rozlitá logika.
+
+ZAKONZERVOVÁNO (řez #14, 2026-07-19): `question_pattern` a UDPipe-závislé
+helpery už hlavní cesta nevolá — rozbor otázky dělají výhradně šablony
+(`jellyai/answerer/query.py`: vzorové karty + pseudo-QL). Dataclassy
+`Pattern`/`SubQuery` a (de)serializace zůstávají NOSNÉ pro celou dotazovou
+cestu. Viz docs/superpowers/conserved-components.md.
 """
 
 from dataclasses import dataclass, field

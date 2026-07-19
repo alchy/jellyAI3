@@ -1,0 +1,16 @@
+{
+  "name": "q-hola-otazka",
+  "trigger": {
+    "event": "utterance.query",
+    "priority": 2,
+    "pattern": [
+      "%{TAZACI}"
+    ]
+  },
+  "action": {
+    "query": {
+      "hole": "$1"
+    }
+  },
+  "teach": "Holé tázací slovo „Kdy?“ / „Kde?“ po odpovědi (řez #14 — dřív UDPipe): drill do POSLEDNÍHO faktu rozhovoru — díra z tabulky interrogatives, účastníky drží kontext tahu. Ukotvení: matchne jen jednoslovnou otázku."
+}

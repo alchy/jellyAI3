@@ -130,14 +130,15 @@ def _verb_match(token, predicates, first=False):
     stripped = low.rstrip("aioy")
     if stripped.endswith("l") and stripped in normalized:
         return normalized[stripped]
-    if len(low) < 4:
-        return None
-    # generická dějová slovesa („stalo"→stát) mají tvary v jazykové tabulce —
-    # prefix na krátké kmeny nestačí; predikát nemusí být ve slovníku grafu
-    # (_event_answer fakt s tímto predikátem nepotřebuje)
+    # KATALOG tvarů („stalo"→stát, „žil"→žít) PŘED délkovým prahem —
+    # explicitní jazyková data přebíjejí heuristiku (krátké „žil" by práh
+    # zahodil); predikát nemusí být ve slovníku grafu (synonymní kruh
+    # a _event_answer ho vyhodnotí)
     lemma = current()["event_verb_forms"].get(low)
     if lemma:
         return lemma
+    if len(low) < 4:
+        return None
     best = None
     # páruje se i proti synonymům predikátů (spec 4.2): „žili"→žít, expanzi
     # na bydlet-fakty pak dělá answererův _synonym_ring
@@ -276,10 +277,12 @@ def _card_query(question, predicates, is_node=None, is_word=None):
         # 1. OSOBA („Kdy jsem měl…") — podmětem je IDENTITA UŽIVATELE
         # (uzel Mnemos); pojmenované entity jsou předměty
         pattern.known.append(("subj", lang["user_entity"]))
-    if pattern.predicate is None and spec.get("hole_role") is None:
-        # bez predikátu jen karta, která roli díry určila sama (relation);
-        # jinak platí past 11 — neznámé sloveso jde fallbackem
-        return None
+    if pattern.predicate is None:
+        # past 11: karta, která predikát ŽÁDALA a nedostala (neznámé
+        # sloveso), se nehlásí; bez klíče predicate stačí rozřešená díra
+        # (relation literálem, attr „Jaká rodina?", holé „Kdy?")
+        if "predicate" in spec or pattern.hole_role is None:
+            return None
     # rod slovesného/sponového tvaru filtruje kandidáty při pro-dropu
     # a u identity („byla" → Fem) — stejně jako u šablon; spona má
     # přednost (u sponových karet je slovesným slotem podstatné jméno)

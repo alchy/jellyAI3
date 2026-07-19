@@ -73,10 +73,11 @@ vrstva lexer+matcher+vzorové karty je páteř dalšího vývoje (#46).
 
 - **Nikdy nespouštěj pytest přes `| tail` v řetězu s `&&`** — maska exit
   kódu už jednou pustila SyntaxError do main. Nejdřív celý běh, pak čti.
-- **Sahal jsi na query.py / vzorové karty? Spusť i PARITY GATE**
-  `run_etalon.py --mode templates` — musí být 29/29 stejně jako hybrid.
-  Karty mají před šablonami přednost; regrese znamená, že karta ukradla
-  otázku jiného smyslu (viz pasti 9–11).
+- **Parity gate `--mode templates` je ZRUŠEN řezem #14** (2026-07-19):
+  šablony (vzorové karty + pseudo-QL) jsou JEDINÁ dotazová cesta, UDPipe
+  fallback i `query_mode` neexistují. Kartová regrese se pozná přímo na
+  etalonu — karty mají před pozičními šablonami přednost; krádež otázky
+  jiného smyslu (pasti 9–11) hlídej dál.
 - **Nová feature = nový řádek benchmarku.** Odpovědní chování → řádek
   `benchmark/etalon.jsonl` (`{"q", "expect", "cat"}`; negativa přes
   `"reject"`); dialogové chování → scénář `benchmark/dialog.jsonl`
@@ -177,9 +178,14 @@ všechny benchmarky.
   intervalů → containment míst), tabulky v cs.json ne natvrdo.
 - #7: NEBEZPEČNÉ (kvalita/konflikty) — deník verzovat, zdroj=uživatel,
   fakty od uživatele nikdy nesmí tiše přepsat korpus. Kriticky promysli.
-- #14: UDPipe pryč z query strany — gate splněn (etalon 28/28 v režimu
-  `--mode templates`); smaž fallback větev v answer(), `question_pattern`/
-  `analyze_question` přesuň do `conserved_`, run_etalon --mode udpipe zruš.
+- #14: ✅ HOTOVO (2026-07-19): fallback větev v answer() smazána,
+  `query_mode` zrušen úplně (config, tasks, run_etalon --mode),
+  `question_pattern` zakonzervován (conserved-components.md);
+  `analyze_question` zůstává ŽIVÝ pro TemplateAnswerer. Díry po řezu
+  zalepily karty: q-otaz-minuly-prodrop („Kdy se narodil?"),
+  q-vyberova-prodrop („Jaká rodina?" — implicitní spona být),
+  q-hola-otazka („Kdy?"), q-co-vime; „žil"→žít katalogem
+  event_verb_forms PŘED délkovým prahem.
 
 ## 6. Pasti (draze zaplacené — neopakuj)
 

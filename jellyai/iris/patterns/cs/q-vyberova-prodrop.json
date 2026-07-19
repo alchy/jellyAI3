@@ -1,0 +1,21 @@
+{
+  "name": "q-vyberova-prodrop",
+  "trigger": {
+    "event": "utterance.query",
+    "priority": 3,
+    "pattern": [
+      "%{TAZACI_VYBER}",
+      "%{ENTITA}"
+    ]
+  },
+  "action": {
+    "query": {
+      "hole": "$1",
+      "predicate": "být",
+      "known": [
+        ["subj", "$2"]
+      ]
+    }
+  },
+  "teach": "Navazující vlastnostní otázka „Jaká rodina?“ (řez #14 — dřív UDPipe): adjektivní tázací slovo + entita bez slovesa je implicitně sponová („Jaká JE rodina?“) — predikát „být“ nese karta literálem, attr díra nad tématem, odpověď čerpá kontextové vazby žhavého těžiště (svěží dotaz poctivě nehádá)."
+}

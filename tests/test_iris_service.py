@@ -38,8 +38,7 @@ def _brothers_graph():
 
 def _routes():
     answerer = GraphAnswerer(_brothers_graph(), FakeUfalClient(),
-                             ExtractiveAnswerer(AnswererConfig()),
-                             query_mode="templates")
+                             ExtractiveAnswerer(AnswererConfig()))
     deck = PatternDeck.for_language("cs")
     deck.load()
     automaton = IrisAutomaton(answerer, deck)

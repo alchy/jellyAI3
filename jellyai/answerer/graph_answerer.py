@@ -1,8 +1,10 @@
 """Answerer odpovídající 2-skokovým průchodem reifikovaného faktového grafu.
 
-Otázku rozebere `analyze_question`, najde uzel tématu, z něj fakty (dle role a
-predikátu) a z faktu s **nejvyšší vahou** vezme účastníka cílové role. N-arita: „kde"
-i „kdy" čerpají z téhož narozovacího faktu. Když nic nesedí, deleguje na fallback.
+Otázku rozeberou ŠABLONY (`build_query`: vzorové karty + pseudo-QL — bez
+UDPipe, řez #14), najde se uzel tématu, z něj fakty (dle role a predikátu)
+a z faktu s **nejvyšší vahou** vezme účastník cílové role. N-arita: „kde"
+i „kdy" čerpají z téhož narozovacího faktu. Když nic nesedí, odpověď je
+poctivé „nenašel" — nehádat je zákon.
 """
 
 from datetime import datetime
@@ -14,8 +16,7 @@ from jellyai.iris.subsystems.topos import (_key as _topos_key,
                                            area_keys, load_gazetteer,
                                            place_within)
 from jellyai.lang import current
-from jellyai.answerer.question import analyze_question
-from jellyai.answerer.pattern import question_pattern, SubQuery, Pattern
+from jellyai.answerer.pattern import SubQuery, Pattern
 from jellyai.answerer.query import build_query, Query
 from jellyai.answerer.template import _to_nominative
 from jellyai.graph.activation import ActivationField
@@ -84,13 +85,13 @@ class GraphAnswerer(Answerer):
     """
 
     def __init__(self, graph, client, fallback, *, context_decay=0.55,
-                 spread_depth=2, spread_falloff=0.35, query_mode="udpipe",
-                 clock=None):
+                 spread_depth=2, spread_falloff=0.35, clock=None):
         """Vytvoří answerer.
 
         Args:
             graph (FactGraph): Postavený faktový graf.
-            client: ÚFAL klient (rozbor otázky).
+            client: ÚFAL klient (jen nominativizace odpovědí — rozbor
+                otázky jde šablonami, řez #14).
             fallback (Answerer): Answerer pro neúspěch (extraktivní/template).
             context_decay (float): Pohasínání konverzačního těžiště na dotaz
                 (viz `ActivationField.decay`; nižší = kratší paměť kontextu).
@@ -111,7 +112,6 @@ class GraphAnswerer(Answerer):
         self.source_context = ActivationField(decay=context_decay)  # attention nad ZDROJI
         self.domain_docs = frozenset()   # explicitní doména (focus-shift „v kontextu X")
         self._predicates = {f.predicate for f in graph.facts.values()}  # slovník QL
-        self.query_mode = query_mode  # "udpipe" | "hybrid" | "templates" (pseudo-QL)
         self.history = []        # trajektorie konverzace (tahy s trasou a těžištěm)
         self._word_set = None    # doslovná slova uzlů (veto neznámého slovesa)
         self._resolved_knowns = set()   # entity otázky rozřešené tímto tahem
@@ -962,18 +962,15 @@ class GraphAnswerer(Answerer):
         self.place_filter = None   # nastaví brána Q (oblast v otázce)
         # UNIVERZÁLNÍ princip: otázka→neúplný fakt→match→díra (nahrazuje qtype pravidla
         # i attention — kontextově navazující dotaz řeší tatáž cesta). Rozbor dodají
-        # ŠABLONY (pseudo-QL, bez UDPipe); UDPipe jen mimo templates režim.
+        # VÝHRADNĚ šablony (vzorové karty + pseudo-QL) — řez #14: dotazová
+        # strana UDPipe nevolá; šablony nic → nehádat, poctivé „nenašel"
         qa, pat = None, None
-        if self.query_mode in ("hybrid", "templates"):
-            query = build_query(question, self._predicates, self._span_is_node,
-                                self._node_word, self._is_area)
-            if query is not None:
-                qa, pat = query, query.pattern
-                self.place_filter = getattr(query, "place", None)
-        if qa is None and self.query_mode != "templates":
-            qa = analyze_question(question, self.client)
-            pat = question_pattern(question, self.client)
-        if qa is None:                    # templates-only a šablony nic → nehádat
+        query = build_query(question, self._predicates, self._span_is_node,
+                            self._node_word, self._is_area)
+        if query is not None:
+            qa, pat = query, query.pattern
+            self.place_filter = getattr(query, "place", None)
+        if qa is None:
             qa, pat = Query(), Pattern()
         self.last_pattern = pat
         self._resolved_knowns = set()

@@ -12,8 +12,7 @@ def test_annotate_and_roundtrip(tmp_path):
         parse={"Text.": [[
             {"form": "Text", "lemma": "text", "upos": "NOUN",
              "head": 0, "deprel": "root", "start": 0, "end": 4}
-        ]]},
-    )
+        ]]})
     ann = annotate_passages([passage], client)
     assert ("wiki", 2) in ann
     assert ann[("wiki", 2)]["entities"][0]["text"] == "Rossum"
@@ -38,8 +37,7 @@ def test_annotate_documents_keys_per_sentence_and_shifts_offsets():
                 {"form": "klobouk", "lemma": "klobouk", "upos": "NOUN", "head": 1, "deprel": "obj", "start": 5, "end": 12},
             ]],
         },
-        entities={"Anna spí.": [{"text": "Anna", "type": "P", "start": 0, "end": 4}]},
-    )
+        entities={"Anna spí.": [{"text": "Anna", "type": "P", "start": 0, "end": 4}]})
     ann = annotate_documents(docs, client)
     assert set(ann.keys()) == {("d", 0), ("d", 1)}
     # věta 0 beze změny (base 0)

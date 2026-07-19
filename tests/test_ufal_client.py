@@ -17,8 +17,7 @@ def _free_port():
 def test_fake_ufal_client():
     client = FakeUfalClient(
         entities={"věta": [{"text": "Rossum", "type": "P", "start": 0, "end": 6}]},
-        generate={("Praha", "loc"): ["Praze"], "Rossum": ["Rossum"]},
-    )
+        generate={("Praha", "loc"): ["Praze"], "Rossum": ["Rossum"]})
     assert client.entities("věta")[0]["text"] == "Rossum"
     assert client.entities("neznámá") == []
     assert client.generate("Praha", "loc") == ["Praze"]
@@ -61,8 +60,7 @@ def test_service_handle_spawns_and_health(tmp_path):
         "        self.send_response(200); self.end_headers(); self.wfile.write(b'ok')\n"
         "    def log_message(self, *x): pass\n"
         "http.server.HTTPServer(('127.0.0.1', a.port), H).serve_forever()\n",
-        encoding="utf-8",
-    )
+        encoding="utf-8")
     port = _free_port()
     handle = _ServiceHandle(str(script), "model", "127.0.0.1", port, timeout=10)
     try:

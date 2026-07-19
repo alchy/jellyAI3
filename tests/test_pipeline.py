@@ -8,8 +8,7 @@ def _corpus(tmp_path):
         "Starý Rossum je vynalezl. "
         "Helena přijela na ostrov. "
         "Domin jí ukázal továrnu.",
-        encoding="utf-8",
-    )
+        encoding="utf-8")
     return str(tmp_path)
 
 

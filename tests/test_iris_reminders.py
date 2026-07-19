@@ -53,8 +53,7 @@ def test_format_due_today_vs_date():
 
 def _iris(clock, path=None):
     answerer = GraphAnswerer(FactGraph(), FakeUfalClient(),
-                             ExtractiveAnswerer(AnswererConfig()),
-                             query_mode="templates")
+                             ExtractiveAnswerer(AnswererConfig()))
     return IrisAutomaton(answerer, clock=clock, reminders_path=path)
 
 

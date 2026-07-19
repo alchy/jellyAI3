@@ -86,8 +86,7 @@ def test_relation_answer_enumerates_shared_facts():
                      ("obj", "Jan Křtitel", "person")))
     g.add_fact(_fact("být", ("subj", "Ježíš", "person"),
                      ("pred", "Mesiáš", "concept")))
-    a = GraphAnswerer(g, FakeUfalClient(), ExtractiveAnswerer(AnswererConfig()),
-                      query_mode="templates")
+    a = GraphAnswerer(g, FakeUfalClient(), ExtractiveAnswerer(AnswererConfig()))
     out = a.answer("Jaký měl Ježíš vztah k Janu Křtiteli?", [])
     assert "poslat" in out.text                  # děj, ne kontext
     a.reset()

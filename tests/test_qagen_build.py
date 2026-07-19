@@ -13,8 +13,7 @@ def test_build_dataset(tmp_path):
     qa = tmp_path / "qa" / "qapairs.jsonl"
     cfg = Config(
         data=DataConfig(processed_dir=str(proc)),
-        qagen=QagenConfig(qa_path=str(qa), min_tokens=3),
-    )
+        qagen=QagenConfig(qa_path=str(qa), min_tokens=3))
     ft = FakeTagger(entities={s: [Entity("starý Rossum", "P", 16, 28)]})
     pairs = build_dataset(cfg, ft)
 
@@ -37,7 +36,6 @@ def test_build_dataset_skips_long_sentences(tmp_path):
     cfg = Config(
         data=DataConfig(processed_dir=str(proc)),
         qagen=QagenConfig(qa_path=str(tmp_path / "qa" / "p.jsonl"),
-                          min_tokens=3, max_tokens=10),
-    )
+                          min_tokens=3, max_tokens=10))
     ft = FakeTagger(entities={sentence: [Entity("starý Rossum", "P", 16, 28)]})
     assert build_dataset(cfg, ft) == []

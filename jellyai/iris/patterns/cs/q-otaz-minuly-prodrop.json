@@ -1,0 +1,19 @@
+{
+  "name": "q-otaz-minuly-prodrop",
+  "trigger": {
+    "event": "utterance.query",
+    "priority": 3,
+    "pattern": [
+      "%{TAZACI}",
+      "?%{SE}",
+      "%{SLOVESO_MINULE}"
+    ]
+  },
+  "action": {
+    "query": {
+      "hole": "$1",
+      "predicate": "$3"
+    }
+  },
+  "teach": "Pro-drop navazující otázka „Kdy se narodil?“ / „Kde zemřela?“ (řez #14 — dřív ji nesl UDPipe fallback): jen díra a l-ové příčestí, ŽÁDNÁ entita — podmět doplní answerer z konverzačního těžiště, rodová shoda tvaru slovesa (narodil → mužské téma) filtruje kandidáty. Ukotvení na konec věty chrání otázky s entitou — ty berou těsnější vzory."
+}

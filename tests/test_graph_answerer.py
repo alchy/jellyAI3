@@ -152,8 +152,7 @@ def test_place_answer_normalized_to_nominative():
             {"form": "Němcová", "lemma": "Němcová", "upos": "PROPN", "head": 4, "deprel": "flat", "start": 23, "end": 30},
         ]]},
         analyze={"Slezsku": [{"form": "Slezsku", "lemma": "Slezsko", "tag": "NNNS6-----A----"}]},
-        generate={("Slezsko", "NNNS1-----A----"): ["Slezsko"]},
-    )
+        generate={("Slezsko", "NNNS1-----A----"): ["Slezsko"]})
     a = GraphAnswerer(g, client, ExtractiveAnswerer(AnswererConfig()))
     assert a.answer(q, []).text == "Slezsko"     # skloněno do 1. pádu
 
@@ -219,8 +218,7 @@ def test_run_pattern_executes_direct_ql():
     g = FactGraph()
     g.add_fact(make_fact("napsat", [Participant("subj", "Božena Němcová", "person"),
                                     Participant("obj", "Babička", "dílo")]))
-    a = GraphAnswerer(g, FakeUfalClient(), ExtractiveAnswerer(AnswererConfig()),
-                      query_mode="templates")
+    a = GraphAnswerer(g, FakeUfalClient(), ExtractiveAnswerer(AnswererConfig()))
     topic, values, fact = a.run_pattern(Pattern("napsat", [("obj", "Babička")],
                                                 "subj", "person"))
     assert values == ["Božena Němcová"] and fact.predicate == "napsat"
