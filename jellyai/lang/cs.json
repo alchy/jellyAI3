@@ -113,6 +113,7 @@
                            "áme", "áte", "íte"],
   "finite_verb_forms": ["prsi", "snezi"],
   "particle_words": ["uz", "jeste", "take", "taky"],
+  "new_person_words": ["novy", "noveho", "novemu", "novou", "nova", "nove"],
   "place_nominative_endings": ["ice", "any"],
   "user_entity": "uživatel",
   "focus_shift_phrases": ["v kontextu", "v ramci", "v oblasti", "myslim tim",

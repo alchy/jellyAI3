@@ -36,7 +36,7 @@ def test_cmd_web_wires_prompt_through_iris_client(tmp_path, monkeypatch):
     class FakeView:
         def __init__(self):
             self.cb = None
-            self.tick = None
+            self.ticks = []          # web registruje VÍC smyček (animace, inbox)
             self.served = False
             self.updated = {}
             self.packets = []
@@ -44,12 +44,16 @@ def test_cmd_web_wires_prompt_through_iris_client(tmp_path, monkeypatch):
             self.docs = None
             self.nodes = None
 
+        def tick(self):
+            for callback in self.ticks:
+                callback()
+
         def from_graph(self, graph): return self
         def add_node(self, *a, **k): pass
         def add_edge(self, *a, **k): pass
         def update_node(self, node_id, **attrs): self.updated[node_id] = attrs
         def packet(self, path): self.packets.append(path)
-        def every(self, seconds, callback): self.tick = callback
+        def every(self, seconds, callback): self.ticks.append(callback)
         def open_terminal(self, callback): self.cb = callback
         def open_docs_panel(self): pass
         def open_nodes_panel(self): pass
@@ -61,7 +65,7 @@ def test_cmd_web_wires_prompt_through_iris_client(tmp_path, monkeypatch):
 
     view = FakeView()
     cmd_web(cfg, view=view, client=FakeIrisClient())
-    assert view.served is True and view.cb is not None and view.tick is not None
+    assert view.served is True and view.cb is not None and view.ticks
     view.cb("kdo napsal Babičku?")               # simuluj dotaz z konzole
     assert any("Božena Němcová" in line for line in view.written)
     assert "Božena Němcová" in view.updated      # aktivace → velikost uzlu

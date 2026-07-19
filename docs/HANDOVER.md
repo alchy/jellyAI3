@@ -53,7 +53,7 @@ model). Čti ho CELÝ před první změnou kódu. Doplňuje `docs/BACKLOG.md`
 .venv/bin/python -m pytest -q                     # musí: N passed, 0 failed
 .venv/bin/python benchmark/run_etalon.py          # musí: JÁDRO 29/29 (100 %)
 .venv/bin/python benchmark/run_focus.py           # musí: 12/12
-.venv/bin/python benchmark/run_dialog.py          # musí: 25/25
+.venv/bin/python benchmark/run_dialog.py          # musí: 27/27
 .venv/bin/python benchmark/run_mnemos.py          # musí: ZÁPIS 29/29 (100 %)
 .venv/bin/python benchmark/run_coverage.py        # diagnostika (sleduj trend)
 ```

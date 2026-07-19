@@ -27,6 +27,23 @@ class PendingFocus:
 
 
 @dataclass
+class PendingIdentity:
+    """Rozpracované určení PODMĚTU výroku — čekáme na volbu identity (#43).
+
+    „Emil bydlel v Brně." při známé osobě „Emil Filla": výrok se nepřipisuje
+    mlčky, nabídka čeká na volbu. Atributy:
+        text (str): Původní výrok (deník ukládá jeho rozklad).
+        statement (dict): Rozložený výrok (bez potvrzeného podmětu).
+        options (list[tuple[str, str]]): (popisek volby, id podmětu).
+        card (str): Jméno pattern-karty, která dialog vyvolala.
+    """
+    text: str
+    statement: dict
+    options: list
+    card: str
+
+
+@dataclass
 class FocusState:
     """Stav automatu mezi tahy: rozpracovaný dialog + historie tahů."""
     pending: PendingFocus = None

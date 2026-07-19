@@ -1,8 +1,8 @@
 # BACKLOG — otevřené body (živý dokument)
 
 > Aktualizuj při každém uzavření/přidání bodu. Stav ke commitu: viz git log.
-> Metriky teď (2026-07-19 večer): **483 testů, etalon 29/29 (3 gap-fixed /
-> 5 gap), focus 12/12, dialog 25/25 (12 scénářů), ZÁPIS 29/29 (12 gap-fixed
+> Metriky teď (2026-07-19 noc): **491 testů, etalon 29/29 (3 gap-fixed /
+> 5 gap), focus 12/12, dialog 27/27 (13 scénářů), ZÁPIS 29/29 (12 gap-fixed
 > / 0 — řádek #35 jen s `--nom`) — jádra 100 %.**
 >
 > **➡️ PŘEDÁNÍ PRÁCE: čti nejdřív `docs/HANDOVER.md`** — zákony projektu,
@@ -86,7 +86,7 @@ lematika** (dialog 2026-07-19). NEdělat teď (tamtéž): #19 hybridní aktivace
 
 | # | Oblast | Bod | Poznámka | Priorita |
 |---|--------|-----|----------|----------|
-| 43 | Mnemos/Iris | **Identita podmětu bez potvrzení** — „Emil bydlel v Brně." se na ostrém grafu připíše korpusovému „Emil Filla" (rozřešení `_statement_subject` bere první person uzel, na který jde jméno rozřešit). Nové jméno ≠ korpusová osoba; zákon „dialog > figly" žádá potvrzení kartou (clarify-identity: „Myslíš malíře Emila Fillu, nebo nového Emila?"). | Nález E2E z 2026-07-19; souvisí #8 (jméno není entita) a #33 (typy za běhu). | 3 |
+| 43 | Mnemos/Iris | ✅ **HOTOVO** (2026-07-19): **clarify-identity** — jméno rozřešené na osobu grafu jen ČÁSTEČNĚ („Emil"→„Emil Filla") se nepřipisuje mlčky: karta `clarify-identity` (event `statement.subject`, rys `inexact_person`) nabídne existující osobu i založení nové. Volba jménem / „ano" (první) / slovo z `new_person_words` (nová osoba); otazník ruší. Mechanismus: `PendingIdentity` ve stavu, `_subject_or_clarify` sdílený oběma cestami zápisu, `_resume_identity` před `_resume_pick`. Přesná shoda a elidovaný podmět (kontext) se nedoptávají — scénář „ano, měl rád knedlíky" nezměněn. E2E přes GUI inbox ✓; scénář identita-podmetu v dialog benchmarku. | Bez karty platí původní chování (rozhodnutí nese karta). Souvisí #8, #33. | ✓ |
 | 36 | Viz / infra | **Zabalit font lokálně** do `viewbase/static` — troika-three-text tahá glyfy z `cdn.jsdelivr.net` (unicode-font-resolver) přes `fetch()`; za striktní CSP (`connect-src 'self'`) jsou titulky uzlů neviditelné. Self-host = žádná externí závislost ani nutnost povolovat CDN (důležité pro air-gapped/offline). | Předgenerovat/uložit font(y) do static a resolver přesměrovat na lokální cestu; pak CSP nechat přísnou. | 3 |
 
 ## Hotovo (archiv — detaily v git logu)

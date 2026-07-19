@@ -40,7 +40,7 @@ from jellyai.iris.subsystems.mnemos import (forget, forget_entity,
                                             persist, remember, replay)
 from jellyai.iris.patterns import PatternDeck
 from jellyai.iris.presenter import activation_window, docs_window
-from jellyai.iris.state import FocusState, PendingFocus
+from jellyai.iris.state import FocusState, PendingFocus, PendingIdentity
 from jellyai.lang import current
 
 _PICK_WARMTH = 2.0        # jas vybraného kandidáta (volba = silné zaostření)
@@ -176,6 +176,11 @@ class IrisAutomaton:
             self.state.remember(text, response)
             return response
         used_patterns = []
+        # VOLBA IDENTITY podmětu rozpracovaného výroku (#43) má přednost —
+        # PendingIdentity není otázka k přehrání, ale výrok k dopsání
+        identity = self._resume_identity(text)
+        if identity is not None:
+            return identity
         pick = self._resume_pick(text)
         if pick is not None:
             chosen, text = pick
@@ -240,12 +245,9 @@ class IrisAutomaton:
             statement = parse_statement(text, self.clock(), self.deck,
                                         is_node=self._known_word)
             if statement is not None and statement.get("needs_subject"):
-                subject, rest = self._statement_subject(statement["objects"], statement.get("places", ()))
-                if subject is None:
-                    statement = None     # není komu připsat → nepřipisovat
-                else:
-                    statement["subject"] = subject
-                    statement["objects"] = rest
+                statement = self._subject_or_clarify(text, statement)
+                if isinstance(statement, IrisResponse):
+                    return statement     # dialog o identitě podmětu (#43)
             if statement is not None:
                 return self._memorize(text, statement)
         # VZPOMÍNÁNÍ („Co jsem ti řekl včera?") — Chronos filtr nad
@@ -527,12 +529,9 @@ class IrisAutomaton:
         statement = parse_statement(remainder, self.clock(), self.deck,
                                     is_node=self._known_word)
         if statement is not None and statement.get("needs_subject"):
-            subject, others = self._statement_subject(statement["objects"], statement.get("places", ()))
-            if subject is None:
-                statement = None
-            else:
-                statement["subject"] = subject
-                statement["objects"] = others
+            statement = self._subject_or_clarify(text, statement)
+            if isinstance(statement, IrisResponse):
+                return statement         # dialog o identitě podmětu (#43)
         if statement is None:
             card = self.deck.best("memory.note", {})
             if card is None:
@@ -895,18 +894,95 @@ class IrisAutomaton:
                 node = self.answerer._resolve_topic(span.split(), warm=False)  # pylint: disable=protected-access
                 found = self.answerer.graph.nodes.get(node)
                 if found is not None and found.type == "person":
-                    return node, objects[:i] + objects[i + size:]
+                    return node, objects[:i] + objects[i + size:], span
         places = set(places)
         for i, obj in enumerate(objects):     # explicitní nové jméno > kontext
             if (obj not in places and obj[:1].isupper()
                     and obj.replace("-", "").isalpha() and len(obj) > 1
                     and self.answerer.graph.nodes.get(obj) is None):
-                return obj, objects[:i] + objects[i + 1:]
+                return obj, objects[:i] + objects[i + 1:], obj
         for candidate in self.answerer._context_candidates():  # pylint: disable=protected-access
             node = self.answerer.graph.nodes.get(candidate)
             if node is not None and node.type == "person":
-                return candidate, objects
-        return None, objects
+                return candidate, objects, None
+        return None, objects, None
+
+    def _subject_or_clarify(self, text, statement):
+        """Doplní výroku podmět, NEBO otevře dialog o identitě (#43).
+
+        Jméno, které se na osobu grafu rozřeší jen ČÁSTEČNĚ („Emil" →
+        „Emil Filla"), se nepřipisuje mlčky — zákon dialog > figly: karta
+        clarify-identity nabídne existující osobu i založení nové. Přesná
+        shoda ani elidovaný podmět (kontext) se nedoptávají.
+
+        Returns:
+            IrisResponse | dict | None: Dialogová nabídka, NEBO výrok
+            s podmětem, NEBO None (není komu připsat).
+        """
+        subject, rest, span = self._statement_subject(
+            statement["objects"], statement.get("places", ()))
+        if subject is None:
+            return None
+        statement = dict(statement, subject=subject, objects=rest)
+        if span is None or subject == span:
+            return statement
+        card = self.deck.best("statement.subject",
+                              {"features": {"inexact_person"}})
+        if card is None:
+            return statement           # bez karty platí původní chování
+        label_new = f"nový {span}"
+        prompt = card.dialog.format(candidates=f"{subject}, {label_new}",
+                                    term=span)
+        self.answerer.context.warm(subject,
+                                   card.action.get("warm_candidates", 0.0))
+        self.state.pending = PendingIdentity(
+            text=text, statement=statement,
+            options=[(subject, subject), (label_new, span)], card=card.name)
+        response = IrisResponse(
+            text=prompt, kind="dialog", assurance=0.5,
+            activation_window=activation_window(self.answerer),
+            docs_window=docs_window(self.answerer),
+            used=self._used([card.name]),
+            clarify={"prompt": prompt, "candidates": [subject, label_new]})
+        self.state.remember(text, response)
+        return response
+
+    def _resume_identity(self, text):
+        """Rozpozná volbu identity podmětu z rozpracované nabídky (#43).
+
+        Volba jménem (průnik slov), „ano" = první nabídnutý, slovo z tabulky
+        `new_person_words` = založit novou osobu se jménem z výroku. Otazník
+        i nerozpoznaný text nabídku ruší (jde o nové téma). Remíza průniku
+        („Emil" sedí na obojí) drží existující osobu — první možnost.
+
+        Returns:
+            IrisResponse | None: Potvrzení zápisu, nebo None (jiný vstup).
+        """
+        pending = self.state.pending
+        if not isinstance(pending, PendingIdentity):
+            return None
+        self.state.pending = None          # nabídka je jednorázová
+        if "?" in text:
+            return None
+        words = {deaccent(w.lower()) for w in re.findall(r"[\w.]+", text)}
+        if not words:
+            return None
+        chosen = None
+        if words & set(current().get("new_person_words", ())):
+            chosen = pending.options[-1]
+        elif words <= {"ano", "jo", "yes"}:
+            chosen = pending.options[0]
+        else:
+            overlaps = [(len(words & {deaccent(w.lower())
+                                      for w in label.split()}),
+                         (label, subj)) for label, subj in pending.options]
+            best = max(overlaps, key=lambda o: o[0])
+            chosen = best[1] if best[0] > 0 else None
+        if chosen is None:
+            return None                    # nové téma — nabídka končí
+        statement = dict(pending.statement, subject=chosen[1])
+        self.answerer.context.warm(chosen[1], _PICK_WARMTH)
+        return self._memorize(pending.text, statement)
 
     def _known_word(self, token):
         """DOSLOVNÉ slovo uzlu grafu? Veto pro detekci slovesa v Mnemos:

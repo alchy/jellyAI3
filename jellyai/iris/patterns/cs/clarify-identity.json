@@ -1,0 +1,8 @@
+{
+  "name": "clarify-identity",
+  "trigger": {"event": "statement.subject", "priority": 5,
+              "requires": ["inexact_person"]},
+  "dialog": "Koho myslíš „{term}“ — {candidates}? Odpověz jménem, „ano“ pro první možnost, „nový“ založí novou osobu.",
+  "action": {"await": "user-pick", "warm_candidates": 0.5},
+  "teach": "Výrok o osobě, jejíž jméno se na osobu grafu rozřeší jen částečně (Emil → malíř Emil Filla): fakt se nepřipisuje mlčky — zákon dialog > figly. Nabídka drží existující osobu jako první volbu („ano“), slovo z tabulky new_person_words založí novou osobu se jménem z výroku. Otazník nebo nerozpoznaný text nabídku ruší a jde jako nové téma. Přesná shoda jména ani elidovaný podmět z kontextu se nedoptávají."
+}
