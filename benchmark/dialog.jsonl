@@ -16,3 +16,4 @@
 {"name": "co-dela-cinnost", "turns": [{"u": "Jindra uklízí v Počernicích.", "expect": ["Zapamatováno", "uklízí"]}, {"u": "Co dělá Jindra?", "expect": ["uklízí"], "kind": "answer"}]}
 {"name": "souveti-multi-memorize", "turns": [{"u": "Roník jí i vegetariánskou stravu, má však rád i maso.", "expect": ["Zapamatováno", "jí", "má", "maso"]}, {"u": "Co má Roník?", "expect": ["maso"], "kind": "answer"}]}
 {"name": "posli-mail-adresat", "turns": [{"u": "Marcela má email marcela.duffkova@seznam.cz.", "expect": ["Zapamatováno"]}, {"u": "Pošli zítra mail Marci, že ji pozdravuji.", "expect": ["Pošlu Marci"], "reject": ["Neznám e-mail", "zitra"]}]}
+{"name": "meta-fokus", "turns": [{"u": "O kom mluvíme?", "kind": "answer", "expect": ["začíná"]}, {"u": "Kdo napsal R.U.R.?", "kind": "answer", "expect": ["Karel"]}, {"u": "O kom mluvíme?", "kind": "answer", "expect": ["Mluvíme o", "Čapek"]}]}

@@ -1,0 +1,9 @@
+{
+  "name": "meta-focus-empty",
+  "trigger": {
+    "event": "focus.query",
+    "priority": 4
+  },
+  "dialog": "Zatím o ničem — rozhovor teprve začíná. Polož mi otázku.",
+  "teach": "META-otázka na stav rozhovoru BEZ zahřátého těžiště (čerstvá session): poctivá odpověď místo „nenašel“ — uživatel se ptá na stav dialogu, ne na graf."
+}

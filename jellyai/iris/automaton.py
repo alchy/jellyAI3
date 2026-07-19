@@ -289,6 +289,11 @@ class IrisAutomaton:
                     statements.append(statement)
             if statements:
                 return self._memorize(text, statements)
+        # META: stav rozhovoru („O kom mluvíme?") — introspekce těžiště,
+        # odpověď zná automat sám (nález z živého dialogu 2026-07-20)
+        focus_state = self._focus_query(text)
+        if focus_state is not None:
+            return focus_state
         # VZPOMÍNÁNÍ („Co jsem ti řekl včera?") — Chronos filtr nad
         # timestampy Mnemos; fráze z tabulky, texty karty memory.recall
         recalled = self._recall_query(text)
@@ -396,6 +401,32 @@ class IrisAutomaton:
                     card.dialog.format(task=item["task"]) if card
                     else item["task"], recipient=item.get("recipient"))
                 for item in due]
+
+    def _focus_query(self, text):
+        """META-otázka na stav rozhovoru („O kom mluvíme?") — introspekce
+        KONVERZAČNÍHO TĚŽIŠTĚ: odpovědí je nejteplejší uzel aktivace,
+        graf se nedotkne (automat odpovídá sám o sobě, jistota plná).
+        Fráze nese tabulka `focus_query_phrases`, texty karty focus.query.
+
+        Returns:
+            IrisResponse | None: Stav těžiště, nebo None (není meta-otázka).
+        """
+        low = deaccent(text.lower())
+        if not any(p in low for p in current().get("focus_query_phrases", ())):
+            return None
+        hottest = self.answerer.context.hottest()
+        card = self.deck.best("focus.query",
+                              {"candidates": [hottest] if hottest else []})
+        if card is None:
+            return None
+        message = card.dialog.format(topic=hottest or "")
+        response = IrisResponse(
+            text=message, kind="answer", assurance=1.0,
+            activation_window=activation_window(self.answerer),
+            docs_window=docs_window(self.answerer),
+            used={"components": ["iris"], "patterns": [card.name]})
+        self.state.remember(text, response)
+        return response
 
     def _recall_query(self, text):
         """„Co jsem ti řekl (včera / dnes / minulý týden)?" — výpis toho,

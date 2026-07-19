@@ -1,0 +1,10 @@
+{
+  "name": "meta-focus",
+  "trigger": {
+    "event": "focus.query",
+    "priority": 5,
+    "min_candidates": 1
+  },
+  "dialog": "Mluvíme o: {topic}.",
+  "teach": "META-otázka na stav rozhovoru („O kom mluvíme?“, nález z živého dialogu 2026-07-20): odpověď zná automat SÁM — nejteplejší uzel konverzačního těžiště; graf se nedotkne, jistota je plná (introspekce). Fráze nese tabulka focus_query_phrases."
+}
