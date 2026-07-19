@@ -471,6 +471,8 @@ def _build_parser():
     p_graph = sub.add_parser("graph", parents=[common], help="postaví faktový graf z anotací")
     p_graph.add_argument("--view", action="store_true", help="export do viewBase")
     sub.add_parser("web", parents=[common], help="webová vizualizace grafu + prompt (viewBase)")
+    sub.add_parser("triage", parents=[common],
+                   help="shluky tahů s miss/nízkou assurance (stopa #38)")
     p_ask = sub.add_parser("ask", parents=[common], help="odpoví na jeden dotaz")
     p_ask.add_argument("question", help="otázka v češtině")
     p_explain = sub.add_parser("explain", parents=[common], help="popíše blok")
@@ -525,6 +527,9 @@ def main(argv=None):  # pylint: disable=too-many-branches
         cmd_graph(config, view=args.view)
     elif args.command == "web":
         cmd_web(config)
+    elif args.command == "triage":
+        from jellyai.iris.triage import load_rows, report
+        print(report(load_rows(config.graph.telemetry_path)))
     elif args.command == "ask":
         print(cmd_ask(config, args.question))
     elif args.command == "explain":

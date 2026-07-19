@@ -75,7 +75,8 @@ def serve(host, port, routes, gets=None):
 
 
 def parse_args():
-    """Rozparsuje společné argumenty služby (--port, --model, --host).
+    """Rozparsuje společné argumenty služby (--port, --model, --host,
+    --telemetry — cesta stopy tahů #38; „off" vypne, default z configu).
 
     Returns:
         argparse.Namespace: Argumenty.
@@ -84,4 +85,6 @@ def parse_args():
     parser.add_argument("--port", type=int, required=True)
     parser.add_argument("--model", required=True)
     parser.add_argument("--host", default="127.0.0.1")
+    parser.add_argument("--telemetry", default=None,
+                        help="stopa tahů JSONL (off = bez stopy)")
     return parser.parse_args()

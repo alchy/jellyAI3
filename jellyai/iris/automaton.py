@@ -100,7 +100,7 @@ class IrisAutomaton:
     """Stavový automat zaostření nad jedním answererem (jedna konverzace)."""
 
     def __init__(self, answerer, deck=None, clock=None, memory_path=None,
-                 reminders_path=None):
+                 reminders_path=None, telemetry_path=None):
         """Vytvoří automat.
 
         ZÁKON: žádné prahy ani rozhodnutí v kódu — kdy se vede dialog a kdy
@@ -118,6 +118,9 @@ class IrisAutomaton:
                 None = paměť jen v RAM (testy).
             reminders_path (str | None): Sklad připomínek (JSONL) — KRÁTKODOBÁ
                 paměť Chronos: připomínka po odpálení mizí; None = jen RAM.
+            telemetry_path (str | None): Stopa tahů pro triage (#38, JSONL:
+                otázka → karty → odpověď + assurance); None = bez stopy
+                (benchmarky a testy provoz neznečišťují).
         """
         self.answerer = answerer
         if hasattr(answerer, "clock"):
@@ -130,6 +133,7 @@ class IrisAutomaton:
         self.deck = deck
         self.clock = clock or datetime.now
         self.memory_path = memory_path
+        self.telemetry_path = telemetry_path
         self.state = FocusState()
         self._words = None       # cache doslovných slov uzlů (veto sloves)
         self.telemetry = {}      # jméno karty → {"used", "gain"} (měřený zisk)
@@ -160,10 +164,32 @@ class IrisAutomaton:
             IrisResponse: Odpověď nebo dialogové doostření + metadata.
         """
         fired = self.fire_due()
+        if self.telemetry_path:
+            # tah bez dotazu (konstatování) nesmí zdědit kartu minulé otázky
+            setattr(self.answerer, "last_query_card", None)
         response = self._turn(text, temperature=temperature)
         if fired:
             response.text = "\n".join(fired + [response.text])
+        if self.telemetry_path:
+            self._trace_turn(text, response)   # stopa pro triage (#38)
         return response
+
+    def _trace_turn(self, text, response):
+        """Stopa tahu do JSONL (#38): otázka → karty → odpověď + assurance.
+        Provoz tak plní etalony průběžně — `./jelly triage` shlukuje missy."""
+        trace = response.trace if isinstance(response.trace, dict) else {}
+        patterns = list(response.used.get("patterns", []))
+        query_card = getattr(self.answerer, "last_query_card", None)
+        if query_card and query_card not in patterns:
+            patterns.insert(0, query_card)   # vzorová karta dotazu do stopy
+        row = {"ts": self.clock().isoformat(timespec="seconds"),
+               "q": text, "kind": response.kind, "answer": response.text,
+               "assurance": round(response.assurance, 3),
+               "components": response.used.get("components", []),
+               "patterns": patterns,
+               "topic": trace.get("topic"), "predicate": trace.get("predicate")}
+        with open(self.telemetry_path, "a", encoding="utf-8") as fh:
+            fh.write(json.dumps(row, ensure_ascii=False) + "\n")
 
     def _turn(self, text, temperature=0.0):
         """Vlastní tah (bez odpalu připomínek — replay/focus-shift rekurze)."""

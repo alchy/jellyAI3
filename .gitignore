@@ -12,3 +12,4 @@ model/udpipe*
 .pytest_cache/
 data/reminders.jsonl
 data/web_inbox.txt
+data/telemetry.jsonl

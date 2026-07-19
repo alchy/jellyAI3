@@ -89,6 +89,7 @@
                         "prsi": "prší", "snezi": "sněží"},
   "negation_prefix": "ne",
   "negative_existence_answer": "Ne, od {time} {predicate}.",
+  "miss_markers": ["nenašel", "nepodařilo se mi zaostřit", "neznám"],
   "reminder_phrases": ["pripomen mi", "pripomen mne", "upozorni me",
                        "pripomenes mi", "pripominka"],
   "send_phrases": ["posli", "poslete", "odesli"],

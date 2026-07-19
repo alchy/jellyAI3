@@ -197,9 +197,13 @@ def main():
     answerer = make_graph_answerer(config)
     deck = PatternDeck.for_language(config.graph.language)
     deck.load()
+    telemetry = args.telemetry or config.graph.telemetry_path
+    if telemetry == "off":
+        telemetry = None       # testy/izolované běhy provoz neznečišťují
     automaton = IrisAutomaton(answerer, deck,   # prahy nesou karty (ZÁKON)
                               memory_path=config.graph.memory_path,
-                              reminders_path=config.graph.reminders_path)
+                              reminders_path=config.graph.reminders_path,
+                              telemetry_path=telemetry)
 
     channels = _channels(config)
 

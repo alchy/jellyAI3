@@ -104,6 +104,7 @@ class GraphAnswerer(Answerer):
         self.spread_falloff = spread_falloff
         self.last_trace = None   # trasa poslední odpovědi (téma → fakt → hodnota)
         self.last_pattern = None  # poslední vykonaný pseudo-QL Pattern (API)
+        self.last_query_card = None  # vzorová karta tahu (telemetrie #38)
         self.last_resolution = None  # evidence rozlišení (vstup QueryAssurance)
         self.last_overflow = []  # oblasti (theme) přetékajícího výčtu
         self._prev_trace = None  # trasa PŘEDCHOZÍHO tahu (drill „Kdy?")
@@ -965,11 +966,13 @@ class GraphAnswerer(Answerer):
         # VÝHRADNĚ šablony (vzorové karty + pseudo-QL) — řez #14: dotazová
         # strana UDPipe nevolá; šablony nic → nehádat, poctivé „nenašel"
         qa, pat = None, None
+        self.last_query_card = None   # vzorová karta tahu (telemetrie #38)
         query = build_query(question, self._predicates, self._span_is_node,
                             self._node_word, self._is_area)
         if query is not None:
             qa, pat = query, query.pattern
             self.place_filter = getattr(query, "place", None)
+            self.last_query_card = query.card
         if qa is None:
             qa, pat = Query(), Pattern()
         self.last_pattern = pat

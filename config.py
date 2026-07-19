@@ -157,6 +157,8 @@ class GraphConfig:
         spread_falloff (float): Útlum vyzařování na skok (jas × falloff^dist).
         memory_path (str): Deník paměti Mnemos (JSONL) — konstatování
             uživatele; přežívá restart služby i přestavbu grafu.
+        telemetry_path (str): Stopa tahů pro triage (#38, JSONL) —
+            otázka → karty → odpověď + assurance; čte `./jelly triage`.
     """
     graph_path: str = "data/graph.pkl"
     context_decay: float = 0.8
@@ -165,6 +167,7 @@ class GraphConfig:
     spread_falloff: float = 0.35
     memory_path: str = "data/memory.jsonl"
     reminders_path: str = "data/reminders.jsonl"
+    telemetry_path: str = "data/telemetry.jsonl"
 
 
 @dataclass

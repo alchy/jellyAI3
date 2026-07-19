@@ -48,6 +48,7 @@ class Query:
     topic_terms: list = field(default_factory=list)
     gender: str = None
     place: str = None      # oblast otázky („v Čechách") — filtr Topos
+    card: str = None       # jméno vítězné vzorové karty (telemetrie #38)
 
 
 def _known_words(known):
@@ -290,7 +291,8 @@ def _card_query(question, predicates, is_node=None, is_word=None):
     return Query(pattern=pattern, qtype=qtype, verb_lemma=pattern.predicate,
                  is_copula=cop is not None,
                  gender=_verb_gender(surface(gender_tok))
-                 if gender_tok is not None else None)
+                 if gender_tok is not None else None,
+                 card=card.name)
 
 
 def build_query(question, predicates, is_node=None, is_word=None,

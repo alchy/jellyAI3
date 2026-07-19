@@ -114,7 +114,8 @@ def test_service_subprocess_answers_over_http(tmp_path):
     model = _brothers_graph().save(str(tmp_path / "graph.pkl"))
     port = _free_port()
     proc = subprocess.Popen([sys.executable, "services/iris_service.py",
-                             "--port", str(port), "--model", model])
+                             "--port", str(port), "--model", model,
+                             "--telemetry", "off"])
     try:
         _wait_health(port, proc)
         data = json.dumps({"question": "Kdo napsal R.U.R.?"}).encode("utf-8")
