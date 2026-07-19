@@ -126,3 +126,24 @@ def test_service_subprocess_answers_over_http(tmp_path):
         assert "Karel" in out["answer"]
     finally:
         proc.terminate()
+
+
+def test_version_route_reports_sha_and_start():
+    """#40 verzovací handshake: /version nese git SHA a čas startu —
+    web při připojení pozná, na jakou instanci mluví."""
+    _, gets = _routes()
+    out = gets["/version"]()
+    assert out["sha"] and out["started"]
+
+
+def test_version_warning_only_on_real_mismatch():
+    """Křičí se jen při skutečné neshodě dvou známých verzí — „unknown"
+    (mimo git, např. nasazený tarball) poctivě nesoudí."""
+    from jellyai.iris.client import version_warning
+
+    assert version_warning("abc1234", "abc1234") is None
+    assert version_warning("unknown", "abc1234") is None
+    assert version_warning("abc1234", "unknown") is None
+    warning = version_warning("abc1234", "def5678")
+    assert warning is not None
+    assert "abc1234" in warning and "def5678" in warning

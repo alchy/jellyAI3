@@ -103,8 +103,18 @@ def make_routes(automaton, deck):
                 "patterns": [{"name": card.name, "teach": card.teach}
                              for card in deck.cards]}
 
+    from datetime import datetime
+    from jellyai.buildinfo import git_sha
+    started = datetime.now().isoformat(timespec="seconds")
+    sha = git_sha()
+
+    def version():
+        """`/version` → git SHA + čas startu (verzovací handshake, #40):
+        web při připojení pozná, jestli mluví na aktuální build."""
+        return {"sha": sha, "started": started}
+
     posts = {"/query": query, "/graphql": graphql, "/reset": reset}
-    gets = {"/schema": schema}
+    gets = {"/schema": schema, "/version": version}
     return posts, gets
 
 
@@ -182,6 +192,8 @@ def main():
     from jellyai.tasks import make_graph_answerer
     config = Config()
     config.graph.graph_path = args.model     # --model = uložený faktový graf
+    from jellyai.buildinfo import git_sha
+    print(f"[iris] build {git_sha()} — model {args.model}", flush=True)
     answerer = make_graph_answerer(config)
     deck = PatternDeck.for_language(config.graph.language)
     deck.load()
