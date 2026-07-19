@@ -181,10 +181,12 @@ doporučil user — ilustrace, ne zadání):
   benchmark ukáže, kolik pořadí reálně žije; permutační magie do vzorů
   nepatří (§7).
 
-## 9. Vztah k jellyV4
+## 9. Vztah k návrhu jellyV4
 
-Toto JE brána [1] z `docs/proposed-architecture/jellyV4.md`, stavěná
-inkrementálně uvnitř V3: lexer = jádro brány (zatím bez ÚFAL kontextu),
-vzorové karty = interpret [2] nad typovanými tokeny. Kdyby V4 přestavba
-přišla, obě vrstvy přežijí beze změny záměru; kdyby nepřišla, V3 z nich
-má užitek okamžitě.
+Toto JE „jediná lingvistická brána" z návrhu jellyV4 (2026-07-19),
+stavěná inkrementálně uvnitř V3: lexer = jádro brány (zatím bez ÚFAL
+kontextu), vzorové karty = interpret nad typovanými tokeny. Samotný
+V4 dokument byl rozpuštěn do BACKLOGu (2026-07-20): brána → #46/#32,
+event log + projekce → #47, observable graf → #48, model-worker → #49,
+řídká matice → #50. Kdyby přestavba přišla, obě vrstvy přežijí beze
+změny záměru; kdyby nepřišla, V3 z nich má užitek okamžitě.
