@@ -38,6 +38,7 @@
 | 2 | Hygiena dat | **Zbytek**: uzel „mle" (NOUN mangle — lemma↔form konzistence), kapitalizované slovesné predikáty (Chvalte), „dovoleno" v pred/attr. | Vzor: hlasování v hygiene.py. | 12 |
 | 15 | Coverage | Anaforický kbelík (~2 100 vět se zájmenným podmětem). | — | 13 |
 | 16 | Etalon gapy | BN copula-profese; Kolik dětí (→ #11); Kde působila; „Jaka babicka?". | Průběžně s příslušnými body. | 14 |
+| 52 | Answerer | **„Co dělá X?" rozlévá výčet přes uzel uživatele** (nález z produkce 2026-07-19): `_event_answer` depth-1 jde i přes theme=uživatel → k činnosti Jindry přibalí VŠECHNY zápisy paměti (jmenuje/bydlet/email). Správná odpověď je první, ale výčet je šum. | Guard: agregace událostí nesmí skákat přes uzel uživatele (pozorovatel není spojka) — obdoba guardu „pozorovatel není odpověď" z #44. | 5 |
 | 17 | Infra | Konsolidace `data/` (mapa statické × uživatelské znalosti) + README sekce. | Malý úklid. | 15 |
 | 21 | Infra | viewBase python testy: chybí httpx2 (6 souborů nekolektuje). | Doinstalovat/upravit testclient. | 16 |
 | 19 | Experiment | Hybridní aktivace uzel × hrana. | Metrika → prototyp za flagem. | 17 |
