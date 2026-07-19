@@ -216,8 +216,13 @@ def parse_statement(text, now, deck=None, is_node=None):
     # a TÁZACÍCH slov (vztažné „co" ve vsuvce „To co X jí…" není účastník)
     skip = {"prvni_osoba", "spona", "funkcni", "potvrzeni", "cas", "castice",
             "otaz"}
+    # KONCOVÁ spona neexistuje (spec §5, homograf „byt"≡„být" po deakcentaci):
+    # spona stojí uprostřed věty — má-li výrok predikát ze VZORU („V Plzni
+    # MÁ pronajatý byt."), je závěrečný spona-tvar podstatné jméno, účastník
+    final_homograph = (tagged[-1] if tagged and source == "pattern"
+                       and "spona" in tagged[-1].classes else None)
     objects = [t.form for t in tagged
-               if not (skip & t.classes)
+               if (not (skip & t.classes) or t is final_homograph)
                # l-příčestí je uvnitř věty malými; KAPITALIZOVANÝ tvar, který
                # po ořezu vypadá jako l-tvar („Karla", „Emil"), je jméno a
                # z objektů vypadnout nesmí (výrok by se ztratil / přišel o podmět)

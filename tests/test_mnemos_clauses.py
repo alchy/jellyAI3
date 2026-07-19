@@ -60,6 +60,29 @@ def test_vsuvka_definition_parses_clean():
     assert parses[0]["objects"] == ["Roník", "strava"]
 
 
+def test_final_copula_homograph_stays_participant():
+    """Gap #45 byt≡být: „V Plzni má pronajatý byt." — koncové „byt"
+    sponou být nemůže (spona stojí UPROSTŘED, spec §5); s predikátem
+    ze vzoru (má) je to účastník a místo drží roli loc."""
+    from jellyai.iris.subsystems.mnemos import parse_statement
+
+    p = parse_statement("V Plzni má pronajatý byt.", NOW, None)
+    assert p is not None and p["kind"] == "event"
+    assert p["predicate"] == "má"
+    assert "byt" in p["objects"] and "má" not in p["objects"]
+    assert p["places"] == ["Plzni"]
+
+
+def test_medial_copula_still_dropped_from_objects():
+    """Pravidlo je POZIČNÍ: spona uprostřed („Niki je však většinou
+    v Plzni.") účastníkem nezůstává — observation drží."""
+    from jellyai.iris.subsystems.mnemos import parse_statement
+
+    p = parse_statement("Niki je však většinou v Plzni.", NOW, None)
+    assert p is not None and p["kind"] == "observation"
+    assert "je" not in p["objects"]
+
+
 def test_multi_memorize_stores_both_clauses():
     """Automat uloží OBA fakty souvětí, potvrzení je vyjmenuje a druhá
     klauzule je dotazatelná („Co má Roník?" → maso)."""

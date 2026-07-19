@@ -4,6 +4,7 @@
     "event": "utterance.statement",
     "priority": 8,
     "pattern": [
+      "?%{FUNKCNI}",
       "?%{JMENO}",
       "%{KRATKE_SLOVESO}",
       "%{ZBYTEK}"
@@ -13,8 +14,8 @@
   "action": {
     "memorize": "event",
     "predicate_from": "pattern",
-    "predicate_slot": "$2",
+    "predicate_slot": "$3",
     "time_granularity": "moment"
   },
-  "teach": "Dějový výrok s KRÁTKÝM slovesem („Roník jí granule.“, „…má však rád i maso.“): dvojznakové tvary (jí, sní, má) délkový guard prézentu nepustí a plochý rys je nevidí — pozná je jen STAVBA VĚTY: vzor [jméno?, katalogové sloveso, zbytek]. Katalog se rozšiřuje literálem na kartě, ne pravidlem (poučení #32/#45). Predikát je slot vzoru, účastníci projdou běžným filtrem."
+  "teach": "Dějový výrok s KRÁTKÝM slovesem („Roník jí granule.“, „V Plzni má pronajatý byt.“, „…má však rád i maso.“): dvojznakové tvary (jí, sní, má) délkový guard prézentu nepustí a plochý rys je nevidí — pozná je jen STAVBA VĚTY: vzor [předložka?, jméno?, katalogové sloveso, zbytek]. Katalog se rozšiřuje literálem na kartě, ne pravidlem (poučení #32/#45). Predikát je slot vzoru, účastníci projdou běžným filtrem; koncový spona-homograf („byt“) je s predikátem ze vzoru účastník — spona stojí uprostřed (spec §5)."
 }
