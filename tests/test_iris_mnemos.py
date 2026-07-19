@@ -291,3 +291,63 @@ def test_full_dumpling_scenario_via_iris():
     out = iris.turn("Kdy jsem měl v tomto roce knedlíky?")
     assert out.kind == "answer"
     assert "17. července 2026" in out.text
+
+
+def test_l_name_before_participle_is_not_predicate():
+    """#31: „Emil bydlel v Brně." — jméno na začátku věty vypadá po ořezu
+    jako l-tvar; predikátem má být skutečné příčestí (malými písmeny),
+    jméno musí ZŮSTAT v objektech (jinak nejde rozřešit podmět)."""
+    fact = parse_statement("Emil bydlel v Brně.", NOW)
+    assert fact is not None and fact["kind"] == "attributed"
+    assert fact["predicate"] == "bydlet"        # katalog: bydlel→bydlet
+    assert "Emil" in fact["objects"] and "Brně" in fact["objects"]
+    fact = parse_statement("Karel vařil guláš.", NOW)
+    assert fact["predicate"] == "vařil"
+    assert "Karel" in fact["objects"]
+
+
+def test_feminine_name_after_strip_is_not_predicate():
+    """#31 i ženská jména: „Marcela" po ořezu -a končí na -l."""
+    fact = parse_statement("Marcela bydlela v Petrovicích.", NOW)
+    assert fact["predicate"] == "bydlet"
+    assert "Marcela" in fact["objects"]
+
+
+def test_capitalized_l_lookalike_stays_in_objects():
+    """Nález #37: „Potkal jsem Karla." se ztrácel — „Karla" vypadá jako
+    l-tvar a epizodní karta ho vylučovala z objektů → prázdno → None."""
+    fact = parse_statement("Potkal jsem Karla.", NOW)
+    assert fact is not None and fact["kind"] == "episode"
+    assert fact["predicate"] == "potkal"
+    assert fact["objects"] == ["Karla"]
+
+
+def test_catalog_applies_after_lowercase_choice():
+    """#31+#32: bezdiakritické „bydli" je l-tvar malými → katalog ho zlomí
+    na infinitiv i se jménem před ním."""
+    fact = parse_statement("Karel bydli v Praze.", NOW)
+    assert fact["predicate"] == "bydlet"
+    assert "Karel" in fact["objects"] and "Praze" in fact["objects"]
+
+
+def test_possessive_is_not_attribute_subject():
+    """Nález #37: „Můj email je …" — přivlastňovací zájmeno (kapitalizovaný
+    začátek věty) není jméno subjektu; atribut patří identitě uživatele."""
+    fact = parse_statement("Můj email je jindra@example.com.", NOW)
+    assert fact is not None and fact["kind"] == "attribute"
+    assert fact["subject"] == "uživatel"
+
+
+def test_temporal_modifier_not_in_objects():
+    """Nález #37: „Minulý týden jsem byl v Brně." — modifikátory časových
+    výrazů (minulý/příští/tento) nejsou účastníci děje."""
+    fact = parse_statement("Minulý týden jsem byl v Brně.", NOW)
+    assert fact["objects"] == ["Brně"]
+
+
+def test_bare_weather_verb_is_stored():
+    """Nález #37: „Sněží." — děj bez účastníků se nesmí ztratit; kartový
+    flag allow_no_objects (rozhodnutí v datech, ne v kódu)."""
+    fact = parse_statement("Sněží.", NOW)
+    assert fact is not None and fact["kind"] == "event"
+    assert fact["objects"] == []

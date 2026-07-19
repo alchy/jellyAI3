@@ -162,10 +162,18 @@ def parse_statement(text, now, deck=None, is_node=None):
         return None
     kind = card.action["memorize"]
     source = card.action.get("predicate_from")
+    source_token = None      # povrchový tvar, ze kterého predikát vznikl
     if source == "l_verb":
-        predicate = next((_l_form(t) for t in tokens if _l_form(t)), None)
+        # l-ové příčestí je uvnitř věty MALÝMI písmeny; kapitalizovaný kandidát
+        # („Emil", „Marcela" po ořezu) je zpravidla jméno — predikátem se stává,
+        # jen když jiný l-tvar není („Pršelo v Praze")
+        forms = [(t, _l_form(t)) for t in tokens]
+        source_token, predicate = next(
+            ((t, f) for t, f in forms if f and t[:1].islower()),
+            next(((t, f) for t, f in forms if f), (None, None)))
     elif source == "finite_verb":
         predicate = _finite_verb(tokens, norms, is_node)
+        source_token = predicate
     else:
         predicate = card.action.get("predicate")
     if predicate is None:
@@ -192,7 +200,8 @@ def parse_statement(text, now, deck=None, is_node=None):
         if value is None:
             return None
         stop = (set(lang["first_person"]) | set(lang["copula_forms"])
-                | set(lang["query_skip_words"]) | set(lang["confirmation_words"]))
+                | set(lang["query_skip_words"]) | set(lang["confirmation_words"])
+                | set(lang.get("possessive_words", ())))
         name = next((t for t, n in zip(tokens, norms)
                      if t[:1].isupper() and not EMAIL_RE.fullmatch(t)
                      and n not in stop and len(t) > 1), None)
@@ -201,7 +210,12 @@ def parse_statement(text, now, deck=None, is_node=None):
                 "time": time_label, "card": card.name, "needs_subject": False}
     temporal_words = (set(lang["temporal"].get("day_words", ()))
                       | set(lang["temporal"].get("units", ()))
-                      | set(lang["temporal"].get("now_words", ())))
+                      | set(lang["temporal"].get("now_words", ()))
+                      # modifikátory časových výrazů („MINULÝ týden jsem byl…")
+                      # nejsou účastníci děje — interval už zlomil Chronos
+                      | set(lang["temporal"].get("last_words", ()))
+                      | set(lang["temporal"].get("next_words", ()))
+                      | set(lang["temporal"].get("current_words", ())))
     exclude_l = card.action.get("exclude_l_forms", False)
     objects = [tok for tok, norm in zip(tokens, norms)
                if norm not in lang["first_person"]
@@ -209,10 +223,17 @@ def parse_statement(text, now, deck=None, is_node=None):
                and norm not in lang["query_skip_words"]
                and norm not in lang["confirmation_words"]
                and norm not in temporal_words
-               and not (exclude_l and _l_form(tok) is not None)
-               and tok != predicate            # sloveso není účastník
+               # l-příčestí je uvnitř věty malými; KAPITALIZOVANÝ tvar, který
+               # po ořezu vypadá jako l-tvar („Karla", „Emil"), je jméno a
+               # z objektů vypadnout nesmí (výrok by se ztratil / přišel o podmět)
+               and not (exclude_l and tok[:1].islower()
+                        and _l_form(tok) is not None)
+               # sloveso není účastník — vylučuje se i POVRCHOVÝ zdroj
+               # predikátu („Potkal"→potkal, „bydlel"→bydlet po katalogu)
+               and tok != predicate and tok != source_token
                and len(tok) > 1]
-    if not objects or (kind == "observation" and len(objects) < 2):
+    if (not objects and not card.action.get("allow_no_objects")) \
+            or (kind == "observation" and len(objects) < 2):
         return None
     # MÍSTA (brána E Toposu v dialogu): objekt za předložkou „v/ve/na"
     # je místo — dostane roli loc/geo („Marcela bydlí V PETROVICÍCH"),

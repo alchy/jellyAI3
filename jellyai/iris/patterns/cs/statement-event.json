@@ -5,6 +5,6 @@
               "forbids": ["first_person", "copula", "l_verb"]},
   "dialog": "Zapamatováno: {fact}",
   "action": {"memorize": "event", "predicate_from": "finite_verb",
-             "time_granularity": "moment"},
-  "teach": "Prézentní pozorování (Venku prší): sloveso v přítomném čase bez spony i 1. osoby. Predikátem faktu je slovesný tvar sám (do slovníku parseru se přidá, takže zjišťovací Prší venku? odpoví Ano), uživatel je pozorovatel, Chronos kotví děj na okamžik výroku (den + hodina:minuta), ne jen na den."
+             "time_granularity": "moment", "allow_no_objects": true},
+  "teach": "Prézentní pozorování (Venku prší): sloveso v přítomném čase bez spony i 1. osoby. Predikátem faktu je slovesný tvar sám (do slovníku parseru se přidá, takže zjišťovací Prší venku? odpoví Ano), uživatel je pozorovatel, Chronos kotví děj na okamžik výroku (den + hodina:minuta), ne jen na den. Bezúčastný děj (Sněží.) se ukládá také — účastníky nese sám predikát s časem."
 }

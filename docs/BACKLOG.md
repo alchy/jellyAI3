@@ -1,8 +1,9 @@
 # BACKLOG — otevřené body (živý dokument)
 
 > Aktualizuj při každém uzavření/přidání bodu. Stav ke commitu: viz git log.
-> Metriky teď (2026-07-19): **467 testů, etalon 29/29 (3 gap-fixed / 5 gap),
-> focus 12/12, dialog 21/21, ZÁPIS 29/29 (12 gap) — jádra 100 %.**
+> Metriky teď (2026-07-19 večer): **474 testů, etalon 29/29 (3 gap-fixed /
+> 5 gap), focus 12/12, dialog 21/21, ZÁPIS 29/29 (9 gap-fixed / 3 gap) —
+> jádra 100 %.**
 >
 > **➡️ PŘEDÁNÍ PRÁCE: čti nejdřív `docs/HANDOVER.md`** — zákony projektu,
 > testovací smyčka, implementační tipy ke každému otevřenému bodu, pasti.
@@ -46,19 +47,17 @@ Body, které se za běhu (Mnemos, ne korpus) NEPODAŘILO zlomit. Kořen je spole
 morfologie na IZOLOVANÉM tvaru (mimo větný kontext) je nespolehlivá, a náš
 lehký Mnemos parser (`_l_form`/`_finite_verb`) je na hraně.
 
-**Od 2026-07-19 sekci MĚŘÍ zápisový etalon (#37, `benchmark/run_mnemos.py`)
-— 12 gap řádků.** Baseline navíc odhalil 4 NOVÉ nálezy (gap řádky v sadě):
-„Potkal jsem Karla." se ZTRATÍ (Karla po ořezu vypadá jako l-tvar → epizodní
-karta ho vyloučí z objektů → prázdno → None); „Sněží." se ZTRATÍ (děj bez
-účastníků → None); „Můj email je …" → subjekt „Můj" místo uživatele
-(kapitalizovaný začátek věty se bere jako jméno); „Minulý týden jsem byl
-v Brně." nechává zbytek „Minulý" v objektech (filtr časových slov nezná
-víceslovné výrazy). Plus potvrzeno: #31 platí i pro ženská jména („Marcela"
-po ořezu -a → predikát „marcel").
+**Od 2026-07-19 sekci MĚŘÍ zápisový etalon (#37, `benchmark/run_mnemos.py`).**
+Baseline odhalil 4 NOVÉ nálezy („Potkal jsem Karla." ztráta; „Sněží." ztráta;
+„Můj email" → subjekt „Můj"; „Minulý" v objektech) — **vše opraveno týž den
+spolu s #31** (9 gap řádků GAP-FIXED). Otevřené zůstávají 3 gapy: obecné
+bezdiakritické prézens („Venku prsi." se ztratí, #32), „Už" jako objekt
+negace (#24), nominativ víceslabičných míst (Petrovicích, #35 — měřeno
+`--nom`, délková pojistka).
 
 | # | Oblast | Problém | Co jsme zkusili / proč to nešlo | Priorita |
 |---|--------|---------|--------------------------------|----------|
-| 31 | Mnemos parser | **Jméno končící na -l** (Emil, Karel, Pavel, Michal…) `_l_form` mylně bere jako l-příčestí → stane se PREDIKÁTEM („Emil bydlel"→ predikát „emil"). | `_l_form` „vlastní pravidlo" (samohláska před -l) rozlišilo bydli≠bydlel, ale „bydli" pak nespadlo ani do finite_verb (přítomné koncovky mají „í") → výrok se NEULOŽIL. Vráceno. | **1** |
+| 31 | Mnemos parser | ✅ **VYŘEŠENO** (2026-07-19, měřeno #37): výběr l-predikátu preferuje tvary MALÝMI písmeny (skutečné příčestí; kapitalizovaný kandidát jen když jiný není — „Pršelo v Praze"); kapitalizované l-lookalike tvary („Emil", „Karla", „Marcela") zůstávají v objektech (`exclude_l` jen na malá písmena; vylučuje se povrchový ZDROJ predikátu, ne jen tvar po katalogu). Platí i pro ženská jména (Marcela) a bezdiakritické kombinace („Karel bydli" → bydlet). Netknuto: `_l_form` sám — žádné „vlastní pravidlo" tvaru (poučení respektováno). | 5 gap řádků #37 GAP-FIXED; k tomu nálezy „Potkal jsem Karla" (ztráta), „Minulý" v objektech, „Sněží." (karta allow_no_objects), „Můj email" (possessive_words v cs.json) — vše opraveno a měřeno. | ✓ |
 | 32 | Mnemos sloveso | **Bezdiakritické „bydli"→ořez→„bydl"** (zmršený predikát). | Morpho lemma „bydli"→„bydlet" ✓ (izolovaně!), ale predikát je už „bydl" (morpho „bydl"→„byst" ✗). UDPipe kontext „bydli"→„bydnout" ✗. ŘEŠENO cíleným katalogem `cs.json predicate_catalog` (bydl→bydlet) — jen pro známé tvary, ne obecně. Obecné řešení chybí. | 2 |
 | 33 | Mnemos typy | **Jména jako „pojem", ne „osoba"** (Honza/Pavla). Mnemos při dějovém výroku typuje objekty natvrdo concept (nedělá NER jako korpus s NameTagem). | Zkusili PROPN z UDPipe → nespolehlivé (Honza mis-tagnut jako ADP, Pavla ok). Vráceno. | 2 |
 | 34 | Answerer | **„Kdo bydlí s Karlem?" → uživatel** (theme drift): `theme=uživatel` je na KAŽDÉM faktu 1. osoby → chronicky přehřátý → přebíjí „kdo". | Na čistém memory OK; při nasbírané paměti drift. Souvisí s rankingem (#25) a s tím, že user je theme. | 2 |
@@ -87,6 +86,7 @@ lematika** (dialog 2026-07-19). NEdělat teď (tamtéž): #19 hybridní aktivace
 
 | # | Oblast | Bod | Poznámka | Priorita |
 |---|--------|-----|----------|----------|
+| 43 | Mnemos/Iris | **Identita podmětu bez potvrzení** — „Emil bydlel v Brně." se na ostrém grafu připíše korpusovému „Emil Filla" (rozřešení `_statement_subject` bere první person uzel, na který jde jméno rozřešit). Nové jméno ≠ korpusová osoba; zákon „dialog > figly" žádá potvrzení kartou (clarify-identity: „Myslíš malíře Emila Fillu, nebo nového Emila?"). | Nález E2E z 2026-07-19; souvisí #8 (jméno není entita) a #33 (typy za běhu). | 3 |
 | 36 | Viz / infra | **Zabalit font lokálně** do `viewbase/static` — troika-three-text tahá glyfy z `cdn.jsdelivr.net` (unicode-font-resolver) přes `fetch()`; za striktní CSP (`connect-src 'self'`) jsou titulky uzlů neviditelné. Self-host = žádná externí závislost ani nutnost povolovat CDN (důležité pro air-gapped/offline). | Předgenerovat/uložit font(y) do static a resolver přesměrovat na lokální cestu; pak CSP nechat přísnou. | 3 |
 
 ## Hotovo (archiv — detaily v git logu)

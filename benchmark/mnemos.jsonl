@@ -25,8 +25,8 @@
 {"u": "Pršelo v Praze.", "kind": "attributed", "predicate": "pršel", "objects": ["Praze"], "places": ["Praze"], "time": "17. července 2026", "cat": "minulý-děj"}
 {"u": "Před hodinou pršelo v Brně.", "kind": "attributed", "predicate": "pršel", "objects": ["Brně"], "places": ["Brně"], "time": "17. července 2026", "cat": "minulý-děj-čas"}
 {"u": "Venku prsi.", "kind": "event", "objects": ["Venku"], "cat": "bez-diakritiky", "gap": "#32: bezdiakritické prézens („prsi“) nepadne do finite ani l-tvaru → výrok se ZTRATÍ"}
-{"u": "Karel bydli v Praze.", "kind": "event", "predicate": "bydlet", "objects": ["Karel", "Praze"], "places": ["Praze"], "cat": "bez-diakritiky", "gap": "#31+#32: „Karel“ je první l-tvar → predikát „karel“; katalog bydl→bydlet se nedostane ke slovu"}
-{"u": "Marcela bydli v Petrovicich.", "kind": "event", "predicate": "bydlet", "objects": ["Marcela", "Petrovicich"], "places": ["Petrovicich"], "cat": "bez-diakritiky", "gap": "#31+#32: kombinace — predikát „marcel“"}
+{"u": "Karel bydli v Praze.", "predicate": "bydlet", "objects": ["Karel", "Praze"], "places": ["Praze"], "cat": "bez-diakritiky", "note": "kind záměrně nevynucen: attributed (subjekt dořeší automat ze jména v objektech) i event jsou správně", "gap": "#31+#32: „Karel“ je první l-tvar → predikát „karel“; katalog bydl→bydlet se nedostane ke slovu"}
+{"u": "Marcela bydli v Petrovicich.", "predicate": "bydlet", "objects": ["Marcela", "Petrovicich"], "places": ["Petrovicich"], "cat": "bez-diakritiky", "note": "kind záměrně nevynucen — viz řádek Karel bydli", "gap": "#31+#32: kombinace — predikát „marcel“"}
 {"u": "Bydli v Praze.", "kind": "attributed", "predicate": "bydlet", "objects": ["Praze"], "places": ["Praze"], "cat": "bez-diakritiky", "note": "katalog predicate_catalog (bydl→bydlet) FUNGUJE, když jméno nepředchází"}
 {"u": "Už neprší.", "kind": "event", "predicate": "neprší", "reject_objects": ["Už"], "cat": "negace", "gap": "#24: „Už“ se ukládá jako objekt negovaného děje (deník: neprší (Už))"}
 {"u": "Venku neprší.", "kind": "event", "predicate": "neprší", "objects": ["Venku"], "cat": "negace"}
