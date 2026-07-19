@@ -1,12 +1,11 @@
 # BACKLOG — otevřené body (živý dokument)
 
 > Aktualizuj při každém uzavření/přidání bodu. Stav ke commitu: viz git log.
-> Metriky teď (2026-07-19 noc, po sklizni živého dialogu): **494 testů,
-> etalon 29/29 (3 gap-fixed / 5 gap), focus 12/12, dialog 27/27 (13 scénářů
-> + 2 gap scénáře #44/#45), ZÁPIS 33/33 (11 gap-fixed / 5 gap: #45 ×4 +
-> #35-nom) — jádra 100 %. Opraveno ze živého dialogu: částice
-> občas/většinou/však (particle_words), otázka s tečkou („Kdo je Roník.")
-> nevetuje-tabulkou question_words, vokativ guard („Marcele"→Marcel flip).**
+> Metriky teď (2026-07-19 pozdní noc, po #46 fázi 1+2a): **508 testů,
+> etalon 29/29 (3 gap-fixed / 5 gap), focus 12/12, dialog 27/27 (13 scénářů;
+> GAP scénáře 1 opraveno / 1 otevřeno), ZÁPIS 34/34 (11 gap-fixed / 5 gap)
+> — jádra 100 %. Nové vrstvy: lexer (hypotézové třídy slov), matcher
+> (vzorové karty dotazů — event `utterance.query`).**
 >
 > **➡️ PŘEDÁNÍ PRÁCE: čti nejdřív `docs/HANDOVER.md`** — zákony projektu,
 > testovací smyčka, implementační tipy ke každému otevřenému bodu, pasti.
