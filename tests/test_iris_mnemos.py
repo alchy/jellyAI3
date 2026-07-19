@@ -351,3 +351,50 @@ def test_bare_weather_verb_is_stored():
     fact = parse_statement("Sněží.", NOW)
     assert fact is not None and fact["kind"] == "event"
     assert fact["objects"] == []
+
+
+def test_deaccented_present_verb_is_recognized():
+    """#32: „Venku prsi." (bez diakritiky) — cílený katalog tvarů
+    (finite_verb_forms) výrok rozpozná, predicate_catalog obnoví diakritiku;
+    ŽÁDNÝ univerzální algoritmus (poučení #32)."""
+    fact = parse_statement("Venku prsi.", NOW)
+    assert fact is not None and fact["kind"] == "event"
+    assert fact["predicate"] == "prší"        # katalog: prsi→prší
+    assert fact["objects"] == ["Venku"]
+
+
+def test_particle_is_not_object():
+    """#24 (část): „Už neprší." — částice (už/ještě) není účastník děje;
+    negované sloveso zůstává predikátem s prázdnými objekty."""
+    fact = parse_statement("Už neprší.", NOW)
+    assert fact is not None and fact["kind"] == "event"
+    assert fact["predicate"] == "neprší"
+    assert fact["objects"] == []
+
+
+def test_place_nominative_may_be_shorter_with_known_ending():
+    """#35: Petrovicích→Petrovice — kratší nominativ projde, když končí
+    známou toponymní koncovkou (place_nominative_endings); zmršení
+    (Lhotě→Lhot) dál blokováno."""
+    from jellyai.iris.automaton import IrisAutomaton
+
+    class _StubClient:
+        def parse(self, text):
+            return [[{"form": "Petrovicích", "lemma": "Petrovice",
+                      "upos": "PROPN"},
+                     {"form": "Lhotě", "lemma": "Lhot", "upos": "PROPN"}]]
+
+        def analyze(self, token):
+            return []
+
+    answerer = GraphAnswerer(FactGraph(), AnswererConfig(),
+                             ExtractiveAnswerer(AnswererConfig()))
+    answerer.client = _StubClient()
+    iris = IrisAutomaton(answerer, clock=lambda: NOW)
+    statement = {"kind": "event", "predicate": "bydlí",
+                 "objects": ["Marcela", "Petrovicích", "Lhotě"],
+                 "places": ["Petrovicích", "Lhotě"],
+                 "time": "17. července 2026 12:00"}
+    fixed = iris._nominativize_statement("…", statement)
+    assert "Petrovice" in fixed["places"]      # koncovka -ice povolena
+    assert "Lhotě" in fixed["places"]          # zmršení Lhot dál blokováno

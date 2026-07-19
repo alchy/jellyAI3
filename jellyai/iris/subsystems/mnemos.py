@@ -76,12 +76,16 @@ def _finite_verb(tokens, norms, is_node=None):
     """
     lang = current()
     endings = lang["present_verb_endings"]
+    # cílený KATALOG bezdiakritických prézentních tvarů („prsi", „snezi") —
+    # koncovka „i" by jako pravidlo sloveso viděla v každém plurálu („psi");
+    # rozšiřuje se katalogem, ne univerzalizuje (poučení #32)
+    catalog_forms = set(lang.get("finite_verb_forms", ()))
     for tok, norm in zip(tokens, norms):
         if len(tok) < 3 or norm in lang["first_person"] \
                 or norm in lang["copula_forms"] \
                 or norm in lang["query_skip_words"]:
             continue
-        if not tok.lower().endswith(endings):
+        if norm not in catalog_forms and not tok.lower().endswith(endings):
             continue
         if is_node is not None and is_node(tok):
             continue
@@ -223,6 +227,9 @@ def parse_statement(text, now, deck=None, is_node=None):
                and norm not in lang["query_skip_words"]
                and norm not in lang["confirmation_words"]
                and norm not in temporal_words
+               # částice (už/ještě) nejsou účastníci děje — deník měl
+               # „neprší (Už)" jako zmršený zápis (#24)
+               and norm not in lang.get("particle_words", ())
                # l-příčestí je uvnitř věty malými; KAPITALIZOVANÝ tvar, který
                # po ořezu vypadá jako l-tvar („Karla", „Emil"), je jméno a
                # z objektů vypadnout nesmí (výrok by se ztratil / přišel o podmět)

@@ -964,9 +964,14 @@ class IrisAutomaton:
                 if form in places and tok.get("upos") in ("PROPN", "NOUN"):
                     lemma = (tok.get("lemma") or "").split("_")[0]
                     # nominativ místa nebývá KRATŠÍ než tvar (Brně→Brno 4=4,
-                    # Praze→Praha 5=5); kratší = zmršení (Lhotě→Lhot) → zahoď
+                    # Praze→Praha 5=5); kratší = zmršení (Lhotě→Lhot) → zahoď.
+                    # VÝJIMKA (#35): známé toponymní koncovky nominativu
+                    # (Petrovice, Vodňany) — kratší lemma je legitimní
+                    endings = tuple(current().get(
+                        "place_nominative_endings", ()))
                     if (lemma and lemma[:1].isupper() and lemma != form
-                            and len(lemma) >= len(form)):
+                            and (len(lemma) >= len(form)
+                                 or lemma.endswith(endings))):
                         place_lemma[form] = lemma
 
         def nom(word):
