@@ -1,0 +1,28 @@
+{
+  "name": "q-zjistovaci-minuly",
+  "trigger": {
+    "event": "utterance.query",
+    "priority": 3,
+    "pattern": [
+      "l_tvar",
+      "?uzel+",
+      "?uzel+"
+    ]
+  },
+  "action": {
+    "query": {
+      "predicate": "$1",
+      "known": [
+        [
+          "subj",
+          "$2"
+        ],
+        [
+          "obj",
+          "$3"
+        ]
+      ]
+    }
+  },
+  "teach": "Zjišťovací otázka v minulém čase („Napsal Karel Čapek Válku s mloky?“): l-ové příčestí na začátku je predikát (normalizace _verb_match: napsal→napsat), spanový prvek uzel+ rozdělí víceslovné entity orákulem grafu. Nerozřešení spanu = karta nesedí a otázka jde poziční šablonou (bezpečný fallback)."
+}

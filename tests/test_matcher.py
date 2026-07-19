@@ -42,3 +42,43 @@ def test_norm_alternatives_are_deaccented():
     assert binding is not None
     assert binding[1].form == "Čím"
     assert binding[3].form == "Marcela" and binding[4].form == "Roníka"
+
+
+def _is_span(span):
+    return span in ("Karel Čapek", "Válka s mloky", "Válku s mloky",
+                    "Marcel", "Babičku")
+
+
+def test_span_element_matches_multiword_entity_greedily():
+    tagged = classify("Napsal Karel Čapek Válku s mloky.")
+    binding = match_sequence(["l_tvar", "uzel+", "?uzel+"], tagged,
+                             is_span=_is_span)
+    assert binding is not None
+    assert [t.form for t in binding[2]] == ["Karel", "Čapek"]
+    assert [t.form for t in binding[3]] == ["Válku", "s", "mloky"]
+
+
+def test_span_element_backtracks_to_let_rest_match():
+    """Hladový span musí ustoupit, aby zbytek vzoru vyšel — druhá entita
+    existuje, jen ji nesmí spolknout první."""
+    tagged = classify("Napsal Karel Čapek Babičku.")
+    binding = match_sequence(["l_tvar", "uzel+", "uzel+"], tagged,
+                             is_span=_is_span)
+    assert binding is not None
+    assert [t.form for t in binding[2]] == ["Karel", "Čapek"]
+    assert [t.form for t in binding[3]] == ["Babičku"]
+
+
+def test_span_element_requires_validation():
+    tagged = classify("Napsal Karel Čapek Válku s mloky.")
+    assert match_sequence(["l_tvar", "uzel+"], tagged,
+                          is_span=_is_span) is None      # zbytek nespolkne
+    assert match_sequence(["l_tvar", "uzel+", "?uzel+"], tagged,
+                          is_span=None) is None          # bez orákula nematchne
+
+
+def test_optional_span_absent_binds_none():
+    tagged = classify("Prší.")
+    binding = match_sequence(["sloveso_fin", "?uzel+"], tagged,
+                             is_span=_is_span)
+    assert binding is not None and binding[2] is None

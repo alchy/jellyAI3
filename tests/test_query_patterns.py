@@ -66,3 +66,24 @@ def test_place_hole_still_works_after_guards():
     """Guardy nesmí rozbít směr „Kde bydlí X?" (loc díra z týchž faktů)."""
     a = _answerer(_bydli("Marcela", "Petrovice"))
     assert a.answer("Kde bydlí Marcela?", []).text == "Petrovice"
+
+
+def test_existence_cards_build_pattern_via_card_path():
+    """Fáze 2b: zjišťovací otázky jako karty — span prvek `uzel+` dělí
+    víceslovné entity orákulem grafu; bez účastníků = holá existence."""
+    from jellyai.answerer.query import _card_query
+
+    q = _card_query("Napsal Karel Čapek Válku s mloky?", {"napsat"},
+                    is_node=lambda s: s in ("Karel Čapek", "Válku s mloky"),
+                    is_word=None)
+    assert q is not None
+    assert q.pattern.predicate == "napsat"      # normalizace _verb_match
+    assert q.pattern.known == [("subj", "Karel Čapek"),
+                               ("obj", "Válku s mloky")]
+    assert q.pattern.hole_role is None and q.qtype is None
+
+    bare = _card_query("Prší?", {"prší"},
+                       is_node=lambda s: False, is_word=None)
+    assert bare is not None
+    assert bare.pattern.predicate == "prší"
+    assert bare.pattern.known == []             # holá existence

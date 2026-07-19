@@ -9,9 +9,13 @@ Syntaxe prvku (řetězec):
     "otaz"           token má třídu otaz
     "otaz:kdo|koho"  třídu otaz A norm ∈ {kdo, koho}
     ":v|ve|na"       jen norm (literál, deakcentovaně)
+    "uzel+"          SPAN 1..n tokenů, který orákulum `is_span` potvrdí
+                     jako entitu grafu („Karel Čapek", „Válka s mloky");
+                     hladově nejdelší, ustupuje kvůli zbytku vzoru
     "?…"             volitelný prvek (kterákoli z podob výše)
 
-Vazby: 1-based index PRVKU vzoru → TaggedToken (volitelný nenaplněný → None).
+Vazby: 1-based index PRVKU vzoru → TaggedToken; spanový prvek → list
+TaggedToken; volitelný nenaplněný → None.
 """
 
 
@@ -25,15 +29,18 @@ def _element_matches(element, token):
     return True
 
 
-def match_sequence(pattern, tagged):
+def match_sequence(pattern, tagged, is_span=None):
     """Ukotvený match vzoru na celou sekvenci tokenů.
 
     Args:
         pattern (list[str]): Prvky vzoru (syntaxe v docstringu modulu).
         tagged (list[TaggedToken]): Výstup lexeru.
+        is_span (callable | None): Orákulum `text → bool` pro prvek
+            `uzel+` (typicky `_span_is_node` answereru — slovník entit
+            je graf). None = spanové prvky nematchnou.
 
     Returns:
-        dict[int, TaggedToken | None] | None: Vazby 1-based indexů prvků,
+        dict | None: Vazby 1-based indexů prvků (token | list | None),
         nebo None, když vzor nesedí.
     """
     def walk(p, t, binding):
@@ -42,7 +49,24 @@ def match_sequence(pattern, tagged):
         element = pattern[p]
         optional = element.startswith("?")
         body = element[1:] if optional else element
-        if t < len(tagged) and _element_matches(body, tagged[t]):
+        if body == "uzel+":
+            if is_span is not None:
+                # hladově nejdelší potvrzený span; ustupuje, aby zbytek
+                # vzoru vyšel (druhou entitu nesmí spolknout první)
+                for end in range(len(tagged), t, -1):
+                    span = tagged[t:end]
+                    if "funkcni" in span[0].classes \
+                            or "funkcni" in span[-1].classes:
+                        # entita nezačíná/nekončí funkčním slovem — volné
+                        # orákulum by pustilo i paskvil („Pavla v"); uvnitř
+                        # smí („Válka s mloky")
+                        continue
+                    if not is_span(" ".join(tok.form for tok in span)):
+                        continue
+                    found = walk(p + 1, end, {**binding, p + 1: span})
+                    if found is not None:
+                        return found
+        elif t < len(tagged) and _element_matches(body, tagged[t]):
             found = walk(p + 1, t + 1, {**binding, p + 1: tagged[t]})
             if found is not None:
                 return found

@@ -176,14 +176,16 @@ def _query_deck():
     return _QUERY_DECK
 
 
-def _card_query(question, predicates, is_word):
+def _card_query(question, predicates, is_node=None, is_word=None):
     """Dotaz podle VZOROVÉ KARTY (#46 fáze 2): regulární sekvence tříd
     lexeru na kartě (event `utterance.query`) → pseudo-QL `Pattern`.
 
     Nový tázací tvar = nová karta, žádný Python. Vybírá se nejtěsnější
     match (priorita, délka vzoru); predikát prochází TOUŽ normalizací
     jako šablony (`_verb_match`) — zápis a dotaz se potkají. Díru nese
-    tabulka `interrogatives` (role, typ) přes tázací token vzoru.
+    tabulka `interrogatives` (role, typ) přes tázací token vzoru;
+    víceslovné entity dělí spanový prvek `uzel+` orákulem grafu
+    (`is_node`). Karta bez naplněných známých = holá existence.
 
     Returns:
         Query | None: Rozbor, nebo None (žádná karta nesedí → šablony).
@@ -199,7 +201,7 @@ def _card_query(question, predicates, is_word):
         sequence = card.trigger.get("pattern")
         if not sequence:
             continue
-        binding = match_sequence(sequence, tagged)
+        binding = match_sequence(sequence, tagged, is_span=is_node)
         if binding is None:
             continue
         key = (card.trigger.get("priority", 0), len(sequence))
@@ -215,6 +217,11 @@ def _card_query(question, predicates, is_word):
             return binding.get(int(value[1:]))
         return None
 
+    def surface(bound):
+        if isinstance(bound, list):
+            return " ".join(tok.form for tok in bound)
+        return bound.form if bound is not None else None
+
     pattern = Pattern()
     qtype = None
     hole = ref(spec.get("hole"))
@@ -224,13 +231,16 @@ def _card_query(question, predicates, is_word):
             pattern.hole_role, pattern.hole_type, qtype = entry
     verb = ref(spec.get("predicate"))
     if verb is not None:
-        pattern.predicate = _verb_match(verb.form, predicates, first=True) \
-            or verb.form
+        pattern.predicate = _verb_match(surface(verb), predicates,
+                                        first=True) or surface(verb)
     for known_ref in spec.get("known", ()):
-        token = ref(known_ref)
-        if token is not None:
-            pattern.known.append(("obj", token.form))
-    if pattern.predicate is None or not pattern.known:
+        # ["subj", "$2"] = role + odkaz; holý "$2" = role obj
+        role, value = (known_ref if isinstance(known_ref, list)
+                       else ("obj", known_ref))
+        term = surface(ref(value))
+        if term is not None:
+            pattern.known.append((role, term))
+    if pattern.predicate is None:
         return None
     return Query(pattern=pattern, qtype=qtype, verb_lemma=pattern.predicate)
 
@@ -258,7 +268,7 @@ def build_query(question, predicates, is_node=None, is_word=None,
         return None
     # VZOROVÉ KARTY mají přednost (#46 fáze 2): plně ukotvený match je
     # těsnější než poziční šablony; nesedí-li žádná, jede se postaru
-    card_query = _card_query(question, predicates, is_word)
+    card_query = _card_query(question, predicates, is_node, is_word)
     if card_query is not None:
         return card_query
     tokens = re.findall(r"[\w.]+", question)
