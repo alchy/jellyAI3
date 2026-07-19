@@ -28,6 +28,25 @@ from qagen.download_models import download_models
 _SEED_RUR = "training_text/karel_capek_rur.txt"
 
 
+def _drain_lines(path):
+    """Přečte a VYPRÁZDNÍ souborovou schránku (DEV most webu).
+
+    Řádky připsané do `data/web_inbox.txt` zpracuje web, jako by je uživatel
+    napsal do dialogového okna — testovací dotazy (skript, echo) jsou tak
+    vidět v GUI včetně aktivace a růstu grafu. Chybějící soubor = žádné.
+
+    Returns:
+        list[str]: Neprázdné řádky v pořadí zápisu.
+    """
+    if not os.path.exists(path):
+        return []
+    with open(path, "r+", encoding="utf-8") as fh:
+        lines = [line.strip() for line in fh if line.strip()]
+        fh.seek(0)
+        fh.truncate()
+    return lines
+
+
 def _build_and_save_index(config):
     """Postaví index z vyčištěných textů a uloží ho na disk.
 
@@ -391,6 +410,20 @@ def cmd_web(config, view=None, client=None):
 
     view.every(0.15, animate)
     view.open_terminal(on_query)     # okno 1: dialog (vstup i výstup)
+
+    # DEV MOST: řádky ze souborové schránky jdou TOUŽ cestou jako vstup
+    # z dialogového okna (on_query) — testování skriptem je vidět v GUI
+    inbox_path = os.path.join(
+        os.path.dirname(config.graph.memory_path) or "data", "web_inbox.txt")
+
+    def drain_inbox():
+        for line in _drain_lines(inbox_path):
+            try:
+                on_query(line)
+            except Exception as exc:  # pylint: disable=broad-exception-caught
+                print(f"⚠️ inbox dotaz selhal: {exc}", flush=True)
+
+    view.every(1.0, drain_inbox)
     if hasattr(view, "on_event"):
         # most pro CHRONOS: služba Iris pushne dozrálou připomínku REST
         # eventem — řádek v konzoli (terminal_write) a STATICKÉ okno
