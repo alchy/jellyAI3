@@ -8,6 +8,8 @@ věty jiného smyslu.
 Syntaxe prvku (řetězec):
     "otaz"           token má třídu otaz
     "otaz:kdo|koho"  třídu otaz A norm ∈ {kdo, koho}
+    "l_tvar!spona"   třídu l_tvar a ŽÁDNOU z vyloučených („byl" je
+                     hypotézově obojí — sponové otázky nechává jiným)
     ":v|ve|na"       jen norm (literál, deakcentovaně)
     "uzel+"          SPAN 1..n tokenů, který orákulum `is_span` potvrdí
                      jako entitu grafu („Karel Čapek", „Válka s mloky");
@@ -21,8 +23,11 @@ TaggedToken; volitelný nenaplněný → None.
 
 def _element_matches(element, token):
     """Sedí prvek vzoru (bez prefixu ?) na token?"""
-    cls, _, norms = element.partition(":")
+    cls_part, _, norms = element.partition(":")
+    cls, *excluded = cls_part.split("!")
     if cls and cls not in token.classes:
+        return False
+    if any(ex in token.classes for ex in excluded):
         return False
     if norms and token.norm not in norms.split("|"):
         return False

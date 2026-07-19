@@ -232,11 +232,17 @@ def _card_query(question, predicates, is_node=None, is_word=None):
     verb = ref(spec.get("predicate"))
     if verb is not None:
         pattern.predicate = _verb_match(surface(verb), predicates,
-                                        first=True) or surface(verb)
+                                        first=True)
+        if pattern.predicate is None:
+            # NEZNÁMÉ sloveso (překlep „sworil") — karta se nehlásí;
+            # otázka jde šablonou/UDPipe fallbackem, který má vlastní léky
+            return None
+    # role známého plyne z díry (subj-díra → známý je obj, jinak subj);
+    # explicitní pár ["role", "$N"] na kartě má přednost
+    default_role = "obj" if pattern.hole_role == "subj" else "subj"
     for known_ref in spec.get("known", ()):
-        # ["subj", "$2"] = role + odkaz; holý "$2" = role obj
         role, value = (known_ref if isinstance(known_ref, list)
-                       else ("obj", known_ref))
+                       else (default_role, known_ref))
         term = surface(ref(value))
         if term is not None:
             pattern.known.append((role, term))

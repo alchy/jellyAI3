@@ -87,3 +87,29 @@ def test_existence_cards_build_pattern_via_card_path():
     assert bare is not None
     assert bare.pattern.predicate == "prší"
     assert bare.pattern.known == []             # holá existence
+
+
+def test_hole_question_cards_build_pattern():
+    """Fáze 2c: „OTAZ (se) SLOVESO ENTITA?" jako karta — díra z interrogatives,
+    predikát normalizovaný, entita spanem. Ukotvení chrání složené otázky
+    (vztažné věty, „Jakou hru…") — ty jdou dál poziční šablonou."""
+    from jellyai.answerer.query import _card_query
+
+    q = _card_query("Kdo napsal R.U.R.?", {"napsat"},
+                    is_node=lambda s: s == "R.U.R.", is_word=None)
+    assert q is not None
+    assert q.pattern.predicate == "napsat"
+    assert q.pattern.hole_role == "subj" and q.pattern.hole_type == "person"
+    assert q.pattern.known == [("obj", "R.U.R.")]
+    assert q.qtype == "Kdo"
+
+    q = _card_query("Kde se narodil Karel Čapek?", {"narodit"},
+                    is_node=lambda s: s == "Karel Čapek", is_word=None)
+    assert q is not None
+    assert q.pattern.hole_role == "loc"
+    assert q.pattern.known == [("subj", "Karel Čapek")]
+
+    složená = _card_query("Kdo byl bratr autora, který napsal R.U.R.?",
+                          {"napsat"}, is_node=lambda s: s == "R.U.R.",
+                          is_word=None)
+    assert složená is None       # rekurze zůstává poziční šabloně

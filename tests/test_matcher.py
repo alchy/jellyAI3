@@ -82,3 +82,14 @@ def test_optional_span_absent_binds_none():
     binding = match_sequence(["sloveso_fin", "?uzel+"], tagged,
                              is_span=_is_span)
     assert binding is not None and binding[2] is None
+
+
+def test_exclusion_class_keeps_copula_out():
+    """„byl" je hypotézově l_tvar I spona — prvek `l_tvar!spona` sponové
+    (identitní) otázky nechává poziční šabloně (etalon Kdo byl robot?)."""
+    tagged = classify("Kdo byl robot.")
+    assert match_sequence(["otaz", "l_tvar!spona", "uzel+"], tagged,
+                          is_span=lambda s: s == "robot") is None
+    tagged = classify("Kdo napsal Babičku.")
+    assert match_sequence(["otaz", "l_tvar!spona", "uzel+"], tagged,
+                          is_span=lambda s: s == "Babičku") is not None
