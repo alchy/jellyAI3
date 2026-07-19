@@ -1,0 +1,24 @@
+{
+  "name": "q-vyberova-minuly",
+  "trigger": {
+    "event": "utterance.query",
+    "priority": 5,
+    "pattern": [
+      "%{TAZACI_VYBER}",
+      "%{ENTITA}",
+      "%{SLOVESO_MINULE}",
+      "?%{ENTITA}"
+    ]
+  },
+  "action": {
+    "query": {
+      "hole": "$1",
+      "predicate": "$3",
+      "known": [
+        ["obj", "$2"],
+        ["subj", "$4"]
+      ]
+    }
+  },
+  "teach": "Výběrová otázka „Jakou hru napsal Karel Čapek?“ (#46 fáze 2d, spec 4.6): adjektivní tázací slovo (jakou/kterou…) nese attr díru, entita hned za ním je TYPOVÝ FILTR díry (obj — join druh/být řeší answererův _typed_match), téma je subj a smí být elidované („Jakou hru napsal?“ — doplní kontext). Vylučování !spona chrání sponové otázky („Jaký je robot?“) a vztahové otázky se neuchytí — jejich sloveso není span uzlu před l-ovým příčestím."
+}

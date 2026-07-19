@@ -250,7 +250,11 @@ def _card_query(question, predicates, is_node=None, is_word=None):
             pattern.known.append((role, term))
     if pattern.predicate is None:
         return None
-    return Query(pattern=pattern, qtype=qtype, verb_lemma=pattern.predicate)
+    # rod slovesného tvaru filtruje kandidáty těžiště při pro-dropu
+    # („Jakou hru napsal?" → mužské téma) — stejně jako u šablon
+    return Query(pattern=pattern, qtype=qtype, verb_lemma=pattern.predicate,
+                 gender=_verb_gender(surface(verb)) if verb is not None
+                 else None)
 
 
 def build_query(question, predicates, is_node=None, is_word=None,

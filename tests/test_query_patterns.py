@@ -113,3 +113,42 @@ def test_hole_question_cards_build_pattern():
                           {"napsat"}, is_node=lambda s: s == "R.U.R.",
                           is_word=None)
     assert složená is None       # rekurze zůstává poziční šabloně
+
+
+def test_selection_question_card_builds_typed_pattern():
+    """Fáze 2d: výběrová otázka „Jakou hru napsal Karel Čapek?" jako karta —
+    typový filtr díry (hru) je obj, téma subj (join answererova
+    _typed_match); elidované téma („Jakou hru napsal?") doplní kontext."""
+    from jellyai.answerer.query import _card_query
+
+    q = _card_query("Jakou hru napsal Karel Čapek?", {"napsat"},
+                    is_node=lambda s: s in ("hru", "Karel Čapek"),
+                    is_word=None)
+    assert q is not None
+    assert q.pattern.predicate == "napsat"
+    assert q.pattern.hole_role == "attr" and q.pattern.hole_type is None
+    assert q.pattern.known == [("obj", "hru"), ("subj", "Karel Čapek")]
+    assert q.qtype == "Jaký"
+
+    elided = _card_query("Jakou hru napsal?", {"napsat"},
+                         is_node=lambda s: s == "hru", is_word=None)
+    assert elided is not None
+    assert elided.pattern.known == [("obj", "hru")]
+
+
+def test_selection_card_does_not_steal_other_questions():
+    """Pasti 9–11: výběrový vzor nesmí ukrást vztahovou otázku (l-tvar
+    slovesa se orákulem rozřeší na šumový uzel — „měl") ani sponovou
+    identitu („Jaký je robot?" nemá l-ové příčestí)."""
+    from jellyai.answerer.query import _card_query
+
+    vztah = _card_query("Jaký měl Ježíš vztah k Janu Křtiteli?",
+                        {"poslat"},
+                        is_node=lambda s: s in ("měl", "vztah", "Ježíš",
+                                                "Janu Křtiteli"),
+                        is_word=None)
+    assert vztah is None         # vztahová otázka zůstává poziční šabloně
+
+    spona = _card_query("Jaký je robot?", {"být"},
+                        is_node=lambda s: s == "robot", is_word=None)
+    assert spona is None         # sponová identita zůstává šabloně
