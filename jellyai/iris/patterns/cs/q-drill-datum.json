@@ -1,0 +1,26 @@
+{
+  "name": "q-drill-datum",
+  "trigger": {
+    "event": "utterance.query",
+    "priority": 5,
+    "pattern": [
+      "%{PREDL_CASU}",
+      "%{TAZACI_KTEREM}",
+      "%{CAST_DATA}",
+      "?%{SE}",
+      "%{SLOVESO_MINULE}",
+      "%{ENTITA}"
+    ]
+  },
+  "action": {
+    "query": {
+      "hole": "$2",
+      "date_part": "$3",
+      "predicate": "$5",
+      "known": [
+        "$6"
+      ]
+    }
+  },
+  "teach": "Dvouskokový drill do data „V kterém roce se narodila Božena Němcová?“ (#46 fáze 2d): tázací „kterém/jakém“ + část data (tabulka date_part_forms — rok/měsíc/den) překlápí attr díru na časovou (time/time) a odpovědí je jen žádaná část časového uzlu (1818, ne celé datum). „V TOMTO roce“ drill není — „tomto“ nemá třídu otaz, časový filtr intervalu drží Chronos."
+}

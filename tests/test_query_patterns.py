@@ -152,3 +152,26 @@ def test_selection_card_does_not_steal_other_questions():
     spona = _card_query("Jaký je robot?", {"být"},
                         is_node=lambda s: s == "robot", is_word=None)
     assert spona is None         # sponová identita zůstává šabloně
+
+
+def test_date_drill_card_builds_time_pattern():
+    """Fáze 2d: 2-skokový drill „V kterém roce se narodila BN?" jako karta —
+    část data z tabulky date_part_forms (třída cast_data), attr díra se
+    s částí data překlápí na time/time; „v TOMTO roce" drill není (tomto
+    nemá třídu otaz — filtr intervalu drží Chronos)."""
+    from jellyai.answerer.query import _card_query
+
+    q = _card_query("V kterém roce se narodila Božena Němcová?", {"narodit"},
+                    is_node=lambda s: s == "Božena Němcová", is_word=None)
+    assert q is not None
+    assert q.pattern.predicate == "narodit"
+    assert q.pattern.hole_role == "time" and q.pattern.hole_type == "time"
+    assert q.pattern.date_part == "rok"
+    assert q.pattern.known == [("subj", "Božena Němcová")]
+    assert q.qtype == "Který"
+    assert q.gender == "Fem"
+
+    filtr = _card_query("V tomto roce se narodila Božena Němcová?",
+                        {"narodit"},
+                        is_node=lambda s: s == "Božena Němcová", is_word=None)
+    assert filtr is None         # časový filtr, ne drill — zůstává šabloně

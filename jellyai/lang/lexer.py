@@ -102,6 +102,7 @@ def classify(text, is_node=None):
               ("funkcni", set(lang.get("query_skip_words", ()))),
               ("castice", set(lang.get("particle_words", ()))),
               ("privlastnovaci", set(lang.get("possessive_words", ()))),
+              ("cast_data", set(lang.get("date_part_forms", ()))),
               ("cas", temporal))
     tagged = []
     for form in tokenize(text):

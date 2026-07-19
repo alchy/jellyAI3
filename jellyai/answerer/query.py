@@ -231,6 +231,13 @@ def _card_query(question, predicates, is_node=None, is_word=None):
         entry = lang["interrogatives"].get(hole.norm)
         if entry:
             pattern.hole_role, pattern.hole_type, qtype = entry
+    part = ref(spec.get("date_part"))
+    if part is not None:
+        # „v kterém ROCE" = 2-skokový drill přes časový uzel: část data
+        # z jazykové tabulky, attr díra se překlápí na časovou
+        pattern.date_part = lang["date_part_forms"].get(part.norm)
+        if pattern.date_part and pattern.hole_role == "attr":
+            pattern.hole_role, pattern.hole_type = "time", "time"
     verb = ref(spec.get("predicate"))
     if verb is not None:
         pattern.predicate = _verb_match(surface(verb), predicates,
