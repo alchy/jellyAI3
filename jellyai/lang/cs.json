@@ -133,6 +133,8 @@
     "TAZACI_KTEREM": "otaz:kterem|jakem",
     "PREDL_CASU": ":v|ve",
     "CAST_DATA": "cast_data",
+    "VZTAH": "vztah_dotazu",
+    "FUNKCNI": "funkcni",
     "SPONA": "spona",
     "SE": ":se",
     "DALSI": ":dalsi",

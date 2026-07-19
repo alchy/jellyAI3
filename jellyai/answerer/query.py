@@ -238,6 +238,12 @@ def _card_query(question, predicates, is_node=None, is_word=None):
         pattern.date_part = lang["date_part_forms"].get(part.norm)
         if pattern.date_part and pattern.hole_role == "attr":
             pattern.hole_role, pattern.hole_type = "time", "time"
+    override = spec.get("hole_role")
+    if override is not None and not str(override).startswith("$"):
+        # LITERÁLNÍ role díry na kartě („relation") — operátor spojení
+        # nemá roli v tabulce interrogatives, určuje ji sama karta
+        pattern.hole_role = override
+        pattern.hole_type = spec.get("hole_type")
     verb = ref(spec.get("predicate"))
     if verb is not None:
         pattern.predicate = _verb_match(surface(verb), predicates,
@@ -255,7 +261,9 @@ def _card_query(question, predicates, is_node=None, is_word=None):
         term = surface(ref(value))
         if term is not None:
             pattern.known.append((role, term))
-    if pattern.predicate is None:
+    if pattern.predicate is None and spec.get("hole_role") is None:
+        # bez predikátu jen karta, která roli díry určila sama (relation);
+        # jinak platí past 11 — neznámé sloveso jde fallbackem
         return None
     # rod slovesného tvaru filtruje kandidáty těžiště při pro-dropu
     # („Jakou hru napsal?" → mužské téma) — stejně jako u šablon

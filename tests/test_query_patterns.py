@@ -137,21 +137,32 @@ def test_selection_question_card_builds_typed_pattern():
 
 
 def test_selection_card_does_not_steal_other_questions():
-    """Pasti 9–11: výběrový vzor nesmí ukrást vztahovou otázku (l-tvar
-    slovesa se orákulem rozřeší na šumový uzel — „měl") ani sponovou
-    identitu („Jaký je robot?" nemá l-ové příčestí)."""
+    """Pasti 9–11: výběrový vzor nesmí ukrást sponovou identitu
+    („Jaký je robot?" nemá l-ové příčestí — !spona)."""
     from jellyai.answerer.query import _card_query
-
-    vztah = _card_query("Jaký měl Ježíš vztah k Janu Křtiteli?",
-                        {"poslat"},
-                        is_node=lambda s: s in ("měl", "vztah", "Ježíš",
-                                                "Janu Křtiteli"),
-                        is_word=None)
-    assert vztah is None         # vztahová otázka zůstává poziční šabloně
 
     spona = _card_query("Jaký je robot?", {"být"},
                         is_node=lambda s: s == "robot", is_word=None)
     assert spona is None         # sponová identita zůstává šabloně
+
+
+def test_relation_operator_card_builds_relation_pattern():
+    """Fáze 2d: „Jaký měl X vztah k Y?" jako karta — „vztah" není entita,
+    ale OPERÁTOR spojení (třída vztah_dotazu z relation_query_nouns):
+    sloveso otázky nic nenese (vzor ho přeskočí), oba účastníci jsou obj,
+    díra relation bez predikátu. Výběrový vzor otázku nekrade, i když se
+    „měl" orákulem rozřeší na šumový uzel (past 9–11)."""
+    from jellyai.answerer.query import _card_query
+
+    q = _card_query("Jaký měl Ježíš vztah k Janu Křtiteli?", {"poslat"},
+                    is_node=lambda s: s in ("měl", "vztah", "Ježíš",
+                                            "Janu Křtiteli"),
+                    is_word=None)
+    assert q is not None
+    assert q.pattern.predicate is None
+    assert q.pattern.hole_role == "relation" and q.pattern.hole_type is None
+    assert q.pattern.known == [("obj", "Ježíš"), ("obj", "Janu Křtiteli")]
+    assert q.qtype == "Jaký"
 
 
 def test_date_drill_card_builds_time_pattern():

@@ -1,0 +1,26 @@
+{
+  "name": "q-vztah-operator",
+  "trigger": {
+    "event": "utterance.query",
+    "priority": 5,
+    "pattern": [
+      "%{TAZACI_VYBER}",
+      "%{SLOVESO_MINULE}",
+      "%{ENTITA}",
+      "%{VZTAH}",
+      "%{FUNKCNI}",
+      "%{ENTITA}"
+    ]
+  },
+  "action": {
+    "query": {
+      "hole": "$1",
+      "hole_role": "relation",
+      "known": [
+        ["obj", "$3"],
+        ["obj", "$6"]
+      ]
+    }
+  },
+  "teach": "Vztahová otázka „Jaký měl Ježíš vztah k Janu Křtiteli?“ (#46 fáze 2d): „vztah/vazba“ není entita, ale OPERÁTOR spojení (třída vztah_dotazu z relation_query_nouns) — odpovědí jsou fakty sdílené oběma uzly. Sloveso otázky nenese nic (vzor ho přeskočí, predikát se nevyplňuje), oba účastníci jsou obj, roli díry určuje karta literálem relation. Elidovaného druhého účastníka doplní answerer z těžiště."
+}
