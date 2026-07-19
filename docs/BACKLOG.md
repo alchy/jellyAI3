@@ -1,9 +1,12 @@
 # BACKLOG — otevřené body (živý dokument)
 
 > Aktualizuj při každém uzavření/přidání bodu. Stav ke commitu: viz git log.
-> Metriky teď (2026-07-19 noc): **491 testů, etalon 29/29 (3 gap-fixed /
-> 5 gap), focus 12/12, dialog 27/27 (13 scénářů), ZÁPIS 29/29 (12 gap-fixed
-> / 0 — řádek #35 jen s `--nom`) — jádra 100 %.**
+> Metriky teď (2026-07-19 noc, po sklizni živého dialogu): **494 testů,
+> etalon 29/29 (3 gap-fixed / 5 gap), focus 12/12, dialog 27/27 (13 scénářů
+> + 2 gap scénáře #44/#45), ZÁPIS 33/33 (11 gap-fixed / 5 gap: #45 ×4 +
+> #35-nom) — jádra 100 %. Opraveno ze živého dialogu: částice
+> občas/většinou/však (particle_words), otázka s tečkou („Kdo je Roník.")
+> nevetuje-tabulkou question_words, vokativ guard („Marcele"→Marcel flip).**
 >
 > **➡️ PŘEDÁNÍ PRÁCE: čti nejdřív `docs/HANDOVER.md`** — zákony projektu,
 > testovací smyčka, implementační tipy ke každému otevřenému bodu, pasti.
@@ -86,6 +89,8 @@ lematika** (dialog 2026-07-19). NEdělat teď (tamtéž): #19 hybridní aktivace
 
 | # | Oblast | Bod | Poznámka | Priorita |
 |---|--------|-----|----------|----------|
+| 44 | Query šablony | **Chybějící tázací vzory** (živý dialog 2026-07-19): „Kdo <sloveso> v <místě>?" (`build_query` → None; UDPipe fallback fakty paměti nenajde — dějové zápisy nemají subj, osoba je obj/concept — souvisí #33/#34); „Kdo DALŠÍ bydlí…?"; „Čím krmí X Y?" (instrumentálová díra). GAP scénáře kdo-bydli-v-miste + kratke-sloveso-ji v dialog benchmarku (runner umí gap). | Šablona kdo+místo do query.py; role/typ díry u faktů paměti promyslet s #33 (osoba jako obj/concept) a #34 (theme=uživatel se nesmí nabízet). | **2** |
+| 45 | Mnemos parser | **Krátká slovesa a homografy** (živý dialog 2026-07-19): dvojznakové „jí/sní" pod délkovým guardem `_finite_verb` (≥3) → „Roník jí stravu." se ZTRATÍ a spadne do dotazu (GUI odpovědělo „pes"!); „byt" ≡ spona „být" po deakcentaci → „V Plzni má pronajatý byt." se zmrší na observation bez bytu; souvětí s čárkou se ztratí celé; vsuvka „To co X jí je Y" nechá „co/jí" v objektech. | 4 gap řádky v zápisovém etalonu (kategorie krátká-slovesa/homograf/souvětí/vsuvka). Krátká slovesa možná katalogem (finite_verb_forms vzor — ALE „jí" je i zájmeno, chce kontext); homograf byt/být chce rozlišit substantivum od spony (pozice ve větě?). Rodina pro vlastní lematiku. | **2** |
 | 43 | Mnemos/Iris | ✅ **HOTOVO** (2026-07-19): **clarify-identity** — jméno rozřešené na osobu grafu jen ČÁSTEČNĚ („Emil"→„Emil Filla") se nepřipisuje mlčky: karta `clarify-identity` (event `statement.subject`, rys `inexact_person`) nabídne existující osobu i založení nové. Volba jménem / „ano" (první) / slovo z `new_person_words` (nová osoba); otazník ruší. Mechanismus: `PendingIdentity` ve stavu, `_subject_or_clarify` sdílený oběma cestami zápisu, `_resume_identity` před `_resume_pick`. Přesná shoda a elidovaný podmět (kontext) se nedoptávají — scénář „ano, měl rád knedlíky" nezměněn. E2E přes GUI inbox ✓; scénář identita-podmetu v dialog benchmarku. | Bez karty platí původní chování (rozhodnutí nese karta). Souvisí #8, #33. | ✓ |
 | 36 | Viz / infra | **Zabalit font lokálně** do `viewbase/static` — troika-three-text tahá glyfy z `cdn.jsdelivr.net` (unicode-font-resolver) přes `fetch()`; za striktní CSP (`connect-src 'self'`) jsou titulky uzlů neviditelné. Self-host = žádná externí závislost ani nutnost povolovat CDN (důležité pro air-gapped/offline). | Předgenerovat/uložit font(y) do static a resolver přesměrovat na lokální cestu; pak CSP nechat přísnou. | 3 |
 

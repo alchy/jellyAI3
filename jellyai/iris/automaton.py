@@ -1013,6 +1013,12 @@ class IrisAutomaton:
             return token
         if not analysis:
             return token
+        tag = analysis[0].get("tag") or ""
+        if len(tag) > 4 and tag[4] == "5":
+            # VOKATIV uprostřed oznamovacího výroku je šum taggeru na
+            # izolovaném tvaru („Marcele" → vok. „Marcel" místo dat.
+            # „Marcela" — rodový flip): tvaru věř, lemma zahoď
+            return token
         lemma = (analysis[0].get("lemma") or "").split("_")[0]
         if lemma and lemma[:1].isupper() and lemma != token:
             return lemma

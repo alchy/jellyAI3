@@ -160,6 +160,10 @@ def parse_statement(text, now, deck=None, is_node=None):
               else (t.rstrip(".") if "." not in t[:-1] else t) for t in raw]
     tokens = [t for t in tokens if t]
     norms = [deaccent(t.lower()) for t in tokens]
+    # otázka bez otazníku („Kdo je Roník.") NENÍ konstatování — tázací
+    # slovo na začátku vetuje zápis, dotaz jde dotazovou cestou
+    if norms and norms[0] in lang.get("question_words", ()):
+        return None
     card = deck.best("utterance.statement",
                       {"features": utterance_features(tokens, norms, is_node)})
     if card is None or "memorize" not in card.action:

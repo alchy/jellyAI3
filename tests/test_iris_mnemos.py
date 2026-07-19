@@ -398,3 +398,46 @@ def test_place_nominative_may_be_shorter_with_known_ending():
     fixed = iris._nominativize_statement("…", statement)
     assert "Petrovice" in fixed["places"]      # koncovka -ice povolena
     assert "Lhotě" in fixed["places"]          # zmršení Lhot dál blokováno
+
+
+def test_adverb_particles_are_not_objects():
+    """Nález z GUI (2026-07-19): „V Petrovicích občas bydlí i Niki." —
+    částice/příslovce míry (občas, většinou, však) nejsou účastníci děje;
+    šum v objektech otravoval identitu („Kdo je Niki?" → většinou, však)."""
+    fact = parse_statement("V Petrovicích občas bydlí i Niki.", NOW)
+    assert fact is not None
+    assert "občas" not in fact["objects"]
+    assert "Niki" in fact["objects"]
+    fact = parse_statement("Niki je však většinou v Plzni.", NOW)
+    assert fact is not None
+    assert not {"však", "většinou"} & set(fact["objects"])
+
+
+def test_question_with_period_is_not_statement():
+    """Nález z GUI: „Kdo je Roník." (tečka místo otazníku) se uložil jako
+    fakt `být: Kdo, Roník` — tázací slovo na začátku VETUJE konstatování
+    (tabulka question_words), otázka jde dotazovou cestou."""
+    assert parse_statement("Kdo je Roník.", NOW) is None
+    assert parse_statement("Kde bydlí Marcela.", NOW) is None
+    assert parse_statement("Co jí Roník.", NOW) is None
+
+
+def test_vocative_lemma_does_not_flip_gender():
+    """Nález z GUI (2026-07-19): „Marcele je žena." → uzel „Marcel" (!).
+    Tagger izolovaně čte „Marcele" jako VOKATIV masc „Marcel"; vokativ
+    uprostřed oznamovacího výroku je šum → tvaru věř, lemma zahoď.
+    Jednoznačný pád (Karlem, instrumentál) se nominativizuje dál."""
+    from jellyai.iris.automaton import IrisAutomaton
+
+    class _StubClient:
+        def analyze(self, token):
+            return {"Marcele": [{"lemma": "Marcel_;Y",
+                                 "tag": "NNMS5-----A----"}],
+                    "Karlem": [{"lemma": "Karel_;Y",
+                                "tag": "NNMS7-----A----"}]}.get(token, [])
+
+    answerer = GraphAnswerer(FactGraph(), AnswererConfig(),
+                             ExtractiveAnswerer(AnswererConfig()))
+    iris = IrisAutomaton(answerer, clock=lambda: NOW)
+    assert iris._nominativize_name("Marcele", _StubClient()) == "Marcele"
+    assert iris._nominativize_name("Karlem", _StubClient()) == "Karel"

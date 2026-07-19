@@ -44,25 +44,36 @@ def main():
         scenarios = [json.loads(line) for line in fh if line.strip()]
     config = Config()
     rows, passed, total, scen_passed = [], 0, 0, 0
+    gap_fixed, gap_open = 0, 0
     for scenario in scenarios:
         # čerstvý automat = čistý stav dialogu i grafu (bez cizích faktů)
         iris = IrisAutomaton(make_graph_answerer(config), clock=_now)
+        is_gap = "gap" in scenario       # známý nedostatek — jen tracking
         clean = True
         for turn in scenario["turns"]:
             response = iris.turn(turn["u"])
             ok = _turn_ok(response, turn)
-            passed += ok
-            total += 1
             clean &= ok
-            rows.append(("PASS" if ok else "FAIL ✗", scenario["name"],
-                         turn["u"], response.text))
-        scen_passed += clean
+            if is_gap:
+                status = "gap✓" if ok else "gap"
+            else:
+                status = "PASS" if ok else "FAIL ✗"
+                passed += ok
+                total += 1
+            rows.append((status, scenario["name"], turn["u"], response.text))
+        if is_gap:
+            gap_fixed += clean
+            gap_open += not clean
+        else:
+            scen_passed += clean
 
     for status, name, question, answer in rows:
         print(f"[{status:6}] {name}/{question:36} → {answer[:42]}")
     pct = 100 * passed // total if total else 0
+    core = sum(1 for s in scenarios if "gap" not in s)
     print(f"\nDIALOG: {passed}/{total} tahů ({pct} %), "
-          f"scénářů {scen_passed}/{len(scenarios)}")
+          f"scénářů {scen_passed}/{core}   "
+          f"GAP scénáře: {gap_fixed} opraveno / {gap_open} otevřeno")
     return passed, total
 
 
