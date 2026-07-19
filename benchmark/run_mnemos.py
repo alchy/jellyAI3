@@ -5,8 +5,10 @@
 Dotazová strana má guardrail čtyřnásobný (etalon/focus/dialog/coverage);
 ZÁPISOVÁ strana (Mnemos: výrok uživatele → fakt paměti) selhala v provozu
 bez měření (#31–35). Tento benchmark ji měří na TÉMŽE soukolí jako runtime:
-`parse_statement` s balíčkem karet a vetem `_known_word` živého automatu,
+`parse_clauses` s balíčkem karet a vetem `_known_word` živého automatu,
 fixní hodiny (pátek 17. července 2026, poledne — jako dialog benchmark).
+Souvětí = fakt na klauzuli (#46 fáze 4 v2): řádkové klíče měří PRVNÍ
+parse, klíč `clauses` pak počet i obsah všech klauzulí.
 
 Sada `mnemos.jsonl`: řádek = {u, kind|null, predicate?, objects?(podmnožina),
 reject_objects?, places?, subject?, needs_subject?, time?, nom_*?, cat, gap?}.
@@ -27,7 +29,7 @@ from datetime import datetime
 
 from config import Config
 from jellyai.iris import IrisAutomaton
-from jellyai.iris.subsystems.mnemos import parse_statement
+from jellyai.iris.subsystems.mnemos import parse_clauses
 from jellyai.tasks import make_graph_answerer
 
 MNEMOS = os.path.join(os.path.dirname(__file__), "mnemos.jsonl")
@@ -35,7 +37,11 @@ MNEMOS = os.path.join(os.path.dirname(__file__), "mnemos.jsonl")
 ALLOWED_KEYS = {"u", "kind", "predicate", "objects", "reject_objects",
                 "places", "subject", "needs_subject", "time",
                 "nom_objects", "nom_places", "nom_subject", "cat", "gap",
-                "note"}
+                "note", "clauses"}
+
+# klíče pod-řádku v `clauses` (souvětí = fakt na klauzuli, #46 fáze 4 v2)
+CLAUSE_KEYS = {"kind", "predicate", "objects", "reject_objects",
+               "places", "subject", "needs_subject", "time"}
 
 
 def _now():
@@ -54,6 +60,11 @@ def load_items(path):
             raise ValueError(f"neznámé klíče {sorted(unknown)}: {item}")
         if "u" not in item:
             raise ValueError(f"řádek bez výroku `u`: {item}")
+        for sub in item.get("clauses", ()):
+            unknown = set(sub) - CLAUSE_KEYS
+            if unknown:
+                raise ValueError(
+                    f"neznámé klíče klauzule {sorted(unknown)}: {item}")
     return items
 
 
@@ -93,6 +104,23 @@ def row_ok(statement, item):
     return True, ""
 
 
+def clauses_ok(parses, item):
+    """Očekávání `clauses`: počet parsů sedí a každá klauzule projde
+    týmž checkerem jako řádek (`row_ok`).
+
+    Returns:
+        tuple: (bool, str) — splněno + důvod prvního nesouladu.
+    """
+    expected = item.get("clauses", ())
+    if len(parses) != len(expected):
+        return False, f"klauzulí {len(parses)} ≠ {len(expected)}"
+    for i, (parsed, sub) in enumerate(zip(parses, expected), 1):
+        ok, why = row_ok(parsed, {"u": item["u"], **sub})
+        if not ok:
+            return False, f"klauzule {i}: {why}"
+    return True, ""
+
+
 def _nom_item(item):
     """Nom očekávání řádku přeložená na běžné klíče checkeru."""
     mapped = {"u": item["u"]}
@@ -113,9 +141,12 @@ def main():
     iris = IrisAutomaton(make_graph_answerer(Config()), clock=_now)
     rows, passed, failed, gap_open, gap_fixed, nom_skipped = [], 0, 0, 0, 0, 0
     for item in items:
-        statement = parse_statement(item["u"], _now(), iris.deck,
-                                    is_node=iris._known_word)  # pylint: disable=protected-access
+        parses = parse_clauses(item["u"], _now(), iris.deck,
+                               is_node=iris._known_word)  # pylint: disable=protected-access
+        statement = parses[0] if parses else None
         ok, why = row_ok(statement, item)
+        if ok and "clauses" in item:
+            ok, why = clauses_ok(parses, item)
         nom = _nom_item(item)
         nom_measured = True
         if nom is not None and not args.nom:

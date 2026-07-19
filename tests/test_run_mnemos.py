@@ -11,7 +11,7 @@ import os
 
 import pytest
 
-from benchmark.run_mnemos import MNEMOS, load_items, row_ok
+from benchmark.run_mnemos import MNEMOS, clauses_ok, load_items, row_ok
 
 STATEMENT = {"kind": "event", "predicate": "prší", "objects": ["Venku"],
              "places": [], "time": "17. července 2026 12:00",
@@ -63,6 +63,21 @@ def test_places_subject_time_needs_subject():
     assert not row_ok(fact, {"u": "…", "subject": "uživatel"})[0]
     assert not row_ok(fact, {"u": "…", "time": "16. července 2026"})[0]
     assert not row_ok(fact, {"u": "…", "needs_subject": False})[0]
+
+
+def test_clauses_expectations_check_each_parse():
+    """Klíč `clauses` (#46 fáze 4 v2): souvětí = fakt na klauzuli — počet
+    parsů musí sedět a každý se měří týmž checkerem jako řádek."""
+    first = dict(STATEMENT, predicate="jí", objects=["Roník", "stravu"])
+    second = dict(STATEMENT, predicate="má", objects=["Roník", "maso"])
+    item = {"u": "…", "clauses": [
+        {"predicate": "jí", "objects": ["Roník"]},
+        {"predicate": "má", "objects": ["maso"], "reject_objects": ["jí"]}]}
+    assert clauses_ok([first, second], item)[0]
+    ok, why = clauses_ok([first], item)
+    assert not ok and "klauzul" in why
+    ok, why = clauses_ok([first, dict(second, objects=["jí"])], item)
+    assert not ok
 
 
 def test_load_items_rejects_unknown_keys(tmp_path):

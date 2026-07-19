@@ -37,7 +37,8 @@ from jellyai.iris.subsystems.chronos import (TimeInterval, clock_answer,
                                              resolve_weekday)
 from jellyai.iris.subsystems.mnemos import (forget, forget_entity,
                                             forget_interval, name_stem,
-                                            note_statement, parse_statement,
+                                            note_statement, parse_clauses,
+                                            parse_statement,
                                             persist, remember, replay)
 from jellyai.iris.patterns import PatternDeck
 from jellyai.iris.presenter import activation_window, docs_window
@@ -88,7 +89,7 @@ class IrisResponse:
     trace: dict = None
     sources: list = field(default_factory=list)
     alternatives: list = field(default_factory=list)
-    memorized: dict = None    # konstatování uložené v tomto tahu (Mnemos) —
+    memorized: list = None    # konstatování uložená v tomto tahu (Mnemos) —
                               # vizualizace ho přidá do grafu i s atributy
     forgotten: str = None     # jméno entity zapomenuté v tomto tahu —
                               # vizualizace ji (i její fakty) z plátna odebere
@@ -242,15 +243,19 @@ class IrisAutomaton:
             if shift is not None:
                 return shift
             # KONSTATOVÁNÍ (ne dotaz, ne volba) → Mnemos: timestamp + graf;
-            # DRUH výroku rozhodují karty (utterance.statement), ne kód
-            statement = parse_statement(text, self.clock(), self.deck,
-                                        is_node=self._known_word)
-            if statement is not None and statement.get("needs_subject"):
-                statement = self._subject_or_clarify(text, statement)
-                if isinstance(statement, IrisResponse):
-                    return statement     # dialog o identitě podmětu (#43)
-            if statement is not None:
-                return self._memorize(text, statement)
+            # DRUH výroku rozhodují karty (utterance.statement), ne kód;
+            # souvětí = fakt na klauzuli (#46 fáze 4 v2, parse_clauses)
+            statements = []
+            for statement in parse_clauses(text, self.clock(), self.deck,
+                                           is_node=self._known_word):
+                if statement.get("needs_subject"):
+                    statement = self._subject_or_clarify(text, statement)
+                    if isinstance(statement, IrisResponse):
+                        return statement  # dialog o identitě podmětu (#43)
+                if statement is not None:
+                    statements.append(statement)
+            if statements:
+                return self._memorize(text, statements)
         # VZPOMÍNÁNÍ („Co jsem ti řekl včera?") — Chronos filtr nad
         # timestampy Mnemos; fráze z tabulky, texty karty memory.recall
         recalled = self._recall_query(text)
@@ -538,7 +543,7 @@ class IrisAutomaton:
             if card is None:
                 return None
             statement = note_statement(remainder.rstrip("."), self.clock())
-        return self._memorize(text, statement)
+        return self._memorize(text, [statement])
 
     def _plan_manage(self, text):  # pylint: disable=too-many-locals,too-many-branches
         """SPRÁVA PLÁNU dialogem: „zruš všechno na zítra", „posuň všechny
@@ -983,7 +988,7 @@ class IrisAutomaton:
             return None                    # nové téma — nabídka končí
         statement = dict(pending.statement, subject=chosen[1])
         self.answerer.context.warm(chosen[1], _PICK_WARMTH)
-        return self._memorize(pending.text, statement)
+        return self._memorize(pending.text, [statement])
 
     def _known_word(self, token):
         """DOSLOVNÉ slovo uzlu grafu? Veto pro detekci slovesa v Mnemos:
@@ -1071,49 +1076,56 @@ class IrisAutomaton:
             statement["subject"] = nom(statement["subject"])
         return statement
 
-    def _memorize(self, text, statement):
-        """Uloží konstatování do grafu (Mnemos) a rozsvítí jeho uzly.
+    def _memorize(self, text, statements):
+        """Uloží konstatování do grafu (Mnemos) a rozsvítí jejich uzly.
 
-        Uložení JE zaostření: nové téma svítí, takže navazující otázka
-        („Kdy jsem měl…?") jede po zahřáté aktivaci.
+        Souvětí nese VÍC výroků (#46 fáze 4 v2 — fakt na klauzuli, viz
+        docs/JAK-PSAT-FAKTA.md „jedna věta = jeden fakt"); potvrzení je
+        vyjmenuje. Uložení JE zaostření: nové téma svítí, takže
+        navazující otázka („Kdy jsem měl…?") jede po zahřáté aktivaci.
         """
-        # NOMINATIVIZACE PŘED zápisem (do grafu I deníku → merge pádů, konzistence
-        # po restartu i ve vizualizaci): MÍSTA přes UDPipe (kontext věty: Brně→Brno;
-        # u toponym není past Pavla/Pavel), JMÉNA přes morpho lemma (bezpečné:
-        # Pavla≠Pavel, kdežto UDPipe by je slil).
-        statement = self._nominativize_statement(text, statement)
-        detail = remember(self.answerer.graph, statement,
-                          current()["user_entity"])
-        if self.memory_path:
-            persist(statement, self.memory_path)   # paměť přežije restart
-        places = statement.get("places", ())
-        if len(places) >= 2 and hasattr(self.answerer, "_gazetteer"):
-            # PŘESAH DO TOPOSU: vnořená místa („na Barrandově v Praze")
-            # učí kontejnment za pochodu — zápis subsystému
-            from jellyai.iris.subsystems.topos import (area_keys,
-                                                       learn_containment)
-            for inner, outer in zip(places, places[1:]):
-                learn_containment(self.answerer._gazetteer,
-                                  getattr(self.answerer, "_gazetteer_path",
-                                          None), inner, outer)
-            self.answerer._area_keys = area_keys(self.answerer._gazetteer)
-        # nový fakt = nový slovník: predikát musí znát i pseudo-QL parser
-        self.answerer._predicates.add(statement["predicate"])  # pylint: disable=protected-access
-        if self._words is not None:      # nové uzly paměti do veto cache
-            for obj in statement["objects"]:
-                self._words.update(obj.lower().split())
-        for node in statement["objects"]:
-            self.answerer.context.warm(node, 0.7)
+        details, stored = [], []
+        for statement in statements:
+            # NOMINATIVIZACE PŘED zápisem (do grafu I deníku → merge pádů,
+            # konzistence po restartu i ve vizualizaci): MÍSTA přes UDPipe
+            # (kontext věty: Brně→Brno; u toponym není past Pavla/Pavel),
+            # JMÉNA přes morpho lemma (bezpečné: Pavla≠Pavel).
+            statement = self._nominativize_statement(text, statement)
+            details.append(remember(self.answerer.graph, statement,
+                                    current()["user_entity"]))
+            stored.append(statement)
+            if self.memory_path:
+                persist(statement, self.memory_path)  # přežije restart
+            places = statement.get("places", ())
+            if len(places) >= 2 and hasattr(self.answerer, "_gazetteer"):
+                # PŘESAH DO TOPOSU: vnořená místa („na Barrandově v Praze")
+                # učí kontejnment za pochodu — zápis subsystému
+                from jellyai.iris.subsystems.topos import (area_keys,
+                                                           learn_containment)
+                for inner, outer in zip(places, places[1:]):
+                    learn_containment(self.answerer._gazetteer,
+                                      getattr(self.answerer,
+                                              "_gazetteer_path", None),
+                                      inner, outer)
+                self.answerer._area_keys = area_keys(self.answerer._gazetteer)
+            # nový fakt = nový slovník: predikát musí znát i pseudo-QL parser
+            self.answerer._predicates.add(statement["predicate"])  # pylint: disable=protected-access
+            if self._words is not None:  # nové uzly paměti do veto cache
+                for obj in statement["objects"]:
+                    self._words.update(obj.lower().split())
+            for node in statement["objects"]:
+                self.answerer.context.warm(node, 0.7)
         card = self.deck.best("memory.stored", {})
+        detail = "; ".join(details)
         message = card.dialog.format(fact=detail) if card else detail
-        patterns = [statement["card"]] + ([card.name] if card else [])
+        patterns = [s["card"] for s in stored] + ([card.name] if card else [])
         response = IrisResponse(
             text=message, kind="answer", assurance=1.0,
             activation_window=activation_window(self.answerer),
             docs_window=docs_window(self.answerer),
             used={"components": ["mnemos", "chronos"],
                   "patterns": patterns},
-            memorized=statement)   # vizualizace ho přidá do grafu i s atributy
+            memorized=stored)   # vizualizace je přidá do grafu i s atributy
         self.state.remember(text, response)
         return response
 

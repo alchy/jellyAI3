@@ -349,7 +349,8 @@ def cmd_web(config, view=None, client=None):
         mem = out.get("memorized")
         if mem and graph is not None and hasattr(view, "feed_fact"):
             before = set(graph.facts)
-            remember(graph, mem, user_entity)
+            for statement in mem:      # souvětí = víc výroků (#46 fáze 4 v2)
+                remember(graph, statement, user_entity)
             for key, fact in graph.facts.items():
                 if key not in before:
                     view.feed_fact(graph, fact, labeler=base_form_label)

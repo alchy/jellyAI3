@@ -150,15 +150,6 @@ def parse_statement(text, now, deck=None, is_node=None):
                         > card.trigger.get("priority", 0)):
         card, binding = feature_card, None
     if card is None or "memorize" not in card.action:
-        # SOUVĚTÍ (fáze 4 v1): nerozpoznaná věta s čárkou se zachrání po
-        # klauzulích — uloží se první rozpoznaná (částečný zápis > ztráta)
-        if "," in text:
-            for clause in text.split(","):
-                clause = clause.strip().rstrip(".")
-                if clause:
-                    parsed = parse_statement(clause + ".", now, deck, is_node)
-                    if parsed is not None:
-                        return parsed
         return None
     kind = card.action["memorize"]
     source = card.action.get("predicate_from")
@@ -216,7 +207,8 @@ def parse_statement(text, now, deck=None, is_node=None):
                      and not (stop & t.classes) and len(t.form) > 1), None)
         return {"kind": "attribute", "predicate": predicate, "objects": [value],
                 "subject": name or lang["user_entity"], "places": [],
-                "time": time_label, "card": card.name, "needs_subject": False}
+                "time": time_label, "card": card.name, "needs_subject": False,
+                "predicate_surface": source_token or predicate}
     exclude_l = card.action.get("exclude_l_forms", False)
     # účastníci = obsahová slova: bez 1. osoby, spony, funkčních slov,
     # potvrzení, ČASOVÝCH výrazů (interval už zlomil Chronos) a ČÁSTIC
@@ -245,7 +237,48 @@ def parse_statement(text, now, deck=None, is_node=None):
             places.append(tagged[i + 1].form)
     return {"kind": kind, "predicate": predicate, "objects": objects,
             "places": places, "time": time_label, "card": card.name,
-            "needs_subject": card.action.get("subject_from") == "context"}
+            "needs_subject": card.action.get("subject_from") == "context",
+            "predicate_surface": source_token or predicate}
+
+
+def parse_clauses(text, now, deck=None, is_node=None):
+    """Souvětí → fakt na KLAUZULI (#46 fáze 4 v2, spec §3).
+
+    „Jedna věta = jeden fakt" (docs/JAK-PSAT-FAKTA.md) platí i uvnitř
+    souvětí: „Roník jí stravu, má však rád i maso." jsou DVA fakty.
+    Rozpad na klauzule vyhrává jen když KAŽDÁ klauzule parsuje ČISTĚ —
+    zdroj predikátu malými písmeny (kapitalizovaný l-lookalike „Pavla"
+    ve výčtu „Potkal jsem Karla, Pavla a Marii." klauzuli netvoří);
+    jinak platí parse celku. Když celek selže, uloží se čisté klauzule
+    (zobecněná záchrana v1 — částečný zápis > ztráta). Klauzule bez
+    kapitalizovaného účastníka dědí podmět předchozí klauzule.
+
+    Returns:
+        list[dict]: Parsy klauzulí (i jednoprvkový); [] = nic.
+    """
+    whole = parse_statement(text, now, deck, is_node)
+    if "," not in text:
+        return [whole] if whole is not None else []
+    parses, subject, all_clean = [], None, True
+    for raw in text.split(","):
+        clause = raw.strip().rstrip(".")
+        parsed = (parse_statement(clause + ".", now, deck, is_node)
+                  if clause else None)
+        if parsed is None \
+                or parsed["predicate_surface"][:1].isupper():
+            all_clean = False
+            continue
+        lead = next((o for o in parsed["objects"] if o[:1].isupper()), None)
+        if lead is not None:
+            subject = lead
+        elif subject is not None and not parsed["needs_subject"]:
+            parsed["objects"].insert(0, subject)    # dědění podmětu
+        parses.append(parsed)
+    if all_clean and len(parses) >= 2:
+        return parses
+    if whole is not None:
+        return [whole]
+    return parses
 
 
 def note_statement(text, now):
