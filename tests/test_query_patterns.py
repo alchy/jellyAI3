@@ -165,6 +165,28 @@ def test_relation_operator_card_builds_relation_pattern():
     assert q.qtype == "Jaký"
 
 
+def test_first_person_card_maps_user_subject():
+    """Fáze 2d: „Kdy jsem měl v tomto roce knedlíky?" — 1. osoba: podmětem
+    je IDENTITA UŽIVATELE (uzel Mnemos), jmenovaná entita je předmět;
+    časová slova nejsou účastníci (filtr intervalu drží Chronos)."""
+    from jellyai.answerer.query import _card_query
+
+    q = _card_query("Kdy jsem měl v tomto roce knedlíky?", {"měl"},
+                    is_node=lambda s: s == "knedlíky", is_word=None)
+    assert q is not None
+    assert q.pattern.predicate == "měl"
+    assert q.pattern.hole_role == "time" and q.pattern.hole_type == "time"
+    assert q.pattern.known == [("obj", "knedlíky"), ("subj", "uživatel")]
+    assert q.qtype == "Kdy"
+    assert q.gender == "Masc"
+
+    bez_filtru = _card_query("Kdy jsem měl knedlíky?", {"měl"},
+                             is_node=lambda s: s == "knedlíky", is_word=None)
+    assert bez_filtru is not None
+    assert bez_filtru.pattern.known == [("obj", "knedlíky"),
+                                        ("subj", "uživatel")]
+
+
 def test_date_drill_card_builds_time_pattern():
     """Fáze 2d: 2-skokový drill „V kterém roce se narodila BN?" jako karta —
     část data z tabulky date_part_forms (třída cast_data), attr díra se

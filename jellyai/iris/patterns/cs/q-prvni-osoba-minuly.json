@@ -1,0 +1,27 @@
+{
+  "name": "q-prvni-osoba-minuly",
+  "trigger": {
+    "event": "utterance.query",
+    "priority": 5,
+    "pattern": [
+      "%{TAZACI}",
+      "%{PRVNI_OSOBA}",
+      "%{SLOVESO_MINULE}",
+      "?%{FUNKCNI}",
+      "?%{CAS}",
+      "?%{CAS}",
+      "%{ENTITA}"
+    ]
+  },
+  "action": {
+    "query": {
+      "hole": "$1",
+      "predicate": "$3",
+      "known": [
+        ["obj", "$7"]
+      ],
+      "user_subject": true
+    }
+  },
+  "teach": "Otázka v 1. osobě „Kdy jsem měl (v tomto roce) knedlíky?“ (#46 fáze 2d): podmětem je IDENTITA UŽIVATELE (uzel Mnemos — fakty 1. osoby ho nesou jako subj), jmenovaná entita je předmět. Volitelná časová slova („v tomto roce“, „letos“) nejsou účastníci — filtr intervalu drží Chronos z celé otázky."
+}

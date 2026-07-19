@@ -261,6 +261,10 @@ def _card_query(question, predicates, is_node=None, is_word=None):
         term = surface(ref(value))
         if term is not None:
             pattern.known.append((role, term))
+    if spec.get("user_subject"):
+        # 1. OSOBA („Kdy jsem měl…") — podmětem je IDENTITA UŽIVATELE
+        # (uzel Mnemos); pojmenované entity jsou předměty
+        pattern.known.append(("subj", lang["user_entity"]))
     if pattern.predicate is None and spec.get("hole_role") is None:
         # bez predikátu jen karta, která roli díry určila sama (relation);
         # jinak platí past 11 — neznámé sloveso jde fallbackem

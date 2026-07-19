@@ -135,6 +135,8 @@
     "CAST_DATA": "cast_data",
     "VZTAH": "vztah_dotazu",
     "FUNKCNI": "funkcni",
+    "PRVNI_OSOBA": "prvni_osoba",
+    "CAS": "cas",
     "SPONA": "spona",
     "SE": ":se",
     "DALSI": ":dalsi",
