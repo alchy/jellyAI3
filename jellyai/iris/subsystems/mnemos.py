@@ -211,9 +211,11 @@ def parse_statement(text, now, deck=None, is_node=None):
                 "predicate_surface": source_token or predicate}
     exclude_l = card.action.get("exclude_l_forms", False)
     # účastníci = obsahová slova: bez 1. osoby, spony, funkčních slov,
-    # potvrzení, ČASOVÝCH výrazů (interval už zlomil Chronos) a ČÁSTIC
+    # potvrzení, ČASOVÝCH výrazů (interval už zlomil Chronos), ČÁSTIC
     # (už/však/občas — deník míval „neprší (Už)" jako zmršený zápis, #24)
-    skip = {"prvni_osoba", "spona", "funkcni", "potvrzeni", "cas", "castice"}
+    # a TÁZACÍCH slov (vztažné „co" ve vsuvce „To co X jí…" není účastník)
+    skip = {"prvni_osoba", "spona", "funkcni", "potvrzeni", "cas", "castice",
+            "otaz"}
     objects = [t.form for t in tagged
                if not (skip & t.classes)
                # l-příčestí je uvnitř věty malými; KAPITALIZOVANÝ tvar, který

@@ -94,6 +94,11 @@ class PatternDeck:
         trig = card.trigger
         if trig.get("event") != event:
             return None
+        if trig.get("pattern"):
+            # VZOROVÁ karta se vybírá matchem sekvence (matcher), ne rysy —
+            # bez vazby by tu vyhrála NAPRÁZDNO (vakuová logika, past 2:
+            # vsuvka s prioritou 9 přebila kratke-sloveso 8 a rozbila zápis)
+            return None
         score = 0
         below = trig.get("assurance_below")
         if below is not None:

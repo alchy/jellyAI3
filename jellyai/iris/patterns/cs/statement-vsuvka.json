@@ -1,0 +1,23 @@
+{
+  "name": "statement-vsuvka",
+  "trigger": {
+    "event": "utterance.statement",
+    "priority": 9,
+    "pattern": [
+      ":to",
+      ":co",
+      "%{JMENO}",
+      "%{KRATKE_SLOVESO}",
+      "%{SPONA}",
+      "%{ZBYTEK}"
+    ]
+  },
+  "dialog": "Zapamatováno: {fact}",
+  "action": {
+    "memorize": "event",
+    "predicate_from": "pattern",
+    "predicate_slot": "$4",
+    "time_granularity": "moment"
+  },
+  "teach": "Vsuvková definice „To co Roník jí je strava.“ (spec §3, gap #45): vztažné „to co“ obaluje vnitřní klauzuli — predikátem faktu je JEJÍ sloveso (jí, katalog krátkých sloves), účastníci jsou podmět klauzule a definiens za sponou. Vztažné „co“ (třída otaz) ani spona účastníky nejsou — filtr objektů je zná. Spona je UPROSTŘED věty, ne na konci: tvar se nesplete s výrokem o bytu (homograf byt≡být)."
+}

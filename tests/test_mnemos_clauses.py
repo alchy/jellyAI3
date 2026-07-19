@@ -50,6 +50,16 @@ def test_confirmation_comma_keeps_whole_sentence():
     assert parses[0]["needs_subject"] is True
 
 
+def test_vsuvka_definition_parses_clean():
+    """Vsuvka „To co Roník jí je strava." (spec §3, gap #45): definiční
+    tvar s klauzulí uvnitř — predikát je sloveso vnitřní klauzule (jí),
+    účastníci Roník + strava; vztažné „co" ani spona v objektech nejsou."""
+    parses = parse_clauses("To co Roník jí je strava.", NOW, None)
+    assert len(parses) == 1
+    assert parses[0]["predicate"] == "jí"
+    assert parses[0]["objects"] == ["Roník", "strava"]
+
+
 def test_multi_memorize_stores_both_clauses():
     """Automat uloží OBA fakty souvětí, potvrzení je vyjmenuje a druhá
     klauzule je dotazatelná („Co má Roník?" → maso)."""
