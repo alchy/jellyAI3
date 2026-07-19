@@ -19,17 +19,12 @@ bez koncovky rodu/čísla, aby se „měl/měla/měli" potkaly).
 
 import json
 import os
-import re
 
 from jellyai.graph.canon import deaccent
 from jellyai.graph.extract import make_fact, Participant
 from jellyai.iris.subsystems.chronos import resolve_temporal
 from jellyai.lang import current
-
-# Hodnoty MIMO přirozený jazyk (e-mail) tokenizér rozbije (@, tečky) a tagger
-# neklasifikuje. Regexp je proto rozpozná JAKO CELEK a obejde jazykovou cestu —
-# adresa se nese jako jeden token typu "email".
-EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+\w")
+from jellyai.lang.lexer import EMAIL_RE, classify
 
 # Kmen jména pro shodu napříč pády ("Jindra"≈"Jindrovi" → "jindr"). POZOR:
 # záměrně NE cluster_key — ten slučuje i různé lidi (Pavel≡Pavla → jeden kmen),
@@ -47,13 +42,6 @@ def name_stem(name):
     return stem
 
 
-def _l_form(token):
-    """Kmen l-ového příčestí („měl"/„měla"/„měli" → „měl"); jinak None."""
-    low = token.lower()
-    stripped = low.rstrip("aioy")
-    return stripped if stripped.endswith("l") and len(stripped) >= 3 else None
-
-
 def _date_label(interval):
     """Interval → povrch časového uzlu grafu („17. července 2026").
 
@@ -65,62 +53,41 @@ def _date_label(interval):
     return f"{start.day}. {month} {start.year}"
 
 
-def _finite_verb(tokens, norms, is_node=None):
-    """Prézentní sloveso výroku („prší") — koncovky z jazykové tabulky.
-
-    ENTITY-FIRST: tvar, který se rozřeší na uzel grafu („nádraží" končí -í,
-    ale je to věc, ne děj), slovesem není. Funkční slova se přeskakují.
-
-    Returns:
-        str | None: Slovesný tvar (povrch), nebo None.
-    """
-    lang = current()
-    endings = lang["present_verb_endings"]
-    # cílený KATALOG bezdiakritických prézentních tvarů („prsi", „snezi") —
-    # koncovka „i" by jako pravidlo sloveso viděla v každém plurálu („psi");
-    # rozšiřuje se katalogem, ne univerzalizuje (poučení #32)
-    catalog_forms = set(lang.get("finite_verb_forms", ()))
-    for tok, norm in zip(tokens, norms):
-        if len(tok) < 3 or norm in lang["first_person"] \
-                or norm in lang["copula_forms"] \
-                or norm in lang["query_skip_words"]:
-            continue
-        if norm not in catalog_forms and not tok.lower().endswith(endings):
-            continue
-        if is_node is not None and is_node(tok):
-            continue
-        return tok
-    return None
+def _finite(tagged):
+    """První kandidát prézentního slovesa (třída lexeru), nebo None."""
+    return next((t for t in tagged if "sloveso_fin" in t.classes), None)
 
 
-def utterance_features(tokens, norms, is_node=None):
+def utterance_features(tagged):
     """RYSY výroku pro kartové triggery — kód nerozhoduje, jen měří.
+
+    Args:
+        tagged (list[TaggedToken]): Výstup lexeru (`classify`).
 
     Returns:
         set[str]: Podmnožina {"first_person", "copula", "l_verb",
-        "finite_verb"}.
+        "finite_verb", "email"}.
     """
-    lang = current()
     features = set()
-    if any(n in lang["first_person"] for n in norms):
+    if any("prvni_osoba" in t.classes for t in tagged):
         features.add("first_person")
-    if any(EMAIL_RE.fullmatch(t) for t in tokens):
+    if any("email" in t.classes for t in tagged):
         # Hodnota MIMO přirozený jazyk (e-mail): výrok je přiřazení atributu,
         # NE slovesné/sponové konstatování. Slovní rysy se proto POTLAČÍ, aby
         # spurious signály (slovo „email" končí na -l → vypadá jako l-příčestí)
         # nepřebily kartu atributu. Rys email pak zbývá jediná pasující cesta.
         features.add("email")
         return features
-    if any(n in lang["copula_forms"] for n in norms):
+    if any("spona" in t.classes for t in tagged):
         features.add("copula")
-    finite = _finite_verb(tokens, norms, is_node)
+    finite = _finite(tagged)
     if finite is not None:
         features.add("finite_verb")
     # l-příčestí: jméno „Marcela" po ořezu vypadá jako l-tvar — KAPITALIZOVANÝ
     # začátek věty se počítá, jen když věta nemá prézentní sloveso („Pršelo…")
-    if any(_l_form(t) and t != finite
-           and (t[:1].islower() or (i == 0 and finite is None))
-           for i, t in enumerate(tokens)):
+    if any(t.l_stem and (finite is None or t.form != finite.form)
+           and (t.form[:1].islower() or (i == 0 and finite is None))
+           for i, t in enumerate(tagged)):
         features.add("l_verb")
     return features
 
@@ -153,19 +120,13 @@ def parse_statement(text, now, deck=None, is_node=None):
         deck = PatternDeck.for_language("cs")
         deck.load()
     lang = current()
-    # koncová větná tečka pryč; tečkované zkratky (R.U.R.) zůstávají; e-mailová
-    # adresa se BERE JAKO CELEK (regexp má přednost před dělením na tečkách/@)
-    raw = re.findall(r"[\w.+-]+@[\w.-]+\.\w+|[\w.]+", text)
-    tokens = [t if EMAIL_RE.fullmatch(t)
-              else (t.rstrip(".") if "." not in t[:-1] else t) for t in raw]
-    tokens = [t for t in tokens if t]
-    norms = [deaccent(t.lower()) for t in tokens]
+    tagged = classify(text, is_node=is_node)
     # otázka bez otazníku („Kdo je Roník.") NENÍ konstatování — tázací
     # slovo na začátku vetuje zápis, dotaz jde dotazovou cestou
-    if norms and norms[0] in lang.get("question_words", ()):
+    if tagged and "otaz" in tagged[0].classes:
         return None
     card = deck.best("utterance.statement",
-                      {"features": utterance_features(tokens, norms, is_node)})
+                      {"features": utterance_features(tagged)})
     if card is None or "memorize" not in card.action:
         return None
     kind = card.action["memorize"]
@@ -175,12 +136,16 @@ def parse_statement(text, now, deck=None, is_node=None):
         # l-ové příčestí je uvnitř věty MALÝMI písmeny; kapitalizovaný kandidát
         # („Emil", „Marcela" po ořezu) je zpravidla jméno — predikátem se stává,
         # jen když jiný l-tvar není („Pršelo v Praze")
-        forms = [(t, _l_form(t)) for t in tokens]
-        source_token, predicate = next(
-            ((t, f) for t, f in forms if f and t[:1].islower()),
-            next(((t, f) for t, f in forms if f), (None, None)))
+        pick = next((t for t in tagged
+                     if t.l_stem and t.form[:1].islower()),
+                    next((t for t in tagged if t.l_stem), None))
+        if pick is not None:
+            source_token, predicate = pick.form, pick.l_stem
+        else:
+            predicate = None
     elif source == "finite_verb":
-        predicate = _finite_verb(tokens, norms, is_node)
+        finite = _finite(tagged)
+        predicate = finite.form if finite is not None else None
         source_token = predicate
     else:
         predicate = card.action.get("predicate")
@@ -204,45 +169,32 @@ def parse_statement(text, now, deck=None, is_node=None):
         # ATRIBUT s hodnotou mimo jazyk (e-mail): hodnota = adresa (regexp),
         # podmět = explicitní jméno ve výroku (nový person uzel — nemusí být
         # v korpusu), jinak identita uživatele. Predikát nese karta.
-        value = next((t for t in tokens if EMAIL_RE.fullmatch(t)), None)
+        value = next((t.form for t in tagged if "email" in t.classes), None)
         if value is None:
             return None
-        stop = (set(lang["first_person"]) | set(lang["copula_forms"])
-                | set(lang["query_skip_words"]) | set(lang["confirmation_words"])
-                | set(lang.get("possessive_words", ())))
-        name = next((t for t, n in zip(tokens, norms)
-                     if t[:1].isupper() and not EMAIL_RE.fullmatch(t)
-                     and n not in stop and len(t) > 1), None)
+        stop = {"prvni_osoba", "spona", "funkcni", "potvrzeni",
+                "privlastnovaci"}
+        name = next((t.form for t in tagged
+                     if t.form[:1].isupper() and "email" not in t.classes
+                     and not (stop & t.classes) and len(t.form) > 1), None)
         return {"kind": "attribute", "predicate": predicate, "objects": [value],
                 "subject": name or lang["user_entity"], "places": [],
                 "time": time_label, "card": card.name, "needs_subject": False}
-    temporal_words = (set(lang["temporal"].get("day_words", ()))
-                      | set(lang["temporal"].get("units", ()))
-                      | set(lang["temporal"].get("now_words", ()))
-                      # modifikátory časových výrazů („MINULÝ týden jsem byl…")
-                      # nejsou účastníci děje — interval už zlomil Chronos
-                      | set(lang["temporal"].get("last_words", ()))
-                      | set(lang["temporal"].get("next_words", ()))
-                      | set(lang["temporal"].get("current_words", ())))
     exclude_l = card.action.get("exclude_l_forms", False)
-    objects = [tok for tok, norm in zip(tokens, norms)
-               if norm not in lang["first_person"]
-               and norm not in lang["copula_forms"]
-               and norm not in lang["query_skip_words"]
-               and norm not in lang["confirmation_words"]
-               and norm not in temporal_words
-               # částice (už/ještě) nejsou účastníci děje — deník měl
-               # „neprší (Už)" jako zmršený zápis (#24)
-               and norm not in lang.get("particle_words", ())
+    # účastníci = obsahová slova: bez 1. osoby, spony, funkčních slov,
+    # potvrzení, ČASOVÝCH výrazů (interval už zlomil Chronos) a ČÁSTIC
+    # (už/však/občas — deník míval „neprší (Už)" jako zmršený zápis, #24)
+    skip = {"prvni_osoba", "spona", "funkcni", "potvrzeni", "cas", "castice"}
+    objects = [t.form for t in tagged
+               if not (skip & t.classes)
                # l-příčestí je uvnitř věty malými; KAPITALIZOVANÝ tvar, který
                # po ořezu vypadá jako l-tvar („Karla", „Emil"), je jméno a
                # z objektů vypadnout nesmí (výrok by se ztratil / přišel o podmět)
-               and not (exclude_l and tok[:1].islower()
-                        and _l_form(tok) is not None)
+               and not (exclude_l and t.form[:1].islower() and t.l_stem)
                # sloveso není účastník — vylučuje se i POVRCHOVÝ zdroj
                # predikátu („Potkal"→potkal, „bydlel"→bydlet po katalogu)
-               and tok != predicate and tok != source_token
-               and len(tok) > 1]
+               and t.form != predicate and t.form != source_token
+               and len(t.form) > 1]
     if (not objects and not card.action.get("allow_no_objects")) \
             or (kind == "observation" and len(objects) < 2):
         return None
@@ -250,10 +202,10 @@ def parse_statement(text, now, deck=None, is_node=None):
     # je místo — dostane roli loc/geo („Marcela bydlí V PETROVICÍCH"),
     # aby „Kde bydlí…?" i kontejnment („v Čechách?") měly za co vzít
     places = []
-    for i, tok in enumerate(tokens[:-1]):
-        if deaccent(tok.lower()) in ("v", "ve", "na") \
-                and tokens[i + 1] in objects:
-            places.append(tokens[i + 1])
+    for i, tok in enumerate(tagged[:-1]):
+        if tok.norm in ("v", "ve", "na") \
+                and tagged[i + 1].form in objects:
+            places.append(tagged[i + 1].form)
     return {"kind": kind, "predicate": predicate, "objects": objects,
             "places": places, "time": time_label, "card": card.name,
             "needs_subject": card.action.get("subject_from") == "context"}

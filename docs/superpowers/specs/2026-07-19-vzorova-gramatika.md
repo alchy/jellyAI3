@@ -147,7 +147,33 @@ poctivým terminálem — to je lepší než zmršený zápis.
   (clarify karta), ne heuristikou v kódu.
 - Katalogy výjimek zůstávají v lexeru (datech) — vzory je nedublují.
 
-## 8. Vztah k jellyV4
+## 8. Inspirace a odlišení (klasická počítačová lingvistika)
+
+Srovnání s přehledem oboru (blackblog.cz/uvod-do-pocitacove-lingvistiky,
+doporučil user — ilustrace, ne zadání):
+
+- **Tagová polysémie** („jarní" má až 27 možných značek) je přesně důvod,
+  proč lexer vrací MNOŽINY hypotéz a nerozhoduje předčasně — plná
+  morfologická disambiguace izolovaného tvaru je prohraná bitva (viz
+  Marcele→Marcel); rozhodovat má stavba věty, a co nerozhodne, jde do
+  poctivého dialogu.
+- **Dvouúrovňová morfologie** (Koskeniemi — konečné automaty nad
+  alternacemi kmene: vůz→vozu, švec→ševce): projekt už její zárodek MÁ
+  (`palatal_fold`, `epenthesis_vowel` v cs.json, používá Topos
+  kontejnment). Až přijde vlastní lematika (#32), patří TOHLE do lexeru
+  jako kmenová vrstva — formalizovat existující tabulky, ne stavět nové.
+- **ATN** článek potvrzuje jako historický formalismus přesně toho, co
+  zadavatel popsal („rekurzivní přechodové sítě s podmínkami") — a náš
+  návrh je vědomě NEopakuje: místo obecné sítě regulární vzory + jedna
+  klauzulová úroveň + deck.best (viz §3, §7).
+- **Volný slovosled** (neprojektivita: „Soubor se nepodařilo otevřít")
+  je hlavní riziko sekvenčních vzorů: „Marcela bydlí v Petrovicích" i
+  „V Petrovicích bydlí Marcela" musí matchnout. Řešení dle zákona
+  projektu: ENUMERACE vzorů (dva řádky, ne permutační operátor) —
+  benchmark ukáže, kolik pořadí reálně žije; permutační magie do vzorů
+  nepatří (§7).
+
+## 9. Vztah k jellyV4
 
 Toto JE brána [1] z `docs/proposed-architecture/jellyV4.md`, stavěná
 inkrementálně uvnitř V3: lexer = jádro brány (zatím bez ÚFAL kontextu),
