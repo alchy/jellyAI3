@@ -30,6 +30,15 @@ def _keys(name):
     vowels = "aeiouy"
     if len(base) > 2 and base[-1] not in vowels and base[-2] not in vowels:
         out.add(base[:-1] + "e" + base[-1])   # epenteze: „Plzni" ↔ „Plzeň"
+    for key in list(out):
+        # DRUHÝ ořez (dávka D): nominativ v gazetteeru mohl přijít
+        # o delší koncovku než pádový tvar otázky („Jeruzalém"→jeruzal
+        # přes -ém, ale „Jeruzalémě"→…→jeruzalem přes -ě + epentezi) —
+        # klíče se míjely a místní filtr se u těchto míst nikdy
+        # nenárokoval; délková pojistka ≥ 4 proti zmršení
+        again = deaccent(_stem(key))
+        if again != key and len(again) >= 4:
+            out.add(again)
     fold = current().get("palatal_fold", {})
     for key in list(out):
         if key and key[-1] in fold:

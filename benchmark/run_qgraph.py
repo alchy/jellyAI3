@@ -204,7 +204,8 @@ def main():
             actual = answerer.turn.query_card
             # DEKORACE (T3): nároky se měří tam, kde answerer opravdu
             # běžel — shadow předpověď vs. skutečně aplikované filtry
-            want = decorate(question, now=_now())
+            want = decorate(question, now=_now(),
+                            is_area=answerer._is_area)  # pylint: disable=protected-access
             got = _actual_decorations(answerer)
             if want == got:
                 deco_agree += 1

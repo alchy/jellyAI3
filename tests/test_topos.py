@@ -84,3 +84,15 @@ def test_rain_in_prague_answers_by_containment():
     assert iris.turn("Pršelo v Čechách?").text == "Ano"
     out = iris.turn("Pršelo na Moravě?")
     assert out.text != "Ano"
+
+
+def test_keys_druhy_orez_lokativ_singularu():
+    """Dávka D (nález při T7/B7): „Jeruzalém" se v gazetteeru ořízne na
+    „jeruzal" (-ém), ale lokativ „Jeruzalémě" jen na „jeruzalem" — klíče
+    se minuly a místní filtr se u těchto míst nikdy nenárokoval. Druhý
+    ořez (s délkovou pojistkou ≥ 4) je srovná; „Betlémě" týž vzor."""
+    from jellyai.iris.subsystems.topos import _key, _keys
+    assert _key("Jeruzalém") in _keys("Jeruzalémě")
+    assert _key("Betlém") in _keys("Betlémě")
+    assert _key("Praha") in _keys("Praze")        # palatalizace drží dál
+    assert _key("Plzeň") in _keys("Plzni")        # epenteze drží dál

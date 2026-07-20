@@ -41,12 +41,19 @@ vstupu a answerer má kaskádu poctivých odpovědí.
 
 ## 2. Stav (2026-07-20 večer — den otázkového grafu, ~50 commitů)
 
-- **Metriky:** 582 testů; etalon 33/33 (GAP 11 opraveno / 4 —
-  deterministicky, #58 vyřešen; Kafarnaum řádek čeká na gazetteer
-  seed dávky D), focus 12/12, dialog 45/45 (GAP 8/0), ZÁPIS 34/34,
-  qgraph harness 5 rovin (dispatch, výroky, stav, dekorace, etalon)
-  100 % v obou variantách. Etalon i dialog ověřeny bitově shodné
-  napříč PYTHONHASHSEED.
+- **Metriky:** 591 testů; etalon 35/35 (GAP 12 opraveno / 3,
+  deterministicky — #58 vyřešen), focus 12/12, dialog 45/45 (GAP 8/0),
+  ZÁPIS 34/34, qgraph harness 5 rovin (dispatch, výroky, stav,
+  dekorace, etalon) 100 % v obou variantách. Etalon i dialog ověřeny
+  bitově shodné napříč PYTHONHASHSEED.
+- **Refaktor blok (2026-07-20 pozdě večer):** TurnResult
+  (`answerer.turn`, `begin_turn()`, pick_focus/query_card parametry
+  answer()), lint karet (KNOWN_EVENTS + QUERY_ACTION_KEYS — mrtvá
+  resolve-miss zakonzervována), JEDNO osvětlení na tah (vítězná
+  dotazová karta hintem), `facts_of_predicates` primitivum,
+  DOTAZOVÁ polovina dávky D (nárok oblasti u děrových otázek,
+  druhý ořez klíčů gazetteeru, díra ukotvená místem — „Kdo se
+  narodil v Betlémě?" → Ježíš).
 - **Otázkový graf (#57 + #51) KOMPLETNÍ:** kompilát karet s PĚTI
   rodinami uzlů (otazka/vyrok/prikaz/worker/clarify) je JEDINÝM
   dispatcherem vstupu — přímí experti přes registr claimů
@@ -146,7 +153,7 @@ Plná tabulka priorit: BACKLOG + protokol
 
 | P | Bod | Tip kudy do toho |
 |---|---|---|
-| 1 | **D — extrakční/hygienová dávka** (pasivum, imperativy „Tyč"/„Proste", klauzule jako objekt, gazetteer seed — Kafarnaum chybí!) | vzory v `graph/hygiene.py` (hlasování) a `extract.py`; VYŽADUJE přestavbu grafu (`./jelly graph`) + kontrolu id v benchmarcích (past 5); dělej v čerstvé session |
+| 1 | **D — extrakční/hygienová dávka, ZBÝVAJÍCÍ polovina** (pasivum, imperativy „Tyč"/„Proste", klauzule jako objekt; dotazová polovina ✅ hotová — viz BACKLOG #2; REVIZE: Kafarnaum v gazetteeru BYL) | vzory v `graph/hygiene.py` (hlasování) a `extract.py`; VYŽADUJE přestavbu grafu (`./jelly graph`) + kontrolu id v benchmarcích (past 5); dělej v čerstvé session |
 | 2 | **C10 — formát odpovědí (zárodek Echo #20)** | výroky po jednom v uvozovkách, agregace větami, nominativizace hodnot v textech, kandidáti nabídky bez 2× výpisu; šablony v cs.json, skládání v answereru |
 | 3 | **#8 fáze 2 — střepy Ježíše** | spec `2026-07-18-jmenny-uzel-instance.md`; NEslučuj statisticky (změřeno!); po každém kroku benchmarky |
 | 4 | **T5/E1b — předložkové dekorační prvky karet** („s kým", „k Ježíšovi") | rozšíření rodin q-otaz o volitelné dekorační prvky; pasti 9–11 |

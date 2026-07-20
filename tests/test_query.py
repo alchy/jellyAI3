@@ -246,3 +246,34 @@ def test_verb_match_deterministic_pres_hash_seedy():
             capture_output=True, text=True, check=True)
         results.add(out.stdout.strip())
     assert results == {"udělat"}
+
+
+def test_oblast_za_predlozkou_je_filtr_ne_ucastnik():
+    """T7/B7 (dávka D): oblast za místní předložkou („v Kafarnaum") je
+    tvrdý filtr Toposu, ne účastník — dřív se u děrových otázek tiše
+    zahodila a „Co udělal Ježíš v Kafarnaum?" odpovídalo BEZ místa."""
+    q = build_query("Co udělal Ježíš v Kafarnaum?", {"udělat"},
+                    is_area=lambda t: t == "Kafarnaum")
+    assert q is not None
+    assert q.place == "Kafarnaum"
+    assert all(term != "Kafarnaum" for _, term in q.pattern.known)
+
+
+def test_hola_oblast_bez_predlozky_zustava_tematem():
+    """Předložkový guard: holá oblast bez „v/ve/na" je téma otázky
+    („Kde ležel Kafarnaum?"), ne filtr."""
+    q = build_query("Kde ležel Kafarnaum?", {"ležet"},
+                    is_area=lambda t: t == "Kafarnaum")
+    assert q is not None and q.place is None
+
+
+def test_sloveso_plus_oblast_bez_znamych_je_validni_dotaz():
+    """Dávka D: „Kdo se narodil v Betlémě?" — span „Betlémě" se na uzel
+    nerozřeší, ale sloveso + nárokovaná oblast stačí: díra subj se plní
+    z faktů predikátu UVNITŘ oblasti (tvrdý filtr místo účastníka)."""
+    q = build_query("Kdo se narodil v Betlémě?", {"narodit"},
+                    is_area=lambda t: t == "Betlémě")
+    assert q is not None
+    assert q.place == "Betlémě"
+    assert q.pattern.predicate == "narodit"
+    assert q.pattern.hole_role == "subj" and q.pattern.known == []

@@ -185,7 +185,7 @@ def turn_features(text, tagged=None):
     return frozenset(features)
 
 
-def decorate(text, now=None):
+def decorate(text, now=None, is_area=None):
     """DEKORUJÍCÍ nároky tahu (T3 spec — druhý druh rozsvěcení).
 
     Nároky expertů NEsoutěží s uzly otázek: věší se na vítěze jako
@@ -213,6 +213,15 @@ def decorate(text, now=None):
             # adresáta nese holý dativ (nález retest B4)
             found.add("role:adresat")
             break
+    if is_area is not None:
+        # topos:oblast — táž tabulka předložek (grok PREDL_MISTA) a týž
+        # gazetteer, kterými parser nárokuje místní filtr (dávka D)
+        preps = set(lang.get("pattern_aliases", {}).get("PREDL_MISTA", ":")
+                    .lstrip(":").split("|"))
+        for i, token in enumerate(tagged):
+            if i and tagged[i - 1].norm in preps and is_area(token.form):
+                found.add("topos:oblast")
+                break
     norms = {token.norm for token in tagged}
     if "dalsi" in norms:
         found.add("novost")

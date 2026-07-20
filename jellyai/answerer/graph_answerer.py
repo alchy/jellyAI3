@@ -13,7 +13,7 @@ from datetime import datetime
 from jellyai.answerer.base import Answer, Answerer
 from jellyai.graph.graph import parse_date
 from jellyai.iris.subsystems.chronos import resolve_temporal
-from jellyai.iris.subsystems.topos import (_key as _topos_key,
+from jellyai.iris.subsystems.topos import (_keys as _topos_keys,
                                            area_keys, load_gazetteer,
                                            place_within)
 from jellyai.lang import current
@@ -448,6 +448,11 @@ class GraphAnswerer(Answerer):
             # bez predikátu nelze; pojmenoval-li něco, co pattern nezachytil (RUR),
             # NEhádat z kontextu — kontext je jen pro skutečně navazující dotaz
             return None, [], None
+        if self.place_filter is not None and pat.hole_role:
+            # DÍRA UKOTVENÁ OBLASTÍ (dávka D): „Kdo se narodil v Betlémě?"
+            # nemá rozřešeného známého — kotvou je místní filtr; kontextem
+            # se s místním filtrem nehádá (B7)
+            return self._place_anchored(pat)
         for candidate in self._context_candidates():   # navazující dotaz → z těžiště
             if not self._gender_ok(qa, candidate):
                 continue                     # „narodil?" ≠ ženská entita (a naopak)
@@ -869,9 +874,43 @@ class GraphAnswerer(Answerer):
         self.visited.extend(p.node for f in chosen for p in f.participants)
         return node0, [_event_text(f) for f in chosen], chosen[0]
 
+    def _place_anchored(self, pat):
+        """Díra ukotvená MÍSTEM (dávka D): bez známého účastníka projde
+        fakty predikátového kruhu uvnitř oblasti otázky (tvrdý filtr už
+        platí přes `_place_excluded`) a plní díru; pozorovatel není
+        odpověď (theme/uzel uživatele) ani oblast sama.
+
+        Returns:
+            tuple: (téma = oblast otázky, hodnoty, nejtěžší fakt).
+        """
+        ring = {p for p, _ in _synonym_ring(pat.predicate)}
+        user = current().get("user_entity")
+        weight_by_value, best = {}, None
+        for _, fact in self.graph.facts_of_predicates(ring):
+            if self._time_excluded(fact) or self._place_excluded(fact):
+                continue
+            for p in fact.participants:
+                if p.role != pat.hole_role or p.node == user \
+                        or p.node == self.place_filter \
+                        or place_within(p.node, self.place_filter,
+                                        self._gazetteer):
+                    continue
+                if fact.weight > weight_by_value.get(p.node, 0):
+                    weight_by_value[p.node] = fact.weight
+                if best is None or fact.weight > best.weight:
+                    best = fact
+        if not weight_by_value:
+            return None, [], None
+        values = [v for v, _ in sorted(weight_by_value.items(),
+                                       key=lambda kv: -kv[1])][:_MAX_ENUM]
+        return self.place_filter, values, best
+
     def _is_area(self, token):
-        """Slovo otázky je OBLASTÍ gazetteeru (kmenově) — nárok Topos."""
-        return _topos_key(token) in self._area_keys
+        """Slovo otázky je OBLASTÍ gazetteeru — nárok Topos. Porovnává
+        se přes pádové VARIANTY klíče (`_keys`: palatalizace, epenteze,
+        druhý ořez) — týž slovník, kterým měří `place_within`; jediný
+        klíč míjel singulárové lokativy („Jeruzalémě", dávka D)."""
+        return bool(_topos_keys(token) & self._area_keys)
 
     def _place_excluded(self, fact):
         """Fakt bez účastníka UVNITŘ oblasti otázky (kontejnment Topos).

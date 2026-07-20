@@ -481,6 +481,20 @@ def build_query(question, predicates, is_node=None, is_word=None,
             break
     if date_part and hole_role == "attr":
         hole_role, hole_type = "time", "time"
+    # OBLAST za místní předložkou („v Kafarnaum") NENÍ účastník — je to
+    # tvrdý filtr kontejnmentu (brána Q Toposu, T7/B7); bez nároku se
+    # oblast u děrových otázek tiše zahodila a otázka se zodpověděla
+    # BEZ místa. Předložkový guard: holá oblast je téma („Kde ležel
+    # Kafarnaum?"), ne filtr; tabulka předložek = grok PREDL_MISTA.
+    place = None
+    if is_area is not None:
+        preps = set(lang["pattern_aliases"].get("PREDL_MISTA", ":")
+                    .lstrip(":").split("|"))
+        for k, tok in enumerate(tokens):
+            if k and _norm(tokens[k - 1]) in preps and is_area(tok):
+                place = tok
+                tokens = tokens[:k - 1] + tokens[k + 1:]
+                break
     known = _collect_known(tokens, predicates, relational, is_node)
     if known is None:                          # sirotek v běhu — nehádat
         return None
@@ -489,7 +503,7 @@ def build_query(question, predicates, is_node=None, is_word=None,
         return Query(pattern, qtype=qtype, verb_lemma=verb,
                      is_copula=copula_tok is not None,
                      topic_terms=_leftover_terms(tokens, pattern, predicates),
-                     gender=gender)
+                     gender=gender, place=place)
 
     # 1) vztahová otázka: „Kdo byl bratr X?" → vztahové jméno = predikát;
     #    POD SLOVESEM je vztah vnořený dotaz („Kde se narodil bratr X?" →
@@ -512,8 +526,11 @@ def build_query(question, predicates, is_node=None, is_word=None,
                 return _wrap(Pattern(_norm(rel), [("obj", term)],
                                      "subj", "person"))
 
-    # 2) predikát ze slovníku grafu (slovesný tvar → lemma prefixem)
-    if verb is not None and known:
+    # 2) predikát ze slovníku grafu (slovesný tvar → lemma prefixem);
+    #    místo známého účastníka stačí i NÁROKOVANÁ oblast (dávka D):
+    #    „Kdo se narodil v Betlémě?" = díra subj nad fakty predikátu
+    #    uvnitř oblasti — span „Betlémě" se na uzel rozřešit nemusí
+    if verb is not None and (known or place):
         if any(_norm(t) in lang["first_person"] for t in tokens):
             # 1. OSOBA („Kdy jsem měl…") — podmětem je IDENTITA UŽIVATELE
             # (uzel Mnemos); pojmenované entity jsou předměty
