@@ -50,7 +50,7 @@
 {"q": "Co řekl Ježíš v Jeruzalémě?", "expect": ["učitel Izraele"], "cat": "místní filtr (D)"}
 {"q": "Kdo byl pokřtěn?", "expect": ["Ježíš"], "cat": "pasivum (D)"}
 {"q": "Kdo prostrčil tyče?", "expect": ["nenašel"], "reject": ["Tyč"], "cat": "hygiena imperativů (D)"}
-{"q": "Kde byl Ježíš pokřtěn?", "expect": ["Jordán"], "reject": ["Mesiáš"], "gap": "mezivětná inference: dotazová strana pasiva HOTOVÁ (karta q-pasivum, pacient→obj) a figl Mesiáš padl (reject drží), ale korpus místo křtu v jedné klauzuli nenese — Jordán je jen v „přišel k Jordánu, aby se dal pokřtít“ (účelová klauzule; směr P1c/klauzule, případně #41)"}
+{"q": "Kde byl Ježíš pokřtěn?", "expect": ["Jordán"], "reject": ["Mesiáš"], "gap": "#59 meziklauzulová inference: dotazová strana pasiva HOTOVÁ (karta q-pasivum, pacient→obj) a figl Mesiáš padl (reject drží), ale korpus místo křtu v jedné klauzuli nenese — Jordán je jen v „přišel k Jordánu, aby se dal pokřtít“ (Matouš; Marek s přímou větou v korpusu není). Zezelená mechanismem #59a (účelová klauzule dědí místo z pohybové řídící věty), NE úpravou očekávání"}
 {"q": "Kdy byla vydána korespondence?", "expect": ["2009"], "cat": "pasivum dotaz (D/P1b)"}
 {"q": "Co řekl Ježíš Petrovi?", "expect": ["„satane“"], "cat": "formát výroků (C10)"}
 {"q": "Co víme o Janu Křtiteli?", "expect": ["pokání;"], "cat": "formát agregace (C10)"}

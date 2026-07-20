@@ -165,21 +165,23 @@ Plná tabulka priorit: BACKLOG + protokol
 
 | P | Bod | Tip kudy do toho |
 |---|---|---|
-| 1 | **D — HOTOVO obě poloviny** ✅ (viz BACKLOG #2). Zbytky dávky: ADJ participia pasiva (409 vět), dotazová strana pasiva (gap „Kde byl Ježíš pokřtěn?"), klauzule jako objekt | mechanismy hotové jsou vzorem: `scrub_false_persons` + `name_position_votes` (hlasování jmennosti), pasivní větev v `extract_facts`, fold v `make_fact` |
-| 2 | **C10 — formát odpovědí (zárodek Echo #20)** | výroky po jednom v uvozovkách, agregace větami, nominativizace hodnot v textech, kandidáti nabídky bez 2× výpisu; šablony v cs.json, skládání v answereru |
-| 3 | **#8 fáze 2 — střepy Ježíše** | spec `2026-07-18-jmenny-uzel-instance.md`; NEslučuj statisticky (změřeno!); po každém kroku benchmarky |
-| 4 | **T5/E1b — předložkové dekorační prvky karet** („s kým", „k Ježíšovi") | rozšíření rodin q-otaz o volitelné dekorační prvky; pasti 9–11 |
-| 5 | **#41 oceán vrstev** | zárodek nad ději = `predicate_classes`; entity přes druh-hrany; přímý fakt > zděděný |
-| 6 | **Odpovědní graf + TurnResult** (park → otevřít) | spec dotažení §1; sjednotí 9 side-channelů answereru (postrehy-refaktor 2.1) a dokončí rozklad `_turn` |
-| 7 | **#39 provenience, #47 event log, #17 nález** (memory.jsonl tracked × reminders ne) | před dalšími zapisovateli (Ollama #30, STT #42) |
-| — | Drobné: #28 okno Paměť, #36 font, #21 httpx, #15 kbelík, #50 sparse | „při nejbližším dotyku" |
+| 1 | **run_chain — řetězový etalon** (user chce; multi-hop „detektivka") | strukturální rovina: nejkratší cesta v grafu; behaviorální: tahy dialogu do vyřešení; kategorie: kompozice rolí, tranzitivita Topos, časová inference, identita/aliasy; generace otázek ze schématu = inverze SubQuery |
+| 2 | **#59 meziklauzulová inference** (zadání user 2026-07-20) | (a) účelová klauzule dědí místo/čas z POHYBOVÉ řídící věty („přišel k Jordánu, aby se dal pokřtít" — movement_predicates + k+dativ existují), (b) elidovaný podmět účelové klauzule (vzor: dědění podmětu parse_clauses #46 f. 4); měřítko = gap „Kde byl Ježíš pokřtěn?"→Jordán zezelená MECHANISMEM; inference nikdy nepřebije přímý fakt |
+| 3 | **Echo #20 — pokračování C10** | ÚPLNOST výroků (uzel nese fragment „satane" — `_clause_content` limit 8, seká od hlavy klauzule), řečová brána výroků na neřečových slovesech (nález P1c: 429 predikátů s výroky, vydat/přijít z parataxis), skládání vět, nominativizace hodnot mimo Kde |
+| 4 | **#8 fáze 2 — body 1+3** | bod 1 instance per odstavec — smíšené holé uzly („Josef" = biblický ∪ malíř) jsou PŘÍČINA, proč otisk lže (změřeno při bodu 2!); bod 3 jmenovka jako uzel; spec `2026-07-18-jmenny-uzel-instance.md`; NEslučuj statisticky |
+| 5 | **#41 oceán vrstev** | zárodek nad ději = `predicate_classes`; entity přes druh-hrany; přímý fakt > zděděný (týž princip jako #59) |
+| 6 | **Odpovědní graf + TurnResult dokončení** (park → otevřít) | spec dotažení §1; TurnResult už stojí (value_kind přibylo v C10), zbývá rozklad `_turn` |
+| 7 | **#39 provenience, #47 event log, #17 nález** (memory.jsonl tracked × reminders ne) | před dalšími zapisovateli (Ollama #30, STT #42); #59 odvozené fakty provenienci potřebují taky |
+| — | Drobné: #28 okno Paměť, #36 font, #21 httpx, #15 kbelík, #50 sparse, #12 Galileji fold | „při nejbližším dotyku" |
+| — | Volitelná DATOVÁ zkratka k #59: přidat Marka do korpusu (Mk 1,9 „byl v Jordánu od Jana pokřtěn" — extrakce už umí) | user zvolil mechanismus; Marek je nezávislý bonus, kdyby přišel, gap řádek přepnout na jinou inferenční otázku |
 
 Deploy: produkce `jelly.ithosaudio.eu` (server mail1.lordaudio.eu,
-user tech) — po pushi `git pull` + restart Iris (`--port 8084
---model data/graph.pkl`); handshake `GET /version` MUSÍ ukázat
-aktuální SHA (past: běžela ranní verze a testovala se stará).
-POZOR: produkční `data/memory.jsonl` je paměť uživatele — při pullu
-nesmí být přepsána (je tracked — nález #17).
+user tech) — postup a pasti v runbooku `/www/jelly/DEPLOY-ithosaudio.md`
+(archiv → staging → rsync BEZ --delete a BEZ data/; po rsync
+POROVNAT `patterns/cs/` se stagingem — past 20; graf přestavět na
+serveru `./jelly graph`; /version na archivu hlásí sha=unknown).
+POZOR: produkční `data/memory.jsonl` je paměť uživatele — nesmí být
+přepsána (je tracked — nález #17).
 
 ## 6. Pasti (draze zaplacené — neopakuj)
 
