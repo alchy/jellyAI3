@@ -108,3 +108,29 @@ empty-topic (kontextové patro → vysvětlení s kandidáty subjektů
 predikátu) + zobecněný typový guard person děr (T11) — největší
 viditelný skok kvality, měřitelné řádky existují. Pak A2 třídy dějů
 (cíl testu „zázraky" stále nesplněn) a C10 formát výčtů (Echo).
+
+---
+
+## RETEST 2 (2026-07-20 odpoledne, po „konci figlů" + A2)
+
+| Otázka | Retest 1 | Retest 2 |
+|---|---|---|
+| Koho potkal Ježíš? | figl „Šimon" | **nabídka**: „O ději… nevím nic o: Ježíš. Vím o: Mojžíš, …, Jidáš…" → volba „Jidáš" → **„člověk"** (přehrání substitucí) ✅ |
+| Kdo se setkal s Mojžíšem? | „Boží Hora" (loc jako osoba) | **částečná odpověď**: „kdo nevím; vím kde: Boží Hora" ✅ |
+| Kdo přišel k Ježíšovi? | figl „Ježíš Nazaretský" | poctivá nabídka (figl pryč) ✅ — ale obnažen T13 |
+| Jaké zázraky činil Ježíš? | assurance-fail | **„zázrak (Ježíš): vyhnat — slovo; uzdravit — nemocný; uzdravovat — nemoc, choroba, nemocný."** ✅ |
+| Koho vzkřísil Ježíš? | clarifikace ✓ | beze změny ✓ |
+
+**KLÍČOVÉ NÁLEZY IMPLEMENTACE (Empirie):** (1) „Kdo napsal R.U.R.?"
+je odpověď ASOCIAČNÍHO patra — fakt napsat neexistuje; kontext nelze
+vypnout plošně. (2) Hranice figl × nosná asociace = ROZVĚTVENOST
+tématu (hub Ježíš 209 × řídké R.U.R. 24; práh context_hub_limit).
+(3) Verdikt rolí přes celý vidový kruh (_ring_roles). (4) Sponové
+predikáty do kaskády nepatří (cascade_skip_predicates). (5) „k+dativ"
+je směr, ne adresát.
+
+**NOVÉ DROBNÉ NÁLEZY:** T13 — normalizace sloves volí špatný kmen
+(„přišel"→přisednout, „potkal"→potkávat; kryto ring-rolemi, ale text
+odpovědi nese špatné lemma); kosmetika nabídky (kandidáti vypsáni
+2× — text answereru i karty); „nemocný" chybí ve výčtu „uzdravoval"
+(ranking, k prozkoumání).
