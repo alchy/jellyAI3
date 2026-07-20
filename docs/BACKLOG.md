@@ -56,7 +56,7 @@
 | 17 | Infra | ✅ **HOTOVO** (2026-07-20 pozdě večer): README sekce „Mapa data/“ — tabulka cesta × druh (odvozené / statický zdroj / uživatelský sklad) × vzniká × verzováno × co znamená smazání; zásada: odvozené se přegenerují, uživatelské sklady (memory, reminders, gazetteer-učení) jsou nenahraditelné. | NÁLEZ k rozhodnutí: memory.jsonl (osobní deník) JE verzovaný v gitu, reminders.jsonl ne — nekonzistence; na produkci (ithosaudio) hrozí kolize při pullu. Sjednotit až s #39/#47. | ✓ |
 | 21 | Infra | viewBase python testy: chybí httpx2 (6 souborů nekolektuje). | Doinstalovat/upravit testclient. | 16 |
 | 19 | Experiment | Hybridní aktivace uzel × hrana. | Metrika → prototyp za flagem. | 17 |
-| 20 | Vize | Osobnost/hlas databáze (persona nad Echo). | Závisí na Echo (kompozice). | 18 |
+| 20 | Vize | Osobnost/hlas databáze (persona nad Echo). **ZÁRODEK C10 HOTOV** (2026-07-20 noc, P2): výroky po jednom v českých uvozovkách (quote_format), děje/agregace středníkem (event_separator + TurnResult.value_kind), theme/time/num mimo obsah _event_text (fallback pro jen-theme fakty), nabídka empty-topic bez 2× výpisu kandidátů (jen data karty); 2 etalon řádky (formát C10). ZBÝVÁ pro plné Echo: skládání celých vět, ÚPLNOST výroků (uzel nese fragment „satane" místo „Jdi mi z cesty, satane!" — _clause_content seká od hlavy klauzule, limit 8), řečová brána výroků na neřečových slovesech (nález P1c: vydat/přijít z parataxis), nominativizace hodnot mimo Kde (kvalita id = #12/#33). | Závisí na Echo (kompozice). | 18 |
 
 ## Otevřené z runtime Mnemos — nevyřešené (2026-07-18, deploy jelly.ithosaudio.eu)
 
