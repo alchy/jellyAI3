@@ -186,7 +186,8 @@ def _query_deck():
     return shared_deck("cs")     # jeden deck za proces (postřeh 1.2)
 
 
-def _card_query(question, predicates, is_node=None, is_word=None):
+def _card_query(question, predicates, is_node=None, is_word=None,
+                card_hint=None):
     """Dotaz podle VZOROVÉ KARTY (#46 fáze 2): regulární sekvence tříd
     lexeru na kartě (event `utterance.query`) → pseudo-QL `Pattern`.
 
@@ -206,19 +207,34 @@ def _card_query(question, predicates, is_node=None, is_word=None):
     lang = current()
     aliases = lang.get("pattern_aliases", {})
     best = None
-    for card in _query_deck().cards:
-        if card.trigger.get("event") != "utterance.query":
-            continue
-        sequence = card.trigger.get("pattern")
-        if not sequence:
-            continue
-        binding = match_sequence(expand_pattern(sequence, aliases),
-                                 tagged, is_span=is_node)
-        if binding is None:
-            continue
-        key = (card.trigger.get("priority", 0), len(sequence))
-        if best is None or key > best[0]:
-            best = (key, card, binding)
+    if card_hint is not None:
+        # HINT z osvětlení tahu (#51): vítězný uzel `otazka` je táž
+        # karta, kterou by našel sken níže (illuminate taguje dotazovou
+        # rodinu týmž is_word lexerem, klíč i tie-break jsou shodné) —
+        # match se ověří jen na ní; neprojde-li, jede se plný sken
+        hinted = next((c for c in _query_deck().cards
+                       if c.name == card_hint), None)
+        sequence = hinted.trigger.get("pattern") if hinted else None
+        if sequence:
+            binding = match_sequence(expand_pattern(sequence, aliases),
+                                     tagged, is_span=is_node)
+            if binding is not None:
+                best = ((hinted.trigger.get("priority", 0), len(sequence)),
+                        hinted, binding)
+    if best is None:
+        for card in _query_deck().cards:
+            if card.trigger.get("event") != "utterance.query":
+                continue
+            sequence = card.trigger.get("pattern")
+            if not sequence:
+                continue
+            binding = match_sequence(expand_pattern(sequence, aliases),
+                                     tagged, is_span=is_node)
+            if binding is None:
+                continue
+            key = (card.trigger.get("priority", 0), len(sequence))
+            if best is None or key > best[0]:
+                best = (key, card, binding)
     if best is None:
         return None
     _, card, binding = best
@@ -320,7 +336,7 @@ def _card_query(question, predicates, is_node=None, is_word=None):
 
 
 def build_query(question, predicates, is_node=None, is_word=None,
-                is_area=None):  # pylint: disable=too-many-locals,too-many-return-statements,too-many-branches
+                is_area=None, card_hint=None):  # pylint: disable=too-many-locals,too-many-return-statements,too-many-branches
     """Otázku (končící „?") přeloží šablonou nad slovníkem grafu na `Query`.
 
     Args:
@@ -343,7 +359,8 @@ def build_query(question, predicates, is_node=None, is_word=None,
         return None
     # VZOROVÉ KARTY mají přednost (#46 fáze 2): plně ukotvený match je
     # těsnější než poziční šablony; nesedí-li žádná, jede se postaru
-    card_query = _card_query(question, predicates, is_node, is_word)
+    card_query = _card_query(question, predicates, is_node, is_word,
+                             card_hint=card_hint)
     if card_query is not None:
         return card_query
     tokens = re.findall(r"[\w.]+", question)

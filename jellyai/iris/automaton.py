@@ -251,15 +251,20 @@ class IrisAutomaton:
                             return self._set_reminder(pending["task"], due,
                                                       text, record=pending)
                         return self._set_reminder(pending, due, text)
-            # DISPATCH VÝROKOVÉ POLOVINY (#51 fáze 3): JEDNO osvětlení
-            # pro celý blok — vítězná rodina/karta určuje větev; ruční
-            # pořadí větví nahradily PRIORITY příkazových karet.
-            # Sémantika je STRIKTNÍ: selže-li handler vítěze, tah jde
-            # poctivě dál (žádné zkoušení dalších příkazů) — pořadí
-            # nerozhoduje kód, ale data
-            lit = illuminate(text, self.qgraph, now=self.clock(),
-                             is_node=self.answerer._span_is_node)
-            winner = lit[0] if lit else None
+        # JEDNO OSVĚTLENÍ TAHU (#51): týž výsledek směruje příkazy,
+        # výroky, recall I dotazovou kartu — počítá se až po případném
+        # přepsání textu volbou; dotazová rodina se taguje entity-first
+        # vetem answereru (is_word), takže vítěz otazka = karta answereru
+        lit = illuminate(text, self.qgraph, now=self.clock(),
+                         is_node=self.answerer._span_is_node,
+                         is_word=self.answerer._node_word)
+        winner = lit[0] if lit else None
+        if pick is None and "?" not in text:
+            # DISPATCH VÝROKOVÉ POLOVINY (#51 fáze 3): vítězná rodina/
+            # karta určuje větev; ruční pořadí větví nahradily PRIORITY
+            # příkazových karet. Sémantika je STRIKTNÍ: selže-li handler
+            # vítěze, tah jde poctivě dál (žádné zkoušení dalších
+            # příkazů) — pořadí nerozhoduje kód, ale data
             handled = self._command_turn(winner, text)
             if handled is not None:
                 return handled
@@ -279,10 +284,8 @@ class IrisAutomaton:
         # (#51 fáze 4): cmd-recall smí nést otazník (otázka na paměť
         # dialogu) a prioritou přebíjí dotazové karty; Chronos filtr
         # nad timestampy Mnemos zůstává mechanismem
-        lit_q = illuminate(text, self.qgraph, now=self.clock(),
-                           is_node=self.answerer._span_is_node)
-        if lit_q and lit_q[0].kind == "prikaz" \
-                and lit_q[0].card == "cmd-recall":
+        if winner is not None and winner.kind == "prikaz" \
+                and winner.card == "cmd-recall":
             recalled = self._recall_query(text)
             if recalled is not None:
                 return recalled
@@ -300,8 +303,13 @@ class IrisAutomaton:
         # jas PŘED tahem: „zaostřil už uživatel?" — tah sám si téma rozsvítí,
         # takže čtení po odpovědi by jistotu falešně zvedlo
         before = dict(self.answerer.context.scores)
+        # vítězná dotazová karta z osvětlení → answerer ji nemusí hledat
+        # znovu (týž matcher i klíč — viz docstring illuminate)
+        q_node = next((n for n in lit if n.kind == "otazka"), None)
         answer = self.answerer.answer(text, [], temperature=temperature,
-                                      pick_focus=pick_focus)
+                                      pick_focus=pick_focus,
+                                      query_card=q_node.card if q_node
+                                      else None)
         res = self.answerer.turn.resolution
         if res is not None:
             glow = before.get(res["winner"], 0.0)

@@ -132,6 +132,7 @@ def main():
             text = turn["u"]
             shadow = illuminate(text, qgraph, now=_now(),
                                 is_node=iris.answerer._span_is_node,  # pylint: disable=protected-access
+                                is_word=iris.answerer._node_word,  # pylint: disable=protected-access
                                 use_weights=use_weights)
             standing_in_clarify = (position.node is not None
                                    and position.node.kind == "clarify")
@@ -197,6 +198,7 @@ def main():
         for question in questions:
             shadow = illuminate(question, qgraph, now=_now(),
                                 is_node=answerer._span_is_node,  # pylint: disable=protected-access
+                                is_word=answerer._node_word,  # pylint: disable=protected-access
                                 use_weights=use_weights)
             answerer.answer(question, [])
             actual = answerer.turn.query_card

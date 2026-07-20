@@ -1087,7 +1087,7 @@ class GraphAnswerer(Answerer):
         return [v for v, w in ranked if w >= top * (1.0 - temperature)]
 
     def answer(self, question, retrieved, *, temperature=0.0,
-               pick_focus=None):
+               pick_focus=None, query_card=None):
         """Odpoví 2-skokem grafu; při neúspěchu deleguje na fallback.
 
         Uloží i `last_trace` (téma → fakt → hodnota). **Teplota** `> 0` navíc vrátí
@@ -1116,7 +1116,8 @@ class GraphAnswerer(Answerer):
         # strana UDPipe nevolá; šablony nic → nehádat, poctivé „nenašel"
         qa, pat = None, None
         query = build_query(question, self._predicates, self._span_is_node,
-                            self._node_word, self._is_area)
+                            self._node_word, self._is_area,
+                            card_hint=query_card)
         if query is not None:
             qa, pat = query, query.pattern
             self.place_filter = getattr(query, "place", None)

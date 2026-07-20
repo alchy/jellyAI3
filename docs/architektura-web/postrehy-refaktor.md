@@ -12,7 +12,11 @@ dokumentace) a hrubý návrh směru.
 load spadne nahlas na překlep — první úlovek: mrtvá karta resolve-miss,
 zakonzervována), **2.1** (TurnResult: `answerer.turn` + `begin_turn()`,
 pick_focus je parametr answer() — bitová parita, dialog ověřen napříč
-hash seedy); částečně 1.1 (sdílené jen jádro těsnosti
+hash seedy), **jedno osvětlení na tah** (nový nález nad rámec seznamu:
+_turn volal illuminate 2× a dotazová polovina vítěze nepoužívala —
+teď jediné osvětlení, dotazová rodina tagovaná entity-first vetem
+answereru a vítězná karta předaná answereru hintem s fallback skenem);
+částečně 1.1 (sdílené jen jádro těsnosti
 `trigger_specificity`) a 4.1 (instance_lit přesunut ke grafu).
 Zbytek otevřen — provádět „při nejbližším dotyku", každý se svým
 měřením.*

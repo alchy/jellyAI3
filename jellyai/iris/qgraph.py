@@ -261,7 +261,8 @@ class DialogPosition:
         return target
 
 
-def illuminate(text, qgraph, now=None, is_node=None, use_weights=False):
+def illuminate(text, qgraph, now=None, is_node=None, use_weights=False,
+               is_word=None):
     """Osvětlení tahu: kdo z uzlů svítí a jak silně.
 
     Tier 3 = přímý expert (nárok obsahu řádku: Metronův výraz, hodinová
@@ -269,6 +270,12 @@ def illuminate(text, qgraph, now=None, is_node=None, use_weights=False):
     uzly otázek (priorita, délka vzoru — týž klíč jako deck). Clarify
     uzly text nesvítí — aktivují se STAVEM (hranou z otázky), měří je
     shadow proti skutečným dialog tahům.
+
+    `is_word` = entity-first veto answereru (doslovné slovo uzlu):
+    dotazová rodina se pak taguje TÝMŽ lexerem jako `_card_query` —
+    vítězný uzel `otazka` je tak PROKAZATELNĚ táž karta, kterou by
+    vybral answerer (týž matcher, klíč i tie-break), a smí se mu
+    předat jako hint. Rysové rodiny (vyrok/prikaz) tagging nemění.
 
     Returns:
         list[QNode]: Rozsvícené uzly, nejsilnější první ([] = tma).
@@ -280,12 +287,13 @@ def illuminate(text, qgraph, now=None, is_node=None, use_weights=False):
         if claim.recognize(text, moment):
             lit.append(((3, claim.priority, 0), qgraph.nodes[claim.name]))
     tagged = classify(text, is_node=None)
+    tagged_query = classify(text, is_node=is_word) if is_word else tagged
     aliases = lang.get("pattern_aliases", {})
     features = turn_features(text, tagged)
     for node in qgraph.nodes.values():
         if node.kind == "otazka":
             binding = match_sequence(expand_pattern(node.pattern, aliases),
-                                     tagged, is_span=is_node)
+                                     tagged_query, is_span=is_node)
             if binding is None:
                 continue
             # týž klíč jako deck (priorita, délka vzoru); varianta s vahami
