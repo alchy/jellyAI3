@@ -69,6 +69,23 @@ class Node:
     weight: int = 0
 
 
+def instance_lit(predicate, hole_role, roles_of):
+    """Verdikt líné instance (rodina × predikát) nad schématem (E3/#51).
+
+    Patří ke grafu (postřeh 4.1) — čistá funkce nad schématem rolí.
+
+    Returns:
+        bool | None: True = role díry ve schématu je; False = fakty
+        predikátu roli nikdy nenesou (hledání je marné — chytrá
+        clarifikace); None = predikát neznám / bez rolí (vakuový
+        guard, past 2 — nesoudit).
+    """
+    roles = roles_of(predicate) if predicate else frozenset()
+    if not roles:
+        return None
+    return hole_role in roles if hole_role else None
+
+
 @dataclass
 class FactNode:
     """Reifikovaný fakt (uzel).

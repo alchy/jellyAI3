@@ -20,6 +20,7 @@ from jellyai.answerer.pattern import SubQuery, Pattern
 from jellyai.answerer.query import build_query, Query
 from jellyai.answerer.template import _to_nominative
 from jellyai.graph.activation import ActivationField
+from jellyai.graph.graph import instance_lit
 from jellyai.graph.canon import _stem, name_gender, deaccent
 
 _DATE_PARTS = {"rok", "měsíc", "den"}   # drill: „v kterém roce/měsíci…"
@@ -512,7 +513,6 @@ class GraphAnswerer(Answerer):
             # kontextové patro jen pro ENTITNÍ díry (kdo napsal X…); identita/
             # vlastnost (pred/attr) ani zjišťovací otázka (díra None) kontextem
             # nehádají — poctivé „nenašel" je lepší než nejtěžší soused
-            from jellyai.iris.qgraph import instance_lit
             if instance_lit(getattr(pat, "predicate", None), pat.hole_role,
                             self.graph.predicate_roles) is False:
                 # PRÁZDNÁ ROLE (T3/T4): fakty predikátu roli nikdy nenesou —
@@ -1127,7 +1127,6 @@ class GraphAnswerer(Answerer):
         místo generického terminálu vyjmenovat role, které děj zná.
         Vakuové guardy (past 2): bez predikátu, díry nebo rolí se nesoudí.
         """
-        from jellyai.iris.qgraph import instance_lit
         predicate = getattr(pat, "predicate", None)
         hole_role = getattr(pat, "hole_role", None)
         if instance_lit(predicate, hole_role,

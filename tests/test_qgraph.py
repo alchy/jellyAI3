@@ -155,7 +155,7 @@ def test_instance_ze_schematu_predikatu():
     """E3: instance svítí jen s rolí díry ve schématu; neznámý
     predikát nebo prázdné role = ŽÁDNÝ verdikt (vakuum, past 2)."""
     from config import Config
-    from jellyai.iris.qgraph import instance_lit
+    from jellyai.graph.graph import instance_lit
     from jellyai.tasks import make_graph_answerer
 
     graph = make_graph_answerer(Config()).graph
