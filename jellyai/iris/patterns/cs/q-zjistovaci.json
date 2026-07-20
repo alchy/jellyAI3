@@ -1,0 +1,18 @@
+{
+  "name": "q-zjistovaci",
+  "trigger": {
+    "event": "utterance.query",
+    "priority": 3,
+    "pattern": ["<sloveso>", "?%{ENTITA}", "?%{ENTITA}"],
+    "dimensions": [
+      {"slot": "<sloveso>", "values": [
+        {"suffix": "-minuly", "element": "%{SLOVESO_MINULE}"},
+        {"suffix": "-prezens", "element": "%{SLOVESO}"}]}
+    ]
+  },
+  "action": {
+    "query": {"predicate": "$1",
+              "known": [["subj", "$2"], ["obj", "$3"]]}
+  },
+  "teach": "RODINNÁ karta zjišťovacích otázek (#57 E1): predikát na začátku věty (dimenze ČAS: l-ové příčestí „Napsal Karel Čapek Válku s mloky?“ / prézens „Prší?“, „Bydlí Marcel v Petrovicích?“), volitelní účastníci jsou spany potvrzené grafem s rolemi subj/obj, díra žádná → answerer zkoumá EXISTENCI faktu (Ano / poctivé nenašel / „Ne, od T ne-…“ při negované evidenci). Bez účastníků holá existence predikátu. Nerozřešený span = karta nesedí a otázka jde poziční šablonou (bezpečný fallback)."
+}

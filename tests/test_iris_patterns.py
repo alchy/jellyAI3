@@ -6,6 +6,7 @@ bez zásahu do kódu; jiný jazyk = jiný adresář karet.
 """
 
 import json
+import os
 import pytest
 
 from jellyai.iris.patterns import PatternDeck
@@ -147,3 +148,19 @@ def test_deck_rozvine_rodinu_q_otaz():
     assert cards["q-otaz-prezens-prodrop"].trigger["pattern"] == [
         "%{TAZACI}", "?%{SE}", "%{SLOVESO}"]
     assert cards["q-otaz-prezens-prodrop"].trigger["priority"] == 3
+
+
+def test_deck_rozvine_rodinu_q_zjistovaci():
+    deck = PatternDeck.for_language("cs")
+    deck.load()
+    cards = {card.name: card for card in deck.cards}
+    for jmeno, sloveso in (("q-zjistovaci-minuly", "%{SLOVESO_MINULE}"),
+                           ("q-zjistovaci-prezens", "%{SLOVESO}")):
+        assert cards[jmeno].trigger["pattern"] == [
+            sloveso, "?%{ENTITA}", "?%{ENTITA}"]
+        assert cards[jmeno].trigger["priority"] == 3
+        assert cards[jmeno].action["query"]["known"] == [
+            ["subj", "$2"], ["obj", "$3"]]
+    assert not os.path.exists(os.path.join(
+        PatternDeck.for_language("cs").directory,
+        "q-zjistovaci-minuly.json"))
