@@ -63,6 +63,7 @@ def compile_qgraph(deck, predicates=frozenset(), telemetry_rows=(),
         QGraph: Uzly (otázky, workeři, clarify) s hranami a vahami.
     """
     nodes = {}
+    has_hole, clarify_events = {}, []
     for card in deck.cards:
         trigger = card.trigger
         if trigger.get("event") == "utterance.query" and trigger.get("pattern"):
@@ -70,23 +71,29 @@ def compile_qgraph(deck, predicates=frozenset(), telemetry_rows=(),
                 name=card.name, kind="otazka", worker="graf",
                 pattern=trigger["pattern"], card=card.name,
                 priority=trigger.get("priority", 0))
+            has_hole[card.name] = bool(
+                card.action.get("query", {}).get("hole"))
         elif trigger.get("event") in _CLARIFY_EVENTS:
             nodes[card.name] = QNode(
                 name=card.name, kind="clarify", worker="dialog",
                 card=card.name,
                 edges=[QEdge("navrat", "*")])   # po volbě přehraj otázku
+            clarify_events.append((card.name, trigger["event"]))
     # PŘÍMÍ EXPERTI — worker uzly z registru claimů (#57 E2, zárodek #26)
     if claims is None:
         from jellyai.iris.claims import default_claims
         claims = default_claims()
     for claim in claims:
         nodes[claim.name] = QNode(claim.name, "worker", claim.worker)
-    clarify_names = [n.name for n in nodes.values() if n.kind == "clarify"]
     for node in nodes.values():
         if node.kind == "otazka":
-            # digging: otázka smí pokračovat zpřesněním (homonymum,
-            # přetečení, nízká jistota) — graf si ostří focus dialogem
-            node.edges = [QEdge("zpresneni", name) for name in clarify_names]
+            # digging hrany se ODVOZUJÍ z dat karet (#57 E4), žádný
+            # kartézský součin: statement clarify z otázky nevede,
+            # přetečení dává smysl jen u výčtových děr
+            node.edges = [
+                QEdge("zpresneni", name) for name, event in clarify_events
+                if not event.startswith("statement.")
+                and (event != "data.overflow" or has_hole.get(node.card))]
     for row in telemetry_rows:                   # váhy uzlů z provozu
         for pattern_name in row.get("patterns", ()):
             if pattern_name in nodes:

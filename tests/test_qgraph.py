@@ -166,3 +166,18 @@ def test_instance_ze_schematu_predikatu():
     assert instance_lit("napsat", "obj", roles_of) is True
     assert instance_lit("napsat", "loc", roles_of) is False
     assert instance_lit("blafnout", "loc", roles_of) is None
+
+
+def test_clarify_hrany_se_odvozuji():
+    """E4: hrany otázka→clarify z dat karet (díra × event), ne
+    kartézský součin — statement clarify z otázky nevede, overflow
+    jen z výčtových děr."""
+    qg = _graph()
+    otaz = qg.nodes["q-otaz-minuly"]           # má díru
+    cile = {e.target for e in otaz.edges if e.kind == "zpresneni"}
+    assert "focus-offer-overflow" in cile
+    assert "clarify-identity" not in cile       # statement-side
+    zjist = qg.nodes["q-zjistovaci-prezens"]    # bez díry
+    cile = {e.target for e in zjist.edges if e.kind == "zpresneni"}
+    assert "focus-offer-overflow" not in cile   # existence nepřeteče
+    assert "focus-offer-homonym" in cile
