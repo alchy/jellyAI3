@@ -129,3 +129,21 @@ def test_expand_family_dira_nesmi_mirit_na_prazdny_slot():
     data["action"]["query"]["predicate"] = "$3"
     with pytest.raises(ValueError):
         _expand_family(data)
+
+
+def test_deck_rozvine_rodinu_q_otaz():
+    deck = PatternDeck.for_language("cs")
+    deck.load()
+    cards = {card.name: card for card in deck.cards}
+    assert cards["q-otaz-minuly"].trigger["pattern"] == [
+        "%{TAZACI}", "?%{SE}", "%{SLOVESO_MINULE}", "%{ENTITA}"]
+    assert cards["q-otaz-minuly"].trigger["priority"] == 4
+    assert cards["q-otaz-minuly-prodrop"].trigger["pattern"] == [
+        "%{TAZACI}", "?%{SE}", "%{SLOVESO_MINULE}"]
+    assert cards["q-otaz-minuly-prodrop"].trigger["priority"] == 3
+    assert cards["q-otaz-minuly-prodrop"].action["query"] == {
+        "hole": "$1", "predicate": "$3"}
+    # NOVÁ kombinace z rozvinutí — ručně nikdy nenapsaná:
+    assert cards["q-otaz-prezens-prodrop"].trigger["pattern"] == [
+        "%{TAZACI}", "?%{SE}", "%{SLOVESO}"]
+    assert cards["q-otaz-prezens-prodrop"].trigger["priority"] == 3

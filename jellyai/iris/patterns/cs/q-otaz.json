@@ -1,0 +1,19 @@
+{
+  "name": "q-otaz",
+  "trigger": {
+    "event": "utterance.query",
+    "pattern": ["%{TAZACI}", "?%{SE}", "<sloveso>", "<ucastnik>"],
+    "dimensions": [
+      {"slot": "<sloveso>", "values": [
+        {"suffix": "-minuly", "element": "%{SLOVESO_MINULE}"},
+        {"suffix": "-prezens", "element": "%{SLOVESO}"}]},
+      {"slot": "<ucastnik>", "values": [
+        {"suffix": "", "element": "%{ENTITA}", "priority": 4},
+        {"suffix": "-prodrop", "element": null, "priority": 3}]}
+    ]
+  },
+  "action": {
+    "query": {"hole": "$1", "predicate": "$3", "known": ["$4"]}
+  },
+  "teach": "RODINNÁ karta tázacích otázek s dírou (#57 E1): kostra tázací slovo + ?se + sloveso + účastník, dimenze ČAS (minulý/prézens) × ELIPSE (plná/prodrop) — rozvinutí při načtení decku vyrobí q-otaz-minuly („Kdo napsal R.U.R.?“), q-otaz-prezens („Kde bydlí Marcela?“), q-otaz-minuly-prodrop („Kdy se narodil?“) a q-otaz-prezens-prodrop („Kde bydlí?“). Díru určuje tázací slovo (interrogatives), predikát je sloveso ve slotu, entita span potvrzený grafem. Prodrop varianty (nižší priorita, ukotvení na konec věty) nechají podmět doplnit z konverzačního těžiště: l-tvar nese rodovou shodu, prézens rod nenese a bere nejžhavější téma."
+}
