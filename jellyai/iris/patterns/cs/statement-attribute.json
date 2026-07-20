@@ -1,8 +1,20 @@
 {
   "name": "statement-attribute",
-  "trigger": {"event": "utterance.statement", "priority": 12,
-              "requires": ["email"]},
+  "trigger": {
+    "event": "utterance.statement",
+    "priority": 12,
+    "requires": [
+      "email"
+    ],
+    "forbids": [
+      "otaznik"
+    ]
+  },
   "dialog": "Zapamatováno: {fact}",
-  "action": {"memorize": "attribute", "predicate": "email", "value_type": "email"},
+  "action": {
+    "memorize": "attribute",
+    "predicate": "email",
+    "value_type": "email"
+  },
   "teach": "Atribut osoby s hodnotou MIMO přirozený jazyk (Jindra má email X zavináč Y): e-mailovou adresu rozpozná regexp a obejde tokenizér i tagger, hodnota dostane typ email. Podmětem je jméno z výroku (nový uzel osoby, nemusí být v korpusu), jinak identita uživatele; predikát email, uživatel je zdroj (theme). Rys email dá kartě nejvyšší prioritu, takže sloveso mít se nesklasifikuje jako obyčejný děj."
 }

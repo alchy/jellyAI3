@@ -1,8 +1,20 @@
 {
   "name": "statement-episode-copular",
-  "trigger": {"event": "utterance.statement", "priority": 8,
-              "requires": ["first_person", "copula"]},
+  "trigger": {
+    "event": "utterance.statement",
+    "priority": 8,
+    "requires": [
+      "first_person",
+      "copula"
+    ],
+    "forbids": [
+      "otaznik"
+    ]
+  },
   "dialog": "Zapamatováno: {fact}",
-  "action": {"memorize": "episode", "predicate": "být"},
+  "action": {
+    "memorize": "episode",
+    "predicate": "být"
+  },
   "teach": "Sponová epizoda: 1. osoba + spona bez příčestí (Jsem doma). Predikát je identitní být, podmětem identita uživatele."
 }

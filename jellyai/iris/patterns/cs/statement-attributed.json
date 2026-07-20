@@ -1,10 +1,23 @@
 {
   "name": "statement-attributed",
-  "trigger": {"event": "utterance.statement", "priority": 6,
-              "requires": ["l_verb"],
-              "forbids": ["first_person", "copula"]},
+  "trigger": {
+    "event": "utterance.statement",
+    "priority": 6,
+    "requires": [
+      "l_verb"
+    ],
+    "forbids": [
+      "first_person",
+      "copula",
+      "otaznik"
+    ]
+  },
   "dialog": "Zapamatováno: {fact}",
-  "action": {"memorize": "attributed", "predicate_from": "l_verb",
-             "exclude_l_forms": true, "subject_from": "context"},
+  "action": {
+    "memorize": "attributed",
+    "predicate_from": "l_verb",
+    "exclude_l_forms": true,
+    "subject_from": "context"
+  },
   "teach": "Připsaný fakt (Měl KČ rád knedlíky? -> nenašel -> ano, měl rád knedlíky): tvrzení ve 3. osobě s elidovaným podmětem. Podmětem je explicitní osoba ve výroku, jinak nejteplejší osoba konverzačního těžiště (o kom se právě mluvilo); bez svítící osoby se NIC nepřipisuje. Uživatel tak obohacuje znalosti o korpusových entitách — fakt jde do deníku paměti."
 }

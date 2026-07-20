@@ -10,6 +10,9 @@
       "%{KRATKE_SLOVESO}",
       "%{SPONA}",
       "%{ZBYTEK}"
+    ],
+    "forbids": [
+      "otaznik"
     ]
   },
   "dialog": "Zapamatováno: {fact}",

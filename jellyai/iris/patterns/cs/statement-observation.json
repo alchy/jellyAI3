@@ -1,8 +1,20 @@
 {
   "name": "statement-observation",
-  "trigger": {"event": "utterance.statement", "priority": 5,
-              "requires": ["copula"], "forbids": ["first_person"]},
+  "trigger": {
+    "event": "utterance.statement",
+    "priority": 5,
+    "requires": [
+      "copula"
+    ],
+    "forbids": [
+      "first_person",
+      "otaznik"
+    ]
+  },
   "dialog": "Zapamatováno: {fact}",
-  "action": {"memorize": "observation", "predicate": "být"},
+  "action": {
+    "memorize": "observation",
+    "predicate": "být"
+  },
   "teach": "Pozorování o světě: sponová věta bez 1. osoby (Venku je teplo). Uživatel je u faktu pozorovatel (theme), Chronos přidá čas výroku. Past: slova jako teplo nebo světlo vypadají jako l-příčestí — sponová karta má přednost, proto tu l_verb není podmínkou ani překážkou."
 }

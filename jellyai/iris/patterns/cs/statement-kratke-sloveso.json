@@ -8,6 +8,9 @@
       "?%{JMENO}",
       "%{KRATKE_SLOVESO}",
       "%{ZBYTEK}"
+    ],
+    "forbids": [
+      "otaznik"
     ]
   },
   "dialog": "Zapamatováno: {fact}",
