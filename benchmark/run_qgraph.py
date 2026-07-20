@@ -57,7 +57,7 @@ def _actual_route(response, qgraph):
         return _WORKER_NODES["iris"]
     for name in patterns:
         node = qgraph.nodes.get(name)
-        if node is not None and node.kind in ("otazka", "clarify"):
+        if node is not None and node.kind in ("otazka", "clarify", "vyrok"):
             return name
     if list(components) == ["chronos"] and not patterns:
         return _WORKER_NODES["chronos"]
@@ -120,6 +120,7 @@ def main():
 
     agree = miss = skipped = ties = 0
     state_agree = state_miss = 0
+    vyrok_agree = vyrok_miss = 0
     deco_agree = deco_miss = 0
     disagreements = []
     with open(DIALOG, encoding="utf-8") as fh:
@@ -148,10 +149,25 @@ def main():
                     state_miss += 1
                     disagreements.append((text, actual or "—", "navrat"))
                 continue
-            if actual is None or ("?" not in text and actual_node is not None
-                                  and actual_node.kind == "clarify"):
-                # mimo rozsah: výroková polovina (T6 spec — jiný graf:
-                # typy VÝROKŮ, brána E) a tahy bez směrování textem
+            if actual_node is not None and actual_node.kind == "vyrok":
+                # ROVINA VÝROKY (#51 fáze 1): shoda vítěze osvětlení se
+                # skutečně vybranou výrokovou kartou (brána E)
+                if shadow and shadow[0].name == actual:
+                    vyrok_agree += 1
+                else:
+                    vyrok_miss += 1
+                    disagreements.append(
+                        (text, actual, shadow[0].name if shadow else "—"))
+                continue
+            if actual is None:
+                skipped += 1                 # mimo rozsah (příkazy aj.)
+                continue
+            if "?" not in text and actual_node.kind == "clarify":
+                # VÝROKOVÁ clarify (identita podmětu #43): graf stojí ve
+                # výroku a ostří — pozice, ne dispatch (#51 spec §3)
+                if shadow:
+                    position.enter(shadow[0].name)
+                position.sharpen(actual)
                 skipped += 1
                 continue
             if _agrees(shadow, actual, qgraph):
@@ -215,8 +231,11 @@ def main():
     deco_total = deco_agree + deco_miss
     state_pct = 100 * state_agree // state_total if state_total else 0
     deco_pct = 100 * deco_agree // deco_total if deco_total else 0
+    vyrok_total = vyrok_agree + vyrok_miss
+    vyrok_pct = 100 * vyrok_agree // vyrok_total if vyrok_total else 0
     print(f"\nQGRAPH SHADOW [{args.variant}]: dialog {agree}/{total} "
-          f"({pct} %), stav {state_agree}/{state_total} ({state_pct} %), "
+          f"({pct} %), výroky {vyrok_agree}/{vyrok_total} ({vyrok_pct} %), "
+          f"stav {state_agree}/{state_total} ({state_pct} %), "
           f"dekorace {deco_agree}/{deco_total} ({deco_pct} %), "
           f"mimo rozsah {skipped}, remíz {ties}   "
           f"etalon {et_agree}/{et_total} ({et_pct} %)")

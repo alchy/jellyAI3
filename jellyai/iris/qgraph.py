@@ -104,6 +104,12 @@ def compile_qgraph(deck, predicates=frozenset(), telemetry_rows=(),
                 QEdge("zpresneni", name) for name, event in clarify_events
                 if not event.startswith("statement.")
                 and (event != "data.overflow" or has_hole.get(node.card))]
+        elif node.kind == "vyrok":
+            # zrcadlo výrokové poloviny (#51): z výroku vede jen
+            # VÝROKOVÁ clarify (identita podmětu #43)
+            node.edges = [
+                QEdge("zpresneni", name) for name, event in clarify_events
+                if event.startswith("statement.")]
     for row in telemetry_rows:                   # váhy uzlů z provozu
         for pattern_name in row.get("patterns", ()):
             if pattern_name in nodes:
