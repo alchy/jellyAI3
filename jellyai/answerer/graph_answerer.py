@@ -512,7 +512,16 @@ class GraphAnswerer(Answerer):
             # kontextové patro jen pro ENTITNÍ díry (kdo napsal X…); identita/
             # vlastnost (pred/attr) ani zjišťovací otázka (díra None) kontextem
             # nehádají — poctivé „nenašel" je lepší než nejtěžší soused
-            values, fact = self._match("kontext", known_set, pat.hole_role, pat.hole_type)
+            from jellyai.iris.qgraph import instance_lit
+            if instance_lit(getattr(pat, "predicate", None), pat.hole_role,
+                            self.graph.predicate_roles) is False:
+                # PRÁZDNÁ ROLE (T3/T4): fakty predikátu roli nikdy nenesou —
+                # asociace by vyráběla figl („Koho vzkřísil?" → „Šimon");
+                # nech projít na chytrou clarifikaci (E3)
+                pass
+            else:
+                values, fact = self._match("kontext", known_set,
+                                           pat.hole_role, pat.hole_type)
         if not values and len(known_set) > 1:
             # výběrová otázka: konceptový known bez místa ve faktu = TYPOVÝ
             # filtr díry (join: napsat(X, ?) ∧ být(?, hra) → „Jakou hru…")
@@ -584,6 +593,11 @@ class GraphAnswerer(Answerer):
                             and part.node == current()["user_entity"]:
                         # POZOROVATEL není odpověď: uživatel v roli theme je
                         # metadata zápisu Mnemos, ne účastník děje (#34)
+                        continue
+                    if part.role == "theme" and hole_type == "person":
+                        # okolnost (theme) nesmí plnit OSOBNÍ díru — „Koho
+                        # vzkřísil?" nesmí vrátit „den" (T4); obsahové díry
+                        # bez typu (řeč) theme odpovídat SMÍ (143 výroků)
                         continue
                     if part.role == "time" and hole_role != "time" \
                             and hole_type != "time":
@@ -1122,7 +1136,9 @@ class GraphAnswerer(Answerer):
         lang = current()
         labels = lang.get("role_labels", {})
         roles = self.graph.predicate_roles(predicate)
-        known = ", ".join(sorted(labels[r] for r in roles if r in labels))
+        # pořadí výčtu = pořadí tabulky role_labels (kdo, co, kde, kdy,
+        # kolik), ne abeceda (T-nález A3)
+        known = ", ".join(labels[r] for r in labels if r in roles)
         missing = labels.get(hole_role)
         template = lang.get("empty_role_answer")
         if not known or missing is None or template is None:

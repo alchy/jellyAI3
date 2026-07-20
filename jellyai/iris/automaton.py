@@ -419,6 +419,9 @@ class IrisAutomaton:
         trace = self.answerer.last_trace
         if not isinstance(trace, dict) or trace.get("fact") is None:
             return None
+        if trace.get("predicate") == "kontext":
+            # asociace není fakt děje — nabídka by figl zesilovala (T3)
+            return None
         fact = self.answerer.graph.facts.get(trace["fact"])
         pat = self.answerer.last_pattern
         if fact is None or pat is None \

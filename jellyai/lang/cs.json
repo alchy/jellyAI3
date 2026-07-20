@@ -24,6 +24,8 @@
                        "vnučka", "strýc", "teta", "přítel", "přítelkyně",
                        "kolega", "žák", "učitel", "soused"],
   "predicate_synonyms": [["bydlet", "žít", "sídlit"],
+    ["uzdravit", "uzdravovat"],
+    ["potkat", "setkat", "setkávat", "potkávat"],
                          ["napsat", "sepsat"],
                          ["zemřít", "skonat", "zahynout"],
                          ["putovat", "cestovat", "pobývat", "dlít",
