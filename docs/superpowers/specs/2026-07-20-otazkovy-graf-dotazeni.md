@@ -188,6 +188,21 @@ za běhu Mnemosem musí instance dostat také — slovník roste).
 naučený predikát nesmí propadnout (instanční vrstva musí vidět
 aktuální slovník, ne jen kompilát).
 
+**Empirie E3 (2026-07-20 večer, větev qgraph-dispatch) — PŘIJATO:**
+`FactGraph.predicate_roles()` čte schéma ŽIVĚ z faktů (Mnemos
+predikáty instance vidí), `instance_lit()` v qgraph.py dává verdikt
+s vakuovým guardem (neznámý predikát/prázdné role = None, nesoudí se
+— past 2). „Kde napsal R.U.R.?" → „O ději „napsat“ vím co, kdo; kde
+nevím." (šablona `empty_role_answer` + `role_labels` v cs.json).
+Oba gap řádky FIXED (etalon GAP 6/3, dialog GAP 4/0), parita úplná
+(572 testů, harness 42/42 obě varianty). NÁLEZ: první realizace jako
+KARTA v automatu prošla jen dialog benchmarkem — etalon měří čistý
+answerer; verdikt je odpovědní pravidlo, ne dialogový akt → přesun do
+answereru (šablona = data). Druhý nález: automat čte trace None jako
+miss a přebíjel verdikt kartou assurance-fail — příznak
+`last_empty_role` říká „jistota, ne nejistota“ a dialogové karty se
+obcházejí.
+
 ### E4 — Odvozené hrany (řeší D; závisí na E3)
 
 **Hypotéza:** zpřesňovací hrany se odvodí z typu aktu (overflow jen
