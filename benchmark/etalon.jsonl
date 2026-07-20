@@ -41,3 +41,6 @@
 {"q": "Koho vzkřísil Ježíš?", "expect": ["nevím"], "reject": ["den"], "cat": "prázdná díra", "gap": "T4/B6: theme (den) nesmí plnit person díru — po guardu je obj prázdná role a nastoupí chytrá clarifikace"}
 {"q": "Kdo se setkal s Toničkou Bradáčovou?", "expect": ["Verunka"], "cat": "třída setkání (A1)"}
 {"q": "Kde uzdravil Ježíš?", "expect": ["vím kdo, co, kolik", "kde nevím"], "cat": "prázdná díra (A3 pořadí rolí)"}
+{"q": "Koho potkal Ježíš?", "expect": ["nevím", "vím o"], "reject": ["Šimon"], "cat": "empty-topic (B4)", "gap": "T3/B4: predikát potkat téma Ježíš nenese — kontextový figl (Šimon) nahradí vysvětlení s kandidáty subjektů predikátu"}
+{"q": "Kdo se setkal s Mojžíšem?", "expect": ["nenašel"], "reject": ["Boží Hora"], "cat": "typový guard (T11)", "gap": "T11: osobní díra nesmí brát loc účastníka (Boží Hora) — poctivý terminál"}
+{"q": "Kdo přišel k Ježíšovi?", "expect": ["nenašel"], "reject": ["Nazaretský"], "cat": "typový guard (T11)", "gap": "T11/B4: fakty přijít Ježíše nesou jako podmět — známý=podmět, jiná osoba není; loc/theme osobní díru neplní, kontext nehádá"}
