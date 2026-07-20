@@ -1,0 +1,7 @@
+{
+  "name": "query-empty-topic",
+  "trigger": {"event": "query.empty-topic", "priority": 5},
+  "dialog": "{answer} Mám se podívat na: {candidates}?",
+  "action": {"await": "user-pick"},
+  "teach": "Nabídka při prázdném tématu (B4, princip user: tápání = ptáme se): predikát otázky žádný fakt s tématem nenese a kontextová asociace by byla figl — místo hádání systém vyjmenuje, o kom děj zná (nejtěžší podměty faktů predikátu), a NABÍDNE volbu; volba přehraje otázku se substitucí tématu (týž mechanismus jako homonymní zaostření). Vždy se nejdřív OVĚŘILO, že data v grafu nejsou (empty-role → částečná odpověď → prázdné téma — kaskáda jistot)."
+}

@@ -165,6 +165,11 @@ class GraphConfig:
     language: str = "cs"
     spread_depth: int = 2
     spread_falloff: float = 0.35
+    # HUB limit asociací (B4): téma s víc kontextovými sousedy je
+    # asociační hub (Ježíš 209) — asociace nenese konkrétní vztah
+    # a kontextové patro NEodpovídá (ptáme se); řídké téma (R.U.R. 24)
+    # asociaci unese. Změřeno 2026-07-20 (testovací seance Bible).
+    context_hub_limit: int = 50
     memory_path: str = "data/memory.jsonl"
     reminders_path: str = "data/reminders.jsonl"
     telemetry_path: str = "data/telemetry.jsonl"

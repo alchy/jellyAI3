@@ -86,7 +86,8 @@ class GraphAnswerer(Answerer):
     """
 
     def __init__(self, graph, client, fallback, *, context_decay=0.55,
-                 spread_depth=2, spread_falloff=0.35, clock=None):
+                 spread_depth=2, spread_falloff=0.35, clock=None,
+                 context_hub_limit=50):
         """Vytvoří answerer.
 
         Args:
@@ -107,6 +108,7 @@ class GraphAnswerer(Answerer):
         self.last_pattern = None  # poslední vykonaný pseudo-QL Pattern (API)
         self.last_query_card = None  # vzorová karta tahu (telemetrie #38)
         self.pick_focus = None   # zvolená oblast overflow dialogu (#5) — 1 tah
+        self.context_hub_limit = context_hub_limit   # hub asociací (B4)
         self._theme_bound = set()  # adresáti dotazu — rolová vazba (#55)
         self._last_values = []   # hodnoty minulé odpovědi („Kdo další…?", #53a)
         self.last_resolution = None  # evidence rozlišení (vstup QueryAssurance)
@@ -510,16 +512,23 @@ class GraphAnswerer(Answerer):
             values, fact = self._typed_match(pat.predicate,
                                              known_set | {pat.predicate})
         if not values and pat.hole_role in ("subj", "obj"):
-            # kontextové patro jen pro ENTITNÍ díry (kdo napsal X…); identita/
-            # vlastnost (pred/attr) ani zjišťovací otázka (díra None) kontextem
-            # nehádají — poctivé „nenašel" je lepší než nejtěžší soused
-            if instance_lit(getattr(pat, "predicate", None), pat.hole_role,
-                            self.graph.predicate_roles) is False:
-                # PRÁZDNÁ ROLE (T3/T4): fakty predikátu roli nikdy nenesou —
-                # asociace by vyráběla figl („Koho vzkřísil?" → „Šimon");
-                # nech projít na chytrou clarifikaci (E3)
-                pass
-            else:
+            # KONTEXTOVÉ patro (asociace jako odpověď) — NÁLEZ B4:
+            # vlajkové „Kdo napsal R.U.R.?" je odpověď asociace (fakt
+            # napsat s R.U.R. v korpusu není!) — patro je nosné. Hranice
+            # figlů: u HUBOVÉHO tématu je asociace mnohoznačná (potkal/
+            # přišel/zradil… — druh vztahu nevíme) → neodpovídat, PTÁME
+            # SE (kaskáda: částečná odpověď / nabídka kandidátů).
+            # HRANICE = rozvětvenost: asociační HUB (Ježíš 209 sousedů)
+            # konkrétní vztah nenese, řídké téma (R.U.R. 24) ano —
+            # změřeno; práh context_hub_limit v configu. Verdikt False
+            # (role neexistuje) řeší chytrá clarifikace (E3).
+            verdict = instance_lit(getattr(pat, "predicate", None),
+                                   pat.hole_role, self._ring_roles)
+            fanout = sum(1 for f in self.graph.facts_of(
+                node0, predicate="kontext") for p in f.participants
+                if p.node != node0)
+            if verdict is None or (verdict is True
+                                   and fanout <= self.context_hub_limit):
                 values, fact = self._match("kontext", known_set,
                                            pat.hole_role, pat.hole_type)
         if not values and len(known_set) > 1:
@@ -594,10 +603,12 @@ class GraphAnswerer(Answerer):
                         # POZOROVATEL není odpověď: uživatel v roli theme je
                         # metadata zápisu Mnemos, ne účastník děje (#34)
                         continue
-                    if part.role == "theme" and hole_type == "person":
-                        # okolnost (theme) nesmí plnit OSOBNÍ díru — „Koho
-                        # vzkřísil?" nesmí vrátit „den" (T4); obsahové díry
-                        # bez typu (řeč) theme odpovídat SMÍ (143 výroků)
+                    if hole_type == "person" \
+                            and part.role in ("theme", "loc", "time", "num"):
+                        # OSOBNÍ díra nebere okolnosti (T4 „den", T11
+                        # „Boží Hora"): kdo/koho plní jen subj/obj/pred;
+                        # obsahové díry bez typu (řeč) theme odpovídat
+                        # SMÍ (143 výroků)
                         continue
                     if part.role == "time" and hole_role != "time" \
                             and hole_type != "time":
@@ -1048,6 +1059,7 @@ class GraphAnswerer(Answerer):
         qa, pat = None, None
         self.last_query_card = None   # vzorová karta tahu (telemetrie #38)
         self.last_empty_role = None   # verdikt prázdné díry (#57 E3)
+        self.last_empty_topic = None  # (téma, kandidáti) — nabídka (B4)
         query = build_query(question, self._predicates, self._span_is_node,
                             self._node_word, self._is_area)
         if query is not None:
@@ -1112,11 +1124,15 @@ class GraphAnswerer(Answerer):
         # Pohasíná se jen při úspěchu (v _remember spolu s rozsvícením nového tématu).
         self._log_turn(question, topic, None, None)
         self.pick_focus = None               # volba oblasti platí jeden tah (#5)
-        empty = self._empty_role_answer(pat)
+        cascade_topic = topic or (self.last_resolution or {}).get("winner")
+        empty = (self._empty_role_answer(pat)
+                 or self._partial_fact_answer(pat, cascade_topic)
+                 or self._empty_topic_answer(pat, cascade_topic))
         if empty is not None:
-            # verdikt je JISTOTA (schéma roli nezná), ne nejistota — automat
+            # verdikt je JISTOTA (schéma i fakta prohledána) — automat
             # nesmí odpověď přebít clarify dialogem (assurance-fail)
-            self.last_empty_role = (pat.predicate, pat.hole_role)
+            self.last_empty_role = (getattr(pat, "predicate", None),
+                                    getattr(pat, "hole_role", None))
             return empty
         return self.fallback.answer(question, retrieved)
 
@@ -1130,11 +1146,11 @@ class GraphAnswerer(Answerer):
         predicate = getattr(pat, "predicate", None)
         hole_role = getattr(pat, "hole_role", None)
         if instance_lit(predicate, hole_role,
-                        self.graph.predicate_roles) is not False:
+                        self._ring_roles) is not False:
             return None
         lang = current()
         labels = lang.get("role_labels", {})
-        roles = self.graph.predicate_roles(predicate)
+        roles = self._ring_roles(predicate)
         # pořadí výčtu = pořadí tabulky role_labels (kdo, co, kde, kdy,
         # kolik), ne abeceda (T-nález A3)
         known = ", ".join(labels[r] for r in labels if r in roles)
@@ -1144,6 +1160,85 @@ class GraphAnswerer(Answerer):
             return None
         return Answer(text=template.format(predicate=predicate, known=known,
                                            missing=missing),
+                      sources=["graf"], score=1.0, trace=None)
+
+    def _ring_roles(self, predicate):
+        """Role schématu přes CELÝ synonymní/vidový kruh — normalizace
+        smí vybrat člen bez faktů (potkal→potkávat) a verdikt nesmí
+        spadnout do vakua (B4 nález)."""
+        roles = set()
+        for pred, _ in _synonym_ring(predicate or ""):
+            roles |= self.graph.predicate_roles(pred)
+        return frozenset(roles)
+
+    def _partial_fact_answer(self, pat, topic):
+        """ČÁSTEČNÁ odpověď (princip user, T11): fakty predikátu s tématem
+        EXISTUJÍ, jen díru neumí naplnit (typový guard) — graf se
+        k výsledku dostat MUSÍ: vyjmenuje role, které fakty nesou."""
+        predicate = getattr(pat, "predicate", None)
+        hole_role = getattr(pat, "hole_role", None)
+        if not predicate or not topic or hole_role is None:
+            return None
+        if predicate in current().get("cascade_skip_predicates", ()):
+            # sponové/dekompoziční predikáty nejsou děje — identita má
+            # vlastní patra a poctivý terminál (jádro poctivosti!)
+            return None
+        lang = current()
+        labels = lang.get("role_labels", {})
+        ring = {p for p, _ in _synonym_ring(predicate)}
+        found = {}
+        for fact in self.graph.facts.values():
+            if fact.predicate not in ring \
+                    or all(p.node != topic for p in fact.participants):
+                continue
+            for p in fact.participants:
+                if p.node == topic or p.role == hole_role \
+                        or p.role == "theme" or p.role not in labels:
+                    continue
+                found.setdefault(p.role, [])
+                if p.node not in found[p.role]:
+                    found[p.role].append(p.node)
+        missing = labels.get(hole_role)
+        template = lang.get("partial_fact_answer")
+        if not found or missing is None or template is None:
+            return None
+        parts = "; ".join(f"{labels[r]}: {', '.join(vs[:4])}"
+                          for r, vs in found.items())
+        return Answer(text=template.format(predicate=predicate, topic=topic,
+                                           missing=missing, found=parts),
+                      sources=["graf"], score=1.0, trace=None)
+
+    def _empty_topic_answer(self, pat, topic):
+        """PRÁZDNÉ TÉMA (B4, princip user): predikát roli má, ale žádný
+        jeho fakt téma nenese — kontext NEhádá (figl); místo toho SE
+        PTÁME: kandidáti = nejtěžší podměty faktů predikátu (nabídku
+        s volbou z nich staví automat, volba přehraje otázku)."""
+        predicate = getattr(pat, "predicate", None)
+        if not predicate or not topic \
+                or getattr(pat, "hole_role", None) is None:
+            return None
+        if predicate in current().get("cascade_skip_predicates", ()):
+            # sponové/dekompoziční predikáty nejsou děje — identita má
+            # vlastní patra a poctivý terminál (jádro poctivosti!)
+            return None
+        ring = {p for p, _ in _synonym_ring(predicate)}
+        carriers = {}
+        for fact in self.graph.facts.values():
+            if fact.predicate not in ring:
+                continue
+            if any(p.node == topic for p in fact.participants):
+                return None              # téma fakty nese → jiná cesta
+            for p in fact.participants:
+                if p.role == "subj":
+                    carriers[p.node] = carriers.get(p.node, 0) + fact.weight
+        template = current().get("empty_topic_answer")
+        if not carriers or template is None:
+            return None
+        top = [n for n, _ in sorted(carriers.items(),
+                                    key=lambda kv: -kv[1])][:5]
+        self.last_empty_topic = (topic, top)   # kandidáti pro nabídku
+        return Answer(text=template.format(predicate=predicate, topic=topic,
+                                           known=", ".join(top)),
                       sources=["graf"], score=1.0, trace=None)
 
     def _alternatives(self, qa, topic, value, reverse, temperature):  # pylint: disable=too-many-arguments,too-many-positional-arguments

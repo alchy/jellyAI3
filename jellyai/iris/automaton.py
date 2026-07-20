@@ -310,6 +310,26 @@ class IrisAutomaton:
             candidates = []
         context = {"assurance": assur, "candidates": candidates,
                    "term": res["term"] if res else text}
+        if getattr(self.answerer, "last_empty_topic", None):
+            # PRÁZDNÉ TÉMA (B4, princip user): tápání = PTÁME SE — nabídka
+            # kandidátů predikátu; volba přehraje otázku se substitucí
+            # tématu (existující mechanismus _resume_pick)
+            topic0, candidates = self.answerer.last_empty_topic
+            card = self.deck.best("query.empty-topic", {})
+            if card is not None:
+                self.state.pending = PendingFocus(
+                    question=text, term=topic0,
+                    candidates=list(candidates), card=card.name)
+                response = IrisResponse(
+                    text=card.dialog.format(answer=answer.text,
+                                            candidates=", ".join(candidates)),
+                    kind="dialog", assurance=1.0,
+                    activation_window=activation_window(self.answerer),
+                    docs_window=docs_window(self.answerer),
+                    used={"components": ["graph-answerer"],
+                          "patterns": [card.name]})
+                self.state.remember(text, response)
+                return response
         if getattr(self.answerer, "last_empty_role", None):
             # PRÁZDNÁ DÍRA (#57 E3): schéma roli nezná — odpověď answereru
             # je definitivní (jistota), dialogové karty ji nepřebíjejí

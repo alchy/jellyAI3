@@ -204,8 +204,13 @@ def decorate(text, now=None):
     classes = {cls for token in tagged for cls in token.classes}
     if "prvni_osoba" in classes:
         found.add("mnemos:prvni-osoba")
-    if "dativ" in classes:
-        found.add("role:adresat")
+    for i, token in enumerate(tagged):
+        if "dativ" in token.classes \
+                and (i == 0 or tagged[i - 1].norm not in ("k", "ke")):
+            # „k Ježíšovi" je SMĚR (cíl pohybu), ne adresát řeči —
+            # adresáta nese holý dativ (nález retest B4)
+            found.add("role:adresat")
+            break
     norms = {token.norm for token in tagged}
     if "dalsi" in norms:
         found.add("novost")

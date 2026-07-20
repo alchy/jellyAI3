@@ -41,6 +41,6 @@
 {"q": "Koho vzkřísil Ježíš?", "expect": ["nevím"], "reject": ["den"], "cat": "prázdná díra", "gap": "T4/B6: theme (den) nesmí plnit person díru — po guardu je obj prázdná role a nastoupí chytrá clarifikace"}
 {"q": "Kdo se setkal s Toničkou Bradáčovou?", "expect": ["Verunka"], "cat": "třída setkání (A1)"}
 {"q": "Kde uzdravil Ježíš?", "expect": ["vím kdo, co, kolik", "kde nevím"], "cat": "prázdná díra (A3 pořadí rolí)"}
-{"q": "Koho potkal Ježíš?", "expect": ["nevím", "Vím o"], "reject": ["Šimon"], "cat": "empty-topic (B4)", "gap": "T3/B4 + princip user: téma predikát nenese a kontext nedohledá → PTÁME SE — vysvětlení s kandidáty subjektů predikátu (v dialogu nabídka s volbou)"}
+{"q": "Koho potkal Ježíš?", "expect": ["nevím nic o", "Vím o"], "cat": "empty-topic (B4)", "gap": "T3/B4 + princip user: téma predikát nenese a kontext nedohledá → PTÁME SE — vysvětlení s kandidáty subjektů predikátu (v dialogu nabídka s volbou)"}
 {"q": "Kdo se setkal s Mojžíšem?", "expect": ["nevím", "kde: Boží Hora"], "cat": "částečná odpověď (T11+princip)", "gap": "T11 + princip user: data JSOU (setkat s Mojžíšem, loc Boží Hora) — osobní díru loc neplní, ale graf se k výsledku dostat MUSÍ: částečná odpověď vyjmenuje role, které fakt nese"}
-{"q": "Kdo přišel k Ježíšovi?", "expect": ["nenašel"], "reject": ["Nazaretský"], "cat": "typový guard (T11)", "gap": "T11/B4: fakty přijít Ježíše nesou jako podmět — známý=podmět, jiná osoba není; loc/theme osobní díru neplní, kontext nehádá"}
+{"q": "Kdo přišel k Ježíšovi?", "expect": ["nevím"], "reject": ["Nazaretský"], "cat": "typový guard (T11)", "gap": "T11/B4: fakty přijít Ježíše nesou jako podmět — známý=podmět, jiná osoba není; loc/theme osobní díru neplní, kontext nehádá"}
