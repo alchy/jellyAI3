@@ -10,12 +10,71 @@ zásahu do kódu. Jiný jazyk = jiný adresář karet (`patterns/<jazyk>/`) — 
 princip jako `jellyai/lang/<jazyk>.json`.
 """
 
+import copy
+import itertools
 import json
 import os
 
 from dataclasses import dataclass, field
 
 _DIR = os.path.dirname(__file__)
+
+
+def _expand_family(data):
+    """Rozvine RODINNOU kartu (kostra × dimenze) na konkrétní karty (#57 E1).
+
+    Dimenze jsou ENUMERATIVNÍ osy, žádné podmínky (zákaz ATN): hodnota
+    osy jen dosadí prvek do slotu kostry, přidá příponu jména a smí
+    přepsat prioritu (definuje-li ji víc os, platí poslední). Prvek
+    `null` = slot zmizí — smí být jen POSLEDNÍM prvkem vzoru, aby se
+    neposouvaly odkazy $N (disciplína pasti 14); odkaz na zmizelý slot
+    se z `known` vypustí a v `hole`/`predicate` spadne nahlas.
+    """
+    trigger = data["trigger"]
+    skeleton = trigger["pattern"]
+    dimensions = trigger["dimensions"]
+    cards = []
+    for combo in itertools.product(*(d["values"] for d in dimensions)):
+        chosen = {d["slot"]: v for d, v in zip(dimensions, combo)}
+        pattern, dropped = [], None
+        for index, element in enumerate(skeleton, start=1):
+            value = chosen.get(element)
+            if value is None:                    # obyčejný prvek kostry
+                pattern.append(element)
+            elif value["element"] is None:
+                if index != len(skeleton):
+                    raise ValueError(
+                        f"rodina {data['name']}: prázdný slot {element}"
+                        f" musí být posledním prvkem vzoru")
+                dropped = f"${index}"
+            else:
+                pattern.append(value["element"])
+        priority = trigger.get("priority", 0)
+        for value in combo:
+            if "priority" in value:
+                priority = value["priority"]
+        action = copy.deepcopy(data.get("action", {}))
+        query = action.get("query", {})
+        for key in ("hole", "predicate"):
+            if dropped is not None and query.get(key) == dropped:
+                raise ValueError(f"rodina {data['name']}: {key}"
+                                 f" míří na prázdný slot")
+        if dropped is not None and "known" in query:
+            kept = [k for k in query["known"]
+                    if (k[-1] if isinstance(k, list) else k) != dropped]
+            if kept:
+                query["known"] = kept
+            else:
+                del query["known"]
+        new_trigger = {k: v for k, v in trigger.items()
+                       if k not in ("dimensions", "pattern")}
+        new_trigger["pattern"] = pattern
+        new_trigger["priority"] = priority
+        cards.append({"name": data["name"]
+                      + "".join(v["suffix"] for v in combo),
+                      "trigger": new_trigger, "action": action,
+                      "teach": data.get("teach", "")})
+    return cards
 
 
 @dataclass(frozen=True)
@@ -74,12 +133,16 @@ class PatternDeck:
             path = os.path.join(self.directory, name)
             with open(path, encoding="utf-8") as fh:
                 data = json.load(fh)
-            cards.append(PatternCard(
-                name=data.get("name", name[:-5]),
-                trigger=data.get("trigger", {}),
-                dialog=data.get("dialog", ""),
-                action=data.get("action", {}),
-                teach=data.get("teach", "")))
+            variants = (_expand_family(data)
+                        if "dimensions" in data.get("trigger", {})
+                        else [data])
+            for item in variants:
+                cards.append(PatternCard(
+                    name=item.get("name", name[:-5]),
+                    trigger=item.get("trigger", {}),
+                    dialog=item.get("dialog", ""),
+                    action=item.get("action", {}),
+                    teach=item.get("teach", "")))
         cards.sort(key=lambda c: (-c.trigger.get("priority", 0), c.name))
         self.cards = cards
         return len(cards)

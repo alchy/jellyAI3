@@ -6,6 +6,7 @@ bez zásahu do kódu; jiný jazyk = jiný adresář karet.
 """
 
 import json
+import pytest
 
 from jellyai.iris.patterns import PatternDeck
 
@@ -71,3 +72,60 @@ def test_custom_directory_extends_behavior(tmp_path):
     deck = PatternDeck(str(tmp_path))
     assert deck.load() == 1
     assert deck.match("data.empty", {}).dialog == "Nemám data pro {term}."
+
+
+def _familia():
+    """Zkušební rodinná karta (kostra × dimenze čas a elipse) — #57 E1."""
+    return {
+        "name": "q-pokus",
+        "trigger": {
+            "event": "utterance.query",
+            "pattern": ["%{TAZACI}", "<sloveso>", "<ucastnik>"],
+            "dimensions": [
+                {"slot": "<sloveso>", "values": [
+                    {"suffix": "-minuly", "element": "%{SLOVESO_MINULE}"},
+                    {"suffix": "-prezens", "element": "%{SLOVESO}"}]},
+                {"slot": "<ucastnik>", "values": [
+                    {"suffix": "", "element": "%{ENTITA}", "priority": 4},
+                    {"suffix": "-prodrop", "element": None, "priority": 3}]},
+            ],
+        },
+        "action": {"query": {"hole": "$1", "predicate": "$2",
+                             "known": ["$3"]}},
+        "teach": "Zkušební rodina.",
+    }
+
+
+def test_expand_family_rozvine_kostru_krat_dimenze():
+    from jellyai.iris.patterns import _expand_family
+    cards = _expand_family(_familia())
+    by_name = {card["name"]: card for card in cards}
+    assert set(by_name) == {"q-pokus-minuly", "q-pokus-prezens",
+                            "q-pokus-minuly-prodrop",
+                            "q-pokus-prezens-prodrop"}
+    plna = by_name["q-pokus-minuly"]
+    assert plna["trigger"]["pattern"] == [
+        "%{TAZACI}", "%{SLOVESO_MINULE}", "%{ENTITA}"]
+    assert plna["trigger"]["priority"] == 4
+    assert plna["action"]["query"]["known"] == ["$3"]
+    assert "dimensions" not in plna["trigger"]
+    prodrop = by_name["q-pokus-prezens-prodrop"]
+    assert prodrop["trigger"]["pattern"] == ["%{TAZACI}", "%{SLOVESO}"]
+    assert prodrop["trigger"]["priority"] == 3
+    assert "known" not in prodrop["action"]["query"]
+
+
+def test_expand_family_prazdny_slot_jen_na_konci():
+    from jellyai.iris.patterns import _expand_family
+    data = _familia()
+    data["trigger"]["pattern"] = ["<ucastnik>", "%{TAZACI}", "<sloveso>"]
+    with pytest.raises(ValueError):
+        _expand_family(data)
+
+
+def test_expand_family_dira_nesmi_mirit_na_prazdny_slot():
+    from jellyai.iris.patterns import _expand_family
+    data = _familia()
+    data["action"]["query"]["predicate"] = "$3"
+    with pytest.raises(ValueError):
+        _expand_family(data)
