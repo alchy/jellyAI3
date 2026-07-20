@@ -91,6 +91,77 @@ def compile_qgraph(deck, predicates=frozenset(), telemetry_rows=()):
     return QGraph(nodes=nodes, predicates=frozenset(predicates))
 
 
+def decorate(text, now=None):
+    """DEKORUJÍCÍ nároky tahu (T3 spec — druhý druh rozsvěcení).
+
+    Nároky expertů NEsoutěží s uzly otázek: věší se na vítěze jako
+    OMEZENÍ. Model jen pojmenovává, co dnes v answereru už žije
+    (time_filter, place_filter, user_subject, _theme_bound, novelty)
+    — proto se dekorace čtou z TÝCHŽ zdrojů (jazykové tabulky).
+
+    Returns:
+        frozenset[str]: Jména dekorací („chronos:interval", „topos:oblast",
+        „mnemos:prvni-osoba", „role:adresat", „novost").
+    """
+    from jellyai.iris.subsystems.chronos import resolve_temporal
+    lang = current()
+    found = set()
+    if resolve_temporal(text, now or datetime.now()) is not None:
+        found.add("chronos:interval")
+    tagged = classify(text, is_node=None)
+    classes = {cls for token in tagged for cls in token.classes}
+    if "prvni_osoba" in classes:
+        found.add("mnemos:prvni-osoba")
+    if "dativ" in classes:
+        found.add("role:adresat")
+    norms = {token.norm for token in tagged}
+    if "dalsi" in norms:
+        found.add("novost")
+    if norms & set(lang.get("relation_query_nouns", ())):
+        found.add("vztah:operator")
+    return frozenset(found)
+
+
+class DialogPosition:
+    """POZICE v otázkovém grafu = stav dialogu (T4 spec).
+
+    Sjednocuje dnešní roztroušené reprezentace (PendingFocus, drill
+    přes _prev_trace, pick_focus): stojíme v uzlu a ven vedou HRANY.
+    Zpřesnění je krok po hraně `zpresneni`, volba kandidáta návrat
+    hranou `navrat` (přehraj otázku) — graf si tak sám ostří focus.
+    """
+
+    def __init__(self, qgraph):
+        self.qgraph = qgraph
+        self.node = None
+        self._origin = None       # uzel otázky, ke kterému se vracíme
+
+    def enter(self, name):
+        """Vstup do uzlu (tah směrovaný osvětlením)."""
+        self.node = self.qgraph.nodes.get(name)
+        self._origin = None
+        return self.node
+
+    def sharpen(self, name):
+        """Krok po zpřesňovací hraně; False = hrana neexistuje."""
+        if self.node is None:
+            return False
+        if not any(e.kind == "zpresneni" and e.target == name
+                   for e in self.node.edges):
+            return False
+        self._origin, self.node = self.node, self.qgraph.nodes[name]
+        return True
+
+    def resume(self):
+        """Návrat ze zpřesnění: cíl hrany `navrat` („*" = přehraj otázku)."""
+        if self.node is None or self.node.kind != "clarify":
+            return None
+        target = next((e.target for e in self.node.edges
+                       if e.kind == "navrat"), None)
+        self.node, self._origin = self._origin, None
+        return target
+
+
 def illuminate(text, qgraph, now=None, is_node=None, use_weights=False):
     """Osvětlení tahu: kdo z uzlů svítí a jak silně.
 

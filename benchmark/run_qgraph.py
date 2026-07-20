@@ -27,7 +27,9 @@ from datetime import datetime
 
 from config import Config
 from jellyai.iris import IrisAutomaton
-from jellyai.iris.qgraph import compile_qgraph, illuminate
+from jellyai.iris.qgraph import (DialogPosition, compile_qgraph, decorate,
+                                 illuminate)
+from jellyai.lang import current
 from jellyai.iris.triage import load_rows
 from jellyai.tasks import make_graph_answerer
 
@@ -54,6 +56,31 @@ def _actual_route(response, qgraph):
     if list(components) == ["chronos"] and not patterns:
         return "chronos-hodiny"
     return None                                  # mimo rozsah experimentu
+
+
+def _actual_decorations(answerer):
+    """Dekorace, které tah SKUTEČNĚ aplikoval (stav answereru po tahu)."""
+    found = set()
+    if answerer.time_filter is not None:
+        found.add("chronos:interval")
+    if answerer.place_filter is not None:
+        found.add("topos:oblast")
+    if answerer._theme_bound:                    # pylint: disable=protected-access
+        found.add("role:adresat")
+    pattern = answerer.last_pattern
+    if pattern is not None:
+        if any(term == current()["user_entity"]
+               for _, term in getattr(pattern, "known", ())):
+            found.add("mnemos:prvni-osoba")
+        if pattern.hole_role == "relation":
+            found.add("vztah:operator")
+    return found
+
+
+def _base_key(node):
+    """Klíč BEZ vah — remíza dvou uzlů = místo, kde by váhy rozhodly."""
+    return (node.kind, node.priority,
+            len(node.pattern) if node.pattern else 0)
 
 
 def _agrees(shadow, actual, qgraph):
@@ -85,29 +112,40 @@ def main():
                             telemetry_rows=telemetry)
     use_weights = args.variant == "weights"
 
-    agree = miss = skipped = 0
+    agree = miss = skipped = ties = 0
+    state_agree = state_miss = 0
+    deco_agree = deco_miss = 0
     disagreements = []
     with open(DIALOG, encoding="utf-8") as fh:
         scenarios = [json.loads(line) for line in fh if line.strip()]
     for scenario in scenarios:
         iris = IrisAutomaton(make_graph_answerer(config), clock=_now)
+        position = DialogPosition(qgraph)        # stav dialogu = pozice
         for turn in scenario["turns"]:
             text = turn["u"]
             shadow = illuminate(text, qgraph, now=_now(),
                                 is_node=iris.answerer._span_is_node,  # pylint: disable=protected-access
                                 use_weights=use_weights)
+            standing_in_clarify = (position.node is not None
+                                   and position.node.kind == "clarify")
             response = iris.turn(text)
             actual = _actual_route(response, qgraph)
-            if actual is None:
-                skipped += 1
+            actual_node = qgraph.nodes.get(actual) if actual else None
+            if standing_in_clarify and "?" not in text:
+                # STAVOVÝ tah: stojíme ve zpřesnění, tah je krok po hraně
+                # `navrat` (volba kandidáta / doplnění identity) — graf by
+                # přehrál otázku, ne směroval text
+                resumed = position.resume()
+                if resumed == "*" and actual is not None:
+                    state_agree += 1
+                else:
+                    state_miss += 1
+                    disagreements.append((text, actual or "—", "navrat"))
                 continue
-            actual_node = qgraph.nodes.get(actual)
-            if actual_node is not None \
-                    and actual_node.kind in ("otazka", "clarify") \
-                    and "?" not in text:
-                # STAVOVÝ tah (volba kandidáta, výrok s clarify-identity):
-                # krok po hraně `navrat`, ne textové směrování — pozici
-                # v grafu shadow nezná (měří jen dotazovou polovinu)
+            if actual is None or ("?" not in text and actual_node is not None
+                                  and actual_node.kind == "clarify"):
+                # mimo rozsah: výroková polovina (T6 spec — jiný graf:
+                # typy VÝROKŮ, brána E) a tahy bez směrování textem
                 skipped += 1
                 continue
             if _agrees(shadow, actual, qgraph):
@@ -116,6 +154,17 @@ def main():
                 miss += 1
                 shadow_name = shadow[0].name if shadow else "—"
                 disagreements.append((text, actual, shadow_name))
+            if len(shadow) > 1 and _base_key(shadow[0]) == _base_key(shadow[1]):
+                # REMÍZA základního klíče — jediné místo, kde by váhy
+                # z telemetrie mohly rozhodnout (test „kolik provozu")
+                ties += 1
+            # posun pozice v grafu podle skutečné cesty tahu
+            if actual_node is not None and actual_node.kind == "clarify":
+                if shadow:
+                    position.enter(shadow[0].name)
+                position.sharpen(actual)
+            elif actual_node is not None:
+                position.enter(actual)
 
     et_agree = et_miss = 0
     with open(ETALON, encoding="utf-8") as fh:
@@ -129,6 +178,17 @@ def main():
                                 use_weights=use_weights)
             answerer.answer(question, [])
             actual = answerer.last_query_card
+            # DEKORACE (T3): nároky se měří tam, kde answerer opravdu
+            # běžel — shadow předpověď vs. skutečně aplikované filtry
+            want = decorate(question, now=_now())
+            got = _actual_decorations(answerer)
+            if want == got:
+                deco_agree += 1
+            else:
+                deco_miss += 1
+                disagreements.append(
+                    (question, f"deco {sorted(got) or '—'}",
+                     f"{sorted(want) or '—'}"))
             shadow_card = next((n.name for n in shadow
                                 if n.kind == "otazka"), None)
             if shadow_card == actual:
@@ -145,8 +205,14 @@ def main():
     et_total = et_agree + et_miss
     pct = 100 * agree // total if total else 0
     et_pct = 100 * et_agree // et_total if et_total else 0
+    state_total = state_agree + state_miss
+    deco_total = deco_agree + deco_miss
+    state_pct = 100 * state_agree // state_total if state_total else 0
+    deco_pct = 100 * deco_agree // deco_total if deco_total else 0
     print(f"\nQGRAPH SHADOW [{args.variant}]: dialog {agree}/{total} "
-          f"({pct} %), mimo rozsah {skipped}   "
+          f"({pct} %), stav {state_agree}/{state_total} ({state_pct} %), "
+          f"dekorace {deco_agree}/{deco_total} ({deco_pct} %), "
+          f"mimo rozsah {skipped}, remíz {ties}   "
           f"etalon {et_agree}/{et_total} ({et_pct} %)")
     return agree, miss, et_agree, et_miss
 

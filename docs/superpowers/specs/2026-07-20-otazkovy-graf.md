@@ -167,6 +167,52 @@ jeden model. Doporučené pořadí: nejdřív #26 (jazyk dekorací — už se
 píše: claim_words, _theme_bound, place_filter), pak kompilace decku
 na uzly (bez hran, parity gate), hrany až nakonec.
 
+## 4b. EMPIRIE — co ukázal experiment (větev `otazkovy-graf`)
+
+Postaveno: `jellyai/iris/qgraph.py` (kompilace decku na uzly, osvětlení,
+dekorace, `DialogPosition`), `benchmark/run_qgraph.py` (shadow měření),
+`./jelly qgraph` (dump: 26 uzlů, 2722 predikátů schématu).
+
+**Naměřeno (obě varianty skórování — `tiers` i `weights`):**
+
+| Rovina | Výsledek | Co to znamená |
+|---|---|---|
+| Dispatch (dialog) | **11/11 (100 %)** | osvětlení směruje jako dnešní ruční pořadí bran |
+| Dispatch (etalon) | **41/41 (100 %)** | vítězný uzel = karta, kterou reálně vybral build_query |
+| Stav dialogu | **3/3 (100 %)** | zpřesnění + návrat hranou reprodukuje PendingFocus |
+| Dekorace | **41/41 (100 %)** | předpověď nároků = skutečně aplikované filtry |
+| Remízy základního klíče | **0** | viz níže — klíčový nález |
+
+**NÁLEZ 1 — dekorace model potvrdil.** Predikce z T3 (nároky se věší,
+nesoutěží) sedí na VŠECH 41 etalonových otázkách: `chronos:interval`,
+`topos:oblast`, `mnemos:prvni-osoba`, `role:adresat`, `vztah:operator`
+odpovídají tomu, co answerer skutečně nastaví (`time_filter`,
+`place_filter`, `_theme_bound`…). Vrstva dekorací je tedy popis
+reality, ne nová abstrakce — což je pro #26 (formální claim()) zelená.
+
+**NÁLEZ 2 — váhy jsou zatím MRTVÁ větev.** Otázka user („kolik provozu
+je potřeba, než váhy něco znamenají?") má překvapivou předchozí
+otázku: *nastávají vůbec remízy?* Měření: **0 remíz** základního klíče
+(priorita × délka vzoru) na celém dialogu i etalonu. Váhy nemají kde
+zasáhnout — a dokud kartový deck zůstane takto disciplinovaný,
+telemetrie routing neovlivní ANI při libovolném objemu provozu.
+Praktický důsledek: váhy nezavádět jako součást dispatch; ponechat je
+jako diagnostiku (které uzly žijí) a signál pro triage. Harness remízy
+počítá průběžně — až jich přibude (víc karet stejné priority), otázka
+„kolik provozu" se stane smysluplnou a změří se stejným nástrojem.
+
+**NÁLEZ 3 — hranice rozsahu je ostrá.** Z 50 dialogových tahů je 36
+mimo dotazovou polovinu (výroky, příkazy, připomínky). Potvrzuje T6:
+otázkový graf je POLOVINA jednotného vstupu (#51); výroková typologie
+je jiný graf a nemá se křížit předčasně.
+
+**NÁLEZ 4 — 100 % shoda je slabý i silný signál zároveň.** Silný:
+kompilace je věrná, přepnutí dispatch by nic nerozbilo. Slabý: shoda
+na 100 % také znamená, že graf zatím nepřináší JINÉ rozhodnutí — zisk
+není v přesnosti, ale ve struktuře (jedno místo místo ručního pořadí,
+hrany, stav). Hodnotu prokáže až fáze, kde dnešní kód nemá odpověď:
+proaktivní nabídky hran a odvozené instance.
+
 ## 5. Náčrt migrace (každá fáze měřená)
 
 1. **Kompilace k nahlédnutí**: `./jelly qgraph` — postaví otázkový
