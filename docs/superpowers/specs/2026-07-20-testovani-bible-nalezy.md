@@ -129,6 +129,14 @@ tématu (hub Ježíš 209 × řídké R.U.R. 24; práh context_hub_limit).
 predikáty do kaskády nepatří (cascade_skip_predicates). (5) „k+dativ"
 je směr, ne adresát.
 
+**T14 (nález user, po retestu 2): „Tyč" v kandidátech nabídky** —
+person-SLEPENEC z Exodu (typ person, váha 94): stavba stánku je
+v imperativech 2. osoby („Zhotovíš tyče…") s elidovaným podmětem —
+extrakce udělala z „Tyč" podmět desítek řemeslných dějů a hlasování
+mu dalo typ osoby (rodina „Proste"/T10 — imperativ jako jméno; do
+hygienové dávky D). Kandidáti nabídky nově FILTROVÁNI typem tématu
+(„koho" = osoba) — Tyč projde jen kvůli vadnému typu v datech.
+
 **NOVÉ DROBNÉ NÁLEZY:** T13 — normalizace sloves volí špatný kmen
 („přišel"→přisednout, „potkal"→potkávat; kryto ring-rolemi, ale text
 odpovědi nese špatné lemma); kosmetika nabídky (kandidáti vypsáni

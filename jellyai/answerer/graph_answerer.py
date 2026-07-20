@@ -1258,6 +1258,8 @@ class GraphAnswerer(Answerer):
             # vlastní patra a poctivý terminál (jádro poctivosti!)
             return None
         ring = {p for p, _ in _synonym_ring(predicate)}
+        topic_node = self.graph.nodes.get(topic)
+        topic_type = topic_node.type if topic_node is not None else None
         carriers = {}
         for fact in self.graph.facts.values():
             if fact.predicate not in ring:
@@ -1265,8 +1267,16 @@ class GraphAnswerer(Answerer):
             if any(p.node == topic for p in fact.participants):
                 return None              # téma fakty nese → jiná cesta
             for p in fact.participants:
-                if p.role == "subj":
-                    carriers[p.node] = carriers.get(p.node, 0) + fact.weight
+                if p.role != "subj":
+                    continue
+                node = self.graph.nodes.get(p.node)
+                if topic_type and node is not None \
+                        and node.type != topic_type:
+                    # kandidát nabídky má TYP tématu („koho" = osoba) —
+                    # pozn.: person-slepence (Tyč, T14) propustí jen
+                    # vadný typ v datech, to řeší hygiena (dávka D)
+                    continue
+                carriers[p.node] = carriers.get(p.node, 0) + fact.weight
         template = current().get("empty_topic_answer")
         if not carriers or template is None:
             return None

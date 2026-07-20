@@ -231,3 +231,29 @@ def test_nezapomen_je_memorize_ne_forget():
     assert "cmd:memorize" in features
     assert "cmd:forget" not in features
     assert "cmd:forget" in command_features("Zapomeň na Ronika.")
+
+
+def test_kandidati_nabidky_maji_typ_tematu():
+    """Nabídka empty-topic (B4): kandidát má TYP tématu — „koho" na
+    osobu nenabízí věci (nález user: Tyč; vadný typ v datech řeší
+    hygiena, princip filtru platí)."""
+    from config import Config
+    from jellyai.graph.graph import FactGraph
+    from jellyai.graph.extract import make_fact, Participant
+    from jellyai.answerer.graph_answerer import GraphAnswerer
+    from jellyai.answerer.extractive import ExtractiveAnswerer
+    from config import AnswererConfig
+
+    g = FactGraph()
+    g.add_fact(make_fact("potkat", [Participant("subj", "Jidáš", "person"),
+                                    Participant("obj", "člověk", "concept")]))
+    g.add_fact(make_fact("potkat", [Participant("subj", "Lampa", "concept"),
+                                    Participant("obj", "zeď", "concept")]))
+    g.add_fact(make_fact("bydlet", [Participant("subj", "Ježíš", "person")]))
+    a = GraphAnswerer(g, None, ExtractiveAnswerer(AnswererConfig()))
+    from jellyai.answerer.pattern import Pattern
+    pat = Pattern(predicate="potkat", hole_role="obj", hole_type="person")
+    answer = a._empty_topic_answer(pat, "Ježíš")
+    assert answer is not None
+    assert "Jidáš" in answer.text
+    assert "Lampa" not in answer.text
