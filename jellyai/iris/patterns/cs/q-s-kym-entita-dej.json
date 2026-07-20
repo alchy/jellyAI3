@@ -1,0 +1,25 @@
+{
+  "name": "q-s-kym-entita-dej",
+  "trigger": {
+    "event": "utterance.query",
+    "priority": 5,
+    "pattern": [
+      ":s",
+      ":kym",
+      "?%{SE}",
+      "%{ENTITA}",
+      "%{SLOVESO_MINULE}"
+    ]
+  },
+  "action": {
+    "query": {
+      "hole_role": "obj",
+      "hole_type": "person",
+      "predicate": "$5",
+      "known": [
+        ["subj", "$4"]
+      ]
+    }
+  },
+  "teach": "Předložková tázací vazba „S kým se Ježíš potkal?“ (T5/E1b): „s kým“ je OSOBNÍ díra v roli obj (společník děje) — roli nese karta literálem, protože holé „kým“ v tabulce děr být nesmí (bez předložky je to konatel pasiva). Dosud vazba neměla žádný rozbor (prázdný Pattern → generický terminál). Entita před slovesem je podmět; typ person pouští typový guard (T11)."
+}

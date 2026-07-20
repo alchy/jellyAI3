@@ -329,3 +329,35 @@ def test_adresat_s_podmetem_filtruje_smer():
     assert "satane" in result.text
     assert "pojď za mnou" not in result.text
     assert a.turn.theme_bound == {"Petr"}
+
+
+def test_s_kym_instrumentalova_dira():
+    """T5/E1b: „S kým se Ježíš potkal?" — předložková tázací vazba
+    dosud neměla ŽÁDNÝ rozbor (prázdný Pattern → generický terminál).
+    Karta: „s kým" = osobní díra obj, entita je podmět."""
+    a = _answerer(make_fact("potkat", [
+        Participant("subj", "Ježíš", "person"),
+        Participant("obj", "Nikodém", "person")]))
+    result = a.answer("S kým se Ježíš potkal?", [])
+    assert "Nikodém" in result.text
+    assert (a.turn.query_card or "").startswith("q-s-kym")
+
+
+def test_s_kym_dej_pred_entitou():
+    """„S kým mluvil Mojžíš?" — sloveso před entitou, bez zvratného se."""
+    a = _answerer(make_fact("mluvit", [
+        Participant("subj", "Mojžíš", "person"),
+        Participant("obj", "Hospodin", "person")]))
+    result = a.answer("S kým mluvil Mojžíš?", [])
+    assert "Hospodin" in result.text
+    assert (a.turn.query_card or "").startswith("q-s-kym")
+
+
+def test_s_kym_nekrade_sponu():
+    """„S kým je Marie?" — spona není minulé sloveso (l_tvar!spona),
+    karta se nehlásí; pasti 9–11."""
+    a = _answerer(make_fact("být", [
+        Participant("subj", "Marie", "person"),
+        Participant("pred", "matka", "concept")]))
+    a.answer("S kým je Marie?", [])
+    assert not (a.turn.query_card or "").startswith("q-s-kym")

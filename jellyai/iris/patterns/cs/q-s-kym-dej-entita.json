@@ -1,0 +1,25 @@
+{
+  "name": "q-s-kym-dej-entita",
+  "trigger": {
+    "event": "utterance.query",
+    "priority": 5,
+    "pattern": [
+      ":s",
+      ":kym",
+      "?%{SE}",
+      "%{SLOVESO_MINULE}",
+      "%{ENTITA}"
+    ]
+  },
+  "action": {
+    "query": {
+      "hole_role": "obj",
+      "hole_type": "person",
+      "predicate": "$4",
+      "known": [
+        ["subj", "$5"]
+      ]
+    }
+  },
+  "teach": "Zrcadlo karty q-s-kym-entita-dej pro slovosled se slovesem napřed: „S kým se potkal Ježíš?“ / „S kým mluvil Mojžíš?“ (T5/E1b). Táž sémantika: „s kým“ = osobní díra obj, entita za slovesem je podmět."
+}

@@ -54,3 +54,5 @@
 {"q": "Kdy byla vydána korespondence?", "expect": ["2009"], "cat": "pasivum dotaz (D/P1b)"}
 {"q": "Co řekl Ježíš Petrovi?", "expect": ["„satane“"], "cat": "formát výroků (C10)"}
 {"q": "Co víme o Janu Křtiteli?", "expect": ["pokání;"], "cat": "formát agregace (C10)"}
+{"q": "S kým mluvil Hospodin?", "expect": ["Mojžíš"], "cat": "předložková vazba (T5/E1b)"}
+{"q": "S kým se Ježíš potkal?", "expect": ["Vím o"], "reject": ["nenašel"], "cat": "předložková vazba (T5/E1b)"}
