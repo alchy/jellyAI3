@@ -165,18 +165,12 @@ def _verb_match(token, predicates, first=False):
     return best[0] if best else None
 
 
-_QUERY_DECK = None
 
 
 def _query_deck():
     """Balíček karet se vzorovými dotazy (lazy, čte se jednou za proces)."""
-    global _QUERY_DECK    # pylint: disable=global-statement
-    if _QUERY_DECK is None:
-        from jellyai.iris.patterns import PatternDeck
-        deck = PatternDeck.for_language("cs")
-        deck.load()
-        _QUERY_DECK = deck
-    return _QUERY_DECK
+    from jellyai.iris.patterns import shared_deck
+    return shared_deck("cs")     # jeden deck za proces (postřeh 1.2)
 
 
 def _card_query(question, predicates, is_node=None, is_word=None):

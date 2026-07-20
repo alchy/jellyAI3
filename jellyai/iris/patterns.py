@@ -99,6 +99,19 @@ class PatternCard:
     teach: str = ""
 
 
+_SHARED = {}
+
+
+def shared_deck(language="cs"):
+    """JEDEN deck za proces (postřeh 1.2) — obě cesty (automat, dotazy)
+    čtou tytéž karty; test smí cache vyprázdnit (`_SHARED.clear()`)."""
+    if language not in _SHARED:
+        deck = PatternDeck.for_language(language)
+        deck.load()
+        _SHARED[language] = deck
+    return _SHARED[language]
+
+
 class PatternDeck:
     """Balíček pattern-karet jednoho jazyka + výběr karty k události.
 

@@ -41,7 +41,7 @@ from jellyai.iris.subsystems.mnemos import (forget, forget_entity,
                                             note_statement, parse_clauses,
                                             parse_statement,
                                             persist, remember, replay)
-from jellyai.iris.patterns import PatternDeck
+from jellyai.iris.patterns import PatternDeck, shared_deck
 from jellyai.iris.qgraph import compile_qgraph
 from jellyai.iris.presenter import activation_window, docs_window
 from jellyai.iris.state import FocusState, PendingFocus, PendingIdentity
@@ -129,8 +129,7 @@ class IrisAutomaton:
             # musí platit i pro tvrdý časový filtr answereru
             answerer.clock = clock or datetime.now
         if deck is None:
-            deck = PatternDeck.for_language("cs")
-            deck.load()
+            deck = shared_deck("cs")     # jeden deck za proces (1.2)
         self.deck = deck
         # KOMPILÁT otázkového grafu (#57 fáze D): brány přímých expertů
         # řídí claims (pořadí = data), ne pořadí větví v _turn()
