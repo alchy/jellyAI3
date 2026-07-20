@@ -41,12 +41,23 @@ vstupu a answerer má kaskádu poctivých odpovědí.
 
 ## 2. Stav (2026-07-20 večer — den otázkového grafu, ~50 commitů)
 
-- **Metriky:** 595 testů; etalon 37/37 (GAP 12 opraveno / 4,
-  deterministicky — #58 vyřešen), focus 12/12, dialog 45/45 (GAP 8/0),
-  ZÁPIS 34/34, qgraph harness 5 rovin (dispatch, výroky, stav,
-  dekorace, etalon) 100 % v obou variantách. Etalon i dialog ověřeny
-  bitově shodné napříč PYTHONHASHSEED. Graf po dávce D: 7409 uzlů /
-  18863 faktů (kapitalizované predikáty 296→0, −19 falešných osob).
+- **Metriky (po bloku P1–P4, 2026-07-20 noc):** 622 testů; etalon
+  42/42 (GAP 12/4), focus 12/12, dialog 45/45 (GAP 8/0), ZÁPIS 34/34,
+  qgraph harness 5 rovin 100 % v obou variantách (etalon rovina
+  60/60). Etalon ověřen bitově shodný napříč PYTHONHASHSEED. Graf:
+  7433 uzlů / 18841 faktů (ADJ pasivum +140 faktů, fold participií
+  73, klauzulové slepence −20, dvou-osobové slepence −5).
+- **Blok P1–P4 (2026-07-20 noc) NASAZEN na produkci:** P1 = zbytky
+  dávky D hotové (ADJ participia: extrakce + fold_participles +
+  karty q-pasivum obou slovosledů, pacient=obj; scrub_clause_objects
+  s hlasy POVRCHOVÝCH tvarů + výrok na pohybovém slovese); P2 = C10
+  zárodek Echo (výroky po jednom v uvozovkách, děje středníkem,
+  theme/time/num mimo obsah, nabídka bez 2× výpisu); P3 = #8 fáze 2
+  bod 2 (dissolve_glued_persons — ČTYŘNÁSOBNÁ evidence, klíčová je
+  „komponenty spolu vystupují v týchž faktech": bez ní padl i Josef
+  Čapek, holé uzly jsou smíšené a otisk lže); P4 = karty q-s-kym
+  („S kým mluvil Hospodin?" → Mojžíš) + q-rekl-podmet-adresatovi
+  (nález parity: dativ s podmětem býval druhý subj).
 - **Refaktor blok (2026-07-20 pozdě večer):** TurnResult
   (`answerer.turn`, `begin_turn()`, pick_focus/query_card parametry
   answer()), lint karet (KNOWN_EVENTS + QUERY_ACTION_KEYS — mrtvá
@@ -230,6 +241,19 @@ nesmí být přepsána (je tracked — nález #17).
     `_canon_first` v query.py (malopísmenný predikát před
     kapitalizovaným šumem, pak abecedně); determinismus ověřuj
     bitovým diffem benchmarků pro dva různé hash seedy.
+20. **Deploy: rsync bez --delete nechává MRTVÉ karty** — lint decku
+    (KNOWN_EVENTS) je odmítne a Iris na produkci padá při startu
+    (stalo se 2026-07-20: resolve-miss + 4 staré rodinné soubory
+    q-otaz-*/q-zjistovaci-*). Po rsync VŽDY porovnat výpis
+    `patterns/cs/` se stagingem a přebytky smazat. Pozn.: porty ÚFAL
+    v config.py (8091/92/93) jsou už v upstreamu — dřívější „jediná
+    živá odchylka" zanikla; /version na archivním deployi hlásí
+    sha=unknown (poctivě nesoudí).
+21. **Kapitalizované tvary v hypotézách tříd**: „Božena" končí na
+    -ena (tvar participia) — vzorové prvky nových tříd vylučuj
+    idiomem `trida!jmeno` (jako `l_tvar!spona`, past 9), jinak karta
+    ukradne výběr a shodí kartovou cestu na šablonu. Odhalí parita
+    qgraph (dekorace/etalon rovina).
 
 ## 7. Pracovní smyčka (doporučený postup na 1 úkol)
 
