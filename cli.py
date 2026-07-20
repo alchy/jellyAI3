@@ -473,6 +473,8 @@ def _build_parser():
     sub.add_parser("web", parents=[common], help="webová vizualizace grafu + prompt (viewBase)")
     sub.add_parser("triage", parents=[common],
                    help="shluky tahů s miss/nízkou assurance (stopa #38)")
+    sub.add_parser("qgraph", parents=[common],
+                   help="vypíše zkompilovaný otázkový graf (#57)")
     p_ask = sub.add_parser("ask", parents=[common], help="odpoví na jeden dotaz")
     p_ask.add_argument("question", help="otázka v češtině")
     p_explain = sub.add_parser("explain", parents=[common], help="popíše blok")
@@ -530,6 +532,26 @@ def main(argv=None):  # pylint: disable=too-many-branches
     elif args.command == "triage":
         from jellyai.iris.triage import load_rows, report
         print(report(load_rows(config.graph.telemetry_path)))
+    elif args.command == "qgraph":
+        from jellyai.iris import IrisAutomaton
+        from jellyai.iris.qgraph import compile_qgraph
+        from jellyai.iris.triage import load_rows as _rows
+        from jellyai.tasks import make_graph_answerer
+        answerer = make_graph_answerer(config)
+        iris = IrisAutomaton(answerer)
+        qg = compile_qgraph(iris.deck, answerer._predicates,  # pylint: disable=protected-access
+                            telemetry_rows=_rows(config.graph.telemetry_path))
+        print(f"OTÁZKOVÝ GRAF (#57): {len(qg.nodes)} uzlů, "
+              f"{len(qg.predicates)} predikátů schématu\n")
+        for kind in ("worker", "otazka", "clarify"):
+            for node in sorted(qg.nodes.values(), key=lambda n: n.name):
+                if node.kind != kind:
+                    continue
+                edges = ", ".join(f"{e.kind}→{e.target}" for e in node.edges)
+                weight = f"  váha {node.weight:g}" if node.weight else ""
+                print(f"[{node.kind:7}] {node.name:26} worker={node.worker}"
+                      f"{weight}" + (f"\n          hrany: {edges}"
+                                     if edges else ""))
     elif args.command == "ask":
         print(cmd_ask(config, args.question))
     elif args.command == "explain":

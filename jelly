@@ -30,7 +30,7 @@ case "$cmd" in
     echo "✅ Prostředí připraveno v $ROOT/.venv"
     ;;
 
-  prepare|index|ask|explain|qa|qa-models|wiki|annotate|template|graph|graph-ask|web|triage)
+  prepare|index|ask|explain|qa|qa-models|wiki|annotate|template|graph|graph-ask|web|triage|qgraph)
     if [ ! -x "$PY" ]; then
       echo "❌ Chybí .venv — spusť nejdřív: ./jelly setup" >&2
       exit 1
@@ -45,6 +45,7 @@ case "$cmd" in
       graph)     "$PY" "$ROOT/cli.py" graph "$@" ;;   # postaví faktový graf (příp. --view)
       web)       "$PY" "$ROOT/cli.py" web ;;          # webová vizualizace + prompt (viewBase)
       triage)    "$PY" "$ROOT/cli.py" triage ;;       # shluky missů ze stopy tahů (#38)
+      qgraph)    "$PY" "$ROOT/cli.py" qgraph ;;       # otázkový graf (#57, experiment)
       template)
         if [ "$#" -gt 0 ]; then
           "$PY" "$ROOT/cli.py" ask --template "$*"    # pravidlový jednorázový dotaz
