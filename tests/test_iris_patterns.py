@@ -14,7 +14,7 @@ from jellyai.iris.patterns import PatternDeck
 
 def test_deck_loads_cards_from_directory():
     deck = PatternDeck.for_language("cs")
-    assert deck.load() >= 3          # focus-offer, resolve-miss, assurance-fail
+    assert deck.load() >= 3          # focus-offer, assurance-fail, … (resolve-miss zakonzervována — mrtvý event)
     names = {card.name for card in deck.cards}
     assert "focus-offer-homonym" in names
 
@@ -55,7 +55,8 @@ def test_best_prefers_specific_card_over_priority(tmp_path):
     for card in (generic, tight):
         (tmp_path / f"{card['name']}.json").write_text(
             json.dumps(card), encoding="utf-8")
-    deck = PatternDeck(str(tmp_path))
+    # syntetický event „e" testuje mechaniku výběru — lint vypnut
+    deck = PatternDeck(str(tmp_path), known_events=None)
     deck.load()
     context = {"assurance": 0.2, "candidates": ["A", "B"],
                "features": {"rys"}}
@@ -70,7 +71,8 @@ def test_custom_directory_extends_behavior(tmp_path):
             "teach": "Testovací vzor."}
     (tmp_path / "test-vzor.json").write_text(json.dumps(card),
                                              encoding="utf-8")
-    deck = PatternDeck(str(tmp_path))
+    # syntetický event „data.empty" — mechanika, lint vypnut
+    deck = PatternDeck(str(tmp_path), known_events=None)
     assert deck.load() == 1
     assert deck.match("data.empty", {}).dialog == "Nemám data pro {term}."
 
@@ -164,3 +166,33 @@ def test_deck_rozvine_rodinu_q_zjistovaci():
     assert not os.path.exists(os.path.join(
         PatternDeck.for_language("cs").directory,
         "q-zjistovaci-minuly.json"))
+
+
+def test_deck_odmita_neznamy_event(tmp_path):
+    """Lint karet (postřeh 2.5): překlep eventu = karta, která se nikdy
+    nevybere, tiše — load musí spadnout NAHLAS (vzor: grok-zkratky)."""
+    (tmp_path / "typo.json").write_text(json.dumps({
+        "name": "typo-karta",
+        "trigger": {"event": "utterance.qeury"},
+        "dialog": "", "action": {}, "teach": "překlep"}), encoding="utf-8")
+    with pytest.raises(ValueError, match="utterance.qeury"):
+        PatternDeck(str(tmp_path)).load()
+
+
+def test_deck_odmita_neznamy_klic_query_akce(tmp_path):
+    """Lint karet (postřeh 3.3): neznámý klíč akce dotazové karty
+    (překlep „hole_rol") se dnes tiše ignoruje — load musí spadnout."""
+    (tmp_path / "q-typo.json").write_text(json.dumps({
+        "name": "q-typo",
+        "trigger": {"event": "utterance.query",
+                    "pattern": ["%{TAZACI}"], "priority": 1},
+        "dialog": "", "action": {"query": {"hole_rol": "subj"}},
+        "teach": "překlep"}), encoding="utf-8")
+    with pytest.raises(ValueError, match="hole_rol"):
+        PatternDeck(str(tmp_path)).load()
+
+
+def test_zivy_deck_projde_lintem():
+    """Všechny skutečné karty používají známé eventy i klíče akcí."""
+    deck = PatternDeck.for_language("cs")
+    assert deck.load() > 0

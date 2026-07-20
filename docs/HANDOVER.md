@@ -95,6 +95,11 @@ vstupu a answerer má kaskádu poctivých odpovědí.
   fallback i `query_mode` neexistují. Kartová regrese se pozná přímo na
   etalonu — karty mají před pozičními šablonami přednost; krádež otázky
   jiného smyslu (pasti 9–11) hlídej dál.
+- **Deck při načtení LINTUJE karty**: neznámý event nebo neznámý klíč
+  `query` akce = ValueError nahlas (rejstříky `KNOWN_EVENTS`
+  a `QUERY_ACTION_KEYS` v `patterns.py`). Nový event/klíč = rozšířit
+  kód, který ho konzumuje, I rejstřík. Testy mechaniky decku se
+  syntetickými eventy: `PatternDeck(dir, known_events=None)`.
 - **Nová feature = nový řádek benchmarku.** Odpovědní chování → řádek
   `benchmark/etalon.jsonl` (`{"q", "expect", "cat"}`; negativa přes
   `"reject"`); dialogové chování → scénář `benchmark/dialog.jsonl`

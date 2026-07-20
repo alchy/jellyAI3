@@ -7,11 +7,14 @@ dokumentace) a hrubý návrh směru.
 Řada nálezů má už dnes svůj backlogový bod; kde ho znám, odkazuji.*
 
 *Stav k 2026-07-20 večer (po #51): ✅ provedeno 1.2 (shared_deck),
-1.3 (recognize vrací výsledek — Metron/Chronos), 4.5 (harness z registru);
-částečně 1.1 (sdílené jen jádro těsnosti `trigger_specificity`) a 4.1
-(instance_lit přesunut ke grafu). 2.1 TurnResult vědomě ODLOŽEN
-k odpovědnímu grafu (BACKLOG #57). Zbytek otevřen — provádět „při
-nejbližším dotyku", každý se svým měřením.*
+1.3 (recognize vrací výsledek — Metron/Chronos), 4.5 (harness z registru),
+**2.5 + 3.3** (lint decku: rejstříky KNOWN_EVENTS a QUERY_ACTION_KEYS,
+load spadne nahlas na překlep — první úlovek: mrtvá karta resolve-miss,
+zakonzervována); částečně 1.1 (sdílené jen jádro těsnosti
+`trigger_specificity`) a 4.1 (instance_lit přesunut ke grafu).
+2.1 TurnResult vědomě ODLOŽEN k odpovědnímu grafu (BACKLOG #57).
+Zbytek otevřen — provádět „při nejbližším dotyku", každý se svým
+měřením.*
 
 ---
 

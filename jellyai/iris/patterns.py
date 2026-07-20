@@ -19,6 +19,50 @@ from dataclasses import dataclass, field
 
 _DIR = os.path.dirname(__file__)
 
+# REJSTŘÍK událostí (postřeh 2.5): jediný seznam eventů, které dispatch
+# skutečně konzumuje (deck.best/match volání + rodiny kompilátu qgraph).
+# Překlep eventu na kartě znamenal kartu, která se NIKDY nevybere — tiše;
+# load teď spadne nahlas (týž princip jako neznámá grok-zkratka).
+KNOWN_EVENTS = frozenset({
+    # rodiny otázkového grafu (#51)
+    "utterance.query", "utterance.statement", "utterance.command",
+    "utterance.focus-shift",
+    # dialogové akty (clarify + nabídky)
+    "resolve.ambiguous", "data.overflow", "focus.low", "focus.query",
+    "statement.subject", "query.empty-topic", "answer.offer-roles",
+    # workeři subsystémů
+    "memory.forget", "memory.note", "memory.recall", "memory.stored",
+    "metron.compute",
+    "reminder.cancel", "reminder.default", "reminder.due",
+    "reminder.heads-up", "reminder.list", "reminder.manage-miss",
+    "reminder.move", "reminder.set", "reminder.when",
+})
+
+# Klíče akce `query` dotazové karty (postřeh 3.3) — mini-DSL, které
+# vykonává `_card_query`; neznámý klíč (překlep `hole_rol`) se dřív
+# tiše ignoroval. Nový klíč = rozšířit _card_query I tento seznam.
+QUERY_ACTION_KEYS = frozenset({
+    "hole", "hole_role", "hole_type", "date_part", "class", "copula",
+    "predicate", "known", "user_subject", "novelty",
+})
+
+
+def _lint_card(source, item, known_events):
+    """Lint karty při načtení: známý event + známé klíče query akce."""
+    event = item.get("trigger", {}).get("event")
+    if event not in known_events:
+        raise ValueError(
+            f"Karta {source}: neznámý event „{event}“ — rejstřík "
+            f"KNOWN_EVENTS v patterns.py (překlep by kartu tiše umlčel)")
+    if event == "utterance.query":
+        unknown = set(item.get("action", {}).get("query", {})) \
+            - QUERY_ACTION_KEYS
+        if unknown:
+            raise ValueError(
+                f"Karta {source}: neznámé klíče query akce "
+                f"{sorted(unknown)} — rejstřík QUERY_ACTION_KEYS "
+                f"v patterns.py (vykonává je _card_query)")
+
 
 def _expand_family(data):
     """Rozvine RODINNOU kartu (kostra × dimenze) na konkrétní karty (#57 E1).
@@ -134,13 +178,16 @@ class PatternDeck:
     a pak podle jména; vyhrává PRVNÍ karta, jejíž trigger sedí.
     """
 
-    def __init__(self, directory):
+    def __init__(self, directory, known_events=KNOWN_EVENTS):
         """Vytvoří balíček nad adresářem s JSON kartami.
 
         Args:
             directory (str): Cesta k adresáři (každý `*.json` = jedna karta).
+            known_events: Rejstřík eventů pro lint při načtení; `None`
+                lint vypne (testy mechaniky decku se syntetickými eventy).
         """
         self.directory = directory
+        self.known_events = known_events
         self.cards = []
 
     @classmethod
@@ -165,6 +212,9 @@ class PatternDeck:
                         if "dimensions" in data.get("trigger", {})
                         else [data])
             for item in variants:
+                if self.known_events is not None:
+                    _lint_card(item.get("name", name), item,
+                               self.known_events)
                 cards.append(PatternCard(
                     name=item.get("name", name[:-5]),
                     trigger=item.get("trigger", {}),
