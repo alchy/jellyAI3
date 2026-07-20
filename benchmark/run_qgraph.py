@@ -41,20 +41,26 @@ def _now():
     return datetime(2026, 7, 17, 12, 0)
 
 
+from jellyai.iris.claims import default_claims
+
+_WORKER_NODES = {c.worker: c.name for c in default_claims()}
+
+
 def _actual_route(response, qgraph):
-    """Skutečná cesta tahu z metadat odpovědi → jméno uzlu / None."""
+    """Skutečná cesta tahu z metadat odpovědi → jméno uzlu / None.
+    Jména worker uzlů z registru claimů (postřeh 4.5), ne literály."""
     components = response.used.get("components", ())
     patterns = response.used.get("patterns", ())
     if "metron" in components:
-        return "metron-vypocet"
+        return _WORKER_NODES["metron"]
     if "iris" in components:
-        return "meta-focus"
+        return _WORKER_NODES["iris"]
     for name in patterns:
         node = qgraph.nodes.get(name)
         if node is not None and node.kind in ("otazka", "clarify"):
             return name
     if list(components) == ["chronos"] and not patterns:
-        return "chronos-hodiny"
+        return _WORKER_NODES["chronos"]
     return None                                  # mimo rozsah experimentu
 
 
