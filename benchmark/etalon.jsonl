@@ -37,3 +37,4 @@
 {"q": "Kde putoval Ježíš?", "expect": ["Kafarnaum"], "cat": "topos"}
 {"q": "Co řekl Ježíšovi?", "expect": ["umřel"], "reject": ["Amen"], "cat": "směr řeči"}
 {"q": "Co řekl učedníkům?", "expect": ["Pojďme"], "reject": ["Amen"], "cat": "směr řeči"}
+{"q": "Kde napsal R.U.R.?", "expect": ["nevím"], "cat": "prázdná díra", "gap": "#57 E3: predikát napsat roli loc nikdy nenese — místo generického terminálu má odpovědět chytrá clarifikace (vím kdo a co, kde nevím)"}
