@@ -149,3 +149,20 @@ def test_automat_dispatchuje_prime_experty_z_grafu():
     iris.qgraph.claims = (vetrelec,) + tuple(iris.qgraph.claims)
     r = iris.turn("Kolik je hodin?")
     assert r.used["components"] == ["chronos"]
+
+
+def test_instance_ze_schematu_predikatu():
+    """E3: instance svítí jen s rolí díry ve schématu; neznámý
+    predikát nebo prázdné role = ŽÁDNÝ verdikt (vakuum, past 2)."""
+    from config import Config
+    from jellyai.iris.qgraph import instance_lit
+    from jellyai.tasks import make_graph_answerer
+
+    graph = make_graph_answerer(Config()).graph
+    roles = graph.predicate_roles("napsat")
+    assert "subj" in roles and "obj" in roles
+    assert "loc" not in roles
+    roles_of = graph.predicate_roles
+    assert instance_lit("napsat", "obj", roles_of) is True
+    assert instance_lit("napsat", "loc", roles_of) is False
+    assert instance_lit("blafnout", "loc", roles_of) is None

@@ -127,6 +127,18 @@ class FactGraph:
         else:
             n.weight += 1
 
+    def predicate_roles(self, predicate):
+        """Role, ve kterých fakty predikátu nesou účastníky (#57 E3).
+
+        Schéma otázkového grafu se NEkurátoruje — čte se z faktů;
+        prázdná množina = graf predikát nezná (žádný verdikt).
+        """
+        roles = set()
+        for fact in self.facts.values():
+            if fact.predicate == predicate:
+                roles.update(p.role for p in fact.participants)
+        return frozenset(roles)
+
     def facts_of(self, node_id, role=None, predicate=None):
         """Fakty, v nichž uzel vystupuje (volitelně filtr role a predikátu).
 
