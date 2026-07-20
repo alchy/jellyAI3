@@ -109,3 +109,61 @@ def test_alias_extraction_reads_recene():
     parts = {(p.role, p.node) for p in facts[0].participants}
     assert facts[0].predicate == "jmenovat"
     assert ("subj", "Ježíš") in parts and ("pred", "Kristus") in parts
+
+
+def _glue_graph(with_assertion=False):
+    """Slepenec „Áron Mojžíš" sdílí svět (Hospodin, faraón, Izrael)
+    s Áronem i Mojžíšem; Mojžíš je těžší komponenta. Kontrola: „Josef
+    Čapek" sdílí svět jen s Čapkem — biblický Josef žije jinde."""
+    g = FactGraph()
+    for who in ("Áron Mojžíš", "Áron", "Mojžíš"):
+        for other in ("Hospodin", "faraón", "Izrael"):
+            g.add_fact(_fact("potkat", ("subj", who, "person"),
+                             ("obj", other, "person")))
+    for _ in range(2):   # komponenty spolu JEDNAJÍ (evidence d)
+        g.add_fact(_fact("mluvit", ("subj", "Mojžíš", "person"),
+                         ("obj", "Áron", "person")))
+    for _ in range(3):   # Mojžíš = silnější komponenta
+        g.add_fact(_fact("mluvit", ("subj", "Mojžíš", "person"),
+                         ("obj", "Hospodin", "person")))
+    for who in ("Josef Čapek", "Čapek"):
+        for other in ("Praha", "Karel", "obraz"):
+            g.add_fact(_fact("kontext", ("subj", who, "person"),
+                             ("obj", other, "person")))
+    g.add_fact(_fact("žít", ("subj", "Josef", "person"),
+                     ("obj", "Egypt", "person")))
+    if with_assertion:
+        g.add_fact(_fact("jmenovat", ("subj", "Áron", "person"),
+                         ("pred", "Mojžíš", "jméno")))
+    return g
+
+
+def test_slepenec_se_rozpusti_do_silnejsi_komponenty():
+    """#8 fáze 2 (bod 2): „Áron Mojžíš" kryje dvě nezávislé osoby a
+    otiskem sdílí svět s OBĚMA → rozpustí se do silnější (Mojžíš)."""
+    from jellyai.graph.instance import dissolve_glued_persons
+    g = _glue_graph()
+    dissolved = dissolve_glued_persons(g)
+    assert dissolved == 1
+    assert "Áron Mojžíš" not in g.nodes
+    assert any(p.node == "Mojžíš" for f in g.facts.values()
+               for p in f.participants)
+
+
+def test_cele_jmeno_prezije_rozpousteni():
+    """„Josef Čapek" kryje uzly Josef i Čapek, ale svět biblického
+    Josefa nesdílí (překryv jen k jedné komponentě) → zůstává."""
+    from jellyai.graph.instance import dissolve_glued_persons
+    g = _glue_graph()
+    dissolve_glued_persons(g)
+    assert "Josef Čapek" in g.nodes
+
+
+def test_tvrzeny_alias_slepenec_nerozpousti():
+    """Textové tvrzení `jmenovat` mezi komponentami („Šimon zvaný
+    Petr") znamená JEDNU osobu — o srůstu rozhoduje resolve_instances,
+    rozpouštění se nehlásí (nesmí dvojvládně přepisovat tvrzení)."""
+    from jellyai.graph.instance import dissolve_glued_persons
+    g = _glue_graph(with_assertion=True)
+    assert dissolve_glued_persons(g) == 0
+    assert "Áron Mojžíš" in g.nodes

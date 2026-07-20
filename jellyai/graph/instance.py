@@ -114,3 +114,77 @@ def _name_families(graph):
     return {stem: sorted(members)
             for stem, members in sorted(families.items())
             if len(members) > 1}
+
+
+_MIN_GLUE_OVERLAP = 3     # slepenec musí otiskem sdílet svět s OBĚMA osobami
+
+
+def dissolve_glued_persons(graph):
+    """Rozpuštění dvou-osobových slepenců (#8 fáze 2, bod 2; in-place).
+
+    NER občas slepí dvě osoby jedné věty do uzlu („Áronovi Mojžíš" —
+    dativ adresáta + nominativ podmětu). Slepenec prozradí trojí
+    evidence: (a) obě slova kmenově kryjí NEZÁVISLÉ jednoslovné osoby
+    grafu, (b) otisk slepence sdílí svět s OBĚMA (≥ práh) — legitimní
+    celé jméno („Josef Čapek") svět svého biblického jmenovce nesdílí,
+    (c) mezi komponentami není textové tvrzení `jmenovat` („Šimon
+    zvaný Petr" je JEDNA osoba — vládne resolve_instances), (d)
+    komponenty spolu VYSTUPUJÍ v týchž faktech (Áron+Mojžíš 25×,
+    Jákob+Josef 9× — dvě osoby, které jednají spolu; Josef+Čapek 0 —
+    holý uzel „Josef" je smíšený s biblickým a překryv otisku (b) sám
+    lže, ZMĚŘENO: bez (d) padlo i legitimní celé jméno). Rozpouští
+    se do SILNĚJŠÍ komponenty (váha uzlu).
+
+    Returns:
+        int: Počet rozpuštěných slepenců.
+    """
+    name_predicate = current()["name_predicate"]
+    persons = {n.id: n for n in graph.nodes.values() if n.type == "person"}
+    single = {p: node for p, node in persons.items() if " " not in p}
+    asserted = set()
+    for fact in graph.facts.values():
+        if fact.predicate == name_predicate:
+            names = frozenset(p.node for p in fact.participants)
+            asserted.add(names)
+    by_stem = {}
+    for p in single:
+        for s in _stems(p):
+            by_stem.setdefault(s, set()).add(p)
+    node_map = {}
+    for glued in sorted(persons):
+        words = glued.split()
+        if len(words) != 2:
+            continue
+        covers = []
+        for w in words:
+            stem = _stem(w.lower())
+            hits = sorted(by_stem.get(stem, set()) - {glued})
+            covers.append(hits)
+        if not covers[0] or not covers[1]:
+            continue
+        # nejsilnější kandidát za každé slovo (deterministicky: váha, jméno)
+        first = max(covers[0], key=lambda p: (single[p].weight, p))
+        second = max(covers[1], key=lambda p: (single[p].weight, p))
+        if first == second:
+            continue
+        if frozenset((first, second)) in asserted \
+                or any(glued in pair for pair in asserted):
+            continue          # tvrzený alias = jedna osoba, nerozpouštět
+        cofacts = sum(f.weight for f in graph.facts_of(first)
+                      if any(p.node == second for p in f.participants))
+        if cofacts < 2:
+            continue          # komponenty spolu nejednají → není doloženo,
+            #                   že jde o DVĚ osoby (celé jméno přežívá)
+        anchor = _fingerprint(graph, glued)
+        if len(anchor & _fingerprint(graph, first)) < _MIN_GLUE_OVERLAP \
+                or len(anchor & _fingerprint(graph, second)) \
+                < _MIN_GLUE_OVERLAP:
+            continue          # celé jméno sdílí svět nejvýš s jednou
+        stronger = max((first, second),
+                       key=lambda p: (single[p].weight, p))
+        node_map[glued] = stronger
+    if node_map:
+        from jellyai.graph.graph import remap_nodes
+        remap_nodes(graph, node_map)
+        graph.name_families = _name_families(graph)
+    return len(node_map)

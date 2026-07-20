@@ -84,6 +84,10 @@ def build_fact_graph(config):
     merged = resolve_instances(graph)
     print(f"Instance: {merged} jmenných střepů srostlo (tvrzené aliasy), "
           f"{len(graph.name_families)} jmenných rodin")
+    from jellyai.graph.instance import dissolve_glued_persons
+    dissolved = dissolve_glued_persons(graph)
+    print(f"Slepence: {dissolved} dvou-osobových uzlů rozpuštěno do "
+          f"silnější komponenty (Áron Mojžíš — #8 fáze 2)")
     graph.save(config.graph.graph_path)
     return graph
 
