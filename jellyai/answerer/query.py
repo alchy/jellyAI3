@@ -228,6 +228,11 @@ def _card_query(question, predicates, is_node=None, is_word=None):
         entry = lang["interrogatives"].get(hole.norm)
         if entry:
             pattern.hole_role, pattern.hole_type, qtype = entry
+        else:
+            # karta ŽÁDÁ díru, ale tázací slovo je mimo slovník děr
+            # (proč/jak…) — karta se nehlásí; příslovečná otázka není
+            # existence („Proč přišel Ježíš?" ≠ Ano)
+            return None
     part = ref(spec.get("date_part"))
     if part is not None:
         # „v kterém ROCE" = 2-skokový drill přes časový uzel: část data
@@ -338,6 +343,13 @@ def build_query(question, predicates, is_node=None, is_word=None,
         if entry:
             hole_role, hole_type, qtype = entry
             break
+    if hole_role is None and any(
+            _norm(t) in lang.get("interrogative_adverbs", ()) for t in tokens):
+        # PŘÍSLOVEČNÁ otázka (proč/jak/kudy…) nemá díru v tabulce —
+        # NENÍ to zjišťovací existence („Proč přišel Ježíš?" ≠ Ano);
+        # dřív to krylo neznámé sloveso, katalog supletivních l-tvarů
+        # (přišel→přijít) si vynutil explicitní guard
+        return None
 
     relational = lang["relational_nouns"]
     if hole_role is not None \

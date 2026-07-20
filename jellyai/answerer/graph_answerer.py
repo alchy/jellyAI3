@@ -38,6 +38,19 @@ def _loose(word):
     return s[:-1] if len(s) > 2 and s[-1] in "aeiouy" else s
 
 
+def _movement_ring(predicate):
+    """SMĚROVÁ třída přesunu (putovat≈přijít≈odejít) — kruh JEN pro
+    místní díry a afinitu: u osobních děr obrací děj („Kdo přišel
+    k X?" nesmí odpovědět fakt odejít — nález „Pan")."""
+    movement = current().get("movement_predicates", ())
+    low = predicate.lower() if predicate else ""
+    if predicate in movement or low in movement:
+        # kapitalizované mis-lemma („Putovat") — týž fallback jako
+        # _synonym_ring
+        return [(p, False) for p in movement if p not in (predicate, low)]
+    return []
+
+
 def _synonym_ring(predicate):
     """(predikát, exact) + jeho synonyma z jazykových dat — „Kde žili?" najde
     bydlet-fakt; přesný predikát drží přednost bonusem. Kapitalizovaný
@@ -197,7 +210,8 @@ class GraphAnswerer(Answerer):
         loose = [_loose(t) for t in terms]
         best_id, best_score = None, None
         candidates = []   # (id, stem_hits, váha, loose klíč, afinita) — vějíř
-        ring = _synonym_ring(predicate) if predicate else ()
+        ring = (_synonym_ring(predicate)
+                + _movement_ring(predicate)) if predicate else ()
         for node in self.graph.nodes.values():
             if node.type == "výrok":
                 continue                  # obsah řeči je hodnota, ne téma
@@ -583,7 +597,10 @@ class GraphAnswerer(Answerer):
             return [], None
         node0 = next(iter(known_set))
         scored = []
-        for pred, exact in _synonym_ring(predicate):
+        ring = list(_synonym_ring(predicate))
+        if hole_role == "loc" or hole_type == "geo":
+            ring += _movement_ring(predicate)
+        for pred, exact in ring:
             for fact in self.graph.facts_of(node0, predicate=pred):
                 if not known_set <= {p.node for p in fact.participants}:
                     continue
@@ -1203,7 +1220,8 @@ class GraphAnswerer(Answerer):
         smí vybrat člen bez faktů (potkal→potkávat) a verdikt nesmí
         spadnout do vakua (B4 nález)."""
         roles = set()
-        for pred, _ in _synonym_ring(predicate or ""):
+        for pred, _ in (_synonym_ring(predicate or "")
+                        + _movement_ring(predicate or "")):
             roles |= self.graph.predicate_roles(pred)
         return frozenset(roles)
 
