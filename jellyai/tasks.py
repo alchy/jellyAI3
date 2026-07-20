@@ -67,6 +67,11 @@ def build_fact_graph(config):
     dropped_i = scrub_false_persons(graph, name_position_votes(annotations))
     print(f"Hygiena jmen: −{dropped_i} falešných osob z imperativních "
           f"začátků vět (Tyč, Proste — dávka D)")
+    from jellyai.graph.hygiene import form_upos_votes, scrub_clause_objects
+    dropped_c, dropped_cf = scrub_clause_objects(
+        graph, form_upos_votes(annotations))
+    print(f"Hygiena klauzulí: −{dropped_c} slepených klauzulí v entitních "
+          f"rolích, −{dropped_cf} faktů (T10 — dávka D)")
     from jellyai.graph.hygiene import nominativize, propn_lemma_votes
     renamed = nominativize(graph, propn_lemma_votes(annotations))
     print(f"Nominativizace: {renamed} skloněných id → lemma "

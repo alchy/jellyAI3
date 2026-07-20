@@ -423,3 +423,78 @@ def test_fold_slouci_vahy_shodnych_faktu():
                   if ("num", "1920") in {(p.role, p.node)
                                          for p in f.participants})
     assert merged.predicate == "vydat" and merged.weight == 2
+
+
+def _form_annotations(tokens_by_sentence):
+    """Anotace z [(form, upos), …] vět — hlasování povrchových tvarů."""
+    return {("doc", i): {"sentences": [[{"form": f, "lemma": f.lower(),
+                                         "upos": u, "head": 0,
+                                         "deprel": "dep"}
+                                        for f, u in sent]]}
+            for i, sent in enumerate(tokens_by_sentence)}
+
+
+def test_scrub_clause_objects_drops_glued_clause():
+    """T10 (dávka D zbytek c): uzel „vydal František Borový Praha" je
+    slepená klauzule, ne entita — slovo „vydal" korpus převážně značí
+    VERB. Fakt bez protistrany padá s ním."""
+    from jellyai.graph.hygiene import form_upos_votes, scrub_clause_objects
+    g = FactGraph()
+    g.add_fact(make_fact("vydat", [
+        Participant("subj", "František Borový", "person"),
+        Participant("obj", "vydal František Borový Praha", "person")]))
+    votes = form_upos_votes(_form_annotations(
+        [[("vydal", "VERB")]] * 3 + [[("František", "PROPN")] * 3]))
+    dropped_p, dropped_f = scrub_clause_objects(g, votes)
+    assert dropped_p == 1 and dropped_f == 1
+
+
+def test_scrub_clause_objects_keeps_l_shaped_names():
+    """Jména tvaru l-příčestí (Karel, Pavel) mají PROPN hlasy tvarů —
+    guard je NEsmí zahodit; hlasuje korpus, ne lokální tvar."""
+    from jellyai.graph.hygiene import form_upos_votes, scrub_clause_objects
+    g = FactGraph()
+    g.add_fact(make_fact("napsat", [
+        Participant("subj", "Karel Čapek", "person"),
+        Participant("obj", "Bílá nemoc", "dílo")]))
+    votes = form_upos_votes(_form_annotations(
+        [[("Karel", "PROPN"), ("Čapek", "PROPN")]] * 3))
+    dropped_p, dropped_f = scrub_clause_objects(g, votes)
+    assert dropped_p == 0 and dropped_f == 0
+    assert any(p.node == "Karel Čapek" for f in g.facts.values()
+               for p in f.participants)
+
+
+def test_scrub_clause_objects_nesaha_na_vyrok_a_cas():
+    """Kanál obsahu řeči (typ výrok) a časové uzly („19. června 1841")
+    jsou záměrné víceslovné uzly — guard je míjí."""
+    from jellyai.graph.hygiene import form_upos_votes, scrub_clause_objects
+    g = FactGraph()
+    g.add_fact(make_fact("říci", [
+        Participant("subj", "Mojžíš", "person"),
+        Participant("obj", "budu s tebou", "výrok")]))
+    g.add_fact(make_fact("pokřtít", [
+        Participant("obj", "dcera", "concept"),
+        Participant("time", "19. června 1841", "time")]))
+    votes = form_upos_votes(_form_annotations([[("budu", "VERB")]] * 3))
+    dropped_p, dropped_f = scrub_clause_objects(g, votes)
+    assert dropped_p == 0 and dropped_f == 0
+
+
+def test_scrub_clause_objects_vyrok_na_pohybovem_slovese():
+    """T10 příklad: přijít(obj=„odešel opět na horu zcela sám", výrok) —
+    pohybové sloveso (movement_predicates) obsah řeči nenese, výrok na
+    něm je slepená klauzule. Na řečovém slovese výrok zůstává."""
+    from jellyai.graph.hygiene import form_upos_votes, scrub_clause_objects
+    g = FactGraph()
+    g.add_fact(make_fact("přijít", [
+        Participant("subj", "Ježíš", "person"),
+        Participant("obj", "odešel opět na horu zcela sám", "výrok")]))
+    g.add_fact(make_fact("říci", [
+        Participant("subj", "Mojžíš", "person"),
+        Participant("obj", "budu s tebou", "výrok")]))
+    dropped_p, dropped_f = scrub_clause_objects(
+        g, form_upos_votes(_form_annotations([])))
+    assert dropped_p == 1 and dropped_f == 1
+    assert any(p.node == "budu s tebou" for f in g.facts.values()
+               for p in f.participants)

@@ -549,3 +549,76 @@ def fold_participles(graph):
             existing.source |= fact.source
     graph.replace_facts(kept)
     return len(mapping)
+
+
+def form_upos_votes(annotations):
+    """Hlasy upos podle POVRCHOVÉHO tvaru (ne lemmatu).
+
+    Slepený uzel nese povrch věty („vydal František Borový Praha") —
+    lemma hlasování ho nevidí (klíč „vydat"). Tvar „vydal" ale korpus
+    značí VERB, „Karel" PROPN; povrchové hlasy tak odliší klauzuli
+    od jména tvaru l-příčestí.
+    """
+    votes = defaultdict(Counter)
+    for record in annotations.values():
+        for sent in record.get("sentences", []):
+            for tok in sent:
+                form = tok.get("form")
+                if form:
+                    votes[form][tok.get("upos", "")] += 1
+    return votes
+
+
+def scrub_clause_objects(graph, votes):
+    """Slepené klauzule v entitních rolích pryč (T10, dávka D zbytek c).
+
+    Víceslovný účastník subj/obj/theme typu person/institution/concept/
+    dílo, jehož slovo korpus PŘEVÁŽNĚ značí VERB/AUX („vydal František
+    Borový Praha 1918…", „odešel opět na horu…"), není entita — je to
+    kus věty slepený extrakcí. Kanál obsahu řeči (typ výrok) a časové
+    uzly jsou záměrné víceslovné uzly — guard je míjí. Fakt bez
+    protistrany padá (vzor `scrub`).
+
+    Returns:
+        tuple[int, int]: (vyřazených účastníků, vyřazených faktů).
+    """
+    movement = set(current().get("movement_predicates", ()))
+    dropped_participants = 0
+    dropped_facts = 0
+    kept = {}
+    for key, fact in graph.facts.items():
+        participants = []
+        for p in fact.participants:
+            words = p.node.split()
+            if len(words) >= 2 \
+                    and p.role in ("subj", "obj", "theme") \
+                    and p.type in ("person", "institution",
+                                   "concept", "dílo") \
+                    and any(_dominant(votes, w, ("VERB", "AUX"))
+                            for w in words):
+                dropped_participants += 1
+                continue
+            if p.type == "výrok" and fact.predicate in movement:
+                # pohybové sloveso obsah řeči nenese (T10: „přijít" s obj
+                # „odešel opět na horu…") — výrok na něm je slepená
+                # klauzule; řečová slovesa výroky drží (kanál pro C10)
+                dropped_participants += 1
+                continue
+            participants.append(p)
+        if not participants or (len(participants) < 2
+                                and len(fact.participants) >= 2):
+            dropped_facts += 1                # bez protistrany fakt nenese nic
+            continue
+        if len(participants) == len(fact.participants):
+            kept[key] = fact
+        else:
+            new_key = (fact.predicate, tuple(participants))
+            existing = kept.get(new_key)
+            if existing is None:
+                kept[new_key] = FactNode(new_key, fact.predicate, fact.weight,
+                                         tuple(participants), set(fact.source))
+            else:
+                existing.weight += fact.weight
+                existing.source |= fact.source
+    graph.replace_facts(kept)
+    return dropped_participants, dropped_facts
