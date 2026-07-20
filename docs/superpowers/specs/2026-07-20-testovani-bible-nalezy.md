@@ -76,3 +76,35 @@
 A1+A3+B5+B6 (drobné, hned) → B4 (empty-topic — princip, měřený
 etalonem) → A2 (třídy dějů — koncept s userem) → C9+C10 (s plánem
 #51) → B7+B8 → D (extrakční dávka s přestavbou grafu).
+
+---
+
+## RETEST (2026-07-20 odpoledne, build 8505971 — po dávce 1 + #51)
+
+| Otázka | Před | Po | Verdikt |
+|---|---|---|---|
+| Koho vzkřísil Ježíš? | „den" | „O ději „vzkřísit“ vím kdo; co nevím." | ✅ B6+E3 kaskáda |
+| Kdo přišel k Ježíšovi? | figl + „Mohu doplnit: co." | figl bez nabídky | ✅ B5, ❌ figl trvá (B4) |
+| Koho potkal Ježíš? | figl „Šimon" (kontext) | beze změny | ❌ B4 empty-topic |
+| Koho uzdravoval Ježíš? | — (neptáno) | „nemoc, choroba" — výčet vidového tvaru | ✅ A1 (pozn.: „nemocný" ve výčtu chybí — prozkoumat ranking) |
+| Co víme o Janu Křtiteli? | „ctít: den, strach, hodovat: den…" | „poslat: Ježíš…, promluvit: Izrael, činit: pokání…" | ✅ čistší (vedlejší efekt guardů); ❌ telegraf trvá (C10) |
+| Jaké zázraky činil Ježíš? | assurance-fail | beze změny | ❌ A2 třídy dějů |
+| Co řekl Ježíš Petrovi? / Kde? | fungovalo / terminál | beze změny | ❌ T9 drill vysvětlení |
+| S kým se Ježíš potkal? | nenašel bez karty | beze změny | ❌ T5 předložkové vazby |
+
+**NOVÉ NÁLEZY:**
+- **T11 — místo plní osobní díru:** „Kdo se setkal s Mojžíšem?" →
+  „Boží Hora" (fakt setkat(loc: Boží Hora, subj: Mojžíš); subj je
+  známý → díru kdo vyplnil loc účastník). Táž nemoc jako „den" (B6) —
+  zobecnit: typovaná díra person nesmí brát loc/time/theme účastníky
+  („role/typ je preference" je u PERSON děr špatná zásada).
+- **T12 — nabídka nezná kontext konverzace:** drill „Kde?" (správně
+  Boží Hora) nabídl „Mohu doplnit: kdo" — Mojžíš zazněl v předchozí
+  otázce. Nabídka by měla tlumit role, jejichž hodnoty jsou žhavé
+  z těžiště.
+
+**DOPORUČENÝ SMĚR (k rozhodnutí):** balík „konec figlů" = B4
+empty-topic (kontextové patro → vysvětlení s kandidáty subjektů
+predikátu) + zobecněný typový guard person děr (T11) — největší
+viditelný skok kvality, měřitelné řádky existují. Pak A2 třídy dějů
+(cíl testu „zázraky" stále nesplněn) a C10 formát výčtů (Echo).
