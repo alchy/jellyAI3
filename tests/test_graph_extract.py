@@ -446,3 +446,47 @@ def test_speech_content_clause_becomes_object():
     rekl = next(f for f in facts if f.predicate == "říci")
     objs = [p.node for p in rekl.participants if p.role == "obj"]
     assert objs and "Jdi za mnou" in objs[0]
+
+
+def test_pasivum_podmet_je_pacient():
+    """Dávka D: „Ježíš byl pokřtěn Janem" — nsubj:pass je PACIENT (obj),
+    agent (obl:agent) je konatel (subj); dřív pasivum obracelo děj."""
+    sent = [
+        {"form": "Ježíš", "lemma": "Ježíš", "upos": "PROPN", "head": 3, "deprel": "nsubj:pass", "start": 0, "end": 5},
+        {"form": "byl", "lemma": "být", "upos": "AUX", "head": 3, "deprel": "aux:pass", "start": 6, "end": 9},
+        {"form": "pokřtěn", "lemma": "pokřtít", "upos": "VERB", "head": 0, "deprel": "root", "start": 10, "end": 17},
+        {"form": "Janem", "lemma": "Jan", "upos": "PROPN", "head": 3, "deprel": "obl:agent", "start": 18, "end": 23},
+    ]
+    ents = [{"text": "Ježíš", "type": "P", "start": 0, "end": 5},
+            {"text": "Jan", "type": "P", "start": 18, "end": 23}]
+    facts = extract_facts(_ann(sent, ents))
+    expected = make_fact("pokřtít", [Participant("subj", "Jan", "person"),
+                                     Participant("obj", "Ježíš", "person")])
+    assert expected in facts
+
+
+def test_pasivum_bez_agenta_nedostane_default_subjekt():
+    """Pasivum bez konatele: default_subject (hlavní entita dokumentu)
+    NENÍ agent — fakt nese jen pacienta (+ případné atributy)."""
+    sent = [
+        {"form": "Ježíš", "lemma": "Ježíš", "upos": "PROPN", "head": 3, "deprel": "nsubj:pass", "start": 0, "end": 5},
+        {"form": "byl", "lemma": "být", "upos": "AUX", "head": 3, "deprel": "aux:pass", "start": 6, "end": 9},
+        {"form": "pokřtěn", "lemma": "pokřtít", "upos": "VERB", "head": 0, "deprel": "root", "start": 10, "end": 17},
+        {"form": "Jordánu", "lemma": "Jordán", "upos": "PROPN", "head": 3, "deprel": "obl", "start": 20, "end": 27},
+    ]
+    ents = [{"text": "Ježíš", "type": "P", "start": 0, "end": 5},
+            {"text": "Jordán", "type": "G", "start": 20, "end": 27}]
+    facts = extract_facts(_ann(sent, ents), default_subject=("Bůh", "person"))
+    fact = next(f for f in facts if f.predicate == "pokřtít")
+    parts = {(p.role, p.node) for p in fact.participants}
+    assert ("obj", "Ježíš") in parts and ("loc", "Jordán") in parts
+    assert all(node != "Bůh" for _, node in parts)
+
+
+def test_kapitalizovany_predikat_se_sklada_malymi():
+    """Dávka D (hygiena #2): predikát je děj — kapitalizace věty do něj
+    nepatří („Zhotovíš dva cheruby" nesmí založit predikát „Zhotovit"
+    vedle „zhotovit"; třída šumu z #58)."""
+    fact = make_fact("Zhotovit", [Participant("subj", "A", "person"),
+                                  Participant("obj", "B", "concept")])
+    assert fact.predicate == "zhotovit"

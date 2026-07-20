@@ -48,3 +48,6 @@
 {"q": "Co udělal Ježíš v Kafarnaum?", "expect": ["nenašel"], "reject": ["stan"], "cat": "místní filtr (B7)", "gap": "GAP-FIXED dávkou D: oblast za předložkou se nárokuje i u děrových otázek (place_filter) a figl „stan“ vyloučil tvrdý filtr; REVIZE nálezu B7 — Kafarnaum v gazetteeru BYL, chyběl nárok oblasti v šabloně. Odpověď z lokalizovaných dějů dá až agregace tříd (#41)"}
 {"q": "Kdo se narodil v Betlémě?", "expect": ["Ježíš"], "cat": "místní filtr (D)"}
 {"q": "Co řekl Ježíš v Jeruzalémě?", "expect": ["učitel Izraele"], "cat": "místní filtr (D)"}
+{"q": "Kdo byl pokřtěn?", "expect": ["Ježíš"], "cat": "pasivum (D)"}
+{"q": "Kdo prostrčil tyče?", "expect": ["nenašel"], "reject": ["Tyč"], "cat": "hygiena imperativů (D)"}
+{"q": "Kde byl Ježíš pokřtěn?", "expect": ["Jordán"], "reject": ["Mesiáš"], "gap": "dotazová strana pasiva: otázka mapuje pacienta na subj, fakty po dávce D ho nesou v obj — chce pasivní mapování v parseru otázek (šablona/karta „byl <příčestí>“); extrakční strana hotová"}

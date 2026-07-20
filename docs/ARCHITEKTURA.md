@@ -478,7 +478,7 @@ zhoršit.
 
 | benchmark | co měří | normativ |
 |---|---|---|
-| `run_etalon.py` | odpovědi na korpusem kryté otázky | 33/33 (jádro 100 %) |
+| `run_etalon.py` | odpovědi na korpusem kryté otázky | 37/37 (jádro 100 %) |
 | `run_focus.py` | aktivace správných uzlů (top-K jasu) | 12/12 |
 | `run_dialog.py` | scénáře automatu (fixní hodiny, čerstvý graf per scénář); umí GAP scénáře | 45/45 |
 | `run_mnemos.py` | ZÁPIS: výrok → parse (týmž soukolím jako runtime); `--nom` i nominativizaci | 34/34 |

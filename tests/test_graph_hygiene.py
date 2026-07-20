@@ -351,3 +351,26 @@ def test_scrub_drops_fact_left_without_partner():
     dropped_participants, dropped_facts = scrub(g, votes)
     assert dropped_facts == 1
     assert not g.facts
+
+
+def test_falesna_osoba_z_imperativu_padne():
+    """Dávka D (T14 „Tyč"): osoba, jejíž tvary se v korpusu NIKDY nepíší
+    velkým písmenem uprostřed věty a mají malopísmenné výskyty (≥2), není
+    jméno — je to věcný/imperativní začátek věty. Skutečné jméno s jedním
+    výskytem (Verunka: malých 0) přežije."""
+    from jellyai.graph.extract import make_fact, Participant
+    from jellyai.graph.graph import FactGraph
+    from jellyai.graph.hygiene import scrub_false_persons
+    g = FactGraph()
+    g.add_fact(make_fact("zhotovit", [Participant("subj", "Tyč", "person"),
+                                      Participant("obj", "cherub", "concept")]))
+    g.add_fact(make_fact("potkat", [Participant("subj", "Verunka", "person"),
+                                    Participant("obj", "Barunka", "person")]))
+    g.aliases = {"Tyč": ["Tyče"]}
+    votes = {"tyč": [0, 1], "tyče": [0, 22],       # [uprostřed velké, malé]
+             "verunka": [0, 0], "barunka": [3, 0]}
+    dropped = scrub_false_persons(g, votes)
+    assert dropped == 1
+    assert "Tyč" not in g.nodes
+    assert any(p.node == "Verunka" for f in g.facts.values()
+               for p in f.participants)

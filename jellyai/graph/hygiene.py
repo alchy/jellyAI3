@@ -254,6 +254,81 @@ def scrub_semantics(graph, animacy_votes):
     return dropped
 
 
+def name_position_votes(annotations):
+    """Hlasy o JMENNOSTI tvaru: [velkých UPROSTŘED věty, malých celkem].
+
+    Velké písmeno uprostřed věty (po alfabetickém sousedu — začátek
+    věty ani pozice po uvozovce/dvojtečce nesvědčí) je evidence
+    vlastního jména; malopísmenný výskyt je evidence obecného slova.
+
+    Returns:
+        dict[str, list[int, int]]: tvar (lower) → [velkých uprostřed, malých].
+    """
+    votes = defaultdict(lambda: [0, 0])
+    for annotation in annotations.values():
+        for sent in annotation.get("sentences", []):
+            for k, token in enumerate(sent):
+                form = token.get("form") or ""
+                if not form[:1].isalpha():
+                    continue
+                if form[:1].islower():
+                    votes[form.lower()][1] += 1
+                elif k and (sent[k - 1].get("form") or "")[:1].isalpha():
+                    votes[form.lower()][0] += 1
+    return votes
+
+
+def _false_person(votes, node_id, aliases):
+    """Jméno bez JEDINÉHO velkého výskytu uprostřed věty, jehož tvary
+    v korpusu žijí malými písmeny (≥ práh) — imperativní/věcný začátek
+    věty („Tyč", „Proste"; nález T14), ne osoba. Skutečné jméno s málo
+    výskyty (Verunka) malopísmennou evidenci nemá a přežije."""
+    forms = {node_id.lower()} | {a.lower() for a in aliases}
+    mid = sum(votes.get(f, (0, 0))[0] for f in forms)
+    low = sum(votes.get(f, (0, 0))[1] for f in forms)
+    return mid == 0 and low >= _MIN_CASE_VOTES
+
+
+def scrub_false_persons(graph, votes):
+    """Vyřadí FALEŠNÉ OSOBY z imperativních/věcných začátků vět
+    (in-place, vzor `scrub`): jednoslovný účastník typu person, jehož
+    jmennost korpus vyvrací (`_false_person`), z faktů vypadne; fakt
+    pod dva účastníky umírá. „Tyč" (w=94, imperativy stavby stánku
+    v Exodu) tak přestane být podmětem dějů.
+
+    Args:
+        graph (FactGraph): Graf k čistce (čte `graph.aliases`).
+        votes (dict): Výstup `name_position_votes`.
+
+    Returns:
+        int: Počet vyřazených falešných osob (uzlů).
+    """
+    false = {node.id for node in graph.nodes.values()
+             if node.type == "person" and " " not in node.id
+             and _false_person(votes, node.id,
+                               graph.aliases.get(node.id, ()))}
+    if not false:
+        return 0
+    kept = {}
+    for key, fact in graph.facts.items():
+        participants = [p for p in fact.participants if p.node not in false]
+        if len(participants) < 2:
+            continue
+        if len(participants) == len(fact.participants):
+            kept[key] = fact
+        else:
+            new_key = (fact.predicate, tuple(participants))
+            existing = kept.get(new_key)
+            if existing is None:          # ořez = nový klíč i id (drill čte id)
+                kept[new_key] = FactNode(new_key, fact.predicate, fact.weight,
+                                         tuple(participants),
+                                         set(getattr(fact, "source", ())))
+            else:                         # ořezy splynuly → agregace vah
+                existing.weight += fact.weight
+    graph.replace_facts(kept)
+    return len(false)
+
+
 def propn_lemma_votes(annotations):
     """Hlasy o LEMMATU jmenných tvarů: tvar (lower) → Counter({lemma}).
 
@@ -335,6 +410,16 @@ def nominativize(graph, lemma_votes):
     return len(node_map)
 
 
+def _dominant_predicate(votes, predicate, kinds):
+    """Dominance pro PREDIKÁT: fold v make_fact píše predikáty malými
+    („Izaiáš"→„izaiáš"), hlasy lemmat ale nesou původní velikost —
+    zkusí se obě varianty, jinak by jmenný predikát čistce utekl."""
+    if _dominant(votes, predicate, kinds):
+        return True
+    return bool(predicate) and predicate[:1].islower() and _dominant(
+        votes, predicate[:1].upper() + predicate[1:], kinds)
+
+
 def _dominant(votes, lemma, kinds):
     """True, když má lemma dost hlasů a `kinds` v nich převažují."""
     counter = votes.get(lemma)
@@ -369,7 +454,8 @@ def scrub(graph, votes):
     for key, fact in graph.facts.items():
         # predikát s převahou jmenných hlasů není děj („Izaiáš")
         if fact.predicate not in structural \
-                and _dominant(votes, fact.predicate, ("PROPN", "NOUN")):
+                and _dominant_predicate(votes, fact.predicate,
+                                        ("PROPN", "NOUN")):
             dropped_facts += 1
             continue
         participants = []

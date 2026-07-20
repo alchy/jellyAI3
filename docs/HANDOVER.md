@@ -41,11 +41,12 @@ vstupu a answerer má kaskádu poctivých odpovědí.
 
 ## 2. Stav (2026-07-20 večer — den otázkového grafu, ~50 commitů)
 
-- **Metriky:** 591 testů; etalon 35/35 (GAP 12 opraveno / 3,
+- **Metriky:** 595 testů; etalon 37/37 (GAP 12 opraveno / 4,
   deterministicky — #58 vyřešen), focus 12/12, dialog 45/45 (GAP 8/0),
   ZÁPIS 34/34, qgraph harness 5 rovin (dispatch, výroky, stav,
   dekorace, etalon) 100 % v obou variantách. Etalon i dialog ověřeny
-  bitově shodné napříč PYTHONHASHSEED.
+  bitově shodné napříč PYTHONHASHSEED. Graf po dávce D: 7409 uzlů /
+  18863 faktů (kapitalizované predikáty 296→0, −19 falešných osob).
 - **Refaktor blok (2026-07-20 pozdě večer):** TurnResult
   (`answerer.turn`, `begin_turn()`, pick_focus/query_card parametry
   answer()), lint karet (KNOWN_EVENTS + QUERY_ACTION_KEYS — mrtvá
@@ -153,7 +154,7 @@ Plná tabulka priorit: BACKLOG + protokol
 
 | P | Bod | Tip kudy do toho |
 |---|---|---|
-| 1 | **D — extrakční/hygienová dávka, ZBÝVAJÍCÍ polovina** (pasivum, imperativy „Tyč"/„Proste", klauzule jako objekt; dotazová polovina ✅ hotová — viz BACKLOG #2; REVIZE: Kafarnaum v gazetteeru BYL) | vzory v `graph/hygiene.py` (hlasování) a `extract.py`; VYŽADUJE přestavbu grafu (`./jelly graph`) + kontrolu id v benchmarcích (past 5); dělej v čerstvé session |
+| 1 | **D — HOTOVO obě poloviny** ✅ (viz BACKLOG #2). Zbytky dávky: ADJ participia pasiva (409 vět), dotazová strana pasiva (gap „Kde byl Ježíš pokřtěn?"), klauzule jako objekt | mechanismy hotové jsou vzorem: `scrub_false_persons` + `name_position_votes` (hlasování jmennosti), pasivní větev v `extract_facts`, fold v `make_fact` |
 | 2 | **C10 — formát odpovědí (zárodek Echo #20)** | výroky po jednom v uvozovkách, agregace větami, nominativizace hodnot v textech, kandidáti nabídky bez 2× výpisu; šablony v cs.json, skládání v answereru |
 | 3 | **#8 fáze 2 — střepy Ježíše** | spec `2026-07-18-jmenny-uzel-instance.md`; NEslučuj statisticky (změřeno!); po každém kroku benchmarky |
 | 4 | **T5/E1b — předložkové dekorační prvky karet** („s kým", „k Ježíšovi") | rozšíření rodin q-otaz o volitelné dekorační prvky; pasti 9–11 |

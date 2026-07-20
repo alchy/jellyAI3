@@ -4,13 +4,16 @@
 > Metriky teď (2026-07-20 večer, po dni otázkového grafu — #57 fáze 1–2
 > + E1–E4 + fáze D, #51 jednotný dispatch, konec figlů, T13/T14, dávka
 > drobných kroků; ověřeno spuštěním při aktualizaci docs):
-> **591 testů, etalon 35/35 (15 gap řádků: 12 opraveno / 3 otevřeno,
+> **595 testů, etalon 37/37 (16 gap řádků: 12 opraveno / 4 otevřeno,
 > deterministicky — #58 vyřešen), focus 12/12, dialog 45/45 tahů ve 20
 > scénářích (GAP 8/0), ZÁPIS 34/34 (GAP 16/0 s --nom; bez ÚFAL služeb
 > poctivě 15/1), qgraph harness 5 rovin (dispatch, výroky, stav,
 > dekorace, etalon) 100 % v obou variantách, coverage 65 % vět
-> s faktem — jádra 100 %. Po refaktor bloku: TurnResult, lint karet,
-> jedno osvětlení, facts_of_predicates, dotazová polovina dávky D.**
+> s faktem — jádra 100 %. Po refaktor bloku a OBOU polovinách dávky D:
+> TurnResult, lint karet, jedno osvětlení, facts_of_predicates,
+> místní filtr děrových otázek, pasivum, fold predikátů (296→0),
+> falešné osoby z imperativů (−19 vč. Tyč/Proste). Graf 7409 uzlů /
+> 18863 faktů.**
 >
 > **➡️ PŘEDÁNÍ PRÁCE: čti nejdřív `docs/HANDOVER.md`** — zákony projektu,
 > testovací smyčka, implementační tipy ke každému otevřenému bodu, pasti.
@@ -41,7 +44,7 @@
 | 12 | Topos | Hierarchie míst (Praha ⊂ Čechy), containment, „tady/poblíž". | Jádro HOTOVO v S3 (archiv); zbývá: „poblíž/sousedí" dotazy (near záznamy jsou), místo jako filtr i pro díry, gazetteer editor. | 9 |
 | 30 | Topos | **Kartografický adaptér (Ollama)**: lokální LLM přes API plní gazetteer (pseudo-mapu) — generuje kontejnment/sousedství JSONL řádky pro zadaná místa; VŽDY přes validaci (kurátorský filtr / potvrzení dialogem — halucinace). K tomu dotazy „Kde jsou Domažlice?" (odpověď z gazetteeru — rodičovský řetěz) a „Bydlí pan Tetříček v Domažlicích?" (Mnemos fakt + místní filtr, už funguje principem). | Adaptér jako zásuvný modul (vzor: registr kanálů); po dokončení konceptu Topos. | 12 |
 | 14 | Čistý řez | ✅ **HOTOVO** (2026-07-19): UDPipe pryč z query — fallback větev v answer() smazána, `query_mode` zrušen ÚPLNĚ (config/tasks/run_etalon, žádné režimy), `question_pattern` zakonzervován (conserved-components.md; testy běží dál), `analyze_question` zůstává živý pro TemplateAnswerer. Díry po řezu zalepily KARTY: q-otaz-minuly-prodrop („Kdy se narodil?" — rodová shoda z karty), q-vyberova-prodrop („Jaká rodina?" — implicitní spona „být" literálem), q-hola-otazka (holé „Kdy?" = drill), q-co-vime (agregace „vědět"); „žil"→žít katalogem event_verb_forms PŘED délkovým prahem. BONUS: diakritický etalon gap („ktery napsal") zezelenal — GAP 4/4. KARANTÉNA ÚFAL splněna: závislost jen anotace korpusu + nominativizace Mnemos. | Zbytek původního zadání (answerer → Iris pluginy) je samostatná přestavba — viz #48/#51. | ✓ |
-| 2 | Hygiena dat | **Zbytek**: uzel „mle" (NOUN mangle — lemma↔form konzistence), kapitalizované slovesné predikáty (Chvalte, Udělat — po #58 remíza už deterministická, ale šum v datech trvá), „dovoleno" v pred/attr. DOTAZOVÁ polovina dávky D ✅ HOTOVÁ (2026-07-20 pozdě večer): nárok oblasti za předložkou i u děrových otázek (place_filter — figl „stan" pryč), druhý ořez klíčů gazetteeru (Jeruzalémě/Betlémě; Galileji = paradigma -ea↔-eji stále nefolduje → #12), `_is_area` přes varianty, díra ukotvená místem („Kdo se narodil v Betlémě?" → Ježíš), dekorace topos:oblast; +2 etalon řádky, Kafarnaum GAP-FIXED (REVIZE B7: v gazetteeru BYL, chyběl nárok v šabloně). ZBÝVÁ extrakční polovina: pasivum, imperativy (Tyč/Proste), klauzule jako objekt — přestavba grafu, čerstvá session (past 5). | Vzor: hlasování v hygiene.py. | 12 |
+| 2 | Hygiena dat | **DÁVKA D KOMPLETNÍ** (2026-07-20 pozdě večer, obě poloviny). DOTAZOVÁ: nárok oblasti za předložkou i u děrových otázek (place_filter — figl „stan" pryč), druhý ořez klíčů gazetteeru (Jeruzalémě/Betlémě), `_is_area` přes varianty, díra ukotvená místem („Kdo se narodil v Betlémě?" → Ježíš), dekorace topos:oblast; Kafarnaum GAP-FIXED (REVIZE B7: v gazetteeru BYL). EXTRAKČNÍ: pasivum VERB hlav (nsubj:pass = PACIENT→obj, obl:agent→subj, bez konatele fakt konatele nemá — 81 faktů bez konatele; „Kdo byl pokřtěn?"→Ježíš), fold kapitalizovaných predikátů v make_fact (296→0, s `_dominant_predicate` pro scrub), `scrub_false_persons` + `name_position_votes` (velké UPROSTŘED věty = jmennost; −19 falešných osob vč. Tyč w=94 a Proste — „Kdo prostrčil tyče?" už nefigluje). **ZBÝVÁ**: (a) ADJ participia pasiva (409 nsubj:pass s hlavou ADJ — vydaný/zhotovený — extrakce je nevidí), (b) DOTAZOVÁ strana pasiva (gap řádek „Kde byl Ježíš pokřtěn?"→figl Mesiáš — otázka mapuje pacienta na subj), (c) klauzule jako objekt (nedotčeno), (d) staré drobnosti: uzel „mle", „dovoleno" v pred/attr; Galileji -ea↔-eji nefolduje → #12. | Vzor: hlasování v hygiene.py; přestavba `./jelly graph` proběhla, benchmarky beze ztráty. | 12 |
 | 15 | Coverage | Anaforický kbelík (~2 100 vět se zájmenným podmětem). | — | 13 |
 | 16 | Etalon gapy | BN copula-profese; Kde působila; „Jaka babicka?" (Kolik dětí ✅ FIXED — q-kolik-pocet, 2026-07-20). | Průběžně s příslušnými body. | 14 |
 | 52 | Answerer | **„Co dělá X?" rozlévá výčet přes uzel uživatele** (nález z produkce 2026-07-19): `_event_answer` depth-1 jde i přes theme=uživatel → k činnosti Jindry přibalí VŠECHNY zápisy paměti (jmenuje/bydlet/email). Správná odpověď je první, ale výčet je šum. | Guard: agregace událostí nesmí skákat přes uzel uživatele (pozorovatel není spojka) — obdoba guardu „pozorovatel není odpověď" z #44. | 5 |

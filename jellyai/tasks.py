@@ -63,6 +63,10 @@ def build_fact_graph(config):
     dropped_s = scrub_semantics(graph, noun_animacy_votes(annotations))
     print(f"Hygiena sémantiky: −{dropped_s} faktů "
           f"(osoba pod neživotným druhem, vztah bez protistrany)")
+    from jellyai.graph.hygiene import name_position_votes, scrub_false_persons
+    dropped_i = scrub_false_persons(graph, name_position_votes(annotations))
+    print(f"Hygiena jmen: −{dropped_i} falešných osob z imperativních "
+          f"začátků vět (Tyč, Proste — dávka D)")
     from jellyai.graph.hygiene import nominativize, propn_lemma_votes
     renamed = nominativize(graph, propn_lemma_votes(annotations))
     print(f"Nominativizace: {renamed} skloněných id → lemma "
