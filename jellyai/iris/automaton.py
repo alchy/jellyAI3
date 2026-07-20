@@ -274,11 +274,17 @@ class IrisAutomaton:
                         statements.append(statement)
                 if statements:
                     return self._memorize(text, statements)
-        # VZPOMÍNÁNÍ („Co jsem ti řekl včera?") — Chronos filtr nad
-        # timestampy Mnemos; fráze z tabulky, texty karty memory.recall
-        recalled = self._recall_query(text)
-        if recalled is not None:
-            return recalled
+        # VZPOMÍNÁNÍ („Co jsem ti řekl včera?") — dispatch osvětlením
+        # (#51 fáze 4): cmd-recall smí nést otazník (otázka na paměť
+        # dialogu) a prioritou přebíjí dotazové karty; Chronos filtr
+        # nad timestampy Mnemos zůstává mechanismem
+        lit_q = illuminate(text, self.qgraph, now=self.clock(),
+                           is_node=self.answerer._span_is_node)
+        if lit_q and lit_q[0].kind == "prikaz" \
+                and lit_q[0].card == "cmd-recall":
+            recalled = self._recall_query(text)
+            if recalled is not None:
+                return recalled
         # DOTAZ NA PLÁN („Mám nějaké naplánované úkoly?") — aktivace jde
         # Chronosu: čekající připomínky, zúžené intervalem otázky
         plans = self._plan_query(text)
