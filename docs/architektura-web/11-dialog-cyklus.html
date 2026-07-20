@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>11 · Dialog jako grafový cyklus — Architektura JellyAI</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="site">
+  <a class="home" href="index.html">JellyAI — architektura</a>
+  <span class="crumb">kapitola 11 z 17</span>
+</header>
+<main>
+<nav class="pagenav"><a href="10-schemata-role.html">← Predikátová schémata</a><a href="index.html">⌂ Obsah</a><span class="spacer"></span><a href="12-clarifikace.html">Clarifikace →</a></nav>
+<details class="toc"><summary>Kapitoly</summary><ol>
+<li><a href="01-uvod.html">Úvod do JellyAI</a></li><li><a href="02-architektura.html">Celková architektura</a></li><li><a href="03-tok-dat.html">Tok dat systémem</a></li><li><a href="04-lingvistika.html">Lingvistické předzpracování</a></li><li><a href="05-datovy-model.html">Interní datový model</a></li><li><a href="06-faktovy-graf.html">Faktový graf</a></li><li><a href="07-otazkovy-graf.html">Otázkový graf</a></li><li><a href="08-dispatch-claims.html">Dispatch a claimy</a></li><li><a href="09-workers.html">Workers</a></li><li><a href="10-schemata-role.html">Predikátová schémata</a></li><li><a href="11-dialog-cyklus.html">Dialog jako cyklus</a></li><li><a href="12-clarifikace.html">Clarifikace</a></li><li><a href="13-proaktivni-nabidky.html">Proaktivní nabídky</a></li><li><a href="14-karty.html">Architektura karet</a></li><li><a href="15-workflow.html">Workflow systému</a></li><li><a href="16-principy.html">Principy</a></li><li><a href="17-rozsirovani.html">Rozšiřování systému</a></li>
+</ol></details>
+
+<h1>11 · Dialog jako grafový cyklus</h1>
+<p class="lead">Dialog není lineární automat („stav 3 → stav 4“), ale <strong>cyklus přes tři
+grafy</strong>: každý tah končí tam, kde další začíná — a hrany ven z odpovědi jsou nabídky
+dalších tahů.</p>
+
+<h2>11.1 Cyklus jednou větou</h2>
+<div class="box">
+<p><strong>vstup → větný graf → osvětlení otázkového grafu → dispatch (vítěz + dekorace) →
+dotaz do faktového grafu → odpověď → neosvětlené role odpovědního faktu → nové hrany
+(nabídky, zpřesnění) → další tah</strong></p>
+</div>
+
+<pre class="mermaid">
+flowchart TB
+    IN["vstup uživatele"] --> VG["větný graf tahu&lt;br/&gt;(tokeny + hypotézy + nároky)"]
+    VG --> IL["osvětlení otázkového grafu"]
+    IL --> DIS["dispatch: vítězný uzel&lt;br/&gt;+ dekorace (filtry)"]
+    DIS --> FG["dotaz do faktového grafu&lt;br/&gt;(match → díra)"]
+    FG --> ANS["odpověď"]
+    ANS --> ROLES["neosvětlené role&lt;br/&gt;odpovědního faktu"]
+    ROLES --> EDGES["hrany ven:&lt;br/&gt;nabídka „Mohu doplnit: kdy“&lt;br/&gt;zpřesnění při přetečení&lt;br/&gt;drill na roli"]
+    EDGES --> IN
+    ANS -- "aktivace: odpověď + entity svítí" --> FG
+</pre>
+
+<p>Proč to není lineární automat: klasický dialogový automat má stavy definované <em>předem</em>
+a přechody <em>vyjmenované</em>. Tady je stav <strong>pozice v otázkovém grafu + jas faktového
+grafu</strong> — a přechody se z velké části <em>odvozují z dat</em> (role žhavého faktu, oblasti
+přetečení). Tentýž vstup („Kdy?“) znamená v různých pozicích různé věci: drill po odpovědi,
+holou otázku bez kontextu, doplnění času připomínky.</p>
+
+<h2>11.2 Anatomie jednoho tahu</h2>
+<p>Skutečné pořadí kroků v <code>_turn()</code>
+(<a class="src" href="../../jellyai/iris/automaton.py">jellyai/iris/automaton.py:199–360</a>):</p>
+<ol>
+<li><strong>Přímí experti</strong> — smyčka nad claimy (kapitola <a href="08-dispatch-claims.html">8</a>).</li>
+<li><strong>Rozpracované volby</strong> — čeká-li dialog na volbu identity podmětu
+(<code>PendingIdentity</code>) nebo kandidáta (<code>PendingFocus</code>), vstup se čte jako
+volba; zvolený uzel se zahřeje (+2.0) a původní otázka se <em>přehraje</em> zaostřená.</li>
+<li><strong>Věty bez otazníku</strong> — příkazová a zápisová větev: připomínky, zapomínání,
+„zapamatuj si“, správa plánu, posílání, focus-shift, a nakonec konstatování → Mnemos
+(<code>parse_clauses</code> → karty → fakt(y) → graf + deník).</li>
+<li><strong>Vzpomínání a plán</strong> — „Co jsem ti řekl včera?“, „Mám nějaké úkoly?“.</li>
+<li><strong>Zahřátí intervalu</strong> — časové primitivum otázky rozsvítí časové uzly ležící
+v intervalu ještě před odpovědí.</li>
+<li><strong>Odpověď answereru</strong> — <code>answer()</code>: rozbor kartou → match → díra;
+jas <em>před</em> tahem se zapamatuje (jistota se nesmí měřit z jasu, který si tah sám rozsvítil).</li>
+<li><strong>Dialogové karty</strong> — automat ohlásí událost tahu a karty rozhodnou:
+<code>resolve.ambiguous</code> (odpověď na hádané volbě → nabídka), <code>data.overflow</code>
+(přetečení → nabídka oblastí), <code>focus.low</code> (bez odpovědi → upřímný terminál);
+u čisté odpovědi se případně přilepí proaktivní nabídka rolí (kapitola
+<a href="13-proaktivni-nabidky.html">13</a>).</li>
+</ol>
+
+<h2>11.3 Ukázka: pět tahů, jeden graf</h2>
+<p>Scénář složený ze skutečných benchmarkových tahů — sledujte, jak se stav nese grafem, ne
+proměnnými:</p>
+
+<div class="dialog-sample">
+<p><span class="u">❓ Kdo je Čapek?</span></p>
+<p><em>— „Čapek“ se rozřeší na DVA rovnocenné kandidáty → assurance pod prahem karty →
+karta focus-offer-homonym; dialog stojí ve zpřesňovacím uzlu</em></p>
+<p><span class="s">💬 Mám tu Karla i Josefa Čapka — kterého myslíte?</span></p>
+<p><span class="u">❓ Josef Čapek</span></p>
+<p><em>— volba = hrana návratu: zvolený uzel se zahřeje a otázka se přehraje zaostřená</em></p>
+<p><span class="s">💬 malíř</span></p>
+<p><span class="u">❓ Kde se narodil?</span></p>
+<p><em>— pro-drop: otázka bez podmětu; nejteplejší rodově shodná osoba těžiště = Josef Čapek</em></p>
+<p><span class="s">💬 Hronov</span></p>
+<p><span class="u">✍️ Dnes jsem měl knedlíky.</span></p>
+<p><em>— výrok: Mnemos zapíše fakt s absolutní časovou kotvou (theme: uživatel)</em></p>
+<p><span class="s">💬 Zapamatováno (17. července 2026).</span></p>
+<p><span class="u">❓ Kdy jsem měl v tomto roce knedlíky?</span></p>
+<p><em>— vítězí uzel 1. osoby + dekorace chronos:interval a mnemos:prvni-osoba</em></p>
+<p><span class="s">💬 17. července 2026</span></p>
+</div>
+
+<p>Všimněte si: žádný z tahů 2, 3 by nefungoval jako izolovaná otázka. Fungují, protože
+<strong>aktivační pole faktového grafu je paměť dialogu</strong> — konverzační těžiště, které
+volby zahřívají a čas pohasíná (×0.55 na krok).</p>
+
+<h2>11.4 Digging: zpřesnění a návrat jako hrany</h2>
+<p>Průchod overflow dialogem z pohledu grafu (skutečný scénář „Co řekl Ježíš?“, kapitola
+<a href="07-otazkovy-graf.html">7.5C</a>):</p>
+<pre class="mermaid">
+stateDiagram-v2
+    [*] --> Qnode : osvětlení („Co řekl Ježíš?“)
+    Qnode : uzel otázky q-co-vime
+    Clarify : clarify uzel focus-offer-overflow
+    Qnode --> Clarify : hrana zpresneni (odpověď PŘETEKLA - 143 výroků)
+    Clarify --> Qnode : hrana navrat („Petr“ = volba, otázka se přehraje s pick_focus)
+    Qnode --> [*] : odpověď („satane, nemohli jedinou hodinu bdít se mnou“)
+</pre>
+<p>Volba oblasti při návratu <strong>dominuje</strong>: fakt s vybraným uzlem dostává v matchi
+tier +10000 (<code>pick_focus</code>,
+<a class="src" href="../../jellyai/answerer/graph_answerer.py">graph_answerer.py:618–623</a>) —
+aktivace sama by remízy jen řadila a to nestačilo („Amen“ přebíjel zvoleného celníka). Volba
+platí jeden tah.</p>
+
+<p>Navazující holé „Kdy?“ po odpovědi je <strong>drill</strong>: hrana z <em>odpovědního faktu</em>
+na jeho dosud neosvětlenou roli. Drill hrany se neenumerují — počítají se z rolí žhavého faktu
+za běhu (<code>_prev_trace</code>). Fakt <code>narodit(KČ, Hronov, 1890)</code> po otázce „Kde?“
+nabízí hrany na time a subj.</p>
+
+<h2>11.5 Stav dialogu: co přesně se nese mezi tahy</h2>
+<table>
+<tr><th>Nosič</th><th>Co drží</th><th>Kde</th></tr>
+<tr><td>aktivační pole</td><td>konverzační těžiště (jas uzlů; pohasíná ×0.55)</td><td><code>answerer.context</code></td></tr>
+<tr><td><code>PendingFocus</code></td><td>rozpracované doostření (otázka, termín, kandidáti)</td><td><a class="src" href="../../jellyai/iris/state.py">state.py:13</a></td></tr>
+<tr><td><code>PendingIdentity</code></td><td>rozpracovaný výrok čekající na identitu podmětu</td><td><a class="src" href="../../jellyai/iris/state.py">state.py:29</a></td></tr>
+<tr><td><code>pending_reminder</code></td><td>připomínka čekající na doplnění času</td><td><code>FocusState</code></td></tr>
+<tr><td><code>_prev_trace</code> / <code>_last_values</code></td><td>minulá odpověď (drill; „Kdo další?“)</td><td>answerer</td></tr>
+<tr><td><code>pick_focus</code></td><td>zvolená oblast overflow (platí 1 tah)</td><td>answerer</td></tr>
+</table>
+<p>Model otázkového grafu tyto nosiče sjednocuje do <code>DialogPosition</code> — „kde v grafu
+stojím a kudy vedou hrany ven“ (kapitola <a href="07-otazkovy-graf.html">7.6</a>); shadow harness
+doložil ekvivalenci na dialogových scénářích (stav 3/3). Pending objekty zatím žijí dál —
+přepnutí čeká na rozšíření rozsahu experimentu.</p>
+
+<h2>11.6 Proč cyklus, ne strom</h2>
+<p>Za návrhem je jednoduchá observace o reálných konverzacích: uživatel nezačíná každou otázku
+od nuly — <em>vrtá</em>. Systém proto po každé odpovědi počítá, kudy se dá vrtat dál (neosvětlené
+role, přetečené oblasti, homonymní kandidáti), a buď je nabídne (proaktivní nabídka), nebo na ně
+čeká (drill). Graf je pro tohle přirozený formalismus: odpověď není list stromu, ale uzel
+s hranami ven. A protože hrany se odvozují z dat (rolí faktů), roste dialogový prostor
+<em>automaticky s daty</em> — nový predikát s časem a místem umí drill „Kdy?“/„Kde?“ bez
+jediného řádku kódu.</p>
+
+<nav class="pagenav"><a href="10-schemata-role.html">← Predikátová schémata</a><a href="index.html">⌂ Obsah</a><span class="spacer"></span><a href="12-clarifikace.html">Clarifikace →</a></nav>
+</main>
+<footer class="site">Architektura JellyAI · kapitola 11 · stav ke commitu a63e83f</footer>
+<script>
+(function () {
+  var s = document.createElement("script");
+  s.src = "mermaid.min.js";
+  s.onload = function () {
+    mermaid.initialize({ startOnLoad: false, theme: "neutral" });
+    mermaid.run({ querySelector: "pre.mermaid" });
+  };
+  document.body.appendChild(s);
+})();
+</script>
+</body>
+</html>

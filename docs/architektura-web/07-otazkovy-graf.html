@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>7 · Otázkový graf — Architektura JellyAI</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="site">
+  <a class="home" href="index.html">JellyAI — architektura</a>
+  <span class="crumb">kapitola 7 z 17</span>
+</header>
+<main>
+<nav class="pagenav"><a href="06-faktovy-graf.html">← Faktový graf</a><a href="index.html">⌂ Obsah</a><span class="spacer"></span><a href="08-dispatch-claims.html">Dispatch a claimy →</a></nav>
+<details class="toc"><summary>Kapitoly</summary><ol>
+<li><a href="01-uvod.html">Úvod do JellyAI</a></li><li><a href="02-architektura.html">Celková architektura</a></li><li><a href="03-tok-dat.html">Tok dat systémem</a></li><li><a href="04-lingvistika.html">Lingvistické předzpracování</a></li><li><a href="05-datovy-model.html">Interní datový model</a></li><li><a href="06-faktovy-graf.html">Faktový graf</a></li><li><a href="07-otazkovy-graf.html">Otázkový graf</a></li><li><a href="08-dispatch-claims.html">Dispatch a claimy</a></li><li><a href="09-workers.html">Workers</a></li><li><a href="10-schemata-role.html">Predikátová schémata</a></li><li><a href="11-dialog-cyklus.html">Dialog jako cyklus</a></li><li><a href="12-clarifikace.html">Clarifikace</a></li><li><a href="13-proaktivni-nabidky.html">Proaktivní nabídky</a></li><li><a href="14-karty.html">Architektura karet</a></li><li><a href="15-workflow.html">Workflow systému</a></li><li><a href="16-principy.html">Principy</a></li><li><a href="17-rozsirovani.html">Rozšiřování systému</a></li>
+</ol></details>
+
+<h1>7 · Otázkový graf</h1>
+<p class="lead">Druhý trvalý graf systému: ne parser, ale <strong>graf možných interpretací
+otázky</strong> — typy otázek jako uzly, digging jako hrany, workeři jako atributy a osvětlení
+jako mechanismus výběru.</p>
+
+<h2>7.1 Co otázkový graf je (a co není)</h2>
+<p>Intuice: když přijde otázka, systém se neptá „jak ji rozparsovat?“, ale <strong>„která ze
+známých interpretací otázky právě svítí?“</strong>. Otázkový graf je mapa všech způsobů, kterými
+se lze systému ptát: každý uzel je jeden typ otázky („kdo-udělal-co“, „zjišťovací existence“,
+„aritmetický výpočet“, „hodinová otázka“), a hrany říkají, kudy smí dialog legitimně pokračovat
+(zpřesnění při přetečení, návrat po volbě). Věta tahu uzly <em>osvětlí</em>; nejsilněji osvětlený
+uzel tah směruje.</p>
+
+<p>Co otázkový graf <em>není</em>:</p>
+<ul>
+<li><strong>Není to parser.</strong> Parsování (match vzoru na tokeny) zůstává mechanismem
+matcheru; graf jen strukturuje, <em>co</em> se matchuje a <em>kam</em> vede výsledek.</li>
+<li><strong>Není to druhá pravda.</strong> Graf je deterministický <strong>kompilát</strong>
+karet + schématu predikátů: zdroje se editují, graf se přegenerovává. Karty jsou zdrojový kód,
+graf jejich zkompilovaná podoba — proto se nesmí rozejít a proto je jeho bránou parity gate
+(shadow harness, §7.7).</li>
+<li><strong>Není to ATN.</strong> Hrany nenesou podmínky ani program — jen typ přechodu.
+Rekurzivní přechodové sítě s podmínkami jsou vědomě odmítnutá historická past
+(kapitola <a href="16-principy.html">16</a>).</li>
+</ul>
+
+<h2>7.2 Uzly: tři druhy</h2>
+<p>Kompilaci provádí <code>compile_qgraph</code>
+(<a class="src" href="../../jellyai/iris/qgraph.py">jellyai/iris/qgraph.py:55</a>) nad jedním
+deckem karet + registrem claimů:</p>
+
+<table>
+<tr><th>Druh uzlu</th><th>Vzniká z</th><th>Worker</th><th>Příklad</th></tr>
+<tr><td><code>otazka</code></td><td>dotazové karty (event <code>utterance.query</code> se vzorem)</td><td><code>graf</code></td><td><code>q-otaz-minuly</code> („Kdo napsal R.U.R.?“)</td></tr>
+<tr><td><code>worker</code></td><td>registr claimů přímých expertů (<a class="src" href="../../jellyai/iris/claims.py">claims.py</a>)</td><td><code>metron</code> / <code>chronos</code> / <code>iris</code></td><td><code>metron-vypocet</code> („Kolik je 1 plus 1?“)</td></tr>
+<tr><td><code>clarify</code></td><td>zpřesňovací karty (eventy <code>resolve.ambiguous</code>, <code>data.overflow</code>, <code>focus.low</code>, <code>statement.subject</code>)</td><td><code>dialog</code></td><td><code>focus-offer-overflow</code> (nabídka oblastí)</td></tr>
+</table>
+
+<pre><code># jellyai/iris/qgraph.py:65–87 (zkráceno)
+for card in deck.cards:
+    trigger = card.trigger
+    if trigger.get("event") == "utterance.query" and trigger.get("pattern"):
+        nodes[card.name] = QNode(name=card.name, kind="otazka", worker="graf",
+                                 pattern=trigger["pattern"], card=card.name,
+                                 priority=trigger.get("priority", 0))
+        has_hole[card.name] = bool(card.action.get("query", {}).get("hole"))
+    elif trigger.get("event") in _CLARIFY_EVENTS:
+        nodes[card.name] = QNode(name=card.name, kind="clarify", worker="dialog",
+                                 card=card.name,
+                                 edges=[QEdge("navrat", "*")])
+# PŘÍMÍ EXPERTI — worker uzly z registru claimů (#57 E2)
+for claim in claims:
+    nodes[claim.name] = QNode(claim.name, "worker", claim.worker)</code></pre>
+
+<p><code>./jelly qgraph dump</code> vypíše aktuální kompilát: 27 uzlů a 2 722 predikátů schématu
+(pro líné instance, kapitola <a href="10-schemata-role.html">10</a>). Struktura kompilátu
+(výřez):</p>
+
+<pre class="mermaid">
+flowchart LR
+    subgraph ZD["zdroje (editují se)"]
+        K["karty patterns/cs/*.json"]
+        S["schéma predikátů&lt;br/&gt;(živě z faktového grafu)"]
+        R["registr claimů&lt;br/&gt;claims.py"]
+    end
+    ZD -- "compile_qgraph (deterministicky)" --> G
+    subgraph G["kompilát QGraph (27 uzlů)"]
+        Q1(["q-otaz-minuly&lt;br/&gt;otazka · worker=graf"])
+        Q2(["q-zjistovaci-prezens&lt;br/&gt;otazka · worker=graf"])
+        W1[["metron-vypocet&lt;br/&gt;worker=metron"]]
+        W2[["chronos-hodiny&lt;br/&gt;worker=chronos"]]
+        C1{{"focus-offer-overflow&lt;br/&gt;clarify · worker=dialog"}}
+        C2{{"focus-offer-homonym&lt;br/&gt;clarify · worker=dialog"}}
+        Q1 -- "zpresneni" --> C1
+        Q1 -- "zpresneni" --> C2
+        Q2 -- "zpresneni" --> C2
+        C1 -. "navrat *&lt;br/&gt;(přehraj otázku)" .-> Q1
+    end
+</pre>
+<p><em>(Zjišťovací otázka nemá hranu na overflow — nemá díru, nemá co přetékat; hrany se
+odvozují, viz §7.3.)</em></p>
+
+<h2>7.3 Hrany: odvozené, ne kreslené</h2>
+<p>Hrany <code>zpresneni</code> (otázka → clarify uzel) a <code>navrat</code> (clarify → přehrání
+otázky) se <strong>odvozují z dat karet</strong>, nikoli enumerují ručně — a odvození není
+kartézský součin. Dvě pravidla (výsledek experimentu E4 — počet hran klesl z 80 na 58):</p>
+<pre><code># jellyai/iris/qgraph.py:88–96
+for node in nodes.values():
+    if node.kind == "otazka":
+        # digging hrany se ODVOZUJÍ z dat karet (#57 E4), žádný
+        # kartézský součin: statement clarify z otázky nevede,
+        # přetečení dává smysl jen u výčtových děr
+        node.edges = [
+            QEdge("zpresneni", name) for name, event in clarify_events
+            if not event.startswith("statement.")
+            and (event != "data.overflow" or has_hole.get(node.card))]</code></pre>
+<p>Tedy: zpřesnění identity podmětu výroku (<code>statement.subject</code>) z otázky nevede
+(je to výroková záležitost) a hrana na overflow nabídku vede jen z otázek s dírou (zjišťovací
+otázka nemá co přetékat). <em>Drill</em> hrany (navazující „Kdy?“ po odpovědi) se na úrovni grafu
+neenumerují vůbec — počítají se za běhu z rolí žhavého faktu (kapitola
+<a href="13-proaktivni-nabidky.html">13</a>).</p>
+
+<h2>7.4 Osvětlení: dva druhy rozsvěcení</h2>
+<p>Klíčové rozlišení celého modelu, potvrzené měřením: rozsvěcení má <strong>dva druhy</strong>.</p>
+
+<h3>Soutěžící uzly — jeden vyhrává tah</h3>
+<p><code>illuminate</code> (<a class="src" href="../../jellyai/iris/qgraph.py">qgraph.py:191</a>)
+rozsvítí uzly, které na větu tahu sedí, a seřadí je klíčem
+<code>(tier, priorita, délka vzoru)</code>: tier 3 = přímý expert (nárok na obsah řádku —
+Metronův výraz, hodinová otázka, meta-fráze), tier 2 = vzorové uzly otázek. Je to <em>týž klíč,
+jakým vybírá deck</em> — graf nezavádí druhé rozhodování, jen dává plochému výběru strukturu.</p>
+<pre><code># jellyai/iris/qgraph.py:207–225 (zkráceno)
+for claim in qgraph.claims:
+    if claim.recognize(text, moment):
+        lit.append(((3, claim.priority, 0), qgraph.nodes[claim.name]))
+tagged = classify(text, is_node=None)
+for node in qgraph.nodes.values():
+    if node.kind != "otazka":
+        continue
+    binding = match_sequence(expand_pattern(node.pattern, aliases),
+                             tagged, is_span=is_node)
+    if binding is None:
+        continue
+    key = (2, node.priority, len(node.pattern),
+           node.weight if use_weights else 0)
+    lit.append((key, node))
+lit.sort(key=lambda pair: pair[0], reverse=True)</code></pre>
+
+<h3>Dekorující nároky — věší se na vítěze</h3>
+<p>Kdyby Chronos („v tomto roce“), Topos („v Čechách“), Mnemos (1. osoba) nebo dativní vazba
+soutěžily s typem otázky, přebily by ji. Ve skutečnosti jsou to <strong>omezení</strong>:
+na vítězný uzel se věší jako dekorace. <code>decorate</code>
+(<a class="src" href="../../jellyai/iris/qgraph.py">qgraph.py:105</a>) je čte z týchž jazykových
+tabulek, z jakých answerer staví skutečné filtry:</p>
+<pre><code># jellyai/iris/qgraph.py:117–133 (zkráceno)
+if resolve_temporal(text, now or datetime.now()) is not None:
+    found.add("chronos:interval")     # → time_filter
+...
+if "prvni_osoba" in classes:
+    found.add("mnemos:prvni-osoba")   # → user_subject
+if "dativ" in classes:
+    found.add("role:adresat")         # → _theme_bound
+if "dalsi" in norms:
+    found.add("novost")               # → novelty
+if norms &amp; set(lang.get("relation_query_nouns", ())):
+    found.add("vztah:operator")</code></pre>
+<p>Příklad: „Kdy jsem měl v tomto roce knedlíky?“ vyhraje uzel otázky
+<code>q-prvni-osoba-minuly</code> a nese dekorace <code>chronos:interval</code> (tvrdý filtr
+času) a <code>mnemos:prvni-osoba</code> (podmět = uživatel). Měření: predikované dekorace
+odpovídají skutečně aplikovaným filtrům answereru (<code>time_filter</code>,
+<code>place_filter</code>, <code>_theme_bound</code>…) ve <strong>42/42</strong> etalonových
+případech — vrstva dekorací je <em>popis reality, ne nová abstrakce</em>.</p>
+
+<h2>7.5 Ukázky průchodu</h2>
+
+<h3>A — jednoduchá otázka (jeden uzel svítí)</h3>
+<pre><code>„Kdo napsal R.U.R.?“
+
+větný graf:    kdo{otaz}   napsal{l_tvar}   R.U.R.{uzel+ ✓ orákulum}
+                  │
+otázkový graf: [q-otaz-minuly] svítí (jediný)      worker = graf
+                  │                                 dekorace: —
+faktový graf:  _match(napsat, {R.U.R.}, díra subj/person)
+                  │
+odpověď:       Karel Antonín Čapek</code></pre>
+
+<h3>B — soutěž uzlů + dekorace</h3>
+<pre><code>„Co řekl Ježíšovi?“
+
+větný graf:    co{otaz}   řekl{l_tvar}   Ježíšovi{dativ ⇒ hypotéza adresáta}
+                  │
+otázkový graf: svítí DVA uzly, vyhrává těsnější:
+                  [q-rekl-adresatovi]  (priorita 6)   ← vítěz
+                  [q-otaz-minuly]      (priorita 4)
+                  │
+dekorace:      role:adresat    ← NEsoutěží, věší se na vítěze
+                  │
+faktový graf:  _match(říci, {Ježíš}, díra obj) + rolová vazba theme
+                  │           └ známý MUSÍ být v roli theme (adresát)
+odpověď:       „umřel“   (Martina slova Ježíšovi — ne Ježíšova vlastní)</code></pre>
+
+<h3>C — dialog jako procházka grafem</h3>
+<p>Nejsložitější případ nemá jednu odpověď — má jich 143:</p>
+<div class="dialog-sample">
+<p><span class="u">❓ Co řekl Ježíš?</span> — uzel otázky svítí, faktový graf vrací PŘETEČENÍ
+→ hrana <code>zpresneni</code> → uzel <code>focus-offer-overflow</code></p>
+<p><span class="s">💬 Mám tu více dat… Nabízí se: Jeremiáš, Petr, bůh, celník, chleb…</span></p>
+<p><span class="u">❓ Petr</span> — stojíme ve zpřesňovacím uzlu; volba = hrana <code>navrat</code>;
+otázka se PŘEHRAJE s dominantní oblastí (pick_focus)</p>
+<p><span class="s">💬 satane, nemohli jedinou hodinu bdít se mnou</span></p>
+</div>
+<p>Zpřesňovací uzly jsou plnohodnotné uzly grafu: je-li takový uzel aktivní, dialog pokračuje
+zpřesňováním a <strong>graf si sám ostří focus</strong>.</p>
+
+<h2>7.6 Dialogové stavy: pozice v grafu</h2>
+<p>Stav dialogu byl historicky roztroušený po objektech (<code>PendingFocus</code>, drill přes
+<code>_prev_trace</code>, <code>pick_focus</code>). Model otázkového grafu je sjednocuje do jediné
+věci: <strong>pozice v grafu</strong> — <code>DialogPosition</code>
+(<a class="src" href="../../jellyai/iris/qgraph.py">qgraph.py:151</a>):</p>
+<pre><code>class DialogPosition:
+    def enter(self, name):    # vstup do uzlu (tah směrovaný osvětlením)
+    def sharpen(self, name):  # krok po zpřesňovací hraně; False = hrana neexistuje
+    def resume(self):         # návrat ze zpřesnění: cíl hrany `navrat`
+                              # („*“ = přehraj rozpracovanou otázku)</code></pre>
+<p>Shadow harness ověřuje, že sekvence enter → sharpen → resume reprodukuje skutečné chování
+<code>PendingFocus</code> na dialogových scénářích (stav 3/3). Plné nahrazení pending objektů
+pozicí je další fáze experimentu.</p>
+
+<h2>7.7 Kompilace, parity gate a co experiment naměřil</h2>
+<p>Shadow harness <a class="src" href="../../benchmark/run_qgraph.py">benchmark/run_qgraph.py</a>
+chování <em>neposouvá</em> — porovnává, kudy by šel graf, s tím, kudy systém reálně šel:</p>
+
+<table>
+<tr><th>Rovina</th><th>Výsledek</th><th>Co to znamená</th></tr>
+<tr><td>Dispatch (dialog)</td><td><strong>11/11 (100 %)</strong></td><td>osvětlení směruje jako ruční pořadí bran</td></tr>
+<tr><td>Dispatch (etalon)</td><td><strong>42/42 (100 %)</strong></td><td>vítězný uzel = karta, kterou reálně vybral build_query</td></tr>
+<tr><td>Stav dialogu</td><td><strong>3/3 (100 %)</strong></td><td>zpřesnění + návrat hranou reprodukuje PendingFocus</td></tr>
+<tr><td>Dekorace</td><td><strong>42/42 (100 %)</strong></td><td>předpověď nároků = skutečně aplikované filtry</td></tr>
+<tr><td>Remízy výběrového klíče</td><td><strong>0</strong></td><td>klíčový nález — viz níže</td></tr>
+</table>
+
+<p>Čtyři nálezy, které stojí za zapamatování:</p>
+<ol>
+<li><strong>Dekorace jsou popis reality.</strong> To, co model předpovídá, answerer už dělá —
+zelená pro formální claim() rozhraní (#26).</li>
+<li><strong>Váhy z telemetrie jsou mrtvá větev.</strong> Otázka „kolik provozu je potřeba, než
+váhy něco znamenají?“ má dřívější otázku: <em>nastávají vůbec remízy?</em> Naměřeno
+<strong>0 remíz</strong> základního klíče (priorita × délka vzoru) na celém dialogu i etalonu —
+váhy nemají kde zasáhnout, při žádném objemu provozu. Zůstávají jako diagnostika; harness remízy
+počítá dál.</li>
+<li><strong>Hranice rozsahu je ostrá:</strong> 36 z 50 dialogových tahů je mimo dotazovou
+polovinu (výroky, příkazy, připomínky). Výroková typologie je jiný graf — nekřížit předčasně
+(vědomá hranice #51, kapitola <a href="08-dispatch-claims.html">8.5</a>).</li>
+<li><strong>100 % shody je silný i slabý signál.</strong> Silný: kompilace je věrná. Slabý:
+graf zatím nedělá <em>jiné</em> rozhodnutí — zisk není v přesnosti, ale ve <strong>struktuře</strong>
+(jedno místo pro směrování, hrany pro digging, jedna reprezentace stavu). Hodnotu prokázaly až
+fáze, kde dřívější kód neměl odpověď: chytrá clarifikace ze schématu (kapitola
+<a href="10-schemata-role.html">10</a>) a proaktivní nabídky (kapitola
+<a href="13-proaktivni-nabidky.html">13</a>).</li>
+</ol>
+
+<h2>7.8 Kde bydlí karty obou světů</h2>
+<p>Čtenář hledající „kde to bydlí“: <strong>karty jsou jen jedny</strong> — všechny leží
+v <a class="src" href="../../jellyai/iris/patterns/cs/">jellyai/iris/patterns/cs/*.json</a>
+a čte je jeden <code>PatternDeck</code>. Mezi světy je dělí <em>událost</em> v triggeru:</p>
+<table>
+<tr><th>Událost triggeru</th><th>Role karty</th><th>Kam patří</th></tr>
+<tr><td><code>utterance.query</code> (+<code>pattern</code>)</td><td>tvar otázky (vzor tříd lexeru)</td><td>uzel <code>otazka</code> otázkového grafu</td></tr>
+<tr><td><code>utterance.statement</code></td><td>typ výroku (vzor nebo ploché rysy)</td><td>zápis do faktového grafu</td></tr>
+<tr><td><code>resolve.ambiguous</code>, <code>data.overflow</code>, <code>focus.low</code>, <code>statement.subject</code></td><td>dialogový akt</td><td>uzel <code>clarify</code> + jeho hrany</td></tr>
+<tr><td><code>memory.*</code>, <code>reminder.*</code>, <code>metron.compute</code>, <code>focus.query</code></td><td>odpověď experta</td><td>uzel <code>worker</code></td></tr>
+</table>
+
+<nav class="pagenav"><a href="06-faktovy-graf.html">← Faktový graf</a><a href="index.html">⌂ Obsah</a><span class="spacer"></span><a href="08-dispatch-claims.html">Dispatch a claimy →</a></nav>
+</main>
+<footer class="site">Architektura JellyAI · kapitola 7 · stav ke commitu a63e83f</footer>
+<script>
+(function () {
+  var s = document.createElement("script");
+  s.src = "mermaid.min.js";
+  s.onload = function () {
+    mermaid.initialize({ startOnLoad: false, theme: "neutral" });
+    mermaid.run({ querySelector: "pre.mermaid" });
+  };
+  document.body.appendChild(s);
+})();
+</script>
+</body>
+</html>

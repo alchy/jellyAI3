@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>4 · Lingvistické předzpracování — Architektura JellyAI</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="site">
+  <a class="home" href="index.html">JellyAI — architektura</a>
+  <span class="crumb">kapitola 4 z 17</span>
+</header>
+<main>
+<nav class="pagenav"><a href="03-tok-dat.html">← Tok dat</a><a href="index.html">⌂ Obsah</a><span class="spacer"></span><a href="05-datovy-model.html">Datový model →</a></nav>
+<details class="toc"><summary>Kapitoly</summary><ol>
+<li><a href="01-uvod.html">Úvod do JellyAI</a></li><li><a href="02-architektura.html">Celková architektura</a></li><li><a href="03-tok-dat.html">Tok dat systémem</a></li><li><a href="04-lingvistika.html">Lingvistické předzpracování</a></li><li><a href="05-datovy-model.html">Interní datový model</a></li><li><a href="06-faktovy-graf.html">Faktový graf</a></li><li><a href="07-otazkovy-graf.html">Otázkový graf</a></li><li><a href="08-dispatch-claims.html">Dispatch a claimy</a></li><li><a href="09-workers.html">Workers</a></li><li><a href="10-schemata-role.html">Predikátová schémata</a></li><li><a href="11-dialog-cyklus.html">Dialog jako cyklus</a></li><li><a href="12-clarifikace.html">Clarifikace</a></li><li><a href="13-proaktivni-nabidky.html">Proaktivní nabídky</a></li><li><a href="14-karty.html">Architektura karet</a></li><li><a href="15-workflow.html">Workflow systému</a></li><li><a href="16-principy.html">Principy</a></li><li><a href="17-rozsirovani.html">Rozšiřování systému</a></li>
+</ol></details>
+
+<h1>4 · Lingvistické předzpracování vstupu</h1>
+<p class="lead">Jak se český text mění na interní reprezentaci: tokenizace, segmentace vět,
+lemmatizace, morfologická analýza — a proč systém vede dvě různé lingvistické cesty.</p>
+
+<div class="warn">
+<p><strong>Upřesnění názvosloví:</strong> statistické nástroje, které projekt používá, jsou
+<strong>MorphoDiTa, NameTag a UDPipe</strong> — nástroje <strong>ÚFAL MFF UK</strong> (Ústav
+formální a aplikované lingvistiky), nikoli „nástroje Českého národního korpusu“, jak se občas
+nepřesně říká. A druhé, důležitější upřesnění: tyto nástroje se používají <strong>jen offline</strong>
+(anotace korpusu při buildu) a pro <strong>nominativizaci</strong> při zápisu paměti.
+<strong>Dotazová cesta je UDPipe-free</strong> (vědomý řez #14, 2026-07-19) — otázky rozebírá
+vlastní deterministická vrstva lexer + vzorové karty.</p>
+</div>
+
+<h2>4.1 Proč dvě cesty</h2>
+<p>Čeština je flektivní jazyk s volným slovosledem: tatáž informace má desítky povrchových podob
+(„Marcela bydlí v Petrovicích“ / „V Petrovicích bydlí Marcela“) a tentýž tvar mívá mnoho čtení
+(klasický příklad z literatury: „jarní“ nese až 27 možných morfologických značek). Statistický
+tagger na izolované větě navíc lže — v projektu na to existuje památník: tvar „Marcele“ přečetl
+tagger jako vokativ mužského jména „Marcel“ a ze ženy udělal muže.</p>
+
+<p>Z toho plynou dvě různé strategie:</p>
+<table>
+<tr><th></th><th>Offline anotace korpusu</th><th>Runtime (dotaz i zápis)</th></tr>
+<tr><td>Nástroje</td><td>NameTag (entity), UDPipe (tokeny, lemmata, deprely), MorphoDiTa (morfologie jmen)</td><td>vlastní lexer + matcher + jazykové tabulky</td></tr>
+<tr><td>Obrana proti chybám</td><td><strong>korpusová hlasování</strong> — tvar rozhoduje evidence z celého korpusu</td><td><strong>hypotézy, ne rozhodnutí</strong> — dvojznačnost rozhodne až stavba věty</td></tr>
+<tr><td>Kdy běží</td><td>jednou, při <code>./jelly annotate</code></td><td>při každém tahu</td></tr>
+<tr><td>Kód</td><td><a class="src" href="../../jellyai/annotate.py">jellyai/annotate.py</a>, <a class="src" href="../../jellyai/ufal_client.py">jellyai/ufal_client.py</a></td><td><a class="src" href="../../jellyai/lang/lexer.py">jellyai/lang/lexer.py</a>, <a class="src" href="../../jellyai/lang/matcher.py">jellyai/lang/matcher.py</a></td></tr>
+</table>
+
+<h2>4.2 Segmentace vět</h2>
+<p>Věta je v projektu základní jednotka anotace i odpovědi. Segmentaci dělá vlastní
+<code>split_sentences</code> (<a class="src" href="../../jellyai/text.py">jellyai/text.py:64</a>):
+dělí na koncové interpunkci s mezerou, ale hranici zahodí, když tečka patří ke zkratce
+(„MUDr.“, „tzv.“) nebo k datu pokračujícímu malým písmenem („9. ledna“).</p>
+
+<pre class="mermaid">
+flowchart LR
+    T["„Karel Čapek se narodil 9. ledna 1890. Zemřel v Praze.“"]
+    T --> S1["věta 1: „Karel Čapek se narodil 9. ledna 1890.“"]
+    T --> S2["věta 2: „Zemřel v Praze.“"]
+</pre>
+
+<p>Vstup/výstup:</p>
+<pre><code>&gt;&gt;&gt; split_sentences("Karel Čapek se narodil 9. ledna 1890. Zemřel v Praze.")
+["Karel Čapek se narodil 9. ledna 1890.", "Zemřel v Praze."]
+# tečka za „9.“ hranici NEudělá — ordinál pokračuje malým písmenem</code></pre>
+
+<h2>4.3 Offline anotace: entity + syntax po větách</h2>
+<p><code>annotate_documents</code> (<a class="src" href="../../jellyai/annotate.py">jellyai/annotate.py:80</a>)
+anotuje každou větu zvlášť a offsety posouvá do rámce dokumentu:</p>
+
+<pre><code># jellyai/annotate.py:95–105
+for doc in documents:
+    base = 0
+    for i, sent in enumerate(split_sentences(doc.text)):
+        parsed = client.parse(sent)                     # UDPipe: tokeny+lemmata+deprely
+        sentences = [[_shift(tok, base) for tok in s] for s in parsed]
+        entities = [_shift(e, base) for e in client.entities(sent)]   # NameTag
+        entities = _trim_case_mismatch(entities, sentences)
+        annotations[(doc.doc_id, i)] = {"entities": entities, "sentences": sentences}
+        base += len(sent) + 1</code></pre>
+
+<p>Jednotlivé kroky anotace jedné věty:</p>
+
+<pre class="mermaid">
+flowchart TB
+    V["„Karel Čapek se narodil 9. ledna 1890.“"]
+    V --> TOK["tokenizace (UDPipe)&lt;br/&gt;Karel · Čapek · se · narodil · 9. · ledna · 1890 · ."]
+    TOK --> LEM["lemmatizace (UDPipe)&lt;br/&gt;narodil → narodit · ledna → leden"]
+    LEM --> MORPH["morfologická analýza&lt;br/&gt;UPOS: PROPN PROPN PRON VERB … + pády, rod, číslo"]
+    MORPH --> DEP["závislostní rozbor (deprely)&lt;br/&gt;Karel=nsubj · narodil=root · ledna=obl"]
+    V --> NER["entity (NameTag)&lt;br/&gt;„Karel Čapek“ = osoba (P) · „9. ledna 1890“ = čas (T)"]
+    DEP --> OUT["anotace věty:&lt;br/&gt;{entities: […], sentences: [[token,…]]}"]
+    NER --> OUT
+</pre>
+
+<p>Formát tokenu v anotaci (interní struktura, se kterou dál pracuje extrakce faktů):</p>
+<pre><code>{"form": "narodil", "lemma": "narodit", "upos": "VERB",
+ "deprel": "root", "start": 15, "end": 22, "feats": "…Gender=Masc…"}</code></pre>
+
+<p>Za pozornost stojí <code>_trim_case_mismatch</code>
+(<a class="src" href="../../jellyai/annotate.py">jellyai/annotate.py:37</a>): NER na volném
+slovosledu lepí jméno s okolím („Ježíš Duchem“, Nom+Ins) — entita se usekne v místě pádové
+neshody jejích tokenů. To je první ze série obran proti chybám modelů; další (hlasování) přijdou
+při buildu grafu (kapitola <a href="06-faktovy-graf.html">6</a>).</p>
+
+<h2>4.4 Runtime tokenizace a lexer: hypotézy, ne rozhodnutí</h2>
+<p>Za běhu se ÚFAL nevolá. Tokenizaci dělá <code>tokenize</code>
+(<a class="src" href="../../jellyai/lang/lexer.py">jellyai/lang/lexer.py:64</a>) — e-mail drží
+jako celek (hodnota mimo přirozený jazyk, tagger by ji rozbil), koncovou větnou tečku odsekne,
+tečkované zkratky (R.U.R.) nechá:</p>
+
+<pre><code># jellyai/lang/lexer.py:64–70
+def tokenize(text):
+    raw = re.findall(r"[\w.+-]+@[\w.-]+\.\w+|[\w.]+", text)
+    tokens = [t if EMAIL_RE.fullmatch(t)
+              else (t.rstrip(".") if "." not in t[:-1] else t) for t in raw]
+    return [t for t in tokens if t]</code></pre>
+
+<p>Pak přichází jádro runtime lingvistiky — <strong>lexer</strong>. Intuice: místo „tenhle token
+JE sloveso“ říká „tenhle token MŮŽE BÝT sloveso, jméno nebo l-příčestí“. Každý token dostane
+<em>množinu hypotéz tříd</em>; rozhodne až stavba věty (vzor na kartě, kapitola
+<a href="14-karty.html">14</a>). Formálně: <code>classify(text) → list[TaggedToken]</code>, kde
+<code>TaggedToken.classes</code> je <code>frozenset</code> tříd
+(<a class="src" href="../../jellyai/lang/lexer.py">jellyai/lang/lexer.py:41–56</a>).</p>
+
+<table>
+<tr><th>token</th><th>hypotézy</th><th>proč</th></tr>
+<tr><td>„byt“</td><td>spona, substantivum</td><td>deakcentovaně ≡ „být“</td></tr>
+<tr><td>„byl“</td><td>l_tvar, spona</td><td>minulé příčestí i spona</td></tr>
+<tr><td>„Kdo“</td><td>otaz, jmeno</td><td>kapitalizace na začátku věty</td></tr>
+<tr><td>„Marcela“</td><td>jmeno, l_tvar</td><td>po ořezu koncovky končí na -l (l-lookalike)</td></tr>
+<tr><td>„jí“</td><td>sloveso_fin (i zájmeno)</td><td>homograf — rozhodne pozice ve vzoru</td></tr>
+<tr><td>„prsi“</td><td>sloveso_fin (katalog)</td><td>bezdiakritický katalogový tvar</td></tr>
+</table>
+
+<p>Třídy se počítají <strong>výhradně z jazykových tabulek</strong> <code>cs.json</code>
+(tázací slova, spony, částice, časové výrazy, přivlastňovací, katalogy…) plus tří mechanismů:
+regexp pro hodnoty mimo jazyk (e-mail), ořez l-ového příčestí a rozpoznání prézentního slovesa
+(koncovky + katalog + „entity-first“ veto — slovo, které je doslovným jménem uzlu grafu,
+sloveso není: „nádraží“ končí na -í, ale je to věc). Skutečný výřez:</p>
+
+<pre><code># jellyai/lang/lexer.py:109–133 (zkráceno)
+for form in tokenize(text):
+    norm = deaccent(form.lower())
+    classes = {name for name, table in tables if norm in table}
+    if EMAIL_RE.fullmatch(form):
+        classes.add("email")
+    if form[:1].isupper() and form.replace("-", "").isalpha():
+        classes.add("jmeno")
+    stem = l_stem(form)
+    if stem is not None:
+        classes.add("l_tvar")
+    if len(form) >= 5 and form.lower().endswith(
+            tuple(lang.get("dative_endings", ()))):
+        classes.add("dativ")            # HYPOTÉZA adresáta (#55)
+    if (len(form) >= 3
+            and not ({"prvni_osoba", "spona", "funkcni"} & classes)
+            and (norm in finite_catalog or form.lower().endswith(endings))
+            and not (is_node is not None and is_node(form))):
+        classes.add("sloveso_fin")</code></pre>
+
+<pre class="mermaid">
+flowchart LR
+    Q["„Kdo napsal R.U.R.?“"] --> A["Kdo&lt;br/&gt;{otaz, jmeno}"]
+    Q --> B["napsal&lt;br/&gt;{l_tvar}&lt;br/&gt;l_stem=„napsal“"]
+    Q --> C["R.U.R.&lt;br/&gt;{jmeno}"]
+</pre>
+
+<div class="warn">
+<p><strong>Pozor na čtení názvů tříd:</strong> <code>otaz</code>, <code>cas</code>,
+<code>funkcni</code>, <code>l_tvar</code> nejsou překlepy, ale krátké technické identifikátory
+přesně v podobě, v jaké je píší vzory na kartách. V kartách je obvykle zakrývají čitelné
+grok-zkratky <code>%{TAZACI}</code>, <code>%{SLOVESO_MINULE}</code> — tabulka
+<code>pattern_aliases</code> v <a class="src" href="../../jellyai/lang/cs.json">cs.json:154</a>.</p>
+</div>
+
+<h2>4.5 Katalogy místo univerzálních pravidel</h2>
+<p>Proč lexer u bezdiakritických sloves používá katalog (<code>finite_verb_forms</code>:
+„prsi“, „snezi“) a ne pravidlo „koncovka -i = sloveso“? Protože pravidlo by vidělo sloveso
+v každém plurálu („psi“). Katalogový řádek spraví přesně to, co spravit má, a nic víc. Toto
+poučení je zaplacené: jeden „univerzální“ fix l-tvarů kdysi rozbil klasifikaci celého korpusu.
+Enumerace &gt; univerzalizace je zákon projektu (kapitola <a href="16-principy.html">16</a>).</p>
+
+<h2>4.6 Lemmatizace a nominativizace za běhu</h2>
+<p>Runtime lemmatizaci potřebuje jen <strong>zápis paměti</strong> (Mnemos): fakty se ukládají
+s nominativními id uzlů, ale uživatel mluví v pádech („Marcela bydlí v Petrovicích“ →
+uzel <code>Petrovice</code>). Strategie je dvojí a záměrně kompromisní:</p>
+<ul>
+<li><strong>Jména osob</strong> — morfologické lemma (MorphoDiTa) s <em>vokativním guardem</em>:
+tag s pádem 5 se zahazuje, protože vokativ z izolovaného taggeru je šum („Marcele“ → vok.
+„Marcel“ by udělal rodový flip; past 12 v HANDOVERu).</li>
+<li><strong>Místa</strong> — UDPipe s větným kontextem, s <em>délkovou pojistkou</em> (kratší
+lemma se přijme jen s toponymní koncovkou z tabulky <code>place_nominative_endings</code>:
+Petrovicích→Petrovice, Vodňanech→Vodňany; ale Lhotě↛Lhot).</li>
+</ul>
+<p>Kód: <code>_nominativize_name</code> a <code>_nominativize_statement</code>
+(<a class="src" href="../../jellyai/iris/automaton.py">jellyai/iris/automaton.py:1187, 1213</a>).
+Kmenové porovnávání za běhu (rozřešení „Petrovicích“ na uzel „Petrovice“ při dotazu) dělá
+tabulka koncovek <code>suffixes</code> + skládání kmene v <a class="src" href="../../jellyai/graph/canon.py">jellyai/graph/canon.py</a> —
+včetně palatalizace (Praze↔Praha, tabulka <code>palatal_fold</code>) a epenteze (Plzni↔Plzeň).
+To je mimochodem týž jev, který klasická dvouúrovňová morfologie (Koskenniemi) řeší konečnými
+automaty — zde formalizovaný jako malé jazykové tabulky.</p>
+
+<h2>4.7 Převod do interních struktur — souhrn</h2>
+<pre class="mermaid">
+flowchart TB
+    subgraph OFF["offline (jednou)"]
+        RAWT["text korpusu"] --> ANO["anotace věty&lt;br/&gt;{entities, sentences[tokeny]}"]
+        ANO --> FAKT["Fact + Participant&lt;br/&gt;(extrakce, kapitola 6)"]
+    end
+    subgraph RUN["runtime (každý tah)"]
+        UT["text tahu"] --> TT["TaggedToken[]&lt;br/&gt;(lexer — hypotézy)"]
+        TT --> BIND["vazby vzoru&lt;br/&gt;(matcher — kapitola 14)"]
+        BIND --> PQ["Pattern (pseudo-QL)&lt;br/&gt;nebo statement dict (Mnemos)"]
+    end
+    FAKT --> FG["FactGraph"]
+    PQ --> FG
+</pre>
+
+<p>Interní struktury samotné (TaggedToken, Pattern, Fact…) podrobně popisuje následující
+kapitola <a href="05-datovy-model.html">5</a>.</p>
+
+<nav class="pagenav"><a href="03-tok-dat.html">← Tok dat</a><a href="index.html">⌂ Obsah</a><span class="spacer"></span><a href="05-datovy-model.html">Datový model →</a></nav>
+</main>
+<footer class="site">Architektura JellyAI · kapitola 4 · stav ke commitu a63e83f</footer>
+<script>
+(function () {
+  var s = document.createElement("script");
+  s.src = "mermaid.min.js";
+  s.onload = function () {
+    mermaid.initialize({ startOnLoad: false, theme: "neutral" });
+    mermaid.run({ querySelector: "pre.mermaid" });
+  };
+  document.body.appendChild(s);
+})();
+</script>
+</body>
+</html>

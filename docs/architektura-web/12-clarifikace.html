@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>12 · Clarifikace — Architektura JellyAI</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="site">
+  <a class="home" href="index.html">JellyAI — architektura</a>
+  <span class="crumb">kapitola 12 z 17</span>
+</header>
+<main>
+<nav class="pagenav"><a href="11-dialog-cyklus.html">← Dialog jako cyklus</a><a href="index.html">⌂ Obsah</a><span class="spacer"></span><a href="13-proaktivni-nabidky.html">Proaktivní nabídky →</a></nav>
+<details class="toc"><summary>Kapitoly</summary><ol>
+<li><a href="01-uvod.html">Úvod do JellyAI</a></li><li><a href="02-architektura.html">Celková architektura</a></li><li><a href="03-tok-dat.html">Tok dat systémem</a></li><li><a href="04-lingvistika.html">Lingvistické předzpracování</a></li><li><a href="05-datovy-model.html">Interní datový model</a></li><li><a href="06-faktovy-graf.html">Faktový graf</a></li><li><a href="07-otazkovy-graf.html">Otázkový graf</a></li><li><a href="08-dispatch-claims.html">Dispatch a claimy</a></li><li><a href="09-workers.html">Workers</a></li><li><a href="10-schemata-role.html">Predikátová schémata</a></li><li><a href="11-dialog-cyklus.html">Dialog jako cyklus</a></li><li><a href="12-clarifikace.html">Clarifikace</a></li><li><a href="13-proaktivni-nabidky.html">Proaktivní nabídky</a></li><li><a href="14-karty.html">Architektura karet</a></li><li><a href="15-workflow.html">Workflow systému</a></li><li><a href="16-principy.html">Principy</a></li><li><a href="17-rozsirovani.html">Rozšiřování systému</a></li>
+</ol></details>
+
+<h1>12 · Clarifikace</h1>
+<p class="lead">Co systém dělá, když si není jistý — a proč je vysvětlení architektonicky
+nadřazené odmítnutí. Tři pojmy, které se pletou: clarifikace, odmítnutí, assurance.</p>
+
+<h2>12.1 Tři pojmy, tři situace</h2>
+<table>
+<tr><th></th><th>Kdy nastává</th><th>Co systém řekne</th><th>Povaha</th></tr>
+<tr><td><strong>Clarifikace</strong></td><td>systém <em>ví, že neví dost</em> — a ví, na co se zeptat nebo co vysvětlit</td><td>„Mám tu Karla i Josefa — kterého?“ / „O ději „napsat“ vím co, kdo; kde nevím.“</td><td>dialog pokračuje; systém nabízí cestu dál</td></tr>
+<tr><td><strong>Odmítnutí (terminál)</strong></td><td>systém nenašel a nemá co nabídnout</td><td>„Nepodařilo se mi zaostřit… nejbližší: A, B“</td><td>poctivý konec větve; i terminál ale jmenuje nejbližší kandidáty</td></tr>
+<tr><td><strong>Assurance</strong></td><td>vždy — je to <em>číslo</em> (0–1), ne akt</td><td>nic; řídí, která z předchozích dvou (nebo odpověď) nastane</td><td>mechanismus: jistota zaostření</td></tr>
+</table>
+
+<p>Zaměňovat je znamená špatně číst kód: assurance je <em>vstup</em> rozhodnutí; clarifikace
+a odmítnutí jsou <em>výstupy</em> — a o tom, který nastane, rozhodují <strong>karty</strong>
+(trigger <code>assurance_below</code>), nikdy kód.</p>
+
+<h2>12.2 Assurance: jistota zaostření</h2>
+<p><code>QueryAssurance</code> (<a class="src" href="../../jellyai/iris/assurance.py">jellyai/iris/assurance.py:28</a>)
+odpovídá na otázku „jak moc jsem si jistý, že jsem dotaz zaostřil na správný uzel grafu?“
+Skládá tři síly:</p>
+<pre><code># jellyai/iris/assurance.py:23–42
+TIER_WEIGHTS = {"exact": 1.0, "ins": 0.8, "stem": 0.6, "da": 0.4, "loose": 0.25}
+_ACTIVATION_GAIN = 0.3
+
+def assurance(quality, rivals, activation=0.0):
+    score = quality / (1.0 + max(0, rivals))
+    score += _ACTIVATION_GAIN * min(max(activation, 0.0), 1.0)
+    return max(0.0, min(1.0, score))</code></pre>
+<ol>
+<li><strong>Kvalita jmenné evidence</strong> — jak dobře se termín otázky rozřešil na uzel:
+přesná shoda (1.0) &gt; povrchová (0.8) &gt; kmenová (0.6) &gt; bezdiakritická (0.4) &gt; volná (0.25).</li>
+<li><strong>Rovnocenní soupeři</strong> — kandidáti s <em>toutéž</em> evidencí z jiného kmenového
+clusteru („Kdo je Čapek?“ → Karel i Josef). Volba mezi n rovnocennými je hádání s jistotou ~1/n —
+proto se kvalita dělí.</li>
+<li><strong>Aktivace vítěze</strong> — když uživatel v minulém tahu zaostřil, jeho uzel svítí
+a jistota se vrací nad práh. Dialogová smyčka tak přirozeně konverguje.</li>
+</ol>
+<p>Důležitý detail: jas se čte <strong>před tahem</strong>
+(<a class="src" href="../../jellyai/iris/automaton.py">automaton.py:311–313</a>) — tah sám si téma
+rozsvítí, takže čtení po odpovědi by jistotu falešně zvedlo.</p>
+
+<h2>12.3 Kdo rozhoduje: karty, ne prahy v kódu</h2>
+<p>Automat po odpovědi jen ohlásí událost s kontextem (assurance, kandidáti) — a karta se hlásí,
+jen když její trigger sedí:</p>
+<pre class="mermaid">
+flowchart TB
+    ANS["odpověď answereru + assurance"] --> E1{"odpověď stojí na hádané volbě?&lt;br/&gt;(event resolve.ambiguous)"}
+    E1 -- "karta sedí (assurance_below)" --> C1["clarifikace: nabídka kandidátů&lt;br/&gt;(PendingFocus, čeká na volbu)"]
+    E1 -- ne --> E2{"výčet přetekl?&lt;br/&gt;(event data.overflow)"}
+    E2 -- "karta sedí" --> C2["clarifikace: nabídka oblastí"]
+    E2 -- ne --> OK["odpověď (+ případná nabídka rolí)"]
+    ANS2["žádná odpověď"] --> E3{"event focus.low"}
+    E3 -- "karta sedí" --> T["upřímný terminál:&lt;br/&gt;„Nepodařilo se mi zaostřit… nejbližší: A, B“"]
+</pre>
+<p>Prahové hodnoty (<code>assurance_below</code>, <code>min_candidates</code>) nese trigger karty —
+změna prahu je změna JSON, ne kódu (zákon 1). Vybírá <code>deck.best</code> benefitem: těsnost
+triggeru → priorita → jméno (kapitola <a href="14-karty.html">14</a>).</p>
+
+<h2>12.4 Druhy clarifikace</h2>
+<table>
+<tr><th>Karta / mechanismus</th><th>Situace</th><th>Ukázka</th></tr>
+<tr><td><code>focus-offer-homonym</code></td><td>rovnocenní kandidáti jména</td><td>„Kdo je Čapek?“ → nabídka Karel/Josef</td></tr>
+<tr><td><code>focus-offer-overflow</code></td><td>výčet přetekl (&gt; limit hodnot)</td><td>„Co řekl Ježíš?“ → nabídka oblastí (Petr, celník…)</td></tr>
+<tr><td><code>clarify-identity</code> (#43)</td><td>podmět <em>výroku</em> rozřešen jen částečně</td><td>„Emil bydlel v Brně.“ při známém „Emil Filla“ → nabídka: existující osoba × nová</td></tr>
+<tr><td>chytrá clarifikace prázdné díry (E3)</td><td>schéma predikátu roli díry nikdy nenese</td><td>„Kde napsal R.U.R.?“ → „O ději „napsat“ vím co, kdo; kde nevím.“</td></tr>
+<tr><td><code>assurance-fail</code> / <code>resolve-miss</code></td><td>bez odpovědi, nízká jistota</td><td>upřímný terminál s nejbližšími kandidáty</td></tr>
+</table>
+<p>Za pozornost stojí <code>clarify-identity</code>: chrání <em>zápis</em>, ne odpověď. Jméno,
+které se na osobu grafu rozřeší jen částečně („Emil“ → malíř „Emil Filla“), se nepřipíše mlčky —
+výrok čeká (<code>PendingIdentity</code>), dokud uživatel nezvolí. Bez karty platí původní chování:
+rozhodnutí nese karta, její nepřítomnost = žádný dialog.</p>
+
+<h2>12.5 last_empty_role: jistota, ne nejistota</h2>
+<p>Chytrá clarifikace prázdné díry (kapitola <a href="10-schemata-role.html">10.5</a>) má jednu
+zrádnost, kvůli které existuje zvláštní příznak. Verdikt „fakty predikátu roli nikdy nenesou“
+je <strong>jistota</strong> — systém ví <em>proč</em> odpověď neexistuje. Jenže automat čte
+prázdnou stopu odpovědi jako miss a normálně by ji přebil kartou assurance-fail („Nepodařilo se
+mi zaostřit…“) — čímž by jistotu zahodil a nahradil nejistotou. Příznak
+<code>last_empty_role</code> tomu brání
+(<a class="src" href="../../jellyai/iris/automaton.py">automaton.py:325–328</a>):</p>
+<pre><code># jellyai/iris/automaton.py:325–328
+if getattr(self.answerer, "last_empty_role", None):
+    # PRÁZDNÁ DÍRA (#57 E3): schéma roli nezná — odpověď answereru
+    # je definitivní (jistota), dialogové karty ji nepřebíjejí
+    return self._respond(answer, "answer", 1.0, used_patterns, text)</code></pre>
+<p>Odpověď odchází s assurance 1.0 — protože vysvětlení „kde nevím“ je <em>plně jistá odpověď
+o vlastních datech</em>, ne nejisté hledání.</p>
+
+<h2>12.6 Proč vysvětlení před odmítnutím</h2>
+<p>Zásada „dialog &gt; figly“ (zákon 2) má v clarifikaci svou nejviditelnější podobu. Tři důvody,
+proč systém preferuje vysvětlení:</p>
+<ol>
+<li><strong>Vysvětlení nese informaci, odmítnutí ne.</strong> „O ději „napsat“ vím co, kdo; kde
+nevím“ říká uživateli přesně, kudy se ptát dál („Kdo napsal…?“ ano, „Kde…?“ ne). Generický
+terminál nutí hádat, co bylo špatně.</li>
+<li><strong>Vysvětlení je auditovatelné.</strong> Plyne ze schématu dat (verdikt
+<code>instance_lit</code> lze zkontrolovat proti faktům); odmítnutí je jen absence výsledku.</li>
+<li><strong>Vysvětlení udržuje smyčku.</strong> Dialog je cyklus (kapitola
+<a href="11-dialog-cyklus.html">11</a>) — každá clarifikace je hrana dál (volba, přeformulace),
+kdežto odmítnutí je slepá ulička. I terminál proto jmenuje nejbližší kandidáty.</li>
+</ol>
+
+<h2>12.7 Rekurzivní clarifikace</h2>
+<p>Clarifikace se smí vnořovat: volbu z nabídky lze místo odpovědi opustit novou otázkou (únik
+z nabídky otázkou je podporované chování), volba oblasti po overflow může vést na další
+zpřesnění, a otázka přehraná po volbě prochází znovu celým tahem — včetně případné další
+clarifikace. Stav se přitom nese grafově (pozice + pending objekty), takže vnoření nevyžaduje
+žádný zvláštní „stack stavů“ v kódu.</p>
+
+<nav class="pagenav"><a href="11-dialog-cyklus.html">← Dialog jako cyklus</a><a href="index.html">⌂ Obsah</a><span class="spacer"></span><a href="13-proaktivni-nabidky.html">Proaktivní nabídky →</a></nav>
+</main>
+<footer class="site">Architektura JellyAI · kapitola 12 · stav ke commitu a63e83f</footer>
+<script>
+(function () {
+  var s = document.createElement("script");
+  s.src = "mermaid.min.js";
+  s.onload = function () {
+    mermaid.initialize({ startOnLoad: false, theme: "neutral" });
+    mermaid.run({ querySelector: "pre.mermaid" });
+  };
+  document.body.appendChild(s);
+})();
+</script>
+</body>
+</html>

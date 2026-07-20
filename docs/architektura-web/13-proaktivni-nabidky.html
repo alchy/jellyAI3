@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>13 · Proaktivní nabídky — Architektura JellyAI</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="site">
+  <a class="home" href="index.html">JellyAI — architektura</a>
+  <span class="crumb">kapitola 13 z 17</span>
+</header>
+<main>
+<nav class="pagenav"><a href="12-clarifikace.html">← Clarifikace</a><a href="index.html">⌂ Obsah</a><span class="spacer"></span><a href="14-karty.html">Architektura karet →</a></nav>
+<details class="toc"><summary>Kapitoly</summary><ol>
+<li><a href="01-uvod.html">Úvod do JellyAI</a></li><li><a href="02-architektura.html">Celková architektura</a></li><li><a href="03-tok-dat.html">Tok dat systémem</a></li><li><a href="04-lingvistika.html">Lingvistické předzpracování</a></li><li><a href="05-datovy-model.html">Interní datový model</a></li><li><a href="06-faktovy-graf.html">Faktový graf</a></li><li><a href="07-otazkovy-graf.html">Otázkový graf</a></li><li><a href="08-dispatch-claims.html">Dispatch a claimy</a></li><li><a href="09-workers.html">Workers</a></li><li><a href="10-schemata-role.html">Predikátová schémata</a></li><li><a href="11-dialog-cyklus.html">Dialog jako cyklus</a></li><li><a href="12-clarifikace.html">Clarifikace</a></li><li><a href="13-proaktivni-nabidky.html">Proaktivní nabídky</a></li><li><a href="14-karty.html">Architektura karet</a></li><li><a href="15-workflow.html">Workflow systému</a></li><li><a href="16-principy.html">Principy</a></li><li><a href="17-rozsirovani.html">Rozšiřování systému</a></li>
+</ol></details>
+
+<h1>13 · Proaktivní nabídky</h1>
+<p class="lead">Po odpovědi systém nabídne, co dalšího o věci ví — „Mohu doplnit: kdy.“
+Nabídky nevznikají z kódu ani ze scénářů, ale <strong>ze struktury dat</strong>: z neosvětlených
+rolí odpovědního faktu.</p>
+
+<h2>13.1 Mechanismus jednou větou</h2>
+<div class="box">
+<p>Odpovědní fakt nese role, na které se nikdo neptal (<em>neosvětlené role žhavého faktu</em>) —
+systém je po odpovědi nabídne jedním řádkem; navazující holá otázka („Kdy?“) pak jde existujícím
+drillem odpovědního faktu.</p>
+</div>
+
+<div class="dialog-sample">
+<p><span class="u">✍️ Marcela bydlí v Petrovicích.</span></p>
+<p><span class="s">💬 Zapamatováno.</span></p>
+<p><span class="u">❓ Kde bydlí Marcela?</span></p>
+<p><span class="s">💬 Petrovice<br>Mohu doplnit: kdy.</span> <em>(fakt má i časovou kotvu zápisu, na kterou se nikdo neptal)</em></p>
+<p><span class="u">❓ Kdy?</span></p>
+<p><span class="s">💬 19. července 2026</span> <em>(drill na roli time žhavého faktu)</em></p>
+</div>
+
+<h2>13.2 Odvození nabídky ze struktury</h2>
+<p>Fakt, který odpověděl na „Kde bydlí Marcela?“:</p>
+<pre><code>bydlet( obj:   Marcela          ← known otázky (vyloučit)
+        loc:   Petrovice        ← díra otázky = odpověď (vyloučit)
+        theme: uživatel         ← pozorovatel (vyloučit VŽDY)
+        time:  19. 7. 2026 )    ← neosvětlená role → NABÍDKA „kdy“</code></pre>
+
+<pre class="mermaid">
+flowchart TB
+    F["odpovědní fakt (last_trace)"] --> R["projdi role účastníků"]
+    R --> X1{"role díry otázky?"}
+    X1 -- ano --> OUT["vynech"]
+    X1 -- ne --> X2{"theme (pozorovatel)?"}
+    X2 -- ano --> OUT
+    X2 -- ne --> X3{"uzel už řečený?&lt;br/&gt;(odpověď nebo známý otázky — po UZLECH)"}
+    X3 -- ano --> OUT
+    X3 -- ne --> X4{"role má jmenovku?&lt;br/&gt;(role_labels v cs.json)"}
+    X4 -- ne --> OUT
+    X4 -- ano --> N["nabídni: „Mohu doplnit: {role}.“&lt;br/&gt;(karta answer-offer-roles)"]
+</pre>
+
+<p>Implementace: <code>_offer_roles</code>
+(<a class="src" href="../../jellyai/iris/automaton.py">jellyai/iris/automaton.py:412</a>) —
+skutečný výřez:</p>
+<pre><code># jellyai/iris/automaton.py:412–442 (zkráceno)
+def _offer_roles(self):
+    """Nabídka neosvětlených rolí odpovědního faktu (#57 E4).
+
+    Vyloučení jde po UZLECH, ne rolích — karta smí znát účastníka
+    v jiné roli, než jakou nese fakt (subj karty × obj faktu).
+    Pozorovatel (theme) není nabídka."""
+    trace = self.answerer.last_trace
+    ...
+    fact = self.answerer.graph.facts.get(trace["fact"])
+    pat = self.answerer.last_pattern
+    if fact is None or pat is None \
+            or getattr(pat, "hole_role", None) is None:
+        # jen DĚROVÉ odpovědi: zjišťovací „Ano" zůstává stručné
+        return None
+    labels = current().get("role_labels", {})
+    told = {trace.get("answer")}
+    told.update(term for _, term in getattr(pat, "known", ()) or ())
+    unlit = [labels[p.role] for p in fact.participants
+             if p.role in labels and p.role != "theme"
+             and p.role != getattr(pat, "hole_role", None)
+             and p.node not in told]
+    if not unlit:
+        return None
+    card = self.deck.best("answer.offer-roles", {})
+    if card is None:
+        return None
+    return card.dialog.format(roles=", ".join(sorted(dict.fromkeys(unlit))))</code></pre>
+
+<p>Text nabídky nese karta (rozhodnutí v datech):</p>
+<pre><code>// jellyai/iris/patterns/cs/answer-offer-roles.json
+{
+  "name": "answer-offer-roles",
+  "trigger": {"event": "answer.offer-roles", "priority": 3},
+  "dialog": "Mohu doplnit: {roles}.",
+  ...
+}</code></pre>
+<p>Smazáním této karty nabídky zmizí — chování drží karta, kód jen počítá role.</p>
+
+<h2>13.3 Čtyři pravidla (a proč každé platí)</h2>
+<table>
+<tr><th>Pravidlo</th><th>Proč</th></tr>
+<tr><td><strong>Nabídky vznikají ze struktury dat</strong>, ne ze scénářů</td><td>nový predikát s časem/místem umí nabídku automaticky — dialogový prostor roste s daty (T4 spec doslova: „neosvětlené role odpovědního faktu jsou legitimní další otázky“)</td></tr>
+<tr><td><strong>Nenabízí se už známé role/uzly</strong> — vyloučení po UZLECH</td><td>empirický nález E4: karta zná Marcelu jako <em>subj</em> otázky, ale fakt ji drží jako <em>obj</em> — vyloučení po rolích by ji nabídlo znovu; po uzlech je vyloučení správně („to, co už zaznělo, nenabízej“)</td></tr>
+<tr><td><strong>Nenabízí se pozorovatel (theme)</strong></td><td>theme je metadata výpovědi („kdo to systému řekl“), ne obsah — obdoba zásady „pozorovatel není odpověď“</td></tr>
+<tr><td><strong>Nabídka jen u DĚROVÝCH odpovědí</strong></td><td>empirický nález E4: na zjišťovací „Ano“ se nabídka lepila a rozbila 5 testů; stručnost existence je hodnota — nabídka nesmí být šum (dialog &gt; figly: nabídka ano, vnucování ne)</td></tr>
+</table>
+
+<h2>13.4 Vztah k drillu a otázkovému grafu</h2>
+<p>Nabídka je čistě <em>dialogový akt</em> — jedna řádka za odpovědí. Follow-up („Kdy?“) obsluhuje
+<strong>existující</strong> drill mechanismus (<code>_prev_trace</code> — holá otázka se doplní
+rolí z minulého odpovědního faktu). Z pohledu otázkového grafu jsou nabídky <em>hrany počítané za
+běhu</em>: drill hrany se na úrovni grafu neenumerují, protože plynou z rolí konkrétního žhavého
+faktu (kapitola <a href="11-dialog-cyklus.html">11.4</a>); reifikace těchto hran počká na
+případný „odpovědní graf“ (vědomě zaparkovaný koncept).</p>
+
+<p>Proaktivní nabídka je zároveň případ, kde otázkový graf prokázal hodnotu novým chováním:
+před experimentem E4 systém po odpovědi mlčel; gap scénář
+(<a class="src" href="../../benchmark/dialog.jsonl">benchmark/dialog.jsonl:25</a>) byl založen
+červený a mechanismem zezelenal:</p>
+<pre><code>{"name": "proaktivni-nabidka-roli",
+ "gap": "#57 E4: po odpovědi s neosvětlenými rolemi faktu nabídnout doplnění …",
+ "turns": [{"u": "Marcela bydlí v Petrovicích.", "expect": ["Zapamatováno"]},
+           {"u": "Kde bydlí Marcela?", "expect": ["Petrovic", "Mohu doplnit"]},
+           {"u": "Kdy?", "expect": ["2026"]}]}</code></pre>
+
+<h2>13.5 Hranice zdvořilosti</h2>
+<p>Návrhová otázka „nabízet po každé odpovědi?“ má v projektu jasnou odpověď: <strong>nabídka
+ano, vnucování ne</strong>. Proto nabídka: (1) je jedna řádka, ne dialogový blok; (2) nečeká na
+potvrzení (žádný pending stav — uživatel ji smí ignorovat a ptát se na cokoli); (3) neexistuje
+u existencí a přímých expertů. Stručnost je v systému hodnota téže váhy jako poctivost.</p>
+
+<nav class="pagenav"><a href="12-clarifikace.html">← Clarifikace</a><a href="index.html">⌂ Obsah</a><span class="spacer"></span><a href="14-karty.html">Architektura karet →</a></nav>
+</main>
+<footer class="site">Architektura JellyAI · kapitola 13 · stav ke commitu a63e83f</footer>
+<script>
+(function () {
+  var s = document.createElement("script");
+  s.src = "mermaid.min.js";
+  s.onload = function () {
+    mermaid.initialize({ startOnLoad: false, theme: "neutral" });
+    mermaid.run({ querySelector: "pre.mermaid" });
+  };
+  document.body.appendChild(s);
+})();
+</script>
+</body>
+</html>

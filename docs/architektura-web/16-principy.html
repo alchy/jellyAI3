@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>16 · Architektonické principy — Architektura JellyAI</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="site">
+  <a class="home" href="index.html">JellyAI — architektura</a>
+  <span class="crumb">kapitola 16 z 17</span>
+</header>
+<main>
+<nav class="pagenav"><a href="15-workflow.html">← Workflow</a><a href="index.html">⌂ Obsah</a><span class="spacer"></span><a href="17-rozsirovani.html">Rozšiřování →</a></nav>
+<details class="toc"><summary>Kapitoly</summary><ol>
+<li><a href="01-uvod.html">Úvod do JellyAI</a></li><li><a href="02-architektura.html">Celková architektura</a></li><li><a href="03-tok-dat.html">Tok dat systémem</a></li><li><a href="04-lingvistika.html">Lingvistické předzpracování</a></li><li><a href="05-datovy-model.html">Interní datový model</a></li><li><a href="06-faktovy-graf.html">Faktový graf</a></li><li><a href="07-otazkovy-graf.html">Otázkový graf</a></li><li><a href="08-dispatch-claims.html">Dispatch a claimy</a></li><li><a href="09-workers.html">Workers</a></li><li><a href="10-schemata-role.html">Predikátová schémata</a></li><li><a href="11-dialog-cyklus.html">Dialog jako cyklus</a></li><li><a href="12-clarifikace.html">Clarifikace</a></li><li><a href="13-proaktivni-nabidky.html">Proaktivní nabídky</a></li><li><a href="14-karty.html">Architektura karet</a></li><li><a href="15-workflow.html">Workflow systému</a></li><li><a href="16-principy.html">Principy</a></li><li><a href="17-rozsirovani.html">Rozšiřování systému</a></li>
+</ol></details>
+
+<h1>16 · Architektonické principy</h1>
+<p class="lead">Zákony, které drží systém pohromadě, a pasti, kterými byly zaplacené.
+Tato kapitola je normativní: kdo systém rozšiřuje, řídí se jí.</p>
+
+<h2>16.1 Sedm zákonů projektu</h2>
+
+<div class="law"><p><strong>Zákon 1 — Logika nikdy fixně v kódu.</strong> Chování Iris řídí JSON
+karty; kód smí obsahovat jen mechanismy (výpočet rysů, aritmetika, matching). Nový vzor chování =
+nová karta, ne <code>if</code>. I prahy rozhodování nesou karty. <em>Kde to vidět:</em> práh
+clarifikace je <code>assurance_below</code> na kartě, ne konstanta
+(kapitola <a href="12-clarifikace.html">12.3</a>); pořadí bran expertů je priorita claimů
+(kapitola <a href="08-dispatch-claims.html">8</a>).</p></div>
+
+<div class="law"><p><strong>Zákon 2 — Dialog &gt; figly.</strong> Priorita je aktivace správných
+uzlů; při nejistotě se ptát, bez odpovědi upřímný terminál. Nikdy nehádat. <em>Kde to vidět:</em>
+pozorovatel není odpověď; „nenašel jsem“ je legitimní výstup; nabídka ano, vnucování ne.</p></div>
+
+<div class="law"><p><strong>Zákon 3 — Jazyk jako data.</strong> Vše jazykově specifické patří do
+<code>cs.json</code> (+ karty <code>patterns/cs/</code>). Nový jazyk = nový JSON. Do kódu nikdy
+český řetězec pravidla. <em>Kde to vidět:</em> i texty terminálů („nenašel“) jsou tabulka
+<code>miss_markers</code>, i šablona chytré clarifikace je klíč <code>empty_role_answer</code>.</p></div>
+
+<div class="law"><p><strong>Zákon 4 — Každá změna se měří.</strong> Před commitem musí projít
+pytest + benchmarky; normativy neklesají. Když číslo klesne, je to nález — vyšetři, neobcházej.
+<em>Kde to vidět:</em> gap řádky, parity gate, shadow režim (kapitola
+<a href="15-workflow.html">15</a>).</p></div>
+
+<div class="law"><p><strong>Zákon 5 — Korpusová evidence &gt; lokální tag.</strong> Tagger v jedné
+větě lže. Rozhoduje hlasování přes korpus. <em>Kde to vidět:</em> hygiena buildu
+(kapitola <a href="06-faktovy-graf.html">6.6</a>); ranking identit hlasováním přes patra evidence
+(spona/druh/jmenovat).</p></div>
+
+<div class="law"><p><strong>Zákon 6 — Žádná zpětná kompatibilita.</strong> Graf je prototyp —
+refaktoruje se bez zátěže; nepoužívané cesty se konzervují
+(<code>conserved-components.md</code>), mrtvý kód se maže. <em>Kde to vidět:</em> řez #14 smazal
+UDPipe fallback celý, včetně konfiguračních přepínačů.</p></div>
+
+<div class="law"><p><strong>Zákon 7 — Po každé změně restart služeb.</strong> Proces drží starý
+kód i graf; vývojová smyčka počítá s restartem jen :8084 (kapitola
+<a href="15-workflow.html">15.2</a>).</p></div>
+
+<h2>16.2 Odvozené principy (opakující se vzory)</h2>
+<ul>
+<li><strong>Hypotézy, ne předčasná rozhodnutí.</strong> Dvojznačnost se přizná (množiny tříd
+lexeru) a rozhodne ji stavba věty; co nerozhodne, končí poctivým dialogem. Paralela
+z lingvistiky: plná morfologická disambiguace izolovaného tvaru je prohraná bitva.</li>
+<li><strong>Katalogy, ne univerzální pravidla.</strong> Výjimky se enumerují (katalog
+„prsi“→prší); jeden „chytrý“ algoritmus už jednou rozbil klasifikaci celého korpusu.</li>
+<li><strong>Jedna znalost, jedno pole.</strong> Fakta v jednom grafu (korpus i paměť); do
+odpovědí smí zasáhnout jen aktivace a tvrdé filtry. Žádné vedlejší kanály vlivu.</li>
+<li><strong>Data vědí, co se ví; struktura ví, jak se ptát.</strong> Faktový graf nese znalost,
+otázkový směrování — a otázky jsou stín schématu faktů (sémantika se odvozuje, nekurátoruje).</li>
+<li><strong>Kompilace, ne dvojí pravda.</strong> Odvozená struktura (otázkový graf) se vždy
+přegenerovává ze zdrojů a hlídá parity gatem — nikdy se needituje přímo.</li>
+<li><strong>Pozorovatel není odpověď.</strong> Metadata výpovědi (theme=uživatel, časová kotva
+zápisu) nesmí prosáknout do obsahu odpovědí.</li>
+<li><strong>Enumerace na správné úrovni.</strong> Volný slovosled se řeší enumerací vzorů (dva
+řádky, ne permutační operátor); benchmark ukáže, kolik pořadí reálně žije.</li>
+</ul>
+
+<h2>16.3 Vědomě odmítnuté konstrukce</h2>
+<table>
+<tr><th>Konstrukce</th><th>Proč odmítnuta</th><th>Co místo ní</th></tr>
+<tr><td><strong>ATN</strong> (rekurzivní přechodové sítě s podmínkami; Woods 1970)</td><td>síť přechodů s podmínkami je program, jen hůř čitelný — historicky zemřela na neudržovatelnost; „interpret v JSONu“ je táž past v novém kabátě</td><td>přísně regulární vzory (třídy, literály, volitelnost) + jediná plochá rekurze: klauzulová; hrany grafu jen typované, bez podmínek</td></tr>
+<tr><td><strong>Náhrada karet naučenou sítí</strong></td><td>ztratily by se <code>teach</code>, auditovatelnost a guardy pastí; učit se mají <em>zdroje</em> (karty, schéma, váhy), ne graf sám</td><td>odvozování: karty → kompilát; schéma → instance; telemetrie → diagnostika</td></tr>
+<tr><td><strong>Statistický srůst identit</strong></td><td>změřeno: kontextový otisk identitu nerozliší (Ježíš–Nazaretský 0.31 ≈ Jan–Křtitel 0.28 — první táž osoba, druzí dva lidé)</td><td>srůst jmen jen z textového tvrzení („X řečený Y“)</td></tr>
+<tr><td><strong>Váhy telemetrie v dispatch</strong></td><td>změřeno: 0 remíz výběrového klíče — váhy nemají kde zasáhnout, při žádném objemu provozu</td><td>váhy jako diagnostika; harness remízy počítá dál</td></tr>
+<tr><td><strong>UDPipe v dotazové cestě</strong></td><td>nespolehlivost na izolovaných větách + dvojí pravda rozboru</td><td>řez #14: jediná cesta = vzorové karty + pseudo-QL šablony</td></tr>
+</table>
+
+<h2>16.4 Pasti (draze zaplacené — neopakovat)</h2>
+<p>Výběr ze čtrnácti pastí <a class="src" href="../HANDOVER.md">HANDOVER §6</a>; plné znění je
+povinná četba před první změnou kódu:</p>
+<table>
+<tr><th>#</th><th>Past</th><th>Obrana</th></tr>
+<tr><td>1</td><td>dvě chyby modelů se kryjí (NER slepí jména a UDPipe současně rozbije syntax)</td><td>korpusová hlasování</td></tr>
+<tr><td>2</td><td>vakuová logika: <code>all(…)</code> nad prázdnou množinou je True („Le“ pohltilo Ježíše i Marii)</td><td>u množinových podmínek vždy ověřit neprázdnost; tri-state verdikty (<code>instance_lit</code> → None)</td></tr>
+<tr><td>3, 13</td><td>ASCII uvozovky v JSON kartách</td><td>vždy „české“ — rozbitá karta = desítky testů</td></tr>
+<tr><td>5</td><td>benchmarky závisí na id uzlů; přestavba je legitimně mění</td><td>rozlišit regresi od zlepšení; očekávání aktualizovat jen se zdůvodněním</td></tr>
+<tr><td>8</td><td>čtení celých velkých souborů (graph_answerer ~1200 řádků)</td><td>grep + okna; kontext šetřit na měření</td></tr>
+<tr><td>9</td><td>hypotézové třídy se kryjí: „byl“ je l_tvar i spona — karta ukradla identitní otázky</td><td>vylučovací prvek <code>l_tvar!spona</code> (%{SLOVESO_MINULE})</td></tr>
+<tr><td>10</td><td>volné orákulum spanů: span „Pavla v“ by prošel</td><td>span nesmí začínat/končit třídou funkcni — neoslabovat</td></tr>
+<tr><td>11</td><td>karta se nesmí hlásit, když predikát nezná</td><td>překlep („sworil“) musí propadnout záchranné šabloně</td></tr>
+<tr><td>12</td><td>vokativ z izolovaného taggeru je šum („Marcele“ → „Marcel“, rodový flip)</td><td>nominativizace tag s pádem 5 zahazuje</td></tr>
+<tr><td>14</td><td>víceprvková grok-zkratka (splice) posouvá indexy $N v akci</td><td>odkazy míří na rozvinuté prvky; jednoprvkové zkratky indexy nemění</td></tr>
+</table>
+
+<h2>16.5 Vztah k souvislejším teoriím</h2>
+<ul>
+<li><strong>Spreading activation</strong> (Collins &amp; Loftus) — aktivační pole je její
+minimalistická varianta: warm/step/hottest, s disciplínou „remízy řadí, nerozbíjí“.</li>
+<li><strong>Reifikace vztahů</strong> (RDF reification, event semantics à la Davidson) — fakt
+jako uzel s rolovými hranami; role jsou zjednodušené sémantické role (valenční rámce), odvozované
+z dat, ne ze slovníku.</li>
+<li><strong>Dvouúrovňová morfologie</strong> (Koskenniemi) — palatalizace a epenteze v tabulkách
+<code>palatal_fold</code>/<code>epenthesis_vowel</code> jsou její ruční zárodek.</li>
+<li><strong>Defeasible inheritance</strong> — plánovaný „oceán vrstev“ (#41): dědění po
+druh-hranách s útlumem, přímý fakt vždy poráží zděděný.</li>
+<li><strong>Návrhové vzory:</strong> karty = strategie vybíraná daty; deck.best = specificity
+ranking (podobně CSS kaskádě); kompilace grafu = builder nad DSL; claims = registry pattern;
+shadow harness = parallel run/dark launch.</li>
+</ul>
+
+<nav class="pagenav"><a href="15-workflow.html">← Workflow</a><a href="index.html">⌂ Obsah</a><span class="spacer"></span><a href="17-rozsirovani.html">Rozšiřování →</a></nav>
+</main>
+<footer class="site">Architektura JellyAI · kapitola 16 · stav ke commitu a63e83f</footer>
+<script>
+(function () {
+  var s = document.createElement("script");
+  s.src = "mermaid.min.js";
+  s.onload = function () {
+    mermaid.initialize({ startOnLoad: false, theme: "neutral" });
+    mermaid.run({ querySelector: "pre.mermaid" });
+  };
+  document.body.appendChild(s);
+})();
+</script>
+</body>
+</html>

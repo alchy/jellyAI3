@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>15 · Workflow systému — Architektura JellyAI</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="site">
+  <a class="home" href="index.html">JellyAI — architektura</a>
+  <span class="crumb">kapitola 15 z 17</span>
+</header>
+<main>
+<nav class="pagenav"><a href="14-karty.html">← Architektura karet</a><a href="index.html">⌂ Obsah</a><span class="spacer"></span><a href="16-principy.html">Principy →</a></nav>
+<details class="toc"><summary>Kapitoly</summary><ol>
+<li><a href="01-uvod.html">Úvod do JellyAI</a></li><li><a href="02-architektura.html">Celková architektura</a></li><li><a href="03-tok-dat.html">Tok dat systémem</a></li><li><a href="04-lingvistika.html">Lingvistické předzpracování</a></li><li><a href="05-datovy-model.html">Interní datový model</a></li><li><a href="06-faktovy-graf.html">Faktový graf</a></li><li><a href="07-otazkovy-graf.html">Otázkový graf</a></li><li><a href="08-dispatch-claims.html">Dispatch a claimy</a></li><li><a href="09-workers.html">Workers</a></li><li><a href="10-schemata-role.html">Predikátová schémata</a></li><li><a href="11-dialog-cyklus.html">Dialog jako cyklus</a></li><li><a href="12-clarifikace.html">Clarifikace</a></li><li><a href="13-proaktivni-nabidky.html">Proaktivní nabídky</a></li><li><a href="14-karty.html">Architektura karet</a></li><li><a href="15-workflow.html">Workflow systému</a></li><li><a href="16-principy.html">Principy</a></li><li><a href="17-rozsirovani.html">Rozšiřování systému</a></li>
+</ol></details>
+
+<h1>15 · Workflow systému</h1>
+<p class="lead">Provozní a vývojové smyčky: build korpusu, služby, benchmarky jako brány commitů,
+telemetrie a triage.</p>
+
+<h2>15.1 Build korpusu</h2>
+<pre><code>data/raw/*.txt  →  ./jelly index  →  ./jelly annotate  →  ./jelly graph
+                   (dokumenty)       (ÚFAL služby         (extrakce + hygiena +
+                                      :8081–8083)           kanonizace + instance
+                                                            → data/graph.pkl)</code></pre>
+<p>Vlastní korpus: vhoď <code>.txt</code> do <code>data/raw/</code> a spusť řetěz. Po přestavbě
+grafu se smí id uzlů legitimně zlepšit (Betlémě→Betlém) — očekávání benchmarků se pak aktualizují
+<em>se zdůvodněním v commitu</em>; nikdy se neaktualizují, aby zakryla regresi. Namátková kontrola
+známých uzlů (Ježíš, Božena Němcová, Betlém) po každé přestavbě je součást pracovní smyčky.</p>
+
+<h2>15.2 Služby a jejich životní cyklus</h2>
+<pre class="mermaid">
+flowchart LR
+    subgraph BROWSER["prohlížeč"]
+        GUI["3D graf + okna&lt;br/&gt;(dialog, ⚡ aktivace, 📄 dokumenty, ⏰ připomínky)"]
+    end
+    WEB["web server :8080&lt;br/&gt;(viewBase, pasivní displej)"] --- GUI
+    IRIS["REST Iris :8084&lt;br/&gt;automat + graf + aktivace"]
+    WEB -- "/query + most memorized/forgotten" --> IRIS
+    UFAL["ÚFAL služby :8081–8083&lt;br/&gt;(lazy subprocesy, health-first)"]
+    IRIS -. "jen nominativizace zápisu" .-> UFAL
+    INBOX["data/web_inbox.txt&lt;br/&gt;(DEV most)"] --> WEB
+</pre>
+<table>
+<tr><th>Pravidlo</th><th>Proč</th></tr>
+<tr><td><code>iris_service.py</code> se spouští s <code>--port 8084 --model data/graph.pkl</code></td><td>bez argumentů spadne (past 6); port 8083 drží morpho služba</td></tr>
+<tr><td>po každé změně jádra restart JEN :8084</td><td>proces drží starý kód i graf; GUI (:8080) přežije a napojí se dalším dotazem</td></tr>
+<tr><td>řádky připsané do <code>data/web_inbox.txt</code> zpracuje web jako vstup dialogu</td><td>testování je vidět v GUI včetně aktivace (<code>echo "Prší?" &gt;&gt; data/web_inbox.txt</code>)</td></tr>
+<tr><td>verzovací handshake: <code>GET /version</code> {sha, started}</td><td>klient při neshodě dvou známých SHA křičí — třída bolesti „lokál vs. produkce“ (#40)</td></tr>
+</table>
+
+<h2>15.3 Benchmarky: pět bran commitu</h2>
+<p>Před <em>každým</em> commitem musí projít celá sada
+(<a class="src" href="../HANDOVER.md">HANDOVER §3</a>):</p>
+<pre><code>.venv/bin/python -m pytest -q                # N passed, 0 failed
+.venv/bin/python benchmark/run_etalon.py     # jádro 100 %
+.venv/bin/python benchmark/run_focus.py      # 12/12
+.venv/bin/python benchmark/run_dialog.py     # 100 %
+.venv/bin/python benchmark/run_mnemos.py     # zápis 100 %
+.venv/bin/python benchmark/run_coverage.py   # diagnostika (trend)</code></pre>
+
+<table>
+<tr><th>Benchmark</th><th>Co měří</th><th>Jak</th></tr>
+<tr><td><a class="src" href="../../benchmark/run_etalon.py">run_etalon.py</a></td><td>odpovědi na korpusem kryté otázky</td><td>řádky <code>{"q", "expect", "cat"}</code>; negativa přes <code>"reject"</code></td></tr>
+<tr><td><a class="src" href="../../benchmark/run_focus.py">run_focus.py</a></td><td>aktivace správných uzlů</td><td>očekávané uzly v top-K jasu</td></tr>
+<tr><td><a class="src" href="../../benchmark/run_dialog.py">run_dialog.py</a></td><td>scénáře automatu</td><td>fixní hodiny <code>datetime(2026,7,17,12,0)</code>, čerstvý graf per scénář — determinismus</td></tr>
+<tr><td><a class="src" href="../../benchmark/run_mnemos.py">run_mnemos.py</a></td><td>zápis: výrok → parse</td><td>týmž soukolím jako runtime; <code>--nom</code> měří i nominativizaci (chce běžící ÚFAL)</td></tr>
+<tr><td><a class="src" href="../../benchmark/run_coverage.py">run_coverage.py</a></td><td>podíl vět korpusu bez faktu</td><td>trend, ne normativ</td></tr>
+<tr><td><a class="src" href="../../benchmark/run_qgraph.py">run_qgraph.py</a></td><td>shadow parita otázkového grafu</td><td>4 roviny: dispatch dialog/etalon, stav, dekorace; počítá remízy</td></tr>
+</table>
+
+<h3>Gap řádky: institucionalizovaná poctivost</h3>
+<p>Známý nedostatek se <em>nemaže</em> — přidá se mu <code>"gap": "proč + odkaz na backlog"</code>.
+Benchmark ho reportuje zvlášť a hlídá, že se nezhorší; jakmile projde, ohlásí
+<strong>GAP-FIXED</strong> — a jakmile ho něco znovu rozbije, číslo klesne. Nová feature bez svého
+benchmarkového řádku se nepovažuje za hotovou. Vzorový životní cyklus (z experimentu E4):
+scénář založen <em>červený</em> → mechanismus → GAP-FIXED → řádek zůstává jako regresní hlídka.</p>
+
+<h2>15.4 Pracovní smyčka na jeden úkol</h2>
+<pre class="mermaid">
+flowchart TB
+    A["1 · přečti řádek BACKLOGu&lt;br/&gt;+ související kód (grep, ne celé soubory)"] --> B["2 · napiš test / benchmark řádek&lt;br/&gt;NAPŘED (červený)"]
+    B --> C["3 · minimální implementace&lt;br/&gt;mechanismus do kódu, rozhodování do karet/dat"]
+    C --> D["4 · celá sada: pytest + benchmarky&lt;br/&gt;vše 100 %?"]
+    D -- ne --> C
+    D -- ano --> E["5 · přestavěl jsi graf?&lt;br/&gt;zkontroluj známé uzly"]
+    E --> F["6 · commit (CZ zpráva se zdůvodněním)&lt;br/&gt;+ restart služeb + BACKLOG update"]
+    F --> G["7 · ověř E2E přes REST/web&lt;br/&gt;to, co uvidí uživatel"]
+</pre>
+
+<div class="warn">
+<p><strong>Past 4:</strong> nikdy nespouštěj pytest přes <code>| tail</code> v řetězu
+s <code>&amp;&amp;</code> — maska exit kódu už jednou pustila SyntaxError do main. Nejdřív celý
+běh, pak čti. <strong>Past 7:</strong> commit zprávy s českými uvozovkami přes heredoc
+(<code>git commit -F - &lt;&lt;'MSG'</code>).</p>
+</div>
+
+<h2>15.5 Telemetrie a triage: učení z provozu</h2>
+<p>V provozu (ne v testech) píše automat stopu každého tahu do <code>data/telemetry.jsonl</code>:
+ts, otázka, druh, odpověď, assurance, komponenty, karty (včetně vzorové karty dotazu), téma
+a predikát trasy. Nad stopou pracuje <code>./jelly triage</code>: miss = ne-answer / assurance
+&lt; 0.5 / jazykový marker (<code>miss_markers</code> v cs.json — i texty terminálů jsou data);
+shlukuje se podle (druh, karta), největší shluk první, s ukázkami otázek. Výstup triage je
+přirozený zdroj nových etalon řádků a kandidátů na nové karty — <em>provoz plní benchmarky
+průběžně</em>.</p>
+
+<h2>15.6 Shadow režim: jak se zavádějí nové koncepty</h2>
+<p>Workflow projektu pro větší architektonické změny (vzor: otázkový graf):</p>
+<ol>
+<li><strong>Spec s mentálním modelem</strong> — koncept se nejdřív „projde“ na skutečných tazích
+(spec <a class="src" href="../superpowers/specs/2026-07-20-otazkovy-graf.md">2026-07-20-otazkovy-graf.md</a>).</li>
+<li><strong>Kompilace k nahlédnutí</strong> — nová struktura se postaví vedle staré, bez změny
+chování (<code>./jelly qgraph dump</code>).</li>
+<li><strong>Shadow harness</strong> — měří shodu nové cesty se starou na existujících
+benchmarcích (parita), plus nové gap řádky na chování, které stará cesta neuměla.</li>
+<li><strong>Kritérium přijetí:</strong> parita drží (nic pod 100 %) <em>a</em> aspoň jeden nový
+řádek zezelená. Co kritérium nesplní, se nepřijímá — zůstane zapsaným nálezem (vzor: váhy
+z telemetrie, změřená mrtvá větev).</li>
+<li><strong>Přepnutí</strong> — samostatné rozhodnutí s bitovou paritou (vzor: dispatch přímých
+expertů, fáze D).</li>
+</ol>
+
+<nav class="pagenav"><a href="14-karty.html">← Architektura karet</a><a href="index.html">⌂ Obsah</a><span class="spacer"></span><a href="16-principy.html">Principy →</a></nav>
+</main>
+<footer class="site">Architektura JellyAI · kapitola 15 · stav ke commitu a63e83f</footer>
+<script>
+(function () {
+  var s = document.createElement("script");
+  s.src = "mermaid.min.js";
+  s.onload = function () {
+    mermaid.initialize({ startOnLoad: false, theme: "neutral" });
+    mermaid.run({ querySelector: "pre.mermaid" });
+  };
+  document.body.appendChild(s);
+})();
+</script>
+</body>
+</html>

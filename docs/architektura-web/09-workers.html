@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>9 · Workers: Chronos, Metron, Meta, Mnemos, Topos — Architektura JellyAI</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="site">
+  <a class="home" href="index.html">JellyAI — architektura</a>
+  <span class="crumb">kapitola 9 z 17</span>
+</header>
+<main>
+<nav class="pagenav"><a href="08-dispatch-claims.html">← Dispatch a claimy</a><a href="index.html">⌂ Obsah</a><span class="spacer"></span><a href="10-schemata-role.html">Predikátová schémata →</a></nav>
+<details class="toc"><summary>Kapitoly</summary><ol>
+<li><a href="01-uvod.html">Úvod do JellyAI</a></li><li><a href="02-architektura.html">Celková architektura</a></li><li><a href="03-tok-dat.html">Tok dat systémem</a></li><li><a href="04-lingvistika.html">Lingvistické předzpracování</a></li><li><a href="05-datovy-model.html">Interní datový model</a></li><li><a href="06-faktovy-graf.html">Faktový graf</a></li><li><a href="07-otazkovy-graf.html">Otázkový graf</a></li><li><a href="08-dispatch-claims.html">Dispatch a claimy</a></li><li><a href="09-workers.html">Workers</a></li><li><a href="10-schemata-role.html">Predikátová schémata</a></li><li><a href="11-dialog-cyklus.html">Dialog jako cyklus</a></li><li><a href="12-clarifikace.html">Clarifikace</a></li><li><a href="13-proaktivni-nabidky.html">Proaktivní nabídky</a></li><li><a href="14-karty.html">Architektura karet</a></li><li><a href="15-workflow.html">Workflow systému</a></li><li><a href="16-principy.html">Principy</a></li><li><a href="17-rozsirovani.html">Rozšiřování systému</a></li>
+</ol></details>
+
+<h1>9 · Workers: Chronos, Metron, Meta, Mnemos (a Topos)</h1>
+<p class="lead">Doménoví experti nad osami reality — čas, množství, introspekce, paměť, prostor.
+Sdílejí jeden půdorys, tři brány zapojení a jedno pravidlo: s uživatelem nikdy nemluví přímo.</p>
+
+<h2>9.1 Společný půdorys</h2>
+<p>Subsystémy (<a class="src" href="../../jellyai/iris/subsystems/">jellyai/iris/subsystems/</a>)
+mají čtyři schopnosti, vše řízené daty
+(<a class="src" href="../../jellyai/iris/subsystems/__init__.py">subsystems/__init__.py:1</a>):</p>
+<table>
+<tr><th>Schopnost</th><th>Co znamená</th><th>Příklad (Chronos)</th></tr>
+<tr><td><strong>POZNÁNÍ</strong></td><td>vzory, jak poznat doménový výraz</td><td>„za čtvrt hodiny“, „v 19. století“</td></tr>
+<tr><td><strong>KANONIZACE</strong></td><td>překlad jazyk ↔ kanonický záznam</td><td>„ráno“ ↔ 07:00; „letos“ ↔ interval roku</td></tr>
+<tr><td><strong>AKTIVACE</strong></td><td>reflektor: doménový údaj → jas uzlů</td><td>interval otázky rozsvítí časové uzly</td></tr>
+<tr><td><strong>ZÁZNAMY</strong></td><td>JSONL persistence</td><td><code>reminders.jsonl</code></td></tr>
+</table>
+
+<p>A tři brány zapojení do toku tahu:</p>
+<pre class="mermaid">
+flowchart LR
+    V["výrok uživatele"] -- "brána E&lt;br/&gt;(extrakce)" --> S["subsystém"]
+    O["otázka"] -- "brána Q&lt;br/&gt;(nárok na tokeny → filtr/odpověď)" --> S
+    S -- "brána A&lt;br/&gt;(reflektor do aktivačního pole)" --> G["faktový graf + aktivace"]
+</pre>
+
+<div class="law">
+<p><strong>Dvě zásady:</strong> (1) experti jsou záměrně <em>srostlí s grafem</em> — nejsou to
+knihovny; nezávislé jsou naopak kanálové adaptéry (konzole, okno, alarm, e-mail), které jen nosí
+zprávy. (2) Experti <em>nikdy nemluví s uživatelem přímo</em> — mluví Iris; texty odpovědí nesou
+karty (<code>metron-vypocet</code>, <code>reminder-due</code>…), ne kód subsystému.</p>
+</div>
+
+<h2>9.2 Chronos — čas</h2>
+<p><a class="src" href="../../jellyai/iris/subsystems/chronos.py">jellyai/iris/subsystems/chronos.py</a> —
+kanonizuje časové výrazy na <strong>intervaly</strong> ⟨start, end) s granularitou: „letos“,
+„v 19. století“, „21.1.1900“, „za čtvrt hodiny“, dny v týdnu, části dne (ráno = 7:00, uživatel
+může přeučit). „Teď“ je <em>vždy parametr</em> <code>now</code> — testy a benchmarky ho fixují
+(<code>datetime(2026, 7, 17, 12, 0)</code>), proto jsou deterministické.</p>
+<ul>
+<li><strong>Brána Q — tvrdý filtr:</strong> interval z otázky vyřadí fakty s časem mimo něj
+(<code>time_filter</code> v answereru); nedatované fakty zůstávají. Kovářova kobyla testu:
+rok 1900 správně JE 19. století (interval interpretuje, nepřevádí).</li>
+<li><strong>Přímý expert:</strong> hodinová otázka („Kolik je hodin?“, „Co je za den?“) —
+claim <code>chronos-hodiny</code>, odpovídá Chronos sám, graf se nedotkne.</li>
+<li><strong>Připomínky:</strong> sklad <code>reminders.jsonl</code>, vlastní vlákno hodin
+(<code>ChronosTicker</code>) tepe nezávisle na dialogu; dozrálé připomínky se doručují kanály
+(konzole, okno ⏰, e-mail). Zadávání má chytré defaulty (událost „v pět“ → předstih 2 hodiny;
+„zítra“ → ráno; „příští týden“ → neděle večer — vždy s nabídkou změny); správa se vede dialogem
+(„zruš všechno na zítra“, „přeplánuj to ze 17 na 20“).</li>
+<li><strong>Momentová granularita dějů:</strong> „Venku prší“ se kotví na den + hodinu:minutu —
+paměť nikdy nedrží relativní slovo („dnes“), vždy absolutní kotvu.</li>
+</ul>
+
+<h2>9.3 Metron — míry a počty</h2>
+<p><a class="src" href="../../jellyai/iris/subsystems/metron.py">jellyai/iris/subsystems/metron.py</a> —
+aritmetika z řádku, <em>nikdy eval</em>: vlastní bezpečný výpočet nad tabulkami jazyka
+(<code>word_numerals</code> včetně složenin hladovým rozkladem: „osmdesátdva“ = 80+2;
+<code>operator_words</code>: „plus“ → +; <code>sum_phrases</code>: „dohromady“).</p>
+<div class="dialog-sample">
+<p><span class="u">❓ Kolik je 1 plus 1?</span></p>
+<p><span class="s">💬 1 + 1 = 2</span></p>
+<p><span class="u">❓ sto, osmdesátdva, třicet, 50, 32 … dohromady?</span></p>
+<p><span class="s">💬 100 + 82 + 30 + 50 + 32 = 294</span> <em>(přepis výrazu = kontrola extrakce uživatelem)</em></p>
+</div>
+<p>Guardy: ≥ 2 čísla, striktní střídání číslo–operátor, „:“ patří Chronosu (18:30 není dělení),
+dělení nulou poctivě mlčí. Díky claim prioritě 2 správně přebírá „Kolik je 1 plus 1?“ před
+hodinovou otázkou. Druhá plánovaná brána — počítání <em>faktů grafu</em>
+(„Kolikrát letos pršelo?“) — je backlog #11.</p>
+
+<h2>9.4 Meta (introspekce těžiště)</h2>
+<p>Nejmenší „worker“ není subsystém, ale introspekce automatu: meta-otázka na stav rozhovoru
+(„O kom mluvíme?“, fráze z tabulky <code>focus_query_phrases</code>) — odpovědí je nejteplejší
+uzel konverzačního těžiště, graf se nedotkne
+(<code>_focus_query</code>, <a class="src" href="../../jellyai/iris/automaton.py">automaton.py:491</a>).
+V otázkovém grafu má worker uzel <code>meta-focus</code> s worker atributem <code>iris</code>.</p>
+
+<h2>9.5 Mnemos — paměť uživatele</h2>
+<p><a class="src" href="../../jellyai/iris/subsystems/mnemos.py">jellyai/iris/subsystems/mnemos.py</a> —
+brána zápisu: konstatování klasifikují <em>karty</em> (event <code>utterance.statement</code>)
+na druhy — epizoda 1. osoby („Dnes jsem měl knedlíky“), sponové pozorování („Roník je pes“),
+prézentní děj („Venku prší“), připsaný fakt („ano, měl rád knedlíky“ — subjekt z konverzačního
+těžiště), atribut s hodnotou mimo jazyk (e-mail regexpem obchází tagger) a doslovná poznámka
+(přísloví po příkazu „zapamatuj si“).</p>
+<ul>
+<li>Fakt jde do grafu <em>i</em> do deníku <code>memory.jsonl</code> (append-only; po restartu
+se přehraje — <code>replay</code>).</li>
+<li>Jména a místa se před zápisem nominativizují (kapitola <a href="04-lingvistika.html">4.6</a>).</li>
+<li>Zapomínání je trojí — fakt, entita, období — a maže konzistentně graf i deník.</li>
+<li><strong>Nové predikáty z výroků rozšiřují slovník dotazového parseru:</strong> co se zapíše,
+na to se lze hned ptát.</li>
+<li>Uživatel je na svých výrocích v roli <code>theme</code> (pozorovatel) — proto „Kdo bydlí
+v Petrovicích?“ nikdy neodpoví „uživatel“.</li>
+</ul>
+
+<h2>9.6 Topos — prostor</h2>
+<p><a class="src" href="../../jellyai/iris/subsystems/topos.py">jellyai/iris/subsystems/topos.py</a> —
+zrcadlo Chronosu na ose prostoru: interval na ose času ⟷ strom kontejnmentu na ose prostoru.
+Pseudo-mapa bez souřadnic: gazetteer (<code>sub_topos_gazetteer.jsonl</code>) drží kontejnment
+(Praha ⊂ Čechy ⊂ Česko) a sousedství (near). Plní se kurátorským seedem, diktátem uživatele
+a hlavně <strong>učením za pochodu</strong>: výrok „Pavla a Matěj bydlí na Barrandově v Praze“
+naučí Barrandov ⊂ Praha mimochodem.</p>
+<ul>
+<li>Klíče míst zvládají pády, palatalizaci (Praze↔Praha) i epentezi (Plzni↔Plzeň) — týž jev,
+který klasická dvouúrovňová morfologie řeší konečnými automaty.</li>
+<li><strong>Brána Q:</strong> oblast otázky = tvrdý filtr („Pršelo v Čechách?“ — fakt s Prahou
+projde kontejnmentem, <code>place_filter</code>).</li>
+<li>Slovesná třída přesunu rozšiřuje „kde“ na trasy („Kde putoval Ježíš?“ → Kafarnaum…).</li>
+</ul>
+
+<h2>9.7 Jak se worker potkává s tahem — souhrn</h2>
+<pre class="mermaid">
+flowchart TB
+    T["tah"] --> CL{"přímý claim?&lt;br/&gt;(metron · chronos-hodiny · meta-focus)"}
+    CL -- ano --> W["worker odbaví CELÝ tah&lt;br/&gt;(karta dodá text)"]
+    CL -- ne --> DEC["dekorace části věty:&lt;br/&gt;chronos:interval → time_filter&lt;br/&gt;topos:oblast → place_filter&lt;br/&gt;mnemos:prvni-osoba → user_subject&lt;br/&gt;role:adresat → _theme_bound"]
+    DEC --> ANS["answerer: match nad fakty&lt;br/&gt;s filtry dekorací"]
+    ANS --> ACT["brána A: reflektory rozsvítí&lt;br/&gt;relevantní uzly (aktivace)"]
+</pre>
+
+<table>
+<tr><th>Expert</th><th>Přímý claim (celý tah)</th><th>Dekorace (část věty)</th><th>Brána E (výrok)</th><th>Záznamy</th></tr>
+<tr><td>Chronos</td><td>hodinová otázka</td><td><code>chronos:interval</code> (time_filter)</td><td>časová kotva zápisu</td><td>reminders.jsonl</td></tr>
+<tr><td>Metron</td><td>výpočet z řádku</td><td>— (plán: počty faktů #11)</td><td>—</td><td>—</td></tr>
+<tr><td>Meta</td><td>otázka na těžiště</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>Mnemos</td><td>— (zápis jde vlastní větví)</td><td><code>mnemos:prvni-osoba</code></td><td>klasifikace výroku kartami</td><td>memory.jsonl</td></tr>
+<tr><td>Topos</td><td>—</td><td><code>topos:oblast</code> (place_filter)</td><td>učení míst za pochodu</td><td>gazetteer.jsonl</td></tr>
+</table>
+
+<h2>9.8 Plánovaní experti</h2>
+<p><strong>Echo</strong> (kompozice delších odpovědí, #20) a koncepčně největší
+<strong>oceán vrstev</strong> (#41): dědění vlastností po druh-hranách s útlumem („Psi mají rádi
+maso“ → Roník je pes → Roník má nejspíš rád maso; přímý fakt vždy poráží zděděný) — klasické
+defeasible inheritance, jehož zárodky (predikát <code>druh</code>, typový join, kontejnment
+Toposu) už v systému stojí. Budoucí audio (STT/TTS) přibude jako <em>kanál</em>, ne subsystém.</p>
+
+<nav class="pagenav"><a href="08-dispatch-claims.html">← Dispatch a claimy</a><a href="index.html">⌂ Obsah</a><span class="spacer"></span><a href="10-schemata-role.html">Predikátová schémata →</a></nav>
+</main>
+<footer class="site">Architektura JellyAI · kapitola 9 · stav ke commitu a63e83f</footer>
+<script>
+(function () {
+  var s = document.createElement("script");
+  s.src = "mermaid.min.js";
+  s.onload = function () {
+    mermaid.initialize({ startOnLoad: false, theme: "neutral" });
+    mermaid.run({ querySelector: "pre.mermaid" });
+  };
+  document.body.appendChild(s);
+})();
+</script>
+</body>
+</html>

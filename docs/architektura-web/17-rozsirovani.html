@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>17 · Praktický návod pro rozšiřování — Architektura JellyAI</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="site">
+  <a class="home" href="index.html">JellyAI — architektura</a>
+  <span class="crumb">kapitola 17 z 17</span>
+</header>
+<main>
+<nav class="pagenav"><a href="16-principy.html">← Principy</a><a href="index.html">⌂ Obsah</a><span class="spacer"></span></nav>
+<details class="toc"><summary>Kapitoly</summary><ol>
+<li><a href="01-uvod.html">Úvod do JellyAI</a></li><li><a href="02-architektura.html">Celková architektura</a></li><li><a href="03-tok-dat.html">Tok dat systémem</a></li><li><a href="04-lingvistika.html">Lingvistické předzpracování</a></li><li><a href="05-datovy-model.html">Interní datový model</a></li><li><a href="06-faktovy-graf.html">Faktový graf</a></li><li><a href="07-otazkovy-graf.html">Otázkový graf</a></li><li><a href="08-dispatch-claims.html">Dispatch a claimy</a></li><li><a href="09-workers.html">Workers</a></li><li><a href="10-schemata-role.html">Predikátová schémata</a></li><li><a href="11-dialog-cyklus.html">Dialog jako cyklus</a></li><li><a href="12-clarifikace.html">Clarifikace</a></li><li><a href="13-proaktivni-nabidky.html">Proaktivní nabídky</a></li><li><a href="14-karty.html">Architektura karet</a></li><li><a href="15-workflow.html">Workflow systému</a></li><li><a href="16-principy.html">Principy</a></li><li><a href="17-rozsirovani.html">Rozšiřování systému</a></li>
+</ol></details>
+
+<h1>17 · Praktický návod pro rozšiřování systému</h1>
+<p class="lead">Kuchařka pro nejčastější rozšíření. Univerzální recept je vždy stejný:
+<em>test/benchmark napřed (červený) → data (karta/tabulka) → případný mechanismus → celá sada
+měření → commit se zdůvodněním</em>.</p>
+
+<h2>17.1 Nová dotazová karta (nový tvar otázky)</h2>
+<ol>
+<li><strong>Benchmark napřed:</strong> přidej řádek do
+<a class="src" href="../../benchmark/etalon.jsonl">benchmark/etalon.jsonl</a> —
+<code>{"q": "…?", "expect": ["…"], "cat": "…"}</code>; ověř, že je červený.</li>
+<li><strong>Karta:</strong> nový JSON v <a class="src" href="../../jellyai/iris/patterns/cs/">patterns/cs/</a>
+s eventem <code>utterance.query</code> a vzorem z grok-zkratek:
+<pre><code>{"name": "q-muj-tvar",
+ "trigger": {"event": "utterance.query", "priority": 4,
+             "pattern": ["%{TAZACI}", "?%{SE}", "%{SLOVESO_MINULE}", "%{ENTITA}"]},
+ "action": {"query": {"hole": "$1", "predicate": "$3", "known": ["$4"]}},
+ "teach": "…výklad s „českými“ uvozovkami…"}</code></pre></li>
+<li><strong>Chybí-li třída lexeru</strong>, přidej tabulku do
+<a class="src" href="../../jellyai/lang/cs.json">cs.json</a> a zkratku do
+<code>pattern_aliases</code> — do lexeru se sahá, jen když třídu nejde složit z tabulek.</li>
+<li><strong>Pozor na krádež</strong> (pasti 9–11): kryje-li se vzor s existujícími kartami,
+přidej vylučovací prvek (<code>l_tvar!spona</code>) a negativní testy; karta s neznámým
+predikátem se nesmí hlásit.</li>
+<li><strong>Měření:</strong> celá sada (kapitola <a href="15-workflow.html">15.3</a>) + shadow
+harness <code>run_qgraph.py</code> (nová karta = nový uzel otázkového grafu — kompiluje se sama,
+nic dalšího netřeba).</li>
+</ol>
+<p>Přidáváš-li variantu existující rodiny (jiný čas, elipse), <em>nezakládej klon</em> — přidej
+hodnotu dimenze do rodinné karty (<code>q-otaz.json</code>) a nech rozvinutí vygenerovat
+kombinace. Novou osu zvaž kriticky: dimenze jsou enumerativní, nesmí přepisovat akci
+(kapitola <a href="14-karty.html">14.3</a>).</p>
+
+<h2>17.2 Nová výroková karta (nový druh zápisu)</h2>
+<ol>
+<li>Řádek do <a class="src" href="../../benchmark/mnemos.jsonl">benchmark/mnemos.jsonl</a>:
+<code>{"u": "výrok…", "kind": "…", "predicate": "…", "objects": […]}</code> (červený).</li>
+<li>Karta s eventem <code>utterance.statement</code> — buď vzorová (<code>pattern</code>),
+nebo rysová (<code>requires</code>/<code>forbids</code>). Priorita soutěží s ostatními výroky
+jedním klíčem decku.</li>
+<li>Dialogový scénář do <a class="src" href="../../benchmark/dialog.jsonl">dialog.jsonl</a>
+(zápis + následný dotaz — ověří, že se na zapsané dá ptát).</li>
+</ol>
+
+<h2>17.3 Registrace nového experta (claim)</h2>
+<p>Díky registru claimů (kapitola <a href="08-dispatch-claims.html">8</a>) je to tři kroky —
+bez zásahu do <code>compile_qgraph</code>, <code>illuminate</code> ani <code>turn()</code>:</p>
+<ol>
+<li><strong>Rozpoznávač</strong> — čistá funkce <code>(text, now) → bool</code>; slova/vzory,
+které rozpoznává, patří do <code>cs.json</code>, ne do kódu.</li>
+<li><strong>Claim do registru</strong>
+(<a class="src" href="../../jellyai/iris/claims.py">claims.py:48</a>):
+<pre><code>ExpertClaim("muj-expert", "mujworker", priorita, _rozpoznavac)</code></pre>
+Priorita určuje přednost mezi přímými experty (vyšší dřív) — rozmysli kolize (Metron 2 &gt;
+Chronos 1: „Kolik je 1 plus 1?“ vs. „Kolik je hodin?“).</li>
+<li><strong>Handler + karta:</strong> obsluhu napoj v <code>_expert_turn</code>
+(<a class="src" href="../../jellyai/iris/automaton.py">automaton.py:444</a>) a text odpovědi dej
+do karty (vzor: <code>metron-vypocet.json</code>). Expert nikdy nemluví přímo — formátuje karta.</li>
+</ol>
+<p>Měřením je dialogový scénář + test rozšiřitelnosti (vzor existuje z E2: fiktivní expert
+registrovaný jen claimem dostal worker uzel a osvětlení ho zvedlo).</p>
+
+<h2>17.4 Nový worker/subsystém (celá doména)</h2>
+<ol>
+<li>Založ modul v <a class="src" href="../../jellyai/iris/subsystems/">subsystems/</a> podle
+společného půdorysu: POZNÁNÍ (tabulky), KANONIZACE (jazyk ↔ záznam), AKTIVACE (reflektor),
+ZÁZNAMY (JSONL <code>data/sub_&lt;jmeno&gt;_*.jsonl</code>).</li>
+<li>Rozmysli brány: potřebuje přímý claim (celý tah)? Dekoraci (filtr části věty — vzor:
+<code>place_filter</code> Toposu)? Bránu E (extrakce z výroků)?</li>
+<li>Jazyková data do <code>cs.json</code>, texty odpovědí do karet, „teď“ vždy parametrem
+(determinismus benchmarků).</li>
+<li>Nová feature = nový benchmarkový řádek; u tvrdého filtru navíc „kovářova kobyla“ test
+(vzor: rok 1900 JE 19. století).</li>
+</ol>
+
+<h2>17.5 Nový predikát</h2>
+<p>Většinou <strong>není co programovat</strong>: predikát vzniká zápisem („Roník žere granule“ —
+sloveso se stane predikátem a rozšíří slovník dotazového parseru) nebo buildem korpusu. Schéma
+rolí se čte živě z faktů (<code>predicate_roles</code>), takže dotazy, drilly i chytrá
+clarifikace fungují automaticky. Ručně se řeší jen:</p>
+<ul>
+<li><strong>synonymie</strong> — přidej řádek do <code>predicate_synonyms</code> v cs.json
+(bydlet≈žít≈sídlit),</li>
+<li><strong>bezdiakritické/nepravidelné tvary</strong> — katalog <code>predicate_catalog</code>
+či <code>event_verb_forms</code> (enumerace, ne pravidlo!),</li>
+<li><strong>negace</strong> — páruje se prefixem <code>ne-</code> automaticky (jádro ≥ 3 znaky).</li>
+</ul>
+
+<h2>17.6 Rozšíření faktového grafu</h2>
+<ul>
+<li><strong>Nová data:</strong> vhoď <code>.txt</code> do <code>data/raw/</code> a spusť
+<code>./jelly index → annotate → graph</code>. Po přestavbě zkontroluj známé uzly a benchmarky;
+id se smí zlepšit jen se zdůvodněním (kapitola <a href="15-workflow.html">15.1</a>).</li>
+<li><strong>Nový typ uzlu/role:</strong> rozmysli dopad na <code>_match</code> guardy
+(role-preference, sémantické díry) a <code>role_labels</code> (jinak se role nenabízí
+v clarifikacích ani nabídkách). Přidej etalon řádky na obě strany (pozitivní i reject).</li>
+<li><strong>Nová hygiena:</strong> vzor je hlasování v
+<a class="src" href="../../jellyai/graph/hygiene.py">hygiene.py</a> — nikdy lokální oprava
+jednoho výskytu.</li>
+</ul>
+
+<h2>17.7 Rozšíření otázkového grafu</h2>
+<p>Otázkový graf je kompilát — <strong>needituje se přímo</strong>. Rozšiřuje se přes zdroje:</p>
+<table>
+<tr><th>Chci</th><th>Uprav</th></tr>
+<tr><td>nový uzel otázky</td><td>nová dotazová karta (§17.1) — kompilace ho vyrobí</td></tr>
+<tr><td>nový worker uzel</td><td>nový claim (§17.3)</td></tr>
+<tr><td>nový clarify uzel + hrany</td><td>nová karta s eventem z <code>_CLARIFY_EVENTS</code>
+(<a class="src" href="../../jellyai/iris/qgraph.py">qgraph.py:26</a>); hrany se odvodí
+(statement clarify z otázek nevede, overflow jen u děr)</td></tr>
+<tr><td>nový druh dekorace</td><td>rozšíření <code>decorate()</code>
+(<a class="src" href="../../jellyai/iris/qgraph.py">qgraph.py:105</a>) čtením z jazykové tabulky
++ odpovídající skutečný filtr v answereru; parita dekorací v harnessu musí zůstat 100 %</td></tr>
+</table>
+<p>Po každé změně spusť <code>./jelly qgraph dump</code> (vizuální kontrola kompilátu)
+a <code>benchmark/run_qgraph.py</code> (parita 4 rovin).</p>
+
+<h2>17.8 Rozšíření dialogového workflow</h2>
+<ol>
+<li><strong>Nový dialogový akt:</strong> pokud existuje událost (event), stačí karta. Pokud ne,
+přidej do automatu <em>jen ohlášení události</em> (<code>deck.best("moje.udalost", context)</code>
+v místě rozhodnutí) — rozhodnutí a text nese karta. Vzor: jak <code>_turn()</code> hlásí
+<code>data.overflow</code> s guardem <code>area_lit</code>.</li>
+<li><strong>Nový pending stav:</strong> zvaž nejdřív, zda ho neumí vyjádřit pozice v grafu
+(zpřesňovací uzel + hrana návratu) — roztroušené pending objekty jsou přesně to, co model
+otázkového grafu sjednocuje.</li>
+<li><strong>Scénář do dialog.jsonl</strong> s fixními hodinami; každý scénář dostává čerstvý
+graf.</li>
+</ol>
+
+<h2>17.9 Nový typ parsování (obecně)</h2>
+<p>Rozhodovací strom, kam nová jazyková schopnost patří:</p>
+<pre class="mermaid">
+flowchart TB
+    S["nový jazykový jev"] --> Q1{"jde o nová SLOVA&lt;br/&gt;existující třídy?"}
+    Q1 -- ano --> T["tabulka v cs.json&lt;br/&gt;(žádný kód)"]
+    Q1 --ne--> Q2{"jde o novou TŘÍDU slov?"}
+    Q2 -- ano --> L["tabulka + řádek v lexeru&lt;br/&gt;+ zkratka v pattern_aliases"]
+    Q2 -- ne --> Q3{"jde o nový SLED slov&lt;br/&gt;(konstrukci věty)?"}
+    Q3 -- ano --> K["vzorová karta&lt;br/&gt;(dotazová či výroková)"]
+    Q3 -- ne --> Q4{"jde o nárok na CELÝ tah?"}
+    Q4 -- ano --> C["claim experta"]
+    Q4 -- ne --> M["mechanismus — až poslední možnost;&lt;br/&gt;projednat proti zákonu 1"]
+</pre>
+
+<h2>17.10 Dopady změn — co si vždy ověřit</h2>
+<table>
+<tr><th>Měním</th><th>Může rozbít</th><th>Hlídá</th></tr>
+<tr><td>jazykovou tabulku cs.json</td><td>lexer třídy → match karet → dotazy i zápis</td><td>pytest + etalon + mnemos</td></tr>
+<tr><td>kartu / prioritu karty</td><td>krádež vět jiné karty; výběr decku; kompilát qgraph</td><td>etalon + dialog + run_qgraph (remízy!)</td></tr>
+<tr><td>lexer/matcher</td><td>všechno nad nimi</td><td>celá sada; nikdy neoslabovat guardy spanů</td></tr>
+<tr><td>answerer guardy</td><td>ranking, poctivost („pozorovatel není odpověď“)</td><td>etalon (reject řádky!) + focus</td></tr>
+<tr><td>build pipeline</td><td>id uzlů → všechny benchmarky</td><td>kontrola známých uzlů + zdůvodněná aktualizace očekávání</td></tr>
+<tr><td>automat (_turn)</td><td>pořadí větví = sémantika</td><td>dialog benchmark bitově; zvaž raději claim/kartu</td></tr>
+</table>
+
+<div class="box">
+<p><strong>Checklist před commitem</strong> (kapitola <a href="15-workflow.html">15</a>):
+pytest → etalon → focus → dialog → mnemos → (coverage trend) → run_qgraph; restart :8084;
+E2E přes web/REST; aktualizace BACKLOG řádku; CZ commit zpráva se zdůvodněním přes heredoc.</p>
+</div>
+
+<nav class="pagenav"><a href="16-principy.html">← Principy</a><a href="index.html">⌂ Obsah</a><span class="spacer"></span></nav>
+</main>
+<footer class="site">Architektura JellyAI · kapitola 17 · stav ke commitu a63e83f</footer>
+<script>
+(function () {
+  var s = document.createElement("script");
+  s.src = "mermaid.min.js";
+  s.onload = function () {
+    mermaid.initialize({ startOnLoad: false, theme: "neutral" });
+    mermaid.run({ querySelector: "pre.mermaid" });
+  };
+  document.body.appendChild(s);
+})();
+</script>
+</body>
+</html>

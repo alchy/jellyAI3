@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>5 · Interní datový model — Architektura JellyAI</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="site">
+  <a class="home" href="index.html">JellyAI — architektura</a>
+  <span class="crumb">kapitola 5 z 17</span>
+</header>
+<main>
+<nav class="pagenav"><a href="04-lingvistika.html">← Lingvistika</a><a href="index.html">⌂ Obsah</a><span class="spacer"></span><a href="06-faktovy-graf.html">Faktový graf →</a></nav>
+<details class="toc"><summary>Kapitoly</summary><ol>
+<li><a href="01-uvod.html">Úvod do JellyAI</a></li><li><a href="02-architektura.html">Celková architektura</a></li><li><a href="03-tok-dat.html">Tok dat systémem</a></li><li><a href="04-lingvistika.html">Lingvistické předzpracování</a></li><li><a href="05-datovy-model.html">Interní datový model</a></li><li><a href="06-faktovy-graf.html">Faktový graf</a></li><li><a href="07-otazkovy-graf.html">Otázkový graf</a></li><li><a href="08-dispatch-claims.html">Dispatch a claimy</a></li><li><a href="09-workers.html">Workers</a></li><li><a href="10-schemata-role.html">Predikátová schémata</a></li><li><a href="11-dialog-cyklus.html">Dialog jako cyklus</a></li><li><a href="12-clarifikace.html">Clarifikace</a></li><li><a href="13-proaktivni-nabidky.html">Proaktivní nabídky</a></li><li><a href="14-karty.html">Architektura karet</a></li><li><a href="15-workflow.html">Workflow systému</a></li><li><a href="16-principy.html">Principy</a></li><li><a href="17-rozsirovani.html">Rozšiřování systému</a></li>
+</ol></details>
+
+<h1>5 · Interní datový model</h1>
+<p class="lead">Struktury, kterými data protékají: od tokenu přes vzor a dotaz k faktu, uzlu
+a stavu dialogu. Všechny jsou malé, ploché a záměrně „hloupé“ — inteligence je v tom, jak se
+skládají.</p>
+
+<h2>5.1 Přehled — kdo s kým</h2>
+<pre class="mermaid">
+classDiagram
+    class TaggedToken {
+      form
+      norm
+      classes frozenset
+      l_stem
+    }
+    class PatternCard {
+      name
+      trigger
+      dialog
+      action
+      teach
+    }
+    class Pattern {
+      predicate
+      known role-term páry
+      hole_role
+      hole_type
+    }
+    class SubQuery {
+      predicate
+      known
+      hole_role
+    }
+    class Query {
+      pattern
+      qtype
+      gender
+      place
+      card
+      novelty
+    }
+    class Fact {
+      predicate
+      participants
+    }
+    class Participant {
+      role
+      node
+      type
+    }
+    class FactNode {
+      id
+      predicate
+      weight
+      participants
+      source
+    }
+    class QNode {
+      name
+      kind
+      worker
+      pattern
+      priority
+      edges
+    }
+    class QEdge {
+      kind
+      target
+    }
+    class ExpertClaim {
+      name
+      worker
+      priority
+      recognize
+    }
+    class ActivationField {
+      scores
+      warm()
+      step()
+      hottest()
+    }
+    TaggedToken <.. PatternCard : vzor matchuje tokeny
+    PatternCard <.. Query : vítězná karta = rozbor
+    Query *-- Pattern
+    Pattern *-- SubQuery : rekurze
+    Fact *-- Participant
+    FactNode *-- Participant
+    QNode *-- QEdge
+    Pattern <.. FactNode : match, díra
+</pre>
+
+<h2>5.2 Jazyková vrstva: TaggedToken</h2>
+<p>Intuice: slovo, které o sobě poctivě přiznává všechno, čím by mohlo být. Formálně
+(<a class="src" href="../../jellyai/lang/lexer.py">jellyai/lang/lexer.py:41</a>):</p>
+<pre><code>@dataclass(frozen=True)
+class TaggedToken:
+    form: str                # povrchový tvar („Marcela“)
+    norm: str                # deakcentovaný lowercase — klíč do tabulek („marcela“)
+    classes: frozenset       # hypotézy druhů: {"jmeno", "l_tvar"}
+    l_stem: str = None       # kmen l-ového příčestí („měla“ → „měl“), jinak None</code></pre>
+<p><code>frozen=True</code> není náhoda: tokeny se sdílejí mezi vzory a nesmí je nikdo mutovat.
+Dvojznačnost se <em>nese dál</em> — rozhodne ji až pozice ve vzoru.</p>
+
+<h2>5.3 Karty: PatternCard a PatternDeck</h2>
+<p>Karta je JSON soubor načtený do <code>PatternCard</code>
+(<a class="src" href="../../jellyai/iris/patterns.py">jellyai/iris/patterns.py:80</a>):
+<code>name</code>, <code>trigger</code> (událost + podmínky + případně vzor),
+<code>dialog</code> (šablona věty), <code>action</code> (co udělat), <code>teach</code> (výklad).
+<code>PatternDeck</code> je drží seřazené a vybírá vítěze. Detailně kapitola
+<a href="14-karty.html">14</a>.</p>
+
+<h2>5.4 Dotazová vrstva: Pattern, SubQuery, Query</h2>
+<p>Intuice: otázka je <strong>neúplný fakt</strong>. „Kdo napsal R.U.R.?“ = fakt
+<code>napsat(subj: ?, obj: R.U.R.)</code>, kde <code>?</code> je <em>díra</em> — role, na kterou
+se ptáme. Formálně (<a class="src" href="../../jellyai/answerer/pattern.py">jellyai/answerer/pattern.py:47</a>):</p>
+<pre><code>@dataclass
+class Pattern:
+    """Neúplný fakt z otázky: predikát, známé role→(termín|SubQuery) a díra."""
+    predicate: str = None
+    known: list = field(default_factory=list)   # [(role, termín | SubQuery)]
+    hole_role: str = None    # subj / obj / loc / time / num / attr / pred
+    hole_type: str = None    # person / geo / time / number …</code></pre>
+<p><code>SubQuery</code> umožňuje jedinou rekurzi dotazu: „bratr autora, který napsal R.U.R.“ =
+najdi autora (vnořený dotaz), pak jeho bratra. <code>Query</code>
+(<a class="src" href="../../jellyai/answerer/query.py">jellyai/answerer/query.py:38</a>) balí
+<code>Pattern</code> se signály pro answerer:</p>
+<pre><code>@dataclass
+class Query:
+    pattern: Pattern = None
+    qtype: str = None        # „Kdo“/„Kde“/„Kdy“… (třída odpovědi)
+    verb_lemma: str = None
+    is_copula: bool = False
+    topic_terms: list = field(default_factory=list)
+    gender: str = None       # rod slovesného tvaru — filtr pro-drop kandidátů
+    place: str = None        # oblast otázky („v Čechách“) — filtr Topos
+    card: str = None         # jméno vítězné vzorové karty (telemetrie #38)
+    novelty: bool = False    # „Kdo DALŠÍ…?“ — vyluč už jmenované (#53a)</code></pre>
+
+<h2>5.5 Faktová vrstva: Fact, Participant, FactNode, Node</h2>
+<p>Extrakce vyrábí <code>Fact</code> — hodnotový objekt (frozen), jehož identita je
+(predikát, seřazení účastníci). V grafu se z něj stane <code>FactNode</code> — uzel s vahou
+(kolikrát se opakoval) a proveniencí. Účastník nese roli a typ
+(<a class="src" href="../../jellyai/graph/extract.py">jellyai/graph/extract.py:23</a>,
+<a class="src" href="../../jellyai/graph/graph.py">jellyai/graph/graph.py:58–86</a>):</p>
+<pre><code>@dataclass(frozen=True)
+class Participant:
+    role: str    # subj / obj / time / loc / num / pred / attr / theme
+    node: str    # id uzlu účastníka
+    type: str    # person / geo / time / number / concept / institution
+
+@dataclass
+class FactNode:
+    id: tuple            # (predicate, participants) — identita faktu
+    predicate: str
+    weight: int          # kolikrát se fakt v korpusu opakoval
+    participants: tuple
+    source: set          # zdrojové dokumenty (provenience)
+
+@dataclass
+class Node:
+    id: str      # kanonické id (entita nebo nominativní lemma)
+    type: str    # person/geo/time/number/concept/institution
+    weight: int  # v kolika faktech-výskytech figuruje</code></pre>
+
+<p>Ukázka — výrok „Marcela bydlí v Petrovicích“, vysloveno v dialogu 19. 7. 2026:</p>
+<pre><code>bydlí( obj:   Marcela   ⟨concept⟩,
+       loc:   Petrovice ⟨geo⟩,
+       theme: uživatel  ⟨person⟩,     ← pozorovatel, ne účastník!
+       time:  19. července 2026 19:53 )</code></pre>
+<p>Role <code>theme</code> u dějů značí <em>pozorovatele</em> — metadata výpovědi. Z toho plyne
+odpovědní zásada: <strong>pozorovatel není odpověď</strong> („Kdo bydlí v Petrovicích?“ nesmí
+vrátit „uživatel“). Podrobně kapitola <a href="06-faktovy-graf.html">6</a>.</p>
+
+<h2>5.6 Otázkový graf: QNode, QEdge, QGraph, ExpertClaim</h2>
+<p>(<a class="src" href="../../jellyai/iris/qgraph.py">jellyai/iris/qgraph.py:30–52</a>,
+<a class="src" href="../../jellyai/iris/claims.py">jellyai/iris/claims.py:14</a>)</p>
+<pre><code>@dataclass
+class QEdge:
+    kind: str        # "zpresneni" | "navrat"
+    target: str      # jméno uzlu; "*" = přehraj rozpracovanou otázku
+
+@dataclass
+class QNode:
+    name: str
+    kind: str        # "otazka" | "worker" | "clarify"
+    worker: str      # "graf" | "metron" | "chronos" | "iris" | "dialog"
+    pattern: list = None           # vzor zdrojové karty (jen kind=otazka)
+    card: str = None
+    priority: int = 0              # priorita zdrojové karty (klíč decku)
+    weight: float = 0.0            # zásahy z telemetrie (#38)
+    edges: list = field(default_factory=list)
+
+@dataclass
+class QGraph:
+    nodes: dict
+    predicates: frozenset          # schéma datového grafu (líné instance)
+    claims: tuple = ()             # nároky přímých expertů (#57 E2)
+
+@dataclass(frozen=True)
+class ExpertClaim:
+    name: str        # jméno worker uzlu („metron-vypocet“)
+    worker: str      # subsystém, který tah odbaví
+    priority: int    # přednost mezi přímými experty
+    recognize: object  # callable(text, now) -> bool</code></pre>
+<p>Významy v kapitolách <a href="07-otazkovy-graf.html">7</a> a <a href="08-dispatch-claims.html">8</a>.</p>
+
+<h2>5.7 Aktivace a stav dialogu</h2>
+<p><code>ActivationField</code> (<a class="src" href="../../jellyai/graph/activation.py">jellyai/graph/activation.py:11</a>)
+je slábnoucí mapa <code>klíč → jas</code>: <code>warm()</code> přičte, <code>step()</code> vše
+pohasí (×0.55), <code>hottest()</code> vrátí nejteplejší klíč. Jeden primitiv, tři použití:
+aktuální subjekt při extrakci (pro-drop), retrieval podle vzdálenosti a konverzační těžiště.</p>
+
+<p><code>FocusState</code> (<a class="src" href="../../jellyai/iris/state.py">jellyai/iris/state.py:46</a>)
+drží rozpracovaný dialog mezi tahy: <code>PendingFocus</code> (čekáme na volbu kandidáta),
+<code>PendingIdentity</code> (čekáme na určení podmětu výroku, #43), rozpracovanou připomínku
+a historii tahů. V modelu otázkového grafu tyto objekty splývají do jediné reprezentace —
+<em>pozice v grafu</em> (<code>DialogPosition</code>, kapitola <a href="07-otazkovy-graf.html">7.6</a>).</p>
+
+<h2>5.8 Jazyková data: cs.json</h2>
+<p>Poslední „struktura“ není Python, ale JSON: <a class="src" href="../../jellyai/lang/cs.json">jellyai/lang/cs.json</a>
+nese všechna česká jazyková data — 45+ tabulek. Ukázky (skutečné výřezy):</p>
+<pre><code>// cs.json:41 — tázací slovo → (role díry, typ díry, třída odpovědi)
+"interrogatives": {
+  "kdo": ["subj", "person", "Kdo"],  "koho": ["obj", "person", "Kdo"],
+  "kde": ["loc", "geo", "Kde"],      "kdy": ["time", "time", "Kdy"],
+  "kolik": ["num", "number", "Kolik"], "jaky": ["attr", null, "Jaký"], …
+}
+
+// cs.json:94 — jmenovky rolí pro odpovědní šablony
+"role_labels": {"subj": "kdo", "obj": "co", "loc": "kde",
+                "time": "kdy", "num": "kolik"},
+"empty_role_answer": "O ději „{predicate}“ vím {known}; {missing} nevím.",
+
+// cs.json:154 — grok-zkratky vzorů (DRY + čitelnost)
+"pattern_aliases": {
+  "TAZACI": "otaz",
+  "SLOVESO_MINULE": "l_tvar!spona",
+  "ENTITA": "uzel+",
+  "PREDL_MISTA": ":v|ve|na", …
+}</code></pre>
+<div class="law">
+<p><strong>Zákon 3 — jazyk jako data:</strong> nový jazyk = nový JSON (<code>en.json</code>…)
++ nový adresář karet. Do kódu nikdy nepatří český řetězec pravidla.</p>
+</div>
+
+<h2>5.9 Persistence</h2>
+<table>
+<tr><th>Co</th><th>Kde</th><th>Formát</th><th>Životnost</th></tr>
+<tr><td>faktový graf</td><td><code>data/graph.pkl</code></td><td>pickle</td><td>přestavitelný z korpusu + deníku</td></tr>
+<tr><td>deník paměti</td><td><code>data/memory.jsonl</code></td><td>JSONL, append-only</td><td>po restartu se přehraje do grafu</td></tr>
+<tr><td>připomínky</td><td><code>data/reminders.jsonl</code></td><td>JSONL</td><td>krátkodobá — odpálené mizí</td></tr>
+<tr><td>gazetteer míst</td><td><code>data/sub_topos_gazetteer.jsonl</code></td><td>JSONL {place, in}</td><td>roste učením za pochodu</td></tr>
+<tr><td>telemetrie tahů</td><td><code>data/telemetry.jsonl</code></td><td>JSONL</td><td>diagnostika (triage #38)</td></tr>
+<tr><td>anotace korpusu</td><td><code>data/…annotations…</code></td><td>pickle</td><td>mezivýstup buildu</td></tr>
+</table>
+
+<nav class="pagenav"><a href="04-lingvistika.html">← Lingvistika</a><a href="index.html">⌂ Obsah</a><span class="spacer"></span><a href="06-faktovy-graf.html">Faktový graf →</a></nav>
+</main>
+<footer class="site">Architektura JellyAI · kapitola 5 · stav ke commitu a63e83f</footer>
+<script>
+(function () {
+  var s = document.createElement("script");
+  s.src = "mermaid.min.js";
+  s.onload = function () {
+    mermaid.initialize({ startOnLoad: false, theme: "neutral" });
+    mermaid.run({ querySelector: "pre.mermaid" });
+  };
+  document.body.appendChild(s);
+})();
+</script>
+</body>
+</html>

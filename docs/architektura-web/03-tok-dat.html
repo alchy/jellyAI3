@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>3 · Tok dat systémem — Architektura JellyAI</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="site">
+  <a class="home" href="index.html">JellyAI — architektura</a>
+  <span class="crumb">kapitola 3 z 17</span>
+</header>
+<main>
+<nav class="pagenav"><a href="02-architektura.html">← Celková architektura</a><a href="index.html">⌂ Obsah</a><span class="spacer"></span><a href="04-lingvistika.html">Lingvistika →</a></nav>
+<details class="toc"><summary>Kapitoly</summary><ol>
+<li><a href="01-uvod.html">Úvod do JellyAI</a></li><li><a href="02-architektura.html">Celková architektura</a></li><li><a href="03-tok-dat.html">Tok dat systémem</a></li><li><a href="04-lingvistika.html">Lingvistické předzpracování</a></li><li><a href="05-datovy-model.html">Interní datový model</a></li><li><a href="06-faktovy-graf.html">Faktový graf</a></li><li><a href="07-otazkovy-graf.html">Otázkový graf</a></li><li><a href="08-dispatch-claims.html">Dispatch a claimy</a></li><li><a href="09-workers.html">Workers</a></li><li><a href="10-schemata-role.html">Predikátová schémata</a></li><li><a href="11-dialog-cyklus.html">Dialog jako cyklus</a></li><li><a href="12-clarifikace.html">Clarifikace</a></li><li><a href="13-proaktivni-nabidky.html">Proaktivní nabídky</a></li><li><a href="14-karty.html">Architektura karet</a></li><li><a href="15-workflow.html">Workflow systému</a></li><li><a href="16-principy.html">Principy</a></li><li><a href="17-rozsirovani.html">Rozšiřování systému</a></li>
+</ol></details>
+
+<h1>3 · Tok dat systémem</h1>
+<p class="lead">Dvě cesty dat: offline build korpusu (jednou) a runtime tah dialogu (pořád dokola).
+Tato kapitola je mapa — detaily jednotlivých zastávek mají vlastní kapitoly.</p>
+
+<h2>3.1 Offline: build korpusu</h2>
+<p>Korpus (<code>data/raw/*.txt</code>) se jednorázově přemění na faktový graf
+(<code>data/graph.pkl</code>). Tady — a jen tady — pracují statistické nástroje ÚFAL.</p>
+
+<pre class="mermaid">
+flowchart LR
+    RAW["data/raw/*.txt"] --> IDX["index&lt;br/&gt;(dokumenty, pasáže)"]
+    IDX --> ANN["annotate&lt;br/&gt;NameTag (entity)&lt;br/&gt;UDPipe (tokeny, lemmata, deprely)&lt;br/&gt;po VĚTÁCH"]
+    ANN --> EXT["extrakce faktů&lt;br/&gt;spony · apozice · koordinace&lt;br/&gt;pro-drop · aliasy „řečený“"]
+    EXT --> HYG["hygiena&lt;br/&gt;korpusová hlasování&lt;br/&gt;(upos, pád, životnost, lemma)"]
+    HYG --> CAN["kanonizace&lt;br/&gt;+ poziční merge&lt;br/&gt;+ nominativizace id"]
+    CAN --> INS["instanční vrstva&lt;br/&gt;(srůst jmen JEN z tvrzení)"]
+    INS --> PKL["data/graph.pkl"]
+</pre>
+
+<p>Orchestraci nese <code>build_fact_graph</code>
+(<a class="src" href="../../jellyai/tasks.py">jellyai/tasks.py:40</a>) — skutečný výřez:</p>
+
+<pre><code># jellyai/tasks.py:50–75 (zkráceno)
+dropped_e = scrub_entities(annotations, form_case_votes(annotations))
+graph = build_graph(annotations)
+recover_entities(annotations, graph)   # role ②: doplnit tituly, co NER minul
+resolve_entities(graph)
+dropped_p, dropped_f = scrub(graph, lemma_upos_votes(annotations))
+dropped_s = scrub_semantics(graph, noun_animacy_votes(annotations))
+renamed = nominativize(graph, propn_lemma_votes(annotations))
+merged = resolve_instances(graph)
+graph.save(config.graph.graph_path)</code></pre>
+
+<p>Proč tolik „hygieny“: tagger v jedné větě lže (mis-tagy VERB/NOUN, špatné pády). Rozhoduje
+proto vždy <strong>hlasování tvaru přes celý korpus</strong> — to je zákon 5 projektu
+(kapitola <a href="16-principy.html">16</a>). Detail buildu v kapitole
+<a href="06-faktovy-graf.html">6</a>, lingvistika v kapitole <a href="04-lingvistika.html">4</a>.</p>
+
+<h2>3.2 Runtime: jeden tah dialogu</h2>
+<p>Každý vstup uživatele (otázka, výrok, volba, příkaz) prochází <code>IrisAutomaton.turn()</code>.
+Zjednodušený, ale věrný sled:</p>
+
+<pre class="mermaid">
+sequenceDiagram
+    autonumber
+    participant U as uživatel
+    participant I as IrisAutomaton
+    participant C as claims (přímí experti)
+    participant M as Mnemos (zápis)
+    participant A as GraphAnswerer
+    participant F as FactGraph
+    participant K as karty (deck)
+    U->>I: text tahu
+    I->>I: fire_due() — dozrálé připomínky
+    I->>C: recognize(text)? (Metron, Chronos-hodiny, meta-focus)
+    alt expert si tah nárokuje
+        C-->>U: přímá odpověď (výpočet / hodiny / těžiště)
+    else běžný tah
+        I->>I: volby rozpracovaného dialogu (identita, kandidát)
+        alt text bez „?“ (výrok/příkaz)
+            I->>M: parse_clauses → karty statement.* → fakt(y)
+            M->>F: add_fact + deník memory.jsonl
+            M-->>U: „Zapamatováno …“
+        else otázka
+            I->>A: answer(text)
+            A->>A: build_query — vzorové karty → pseudo-QL Pattern
+            A->>F: match: neúplný fakt → díra
+            F-->>A: hodnoty + fakt + stopa
+            A-->>I: odpověď / přetečení / nenašel
+            I->>K: událost tahu (resolve.ambiguous / data.overflow / focus.low)
+            K-->>U: odpověď NEBO doostřovací dialog
+        end
+    end
+</pre>
+
+<p>Skutečné pořadí větví v <code>_turn()</code>
+(<a class="src" href="../../jellyai/iris/automaton.py">jellyai/iris/automaton.py:199</a>):
+přímí experti smyčkou nad claimy (řádek 204) → volba identity podmětu (#43) → volba kandidáta
+z nabídky → větev bez otazníku (připomínky, zapomínání, „zapamatuj si“, správa plánu, posílání,
+focus-shift, konstatování) → vzpomínání a dotaz na plán → zahřátí časového intervalu → vlastní
+odpověď answereru → dialogové karty. Kapitola <a href="11-dialog-cyklus.html">11</a> ukazuje,
+jak z tohoto sledu vzniká grafový cyklus.</p>
+
+<h2>3.3 Cesta otázky (detail)</h2>
+<p>Otázka „Kdo napsal R.U.R.?“ projde těmito stanicemi:</p>
+
+<pre class="mermaid">
+flowchart TB
+    T["„Kdo napsal R.U.R.?“"] --> LEX["lexer.classify&lt;br/&gt;kdo{otaz} · napsal{l_tvar} · R.U.R.{jmeno}"]
+    LEX --> CARD["výběr vzorové karty&lt;br/&gt;q-otaz-minuly: [%{TAZACI}, ?%{SE}, %{SLOVESO_MINULE}, %{ENTITA}]"]
+    CARD --> PAT["pseudo-QL Pattern&lt;br/&gt;predikát: napsat · známý: R.U.R. (obj)&lt;br/&gt;díra: subj / person"]
+    PAT --> RES["rozřešení entit&lt;br/&gt;„R.U.R.“ → uzel R.U.R. (orákulum grafu)"]
+    RES --> MATCH["_match nad fakty&lt;br/&gt;napsat(subj: ?, obj: R.U.R.)"]
+    MATCH --> ANS["odpověď: Karel Antonín Čapek&lt;br/&gt;+ stopa: téma → fakt → hodnota"]
+    ANS --> GLOW["aktivace: odpověď a entity svítí&lt;br/&gt;(těžiště pro další tah)"]
+</pre>
+
+<p>Aktivační okno po tomto tahu (skutečné hodnoty z provozu):</p>
+<pre><code>Karel Antonín Čapek = 2.68   ← odpověď svítí nejvíc
+R.U.R.              = 2.10   ← rozřešená entita otázky
+Josef Čapek         = 0.51   ← vyzářeno po hranách (bratr)
+člověk, bratr       ≈ 0.35   ← okolí tématu</code></pre>
+
+<p>Následující tah z jasu těží: <em>„Kdy se narodil?“</em> nemá podmět, ale nejteplejší rodově
+shodná osoba je Karel Čapek — systém doplní podmět z těžiště (pro-drop na straně dotazu)
+a odpoví. Aktivace není ozdoba, ale nosný mechanismus.</p>
+
+<h2>3.4 Cesta výroku (zápis paměti)</h2>
+<p>„Marcela bydlí v Petrovicích.“ nemá otazník — jde zápisovou větví:</p>
+
+<pre class="mermaid">
+flowchart TB
+    S["„Marcela bydlí v Petrovicích.“"] --> CL["parse_clauses&lt;br/&gt;(souvětí = fakt na klauzuli)"]
+    CL --> LEX2["lexer + vzorové karty výroků&lt;br/&gt;(utterance.statement)"]
+    LEX2 --> KIND["druh výroku kartou:&lt;br/&gt;prézentní děj s místem"]
+    KIND --> NOM["nominativizace&lt;br/&gt;Petrovicích → Petrovice (UDPipe + toponymní pojistka)"]
+    NOM --> FACT["fakt: bydlet(subj: Marcela, loc: Petrovice,&lt;br/&gt;theme: uživatel, time: 17. 7. 2026 12:00)"]
+    FACT --> STORE["graf (add_fact) + deník data/memory.jsonl&lt;br/&gt;(append-only, po restartu se přehraje)"]
+    STORE --> OK["💬 Zapamatováno."]
+</pre>
+
+<p>Klíčové: fakt jde do <strong>téhož grafu</strong> jako korpusová znalost, jen nese timestamp
+dialogu a pozorovatele (theme = uživatel). Otázka „Kde bydlí Marcela?“ pak jede toutéž dotazovou
+cestou jako otázky nad korpusem — a nový predikát z výroku rozšíří slovník dotazového parseru:
+co se zapíše, na to se lze hned ptát.</p>
+
+<h2>3.5 Tři grafy jednoho tahu</h2>
+<p>Tok dat lze shrnout i takto — v každém tahu se potkají tři grafy s různou životností
+(koncept z <a class="src" href="../superpowers/specs/2026-07-20-otazkovy-graf.md">spec otázkového grafu</a>):</p>
+
+<table>
+<tr><th>Graf</th><th>Životnost</th><th>Obsah</th><th>Role v toku</th></tr>
+<tr><td><strong>větný</strong></td><td>jeden tah</td><td>tokeny + hypotézy tříd + nároky expertů</td><td>vstupní reprezentace; osvětluje otázkový graf</td></tr>
+<tr><td><strong>otázkový</strong></td><td>trvalý (kompilát)</td><td>typy otázek + workeři + zpřesňovací hrany</td><td>směrování tahu, vedení dialogu</td></tr>
+<tr><td><strong>faktový</strong></td><td>trvalý (roste)</td><td>fakty + aktivační pole</td><td>zdroj odpovědí, konverzační těžiště</td></tr>
+</table>
+
+<div class="box">
+<p><strong>Dialog jako cyklus:</strong> větný graf osvětlí otázkový → vítězný uzel + dekorace →
+dotaz do faktového → výsledek → text → neosvětlené role a alternativy = hrany zpět do otázkového
+grafu → další tah. Podrobně v kapitole <a href="11-dialog-cyklus.html">11</a>.</p>
+</div>
+
+<nav class="pagenav"><a href="02-architektura.html">← Celková architektura</a><a href="index.html">⌂ Obsah</a><span class="spacer"></span><a href="04-lingvistika.html">Lingvistika →</a></nav>
+</main>
+<footer class="site">Architektura JellyAI · kapitola 3 · stav ke commitu a63e83f</footer>
+<script>
+(function () {
+  var s = document.createElement("script");
+  s.src = "mermaid.min.js";
+  s.onload = function () {
+    mermaid.initialize({ startOnLoad: false, theme: "neutral" });
+    mermaid.run({ querySelector: "pre.mermaid" });
+  };
+  document.body.appendChild(s);
+})();
+</script>
+</body>
+</html>

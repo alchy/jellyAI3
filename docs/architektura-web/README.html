@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>README — Architektura JellyAI (dokumentační web)</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="site">
+  <a class="home" href="index.html">JellyAI — architektura</a>
+  <span class="crumb">README webu</span>
+</header>
+<main>
+<h1>README dokumentačního webu</h1>
+
+<h2>Co to je</h2>
+<p>Propojený HTML web s kompletní architektonickou dokumentací projektu jellyAI3:
+<a href="index.html">index.html</a> + 17 kapitol (samostatné stránky, interní odkazy, obsah na
+každé stránce). Popisuje skutečný stav kódu ke commitu <code>a63e83f</code> (větev
+<code>otazkovy-graf</code>, 2026-07-20).</p>
+
+<h2>Jak číst offline</h2>
+<p>Stačí otevřít <code>index.html</code> v prohlížeči — web nemá žádné externí závislosti
+(CSS i skripty jsou lokální). Funguje i přes <code>file://</code>.</p>
+
+<h2>Mermaid diagramy</h2>
+<p>Diagramy jsou v HTML vložené jako <code>&lt;pre class="mermaid"&gt;</code> — tj. čitelný
+textový zápis, který se po načtení stránky vykreslí lokálním souborem
+<code>mermaid.min.js</code> (v tomto adresáři; verze 10.9.1, staženo z npm balíčku
+<code>mermaid</code>). Pokud by soubor chyběl nebo se nenačetl, diagramy zůstanou zobrazené
+jako čitelný mermaid zdroj — o obsah nepřijdete.</p>
+<p><strong>Doplnění/aktualizace souboru jedním řádkem:</strong></p>
+<pre><code>curl -sL -o docs/architektura-web/mermaid.min.js \
+  https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js</code></pre>
+
+<h2>Odkazy na zdrojáky</h2>
+<p>Odkazy tvaru <span class="src">jellyai/iris/qgraph.py:55</span> vedou relativně do repozitáře
+(<code>../../jellyai/…</code>). Čísla řádků odpovídají commitu <code>a63e83f</code> — po dalším
+vývoji se mohou posunout; soubor a jméno funkce zůstávají spolehlivým vodítkem.</p>
+
+<h2>Doprovodné soubory</h2>
+<ul>
+<li><a href="postrehy-refaktor.md">postrehy-refaktor.md</a> — review postřehů k členění projektu
+(DRY / konzistence / pochopitelnost / členění), sepsané při tvorbě této dokumentace. Nejde
+o součást učebnice — je to podklad pro budoucí refaktor.</li>
+</ul>
+
+<h2>Aktualizace dokumentace</h2>
+<p>Web je statický — při větších změnách architektury aktualizujte dotčené kapitoly ručně
+a srovnejte s aktuálními zdroji pravdy (docs/ARCHITEKTURA.md, HANDOVER.md, BACKLOG.md, specy).
+Metriky v kapitolách 1 a 15 nesou konkrétní čísla benchmarků — po změnách je přeměřte.</p>
+
+<p><a href="index.html">← zpět na obsah</a></p>
+</main>
+<footer class="site">Architektura JellyAI · README · stav ke commitu a63e83f</footer>
+</body>
+</html>

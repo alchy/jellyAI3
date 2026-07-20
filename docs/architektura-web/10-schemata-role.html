@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>10 · Predikátová schémata a role — Architektura JellyAI</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="site">
+  <a class="home" href="index.html">JellyAI — architektura</a>
+  <span class="crumb">kapitola 10 z 17</span>
+</header>
+<main>
+<nav class="pagenav"><a href="09-workers.html">← Workers</a><a href="index.html">⌂ Obsah</a><span class="spacer"></span><a href="11-dialog-cyklus.html">Dialog jako cyklus →</a></nav>
+<details class="toc"><summary>Kapitoly</summary><ol>
+<li><a href="01-uvod.html">Úvod do JellyAI</a></li><li><a href="02-architektura.html">Celková architektura</a></li><li><a href="03-tok-dat.html">Tok dat systémem</a></li><li><a href="04-lingvistika.html">Lingvistické předzpracování</a></li><li><a href="05-datovy-model.html">Interní datový model</a></li><li><a href="06-faktovy-graf.html">Faktový graf</a></li><li><a href="07-otazkovy-graf.html">Otázkový graf</a></li><li><a href="08-dispatch-claims.html">Dispatch a claimy</a></li><li><a href="09-workers.html">Workers</a></li><li><a href="10-schemata-role.html">Predikátová schémata</a></li><li><a href="11-dialog-cyklus.html">Dialog jako cyklus</a></li><li><a href="12-clarifikace.html">Clarifikace</a></li><li><a href="13-proaktivni-nabidky.html">Proaktivní nabídky</a></li><li><a href="14-karty.html">Architektura karet</a></li><li><a href="15-workflow.html">Workflow systému</a></li><li><a href="16-principy.html">Principy</a></li><li><a href="17-rozsirovani.html">Rozšiřování systému</a></li>
+</ol></details>
+
+<h1>10 · Predikátová schémata a role</h1>
+<p class="lead">Jak systém ví, na co se u kterého děje dá ptát — aniž by kdokoli sepisoval
+sémantiku ručně. Schéma se čte živě z faktů; otázky jsou jeho stín.</p>
+
+<h2>10.1 Role a díra — základ</h2>
+<p>Připomeňme z kapitol <a href="05-datovy-model.html">5</a> a <a href="06-faktovy-graf.html">6</a>:
+každý fakt má účastníky v rolích (<code>subj</code>, <code>obj</code>, <code>loc</code>,
+<code>time</code>, <code>num</code>, <code>pred</code>, <code>attr</code>, <code>theme</code>)
+a otázka je neúplný fakt s <strong>dírou</strong> — rolí, na kterou se ptáme. Kterou roli díra
+nese, určuje tázací slovo tabulkou <code>interrogatives</code>
+(<a class="src" href="../../jellyai/lang/cs.json">cs.json:41</a>):
+„kdo“ → (subj, person), „kde“ → (loc, geo), „kdy“ → (time, time), „kolik“ → (num, number)…</p>
+
+<h2>10.2 predicate_roles(): schéma živě z faktů</h2>
+<p>Intuice: nikdo v projektu nenapsal „predikát <em>napsat</em> má autora a dílo“. Systém to
+<strong>ví z vlastních faktů</strong> — stačí se podívat, v jakých rolích účastníci faktů
+predikátu reálně vystupují. Formálně
+(<a class="src" href="../../jellyai/graph/graph.py">jellyai/graph/graph.py:130</a>):</p>
+<pre><code>def predicate_roles(self, predicate):
+    """Role, ve kterých fakty predikátu nesou účastníky (#57 E3).
+
+    Schéma otázkového grafu se NEkurátoruje — čte se z faktů;
+    prázdná množina = graf predikát nezná (žádný verdikt).
+    """
+    roles = set()
+    for fact in self.facts.values():
+        if fact.predicate == predicate:
+            roles.update(p.role for p in fact.participants)
+    return frozenset(roles)</code></pre>
+
+<p>Dvě vlastnosti stojí za podtržení:</p>
+<ul>
+<li><strong>Živé čtení.</strong> Schéma se nečte z kompilátu, ale z aktuálních faktů — predikát,
+který Mnemos naučil před minutou („Roník žere granule“), má schéma okamžitě. Slovník roste
+s pamětí.</li>
+<li><strong>Odvození, ne kurátorování.</strong> To je princip „otázky jsou stín schématu faktů“:
+podpis <code>napsat{subj: person, obj: dílo}</code> implikuje otázky „Kdo napsal X?“, „Co napsal
+Y?“, „Napsal X Y?“ — sémantika otázkového grafu se neudržuje ručně, protože už existuje ve
+faktovém grafu.</li>
+</ul>
+
+<h2>10.3 Instance: typ otázky × predikát</h2>
+<p>Uzly otázkového grafu jsou <em>generické typy</em> („kdo-udělal-co“). Teprve spolu s konkrétním
+predikátem vzniká <strong>instance</strong> („kdo-napsal-co“) — a ta se nematerializuje předem
+(2 722 predikátů × typy otázek = tisíce mrtvých uzlů), ale <strong>líně</strong>: verdikt
+o smysluplnosti kombinace se spočítá až v okamžiku otázky.</p>
+
+<h2>10.4 instance_lit(): verdikt s vakuovým guardem</h2>
+<p>(<a class="src" href="../../jellyai/iris/qgraph.py">jellyai/iris/qgraph.py:136</a>)</p>
+<pre><code>def instance_lit(predicate, hole_role, roles_of):
+    """Verdikt líné instance (rodina × predikát) nad schématem (E3).
+
+    Returns:
+        bool | None: True = role díry ve schématu je; False = fakty
+        predikátu roli nikdy nenesou (hledání je marné — chytrá
+        clarifikace); None = predikát neznám / bez rolí (vakuový
+        guard, past 2 — nesoudit).
+    """
+    roles = roles_of(predicate) if predicate else frozenset()
+    if not roles:
+        return None
+    return hole_role in roles if hole_role else None</code></pre>
+
+<p>Tři hodnoty, tři významy:</p>
+<table>
+<tr><th>Verdikt</th><th>Kdy</th><th>Důsledek</th></tr>
+<tr><td><code>True</code></td><td>role díry ve schématu je</td><td>hledej normálně (fakt může existovat)</td></tr>
+<tr><td><code>False</code></td><td>predikát graf zná, ale roli <em>nikdy</em> nenese</td><td>hledání je marné → <strong>chytrá clarifikace</strong> (§10.5)</td></tr>
+<tr><td><code>None</code></td><td>predikát neznám / bez rolí / bez díry</td><td><strong>nesoudit</strong> — vakuový guard</td></tr>
+</table>
+
+<div class="warn">
+<p><strong>Proč vakuový guard (past 2):</strong> <code>all(…)</code> nad prázdnou množinou je
+True — projekt na to draze doplatil, když bezkmenné id „Le“ vakuově „sedělo“ na všechno a pohltilo
+Ježíše i Marii. U množinových podmínek se vždy ověřuje neprázdnost; <code>instance_lit</code>
+proto u neznámého predikátu vrací <code>None</code> („nevím“), nikdy <code>False</code> („vím,
+že ne“).</p>
+</div>
+
+<h2>10.5 Chytrá clarifikace: gap jako vysvětlení</h2>
+<p>Co se stane, když je verdikt <code>False</code>? Systém <em>neodmítne</em> ani nevrátí generické
+„nenašel jsem“ — <strong>vysvětlí, co o ději ví a co ne</strong>. Bydlí to záměrně
+v <em>answereru</em>, ne v automatu
+(<a class="src" href="../../jellyai/answerer/graph_answerer.py">graph_answerer.py:1109</a>):</p>
+<pre><code>def _empty_role_answer(self, pat):
+    """Chytrá clarifikace prázdné díry (#57 E3, šablona empty_role_answer).
+
+    Fakty predikátu roli díry NIKDY nenesou → hledání je marné;
+    místo generického terminálu vyjmenovat role, které děj zná.
+    Vakuové guardy (past 2): bez predikátu, díry nebo rolí se nesoudí.
+    """
+    from jellyai.iris.qgraph import instance_lit
+    predicate = getattr(pat, "predicate", None)
+    hole_role = getattr(pat, "hole_role", None)
+    if instance_lit(predicate, hole_role,
+                    self.graph.predicate_roles) is not False:
+        return None
+    lang = current()
+    labels = lang.get("role_labels", {})
+    roles = self.graph.predicate_roles(predicate)
+    known = ", ".join(sorted(labels[r] for r in roles if r in labels))
+    missing = labels.get(hole_role)
+    template = lang.get("empty_role_answer")
+    ...
+    return Answer(text=template.format(predicate=predicate, known=known,
+                                       missing=missing), ...)</code></pre>
+
+<p>Text je šablona v jazykových datech (<a class="src" href="../../jellyai/lang/cs.json">cs.json:96</a>):
+<code>"O ději „{predicate}“ vím {known}; {missing} nevím."</code> — jazyk jako data, zákon 3.
+Výsledek naživo:</p>
+<div class="dialog-sample">
+<p><span class="u">❓ Kde napsal R.U.R.?</span></p>
+<p><span class="s">💬 O ději „napsat“ vím co, kdo; kde nevím.</span></p>
+</div>
+<p>To je přesně případ, kde otázkový graf poprvé <em>přinesl nové chování</em>, nejen strukturu:
+před experimentem E3 by otázka skončila generickým terminálem. Oba gap řádky (etalonový
+i dialogový) tímto zezelenaly.</p>
+
+<div class="box">
+<p><strong>Proč v answereru, a ne kartou v automatu?</strong> Empirický nález z vývoje: první
+realizace jako dialogová karta prošla jen dialog benchmarkem — etalon měří čistý answerer.
+Verdikt prázdné díry je <em>odpovědní pravidlo</em> (plyne ze schématu dat), ne dialogový akt —
+proto patří do answereru, kde ho vidí obě měření. A druhý nález: automat čte prázdnou stopu
+jako „miss“ a přebíjel verdikt kartou assurance-fail — proto existuje příznak
+<code>last_empty_role</code>, který říká „tohle je jistota, ne nejistota“
+(kapitola <a href="12-clarifikace.html">12</a>).</p>
+</div>
+
+<h2>10.6 Odvozování schémat vs. gapy — shrnutí toku</h2>
+<pre class="mermaid">
+flowchart TB
+    Q["otázka: „Kde napsal R.U.R.?“&lt;br/&gt;díra: loc · predikát: napsat"] --> IL{"instance_lit(napsat, loc,&lt;br/&gt;graph.predicate_roles)"}
+    IL -- "True (role existuje)" --> M["běžný match → odpověď / nenašel"]
+    IL -- "None (predikát neznám)" --> M
+    IL -- "False (roli nikdy nenese)" --> C["chytrá clarifikace:&lt;br/&gt;„O ději „napsat“ vím co, kdo; kde nevím.“&lt;br/&gt;+ last_empty_role = jistota"]
+</pre>
+
+<h2>10.7 Role v matchi: preference, filtry a guardy</h2>
+<p>Jakmile díra roli má, match nad fakty (<code>_match</code>,
+<a class="src" href="../../jellyai/answerer/graph_answerer.py">graph_answerer.py:554</a>) s rolemi
+zachází jemněji než binárně:</p>
+<ul>
+<li><strong>Role/typ díry je preference, ne tvrdý filtr</strong> — shoda role dává +1000, shoda
+typu +100 ke skóre; ale <em>sémantické díry</em> (loc, time, num, pred) bez jakékoli shody mlčí
+(„Kdy zemřel?“ nesmí vrátit téma faktu).</li>
+<li><strong>Časová kotva odpovídá jen časové díře</strong> — fakt zapsaný v čase T nesmí
+nabídnout T jako odpověď na „kdo/co“.</li>
+<li><strong>Pozorovatel není odpověď</strong> — uživatel v roli theme je metadata zápisu.</li>
+<li><strong>Rolově vázaný známý (#55):</strong> dativní adresát otázky („Co řekl Ježíšovi?“)
+musí být ve faktu v roli theme — dativ nesmí matchnout mluvčího
+(<code>_theme_bound</code>, <a class="src" href="../../jellyai/answerer/graph_answerer.py">graph_answerer.py:572–577</a>).</li>
+<li><strong>Vztahová jména nejsou identita:</strong> sponové „byl bratrem“ je vztah
+k protistraně — u identitní díry (pred/attr) se vztažná jména bez protistrany přeskakují.</li>
+</ul>
+
+<h2>10.8 Souvislost s teorií</h2>
+<p>Pro čtenáře s lingvistickým zázemím: role účastníků jsou zjednodušená valenční teorie
+(subkategorizační rámce sloves) — s tím rozdílem, že rámce se neudržují ve slovníku (jako
+ve FrameNetu či VALLEXu), ale <em>odvozují z korpusu vlastních faktů</em>. Tri-state verdikt
+<code>instance_lit</code> je pak malá presupoziční kontrola: otázka „Kde napsal X?“ presuponuje,
+že děj „napsat“ má místo — a systém umí presupozici zamítnout s vysvětlením, místo aby mlčel.</p>
+
+<nav class="pagenav"><a href="09-workers.html">← Workers</a><a href="index.html">⌂ Obsah</a><span class="spacer"></span><a href="11-dialog-cyklus.html">Dialog jako cyklus →</a></nav>
+</main>
+<footer class="site">Architektura JellyAI · kapitola 10 · stav ke commitu a63e83f</footer>
+<script>
+(function () {
+  var s = document.createElement("script");
+  s.src = "mermaid.min.js";
+  s.onload = function () {
+    mermaid.initialize({ startOnLoad: false, theme: "neutral" });
+    mermaid.run({ querySelector: "pre.mermaid" });
+  };
+  document.body.appendChild(s);
+})();
+</script>
+</body>
+</html>

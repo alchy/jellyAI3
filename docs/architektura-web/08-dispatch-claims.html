@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>8 · Dispatch expertů a claim registry — Architektura JellyAI</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="site">
+  <a class="home" href="index.html">JellyAI — architektura</a>
+  <span class="crumb">kapitola 8 z 17</span>
+</header>
+<main>
+<nav class="pagenav"><a href="07-otazkovy-graf.html">← Otázkový graf</a><a href="index.html">⌂ Obsah</a><span class="spacer"></span><a href="09-workers.html">Workers →</a></nav>
+<details class="toc"><summary>Kapitoly</summary><ol>
+<li><a href="01-uvod.html">Úvod do JellyAI</a></li><li><a href="02-architektura.html">Celková architektura</a></li><li><a href="03-tok-dat.html">Tok dat systémem</a></li><li><a href="04-lingvistika.html">Lingvistické předzpracování</a></li><li><a href="05-datovy-model.html">Interní datový model</a></li><li><a href="06-faktovy-graf.html">Faktový graf</a></li><li><a href="07-otazkovy-graf.html">Otázkový graf</a></li><li><a href="08-dispatch-claims.html">Dispatch a claimy</a></li><li><a href="09-workers.html">Workers</a></li><li><a href="10-schemata-role.html">Predikátová schémata</a></li><li><a href="11-dialog-cyklus.html">Dialog jako cyklus</a></li><li><a href="12-clarifikace.html">Clarifikace</a></li><li><a href="13-proaktivni-nabidky.html">Proaktivní nabídky</a></li><li><a href="14-karty.html">Architektura karet</a></li><li><a href="15-workflow.html">Workflow systému</a></li><li><a href="16-principy.html">Principy</a></li><li><a href="17-rozsirovani.html">Rozšiřování systému</a></li>
+</ol></details>
+
+<h1>8 · Dispatch expertů a claim registry</h1>
+<p class="lead">Jak se rozhoduje, kdo tah odbaví — a jak se toto rozhodování přestěhovalo
+z ručního pořadí <code>if</code> větví do dat: registru claimů.</p>
+
+<h2>8.1 Problém: ruční pořadí bran</h2>
+<p>Historicky začínal každý tah v <code>turn()</code> kaskádou ručně seřazených bran: nejdřív se
+zeptej Metronu (není to výpočet?), pak Chronosu (není to hodinová otázka?), pak meta-fráze
+(„o kom mluvíme?“)… Pořadí větví bylo <em>sémantika zapsaná polohou v kódu</em> — a to je past
+(#51): nový expert se musel „zařadit správně“, což nikdo nehlídal a benchmark to odhalil až
+nepřímo. Konkrétní příklad: Metron musel být zapojen <em>před</em> hodinovou otázkou, protože
+„Kolik je 1 plus 1?“ i „Kolik je hodin?“ začínají stejně.</p>
+
+<h2>8.2 Řešení: nárok jako záznam registru</h2>
+<p>Intuice: expert si tah <strong>nárokuje</strong> — a nárok (claim) je <em>datový záznam</em>,
+ne pozice v kódu. Formálně (<a class="src" href="../../jellyai/iris/claims.py">jellyai/iris/claims.py:14</a>):</p>
+
+<pre><code>@dataclass(frozen=True)
+class ExpertClaim:
+    """Nárok přímého experta na tah.
+
+    Atributy:
+        name (str): Jméno worker uzlu grafu (např. „metron-vypocet“).
+        worker (str): Subsystém, který tah odbaví.
+        priority (int): Přednost mezi přímými experty (vyšší dřív) —
+            zrcadlí dnešní pořadí bran v turn().
+        recognize: callable(text, now) -> bool — hlásí se expert o tah?
+    """
+    name: str
+    worker: str
+    priority: int
+    recognize: object</code></pre>
+
+<p>Výchozí registr tří přímých expertů
+(<a class="src" href="../../jellyai/iris/claims.py">claims.py:48</a>):</p>
+<pre><code>def default_claims():
+    """Nároky dnešních tří přímých expertů (pořadí = přednost bran)."""
+    return (
+        ExpertClaim("metron-vypocet", "metron", 2, _metron),
+        ExpertClaim("chronos-hodiny", "chronos", 1, _chronos),
+        ExpertClaim("meta-focus", "iris", 0, _meta_focus),
+    )</code></pre>
+
+<p>Rozpoznávače jsou tenké obálky nad branami Q subsystémů: <code>_metron</code> volá
+<code>metron.compute(text)</code>, <code>_chronos</code> volá <code>clock_answer(text, now)</code>,
+<code>_meta_focus</code> hledá fráze z tabulky <code>focus_query_phrases</code>.</p>
+
+<h2>8.3 Přepnutí dispatch (fáze D): smyčka nad claimy</h2>
+<p>Toto <strong>není</strong> shadow experiment — dispatch přímých expertů je od fáze D skutečně
+<strong>přepnutý</strong> na smyčku nad registrem. Automat drží kompilát otázkového grafu
+a začátek každého tahu vypadá takto
+(<a class="src" href="../../jellyai/iris/automaton.py">jellyai/iris/automaton.py:199</a>):</p>
+
+<pre><code># jellyai/iris/automaton.py:199–209
+def _turn(self, text, temperature=0.0):
+    """Vlastní tah (bez odpalu připomínek — replay/focus-shift rekurze)."""
+    # PŘÍMÍ EXPERTI dispatchem grafu (#57 fáze D): pořadí bran nesou
+    # DATA (claims priorita), ne pořadí větví — konec pasti #51 pro
+    # přímé experty; neznámý worker propadá (budoucí claimy)
+    for claim in sorted(self.qgraph.claims, key=lambda c: -c.priority):
+        if not claim.recognize(text, self.clock()):
+            continue
+        handled = self._expert_turn(claim.worker, text)
+        if handled is not None:
+            return handled</code></pre>
+
+<p>Obsluhu workeru mapuje <code>_expert_turn</code>
+(<a class="src" href="../../jellyai/iris/automaton.py">automaton.py:444</a>):
+<code>metron → _metron_query</code>, <code>chronos → _clock_response</code>,
+<code>iris → _focus_query</code>; neznámý worker poctivě propadá (test vetřelce hlídá, že se
+budoucí claim nezhroutí na KeyError, ale projde dál běžnou cestou).</p>
+
+<pre class="mermaid">
+flowchart TB
+    T["text tahu"] --> S["seřaď claims podle priority&lt;br/&gt;(metron 2 → chronos 1 → iris 0)"]
+    S --> R1{"metron.recognize?&lt;br/&gt;(výraz s ≥2 čísly)"}
+    R1 -- ano --> M["_metron_query&lt;br/&gt;„1 + 1 = 2“"]
+    R1 -- ne --> R2{"chronos.recognize?&lt;br/&gt;(hodinová otázka)"}
+    R2 -- ano --> C["_clock_response&lt;br/&gt;„12:00“"]
+    R2 -- ne --> R3{"meta-focus.recognize?&lt;br/&gt;(„o kom mluvíme“)"}
+    R3 -- ano --> F["_focus_query&lt;br/&gt;nejteplejší uzel těžiště"]
+    R3 -- ne --> DAL["běžná cesta tahu&lt;br/&gt;(volby → výrok → otázka)"]
+</pre>
+
+<h2>8.4 Proč to je lepší (měřeno, ne dojmem)</h2>
+<ul>
+<li><strong>Pořadí bran je poprvé v datech</strong> — priorita claimů, ne poloha řádku. Změna
+pořadí = změna čísla, viditelná v diffu jednoho záznamu.</li>
+<li><strong>Rozšiřitelnost bez zásahu do jádra:</strong> test rozšiřitelnosti (experiment E2)
+zaregistroval fiktivního experta <em>jen claimem</em> — worker uzel v grafu vznikl a osvětlení ho
+zvedlo bez jakéhokoli zásahu do <code>compile_qgraph</code>, <code>illuminate</code> či
+<code>turn()</code>. Přesný postup pro nového experta v kapitole
+<a href="17-rozsirovani.html">17</a>.</li>
+<li><strong>Parita doložená bitově:</strong> přepnutí prošlo všemi benchmarky beze změny čísel
+(dialog 45/45 bitově; jediný posun — meta-focus se dostal před resume identity/pick — se ukázal
+jako neutrální). To je vzor projektu: přepíná se jen to, co má parity gate.</li>
+</ul>
+
+<h2>8.5 Vědomá hranice: výroková polovina a příkazy (#51)</h2>
+<div class="warn">
+<p><strong>Co přepnuté NENÍ:</strong> data-driven dispatch dnes řídí <em>přímé experty</em>
+(Metron, Chronos-hodiny, meta-focus). <strong>Výroková polovina a příkazy zůstávají ručnímu
+větvení</strong> v <code>_turn()</code> (připomínky, zapomínání, „zapamatuj si“, správa plánu,
+posílání, focus-shift, konstatování — <a class="src" href="../../jellyai/iris/automaton.py">automaton.py:228–294</a>).
+To není dluh z nedbalosti, ale vědomá hranice: měření ukázalo, že 36 z 50 dialogových tahů leží
+mimo dotazovou polovinu a výroková typologie je <em>jiný graf</em> (bez děr, s bránou E) — křížit
+je předčasně by znamenalo stavět jeden graf na dvou nesourodých sémantikách. Sjednocení celého
+vstupu („utterance jako karty“) je samostatná budoucí etapa #51.</p>
+</div>
+
+<h2>8.6 Vztah claimů a dekorací</h2>
+<p>Pozor na rozlišení, které svádí ke zmatení: <em>claim</em> přímého experta je nárok na
+<strong>celý tah</strong> („tenhle řádek je výpočet, beru ho“). <em>Dekorace</em>
+(kapitola <a href="07-otazkovy-graf.html">7.4</a>) je nárok na <strong>část věty</strong>
+(„v tomto roce“ je moje, udělám z toho filtr) — nesoutěží o tah, věší se na vítěze. Oba koncepty
+jsou „jazyk nároků“ (#26) a mají společné zárodky (tabulka <code>chronos.claim_words</code>
+u posílání zpráv: Chronos deklaruje slovník časových tokenů a parser příkazu je přeskočí, aby
+„zítra“ nebylo adresátem). Formální sjednocení obou do jednoho claim() API se spany je otevřený
+zbytek #26.</p>
+
+<h2>8.7 Telemetrie: dispatch pod dohledem</h2>
+<p>Každý tah se (v provozu, ne v testech) stopuje do <code>data/telemetry.jsonl</code>
+(<code>_trace_turn</code>, <a class="src" href="../../jellyai/iris/automaton.py">automaton.py:182</a>):
+otázka → karty (včetně vzorové karty dotazu) → odpověď + assurance. Nástroj
+<code>./jelly triage</code> (<a class="src" href="../../jellyai/iris/triage.py">jellyai/iris/triage.py</a>)
+shlukuje missy podle (druh, karta) — největší shluk první. Miss-těžký uzel je ukazatel na díru
+v datech nebo chybějící kartu; učební smyčka je: triage → kandidát → nová karta (člověk
+v okruhu) → rekompilace grafu. <em>Graf se neučí sám — učí se jeho zdroje.</em></p>
+
+<nav class="pagenav"><a href="07-otazkovy-graf.html">← Otázkový graf</a><a href="index.html">⌂ Obsah</a><span class="spacer"></span><a href="09-workers.html">Workers →</a></nav>
+</main>
+<footer class="site">Architektura JellyAI · kapitola 8 · stav ke commitu a63e83f</footer>
+<script>
+(function () {
+  var s = document.createElement("script");
+  s.src = "mermaid.min.js";
+  s.onload = function () {
+    mermaid.initialize({ startOnLoad: false, theme: "neutral" });
+    mermaid.run({ querySelector: "pre.mermaid" });
+  };
+  document.body.appendChild(s);
+})();
+</script>
+</body>
+</html>

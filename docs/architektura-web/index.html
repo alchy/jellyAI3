@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Architektura JellyAI — dokumentace</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="site">
+  <a class="home" href="index.html">JellyAI — architektura</a>
+  <span class="crumb">učebnice systému pro nové vývojáře</span>
+</header>
+<main>
+<h1>Architektura JellyAI</h1>
+<p class="lead">Kompletní architektonická dokumentace projektu jellyAI3 — česky mluvícího
+znalostního systému postaveného na symbolickém zpracování jazyka a dvou grafech:
+<strong>faktovém</strong> (co systém ví) a <strong>otázkovém</strong> (jak se lze ptát a kam otázku poslat).
+Dokumentace popisuje skutečný stav kódu k commitu <code>a63e83f</code>
+(<code>main</code>, 2026-07-20) a je čitelná offline.</p>
+
+<div class="box">
+<p><strong>Pro koho je psaná:</strong> pro programátora, který projekt nikdy neviděl, rozumí
+lingvistice a teorii grafů, ale nezná doménové pojmy projektu. Každý nový pojem je nejprve
+vysvětlen intuitivně a teprve poté formalizován. Po přečtení byste měli umět bezpečně
+rozšiřovat systém — novou kartou, novým expertem, novým predikátem — bez konzultace s autorem.</p>
+</div>
+
+<h2>Obsah</h2>
+<ol>
+  <li><a href="01-uvod.html">Úvod do JellyAI</a> — co systém je, čemu věří a jak se měří.</li>
+  <li><a href="02-architektura.html">Celková architektura</a> — vrstvy, moduly a mapa kódu.</li>
+  <li><a href="03-tok-dat.html">Tok dat systémem</a> — cesta věty od znaků k odpovědi; offline build.</li>
+  <li><a href="04-lingvistika.html">Lingvistické předzpracování vstupu</a> — tokenizace, segmentace, lemmatizace, morfologie; nástroje ÚFAL a UDPipe-free dotazová cesta.</li>
+  <li><a href="05-datovy-model.html">Interní datový model</a> — TaggedToken, Pattern, Fact, QNode a spol.</li>
+  <li><a href="06-faktovy-graf.html">Faktový graf</a> — reifikované fakty, uzly, hrany, životní cyklus.</li>
+  <li><a href="07-otazkovy-graf.html">Otázkový graf</a> — graf možných interpretací otázky: kompilace, osvětlení, dekorace, pozice.</li>
+  <li><a href="08-dispatch-claims.html">Dispatch expertů a claim registry</a> — od ručního pořadí bran k datům.</li>
+  <li><a href="09-workers.html">Workers: Chronos, Metron, Meta, Mnemos, Topos</a> — doménoví experti a jejich brány.</li>
+  <li><a href="10-schemata-role.html">Predikátová schémata a role</a> — predicate_roles(), instance_lit(), díry a gapy.</li>
+  <li><a href="11-dialog-cyklus.html">Dialog jako grafový cyklus</a> — dialog není lineární automat, ale procházka grafem.</li>
+  <li><a href="12-clarifikace.html">Clarifikace</a> — clarifikace × odmítnutí × assurance; last_empty_role.</li>
+  <li><a href="13-proaktivni-nabidky.html">Proaktivní nabídky</a> — „Mohu doplnit: kdy.“ ze struktury dat.</li>
+  <li><a href="14-karty.html">Architektura karet</a> — rodiny, dimenze, kompilace, rozvinutí.</li>
+  <li><a href="15-workflow.html">Workflow systému</a> — služby, benchmarky, vývojová smyčka.</li>
+  <li><a href="16-principy.html">Architektonické principy</a> — zákony projektu a draze zaplacené pasti.</li>
+  <li><a href="17-rozsirovani.html">Praktický návod pro rozšiřování systému</a> — checklisty krok za krokem.</li>
+</ol>
+
+<h2>Jak dokumentaci číst</h2>
+<p>Kapitoly 1–3 dávají celkový obraz — čtěte je první a v pořadí. Kapitoly 4–10 vysvětlují
+jednotlivé subsystémy do hloubky; kapitoly 11–13 dialogové chování; kapitoly 14–16 principy,
+které drží celek pohromadě. Kapitola 17 je praktická kuchařka — má smysl až po kapitolách 14 a 16.</p>
+
+<p>Diagramy jsou psané v Mermaidu a vykreslují se lokálním souborem <code>mermaid.min.js</code>
+(žádné externí závislosti — web funguje offline). Pokud by soubor chyběl, diagramy zůstanou
+zobrazené jako čitelný textový zápis. Podrobnosti v <a href="README.html">README</a>.</p>
+
+<h2>Zdroje pravdy</h2>
+<p>Dokumentace vychází z výkladových dokumentů projektu a ze zdrojového kódu:</p>
+<ul>
+  <li><a class="src" href="../ARCHITEKTURA.md">docs/ARCHITEKTURA.md</a> — hlavní výkladový dokument,</li>
+  <li><a class="src" href="../HANDOVER.md">docs/HANDOVER.md</a> — zákony projektu a pasti 1–14,</li>
+  <li><a class="src" href="../BACKLOG.md">docs/BACKLOG.md</a> — živý backlog s historií experimentů,</li>
+  <li><a class="src" href="../superpowers/specs/2026-07-19-vzorova-gramatika.md">specs/2026-07-19-vzorova-gramatika.md</a>,
+      <a class="src" href="../superpowers/specs/2026-07-20-otazkovy-graf.md">specs/2026-07-20-otazkovy-graf.md</a>,
+      <a class="src" href="../superpowers/specs/2026-07-20-otazkovy-graf-dotazeni.md">specs/2026-07-20-otazkovy-graf-dotazeni.md</a> — návrhové dokumenty s měřeními,</li>
+  <li>a zdrojový kód v <a class="src" href="../../jellyai/">jellyai/</a> — všechny ukázky v této dokumentaci jsou skutečné výřezy s odkazem soubor:řádek.</li>
+</ul>
+
+<div class="law">
+<p><strong>Stav měření k datu dokumentace:</strong> 573 testů, etalon 31/31, focus 12/12,
+dialog 45/45 (GAP 5 opraveno / 0 otevřeno), zápisový etalon 34/34; shadow harness otázkového
+grafu: dispatch dialog 11/11, etalon 42/42, stav dialogu 3/3, dekorace 42/42 — vše 100 %,
+0 remíz výběrového klíče.</p>
+</div>
+</main>
+<footer class="site">Architektonická dokumentace jellyAI3 · stav ke commitu a63e83f (2026-07-20) · generováno ze zdrojů pravdy projektu</footer>
+</body>
+</html>

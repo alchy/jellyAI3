@@ -1,0 +1,195 @@
+/* Architektonická dokumentace JellyAI — sdílený styl (offline, bez externích zdrojů) */
+
+:root {
+  --ink: #1c2733;
+  --ink-soft: #4a5a6a;
+  --paper: #fdfcf9;
+  --panel: #f3f1ea;
+  --accent: #1f6f5c;
+  --accent-soft: #e3efe9;
+  --border: #d8d4c8;
+  --code-bg: #f6f4ee;
+  --warn-bg: #fdf3e3;
+  --warn-border: #e0b96a;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 17px;
+  line-height: 1.65;
+  color: var(--ink);
+  background: var(--paper);
+}
+
+header.site {
+  background: var(--ink);
+  color: #f0ece2;
+  padding: 0.6rem 1.2rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1.4rem;
+  align-items: baseline;
+}
+
+header.site a { color: #f0ece2; text-decoration: none; }
+header.site a:hover { text-decoration: underline; }
+header.site .home { font-weight: bold; letter-spacing: 0.03em; }
+header.site .crumb { font-size: 0.85rem; opacity: 0.85; }
+
+main {
+  max-width: 58rem;
+  margin: 0 auto;
+  padding: 1.5rem 1.2rem 4rem;
+}
+
+h1 { font-size: 1.9rem; line-height: 1.25; margin: 0.8rem 0 0.4rem; }
+h2 { font-size: 1.35rem; margin-top: 2.2rem; border-bottom: 2px solid var(--accent-soft); padding-bottom: 0.2rem; }
+h3 { font-size: 1.1rem; margin-top: 1.6rem; }
+p.lead { font-size: 1.08rem; color: var(--ink-soft); margin-top: 0; }
+
+a { color: var(--accent); }
+
+nav.pagenav {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 1.2rem 0;
+  font-family: "Helvetica Neue", Arial, sans-serif;
+  font-size: 0.9rem;
+}
+nav.pagenav a {
+  text-decoration: none;
+  background: var(--accent-soft);
+  padding: 0.3rem 0.7rem;
+  border-radius: 4px;
+}
+nav.pagenav a:hover { background: var(--accent); color: #fff; }
+nav.pagenav .spacer { flex: 1; }
+
+details.toc {
+  font-family: "Helvetica Neue", Arial, sans-serif;
+  font-size: 0.88rem;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.4rem 0.8rem;
+  margin: 0.8rem 0 1.4rem;
+}
+details.toc summary { cursor: pointer; font-weight: bold; color: var(--ink-soft); }
+details.toc ol { margin: 0.5rem 0 0.3rem; padding-left: 1.6rem; column-count: 2; column-gap: 2rem; }
+details.toc li { margin: 0.15rem 0; }
+details.toc a { text-decoration: none; }
+details.toc a:hover { text-decoration: underline; }
+
+code, pre {
+  font-family: "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.86em;
+}
+code {
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 0.05em 0.3em;
+  white-space: nowrap;
+}
+pre {
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.8rem 1rem;
+  overflow-x: auto;
+  line-height: 1.5;
+}
+pre code { background: none; border: none; padding: 0; white-space: pre; }
+
+pre.mermaid {
+  background: #ffffff;
+  text-align: center;
+}
+/* dokud se mermaid nenačte, je diagram čitelný jako text */
+pre.mermaid:not([data-processed]) {
+  text-align: left;
+  color: #33424f;
+}
+
+.src {
+  font-family: "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.8em;
+  color: var(--ink-soft);
+}
+a.src { color: var(--accent); text-decoration: none; border-bottom: 1px dotted var(--accent); }
+
+figure { margin: 1.2rem 0; }
+figcaption {
+  font-family: "Helvetica Neue", Arial, sans-serif;
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+  margin-top: 0.3rem;
+}
+
+table {
+  border-collapse: collapse;
+  margin: 1rem 0;
+  font-size: 0.92rem;
+  width: 100%;
+}
+th, td {
+  border: 1px solid var(--border);
+  padding: 0.4rem 0.7rem;
+  text-align: left;
+  vertical-align: top;
+}
+th { background: var(--panel); font-family: "Helvetica Neue", Arial, sans-serif; font-size: 0.85rem; }
+tr:nth-child(even) td { background: #faf8f3; }
+
+.box, .warn, .law {
+  border-radius: 6px;
+  padding: 0.7rem 1rem;
+  margin: 1.1rem 0;
+}
+.box { background: var(--accent-soft); border: 1px solid #b8d4c8; }
+.warn { background: var(--warn-bg); border: 1px solid var(--warn-border); }
+.law { background: var(--panel); border-left: 4px solid var(--accent); }
+.box p:first-child, .warn p:first-child, .law p:first-child { margin-top: 0; }
+.box p:last-child, .warn p:last-child, .law p:last-child { margin-bottom: 0; }
+
+.dialog-sample {
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.8rem 1rem;
+  margin: 1rem 0;
+  font-size: 0.95rem;
+}
+.dialog-sample .u { color: #7a3b2e; }
+.dialog-sample .s { color: var(--accent); }
+.dialog-sample p { margin: 0.3rem 0; }
+
+blockquote {
+  margin: 1rem 0;
+  padding: 0.2rem 1rem;
+  border-left: 4px solid var(--border);
+  color: var(--ink-soft);
+}
+
+footer.site {
+  border-top: 1px solid var(--border);
+  margin-top: 3rem;
+  padding: 1rem 1.2rem 2rem;
+  font-family: "Helvetica Neue", Arial, sans-serif;
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+  text-align: center;
+}
+
+@media (max-width: 640px) {
+  details.toc ol { column-count: 1; }
+  body { font-size: 16px; }
+}
+
+@media print {
+  header.site, nav.pagenav, details.toc, footer.site { display: none; }
+}

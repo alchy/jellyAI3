@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>2 · Celková architektura — Architektura JellyAI</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="site">
+  <a class="home" href="index.html">JellyAI — architektura</a>
+  <span class="crumb">kapitola 2 z 17</span>
+</header>
+<main>
+<nav class="pagenav"><a href="01-uvod.html">← Úvod</a><a href="index.html">⌂ Obsah</a><span class="spacer"></span><a href="03-tok-dat.html">Tok dat →</a></nav>
+<details class="toc"><summary>Kapitoly</summary><ol>
+<li><a href="01-uvod.html">Úvod do JellyAI</a></li><li><a href="02-architektura.html">Celková architektura</a></li><li><a href="03-tok-dat.html">Tok dat systémem</a></li><li><a href="04-lingvistika.html">Lingvistické předzpracování</a></li><li><a href="05-datovy-model.html">Interní datový model</a></li><li><a href="06-faktovy-graf.html">Faktový graf</a></li><li><a href="07-otazkovy-graf.html">Otázkový graf</a></li><li><a href="08-dispatch-claims.html">Dispatch a claimy</a></li><li><a href="09-workers.html">Workers</a></li><li><a href="10-schemata-role.html">Predikátová schémata</a></li><li><a href="11-dialog-cyklus.html">Dialog jako cyklus</a></li><li><a href="12-clarifikace.html">Clarifikace</a></li><li><a href="13-proaktivni-nabidky.html">Proaktivní nabídky</a></li><li><a href="14-karty.html">Architektura karet</a></li><li><a href="15-workflow.html">Workflow systému</a></li><li><a href="16-principy.html">Principy</a></li><li><a href="17-rozsirovani.html">Rozšiřování systému</a></li>
+</ol></details>
+
+<h1>2 · Celková architektura</h1>
+<p class="lead">Vrstvy systému, hlavní komponenty a mapa kódu — kde co bydlí a proč zrovna tam.</p>
+
+<h2>2.1 Pohled z výšky</h2>
+<p>JellyAI má čtyři patra. Odspodu: <strong>jazyková vrstva</strong> (lexer, matcher, jazykové
+tabulky), <strong>grafová vrstva</strong> (faktový graf, aktivace, build pipeline),
+<strong>odpovídací vrstva</strong> (rozbor otázky, match nad grafem) a <strong>dialogová
+vrstva</strong> (automat Iris, karty, subsystémy-experti, otázkový graf). Nad tím stojí
+kanály — REST služba a web — které jen nosí zprávy.</p>
+
+<pre class="mermaid">
+flowchart TB
+    subgraph K["kanály (nezávislé adaptéry)"]
+        REST["REST Iris :8084&lt;br/&gt;services/iris_service.py"]
+        WEB["web 3D graf :8080&lt;br/&gt;viewbase"]
+    end
+    subgraph D["dialogová vrstva — jellyai/iris/"]
+        IRIS["IrisAutomaton&lt;br/&gt;automaton.py"]
+        DECK["PatternDeck (karty)&lt;br/&gt;patterns.py + patterns/cs/*.json"]
+        QG["otázkový graf&lt;br/&gt;qgraph.py + claims.py"]
+        SUB["subsystémy&lt;br/&gt;chronos · metron · mnemos · topos"]
+    end
+    subgraph A["odpovídací vrstva — jellyai/answerer/"]
+        QUERY["rozbor otázky&lt;br/&gt;query.py (karty → pseudo-QL)"]
+        GA["GraphAnswerer&lt;br/&gt;graph_answerer.py (match, ranking)"]
+    end
+    subgraph G["grafová vrstva — jellyai/graph/"]
+        FG["FactGraph&lt;br/&gt;graph.py"]
+        ACT["ActivationField&lt;br/&gt;activation.py"]
+        BUILD["build: extract · hygiene ·&lt;br/&gt;canon · instance"]
+    end
+    subgraph L["jazyková vrstva — jellyai/lang/"]
+        LEX["lexer.py (hypotézy tříd)"]
+        MAT["matcher.py (regulární vzory)"]
+        CS["cs.json (všechna česká data)"]
+    end
+    UFAL["ÚFAL služby :8081–8083&lt;br/&gt;MorphoDiTa · NameTag · UDPipe&lt;br/&gt;(jen offline anotace + nominativizace)"]
+    REST --> IRIS
+    WEB --> REST
+    IRIS --> DECK
+    IRIS --> QG
+    IRIS --> SUB
+    IRIS --> GA
+    GA --> QUERY
+    QUERY --> LEX
+    QUERY --> MAT
+    GA --> FG
+    GA --> ACT
+    BUILD --> FG
+    UFAL -. "offline build" .-> BUILD
+    LEX --> CS
+    MAT --> CS
+    DECK --> CS
+</pre>
+
+<h2>2.2 Hlavní komponenty</h2>
+
+<h3>Iris — dirigent dialogu</h3>
+<p><code>IrisAutomaton.turn()</code> (<a class="src" href="../../jellyai/iris/automaton.py">jellyai/iris/automaton.py:158</a>)
+je jediné místo, kudy prochází každý tah konverzace. Automat sám nerozhoduje — hlásí
+<em>události</em> („odpověď na hádané volbě“, „přetékající výčet“, „nízké zaostření“) a nechává
+rozhodovat karty. Drží stav dialogu mezi tahy (<code>FocusState</code>,
+<a class="src" href="../../jellyai/iris/state.py">jellyai/iris/state.py</a>) a kompilát
+otázkového grafu.</p>
+
+<h3>Karty — chování jako data</h3>
+<p>Adresář <a class="src" href="../../jellyai/iris/patterns/cs/">jellyai/iris/patterns/cs/</a>
+obsahuje ~48 JSON souborů; každý je jedna karta (nebo rodina karet). Karta má
+<code>trigger</code> (kdy sedím), <code>dialog</code> (co říkám), <code>action</code> (co dělám)
+a <code>teach</code> (výklad pro člověka). Kartami jsou dialogové akty, klasifikace výroků
+<em>i gramatika otázek</em>. Jeden <code>PatternDeck</code> je čte a vybírá z nich
+(<a class="src" href="../../jellyai/iris/patterns.py">jellyai/iris/patterns.py</a>).</p>
+
+<h3>Answerer — otázka jako neúplný fakt</h3>
+<p><code>GraphAnswerer</code> (<a class="src" href="../../jellyai/answerer/graph_answerer.py">jellyai/answerer/graph_answerer.py</a>)
+provádí univerzální princip odpovídání: <em>otázka = neúplný fakt s dírou</em>. Rozbor otázky
+(<a class="src" href="../../jellyai/answerer/query.py">jellyai/answerer/query.py</a>) vyrobí
+<code>Pattern</code> — predikát + známí účastníci + díra — a answerer hledá fakt, který známé
+role pokrývá, a vrací účastníka v roli díry.</p>
+
+<h3>Faktový graf a aktivace</h3>
+<p><code>FactGraph</code> (<a class="src" href="../../jellyai/graph/graph.py">jellyai/graph/graph.py:89</a>)
+drží entity a reifikované fakty; <code>ActivationField</code>
+(<a class="src" href="../../jellyai/graph/activation.py">jellyai/graph/activation.py</a>) nad ním
+drží „jas“ — konverzační těžiště. Korpusová i uživatelská fakta žijí v jednom grafu.</p>
+
+<h3>Otázkový graf</h3>
+<p><a class="src" href="../../jellyai/iris/qgraph.py">jellyai/iris/qgraph.py</a> — deterministický
+kompilát karet + schématu predikátů: uzly = typy otázek, workeři a zpřesňovací akty; hrany =
+legitimní pokračování dialogu. Neexistuje jako druhá pravda — přegenerovává se ze zdrojů.</p>
+
+<h3>Subsystémy — doménoví experti</h3>
+<p><a class="src" href="../../jellyai/iris/subsystems/">jellyai/iris/subsystems/</a>: Chronos (čas),
+Metron (počty), Mnemos (paměť uživatele), Topos (prostor). Sdílejí čtyřdílný půdorys
+(poznání / kanonizace / aktivace / záznamy) a s uživatelem nikdy nemluví přímo — mluví Iris.</p>
+
+<h2>2.3 Mapa kódu</h2>
+<table>
+<tr><th>Soubor</th><th>Role</th></tr>
+<tr><td><a class="src" href="../../jellyai/iris/automaton.py">jellyai/iris/automaton.py</a></td><td>jádro Iris: <code>turn()</code> — připomínky → přímí experti → volby → konstatování → odpověď → karty</td></tr>
+<tr><td><a class="src" href="../../jellyai/iris/patterns.py">jellyai/iris/patterns.py</a> + <span class="src">patterns/cs/*.json</span></td><td>balíček karet; <code>deck.best</code> = benefit-výběr; rozvinutí rodinných karet</td></tr>
+<tr><td><a class="src" href="../../jellyai/iris/qgraph.py">jellyai/iris/qgraph.py</a></td><td>otázkový graf: kompilace, osvětlení, dekorace, pozice v grafu</td></tr>
+<tr><td><a class="src" href="../../jellyai/iris/claims.py">jellyai/iris/claims.py</a></td><td>registr nároků přímých expertů (data-driven dispatch)</td></tr>
+<tr><td><a class="src" href="../../jellyai/iris/subsystems/">jellyai/iris/subsystems/*.py</a></td><td>Chronos, Metron, Mnemos, Topos</td></tr>
+<tr><td><a class="src" href="../../jellyai/lang/lexer.py">jellyai/lang/lexer.py</a></td><td>jeden určovač druhů slov — token s <em>množinou hypotéz</em></td></tr>
+<tr><td><a class="src" href="../../jellyai/lang/matcher.py">jellyai/lang/matcher.py</a></td><td>vykonavatel vzorů: regulární sekvence tříd, spany, zkratky %{…}</td></tr>
+<tr><td><a class="src" href="../../jellyai/lang/cs.json">jellyai/lang/cs.json</a></td><td>VŠECHNA česká jazyková data (45+ tabulek)</td></tr>
+<tr><td><a class="src" href="../../jellyai/answerer/query.py">jellyai/answerer/query.py</a></td><td>rozbor otázky: vzorové karty (přednost) → poziční šablony (fallback)</td></tr>
+<tr><td><a class="src" href="../../jellyai/answerer/graph_answerer.py">jellyai/answerer/graph_answerer.py</a></td><td>match nad grafem, rozřešení témat, ranking, aktivační pole</td></tr>
+<tr><td><a class="src" href="../../jellyai/graph/graph.py">jellyai/graph/graph.py</a></td><td>FactGraph: uzly, fakty, indexy, <code>predicate_roles</code></td></tr>
+<tr><td><a class="src" href="../../jellyai/graph/extract.py">jellyai/graph/extract.py</a></td><td>extrakce faktů z anotací (spony, apozice, aliasy „řečený“)</td></tr>
+<tr><td><a class="src" href="../../jellyai/graph/hygiene.py">jellyai/graph/hygiene.py</a></td><td>korpusová hlasování (upos/pád/životnost/lemma) + scruby + nominativizace</td></tr>
+<tr><td><a class="src" href="../../jellyai/tasks.py">jellyai/tasks.py</a></td><td>build pipeline: annotate → build → hygiena → kanonizace → instance</td></tr>
+<tr><td><a class="src" href="../../services/iris_service.py">services/iris_service.py</a></td><td>REST :8084 — jediný vstup dialogu</td></tr>
+<tr><td><a class="src" href="../../benchmark/">benchmark/run_*.py + *.jsonl</a></td><td>pět benchmarků + shadow harness otázkového grafu</td></tr>
+</table>
+
+<h2>2.4 Proč zrovna takhle — tři návrhové tahy</h2>
+
+<h3>Tenké mechanismy, tlustá data</h3>
+<p>Porovnejte velikosti: matcher vzorů má 128 řádků, lexer 134 — ale <code>cs.json</code> nese
+45+ tabulek a karty ~48 souborů. To je záměr (zákon 1, kapitola <a href="16-principy.html">16</a>):
+kód, který se často mění, je nejrizikovější kód — proto se časté změny (nový tázací tvar, nové
+slovo) odehrávají v datech, kde je změna lokální, čitelná a měřitelná.</p>
+
+<h3>Experti srostlí s grafem × kanálové adaptéry nezávislé</h3>
+<p>Subsystémy (Chronos…) jsou záměrně <em>srostlé</em> s grafem — nejsou to knihovny; jejich smysl
+je právě v tom, že rozsvěcují uzly a filtrují fakty. Naopak <em>kanály</em> (konzole, web okno,
+alarm, e-mail) jsou nezávislé adaptéry, které jen nosí zprávy — budoucí audio (STT/TTS) přibude
+jako kanál, ne jako subsystém.</p>
+
+<h3>Jedna dotazová cesta (řez #14)</h3>
+<p>Historicky existoval UDPipe fallback pro rozbor otázek. Byl vědomě odříznut (2026-07-19):
+dotazová cesta je dnes <strong>UDPipe-free</strong> — rozbor dělají výhradně šablony (vzorové
+karty + pseudo-QL). ÚFAL služby zůstávají jen pro offline anotaci korpusu a nominativizaci při
+zápisu. Zjednodušení má cenu: každý tvar otázky musí být enumerován kartou či šablonou — a přesně
+to benchmarky hlídají.</p>
+
+<h2>2.5 Procesy za běhu</h2>
+<table>
+<tr><th>Proces</th><th>Port</th><th>Role</th></tr>
+<tr><td>REST Iris</td><td>8084</td><td>vlastní automat, graf i aktivace; jediný vstup dialogu</td></tr>
+<tr><td>web (viewBase)</td><td>8080</td><td>pasivní 3D displej grafu: dialogové okno, ⚡ aktivace, 📄 dokumenty, ⏰ připomínky</td></tr>
+<tr><td>ÚFAL služby</td><td>8081–8083</td><td>lazy subprocesy (NameTag, UDPipe, MorphoDiTa); health-first sdílení</td></tr>
+</table>
+<p>Proč oddělené procesy: knihovny <code>ufal.*</code> se v jednom procesu perou o sdílený SWIG
+typ — každá proto běží samostatně s malým HTTP API
+(<a class="src" href="../../jellyai/ufal_client.py">jellyai/ufal_client.py:1</a>). Oddělení Iris
+od webu zase umožňuje vývojovou smyčku: po změně jádra se restartuje jen :8084 a GUI přežije
+(kapitola <a href="15-workflow.html">15</a>).</p>
+
+<nav class="pagenav"><a href="01-uvod.html">← Úvod</a><a href="index.html">⌂ Obsah</a><span class="spacer"></span><a href="03-tok-dat.html">Tok dat →</a></nav>
+</main>
+<footer class="site">Architektura JellyAI · kapitola 2 · stav ke commitu a63e83f</footer>
+<script>
+(function () {
+  var s = document.createElement("script");
+  s.src = "mermaid.min.js";
+  s.onload = function () {
+    mermaid.initialize({ startOnLoad: false, theme: "neutral" });
+    mermaid.run({ querySelector: "pre.mermaid" });
+  };
+  document.body.appendChild(s);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>6 · Faktový graf — Architektura JellyAI</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="site">
+  <a class="home" href="index.html">JellyAI — architektura</a>
+  <span class="crumb">kapitola 6 z 17</span>
+</header>
+<main>
+<nav class="pagenav"><a href="05-datovy-model.html">← Datový model</a><a href="index.html">⌂ Obsah</a><span class="spacer"></span><a href="07-otazkovy-graf.html">Otázkový graf →</a></nav>
+<details class="toc"><summary>Kapitoly</summary><ol>
+<li><a href="01-uvod.html">Úvod do JellyAI</a></li><li><a href="02-architektura.html">Celková architektura</a></li><li><a href="03-tok-dat.html">Tok dat systémem</a></li><li><a href="04-lingvistika.html">Lingvistické předzpracování</a></li><li><a href="05-datovy-model.html">Interní datový model</a></li><li><a href="06-faktovy-graf.html">Faktový graf</a></li><li><a href="07-otazkovy-graf.html">Otázkový graf</a></li><li><a href="08-dispatch-claims.html">Dispatch a claimy</a></li><li><a href="09-workers.html">Workers</a></li><li><a href="10-schemata-role.html">Predikátová schémata</a></li><li><a href="11-dialog-cyklus.html">Dialog jako cyklus</a></li><li><a href="12-clarifikace.html">Clarifikace</a></li><li><a href="13-proaktivni-nabidky.html">Proaktivní nabídky</a></li><li><a href="14-karty.html">Architektura karet</a></li><li><a href="15-workflow.html">Workflow systému</a></li><li><a href="16-principy.html">Principy</a></li><li><a href="17-rozsirovani.html">Rozšiřování systému</a></li>
+</ol></details>
+
+<h1>6 · Faktový graf</h1>
+<p class="lead">Trvalá znalost systému: reifikované fakty, entity, role-hrany a aktivační pole
+nad nimi. Uzly, hrany, ukládání, vyhledávání, životní cyklus — a vazba na otázkový graf.</p>
+
+<h2>6.1 Reifikace: fakt je uzel</h2>
+<p>Intuice: v běžném grafu znalostí by „Marcela bydlí v Petrovicích“ byla <em>hrana</em> mezi
+dvěma uzly. To ale nestačí, jakmile má děj víc než dva účastníky (kdo, kde, kdy, před kým) —
+proto JellyAI dělá <strong>reifikaci</strong>: fakt sám je <em>uzel</em> (<code>FactNode</code>)
+a hrany z něj vedou k účastníkům, každá označená <em>rolí</em>.</p>
+
+<pre class="mermaid">
+flowchart TB
+    F(["fakt: bydlet · váha 1&lt;br/&gt;(uzel FactNode)"])
+    F -- "obj" --> M["Marcela ⟨concept⟩"]
+    F -- "loc" --> P["Petrovice ⟨geo⟩"]
+    F -- "theme" --> U["uživatel ⟨person⟩&lt;br/&gt;(pozorovatel)"]
+    F -- "time" --> T["19. 7. 2026 19:53 ⟨time⟩"]
+</pre>
+
+<p>Formálně: <code>FactNode.id = (predicate, participants)</code> — identita faktu je jeho obsah.
+Tentýž fakt vyslovený podruhé nevytvoří duplikát, jen zvýší váhu
+(<a class="src" href="../../jellyai/graph/graph.py">jellyai/graph/graph.py:101</a>):</p>
+<pre><code># jellyai/graph/graph.py:101–120
+def add_fact(self, fact, source=None):
+    key = (fact.predicate, fact.participants)
+    node = self.facts.get(key)
+    if node is None:
+        node = FactNode(key, fact.predicate, 0, fact.participants)
+        self.facts[key] = node
+        for p in fact.participants:
+            self._by_node.setdefault(p.node, []).append((key, p.role))
+    node.weight += 1
+    if source is not None:
+        node.source.add(source)
+    for p in fact.participants:
+        self._touch(p.node, p.type)</code></pre>
+
+<h2>6.2 Uzly a hrany</h2>
+<table>
+<tr><th>Prvek</th><th>Co to je</th><th>Struktura</th></tr>
+<tr><td>entitní/hodnotový uzel</td><td>osoba, místo, čas, číslo, pojem, instituce</td><td><code>Node(id, type, weight)</code></td></tr>
+<tr><td>faktový uzel</td><td>reifikovaný děj/stav</td><td><code>FactNode(id, predicate, weight, participants, source)</code></td></tr>
+<tr><td>role-hrana</td><td>účast uzlu na faktu</td><td><code>Participant(role, node, type)</code>; role ∈ {subj, obj, loc, time, num, pred, attr, theme}</td></tr>
+<tr><td>aliasy</td><td>sloučené povrchové tvary uzlu</td><td><code>graph.aliases[id]</code> (plní resolver)</td></tr>
+<tr><td>jmenné rodiny</td><td>kmen jména → osobní uzly</td><td><code>graph.name_families</code> (instanční vrstva)</td></tr>
+</table>
+
+<p>Role <code>theme</code> má dvojí čtení, které je potřeba znát: u <em>dějů zapsaných z dialogu</em>
+je to <strong>pozorovatel</strong> (uživatel, který výrok pronesl — metadata výpovědi); u
+<em>řečových faktů</em> je to <strong>adresát</strong> („řekl učedníkům“). Obojí spojuje zásada:
+theme není běžná odpověď — „Kdo bydlí v Petrovicích?“ nesmí vrátit „uživatel“, i kdyby byl uzel
+sebežhavější (guard v <a class="src" href="../../jellyai/answerer/graph_answerer.py">graph_answerer.py:583–587</a>).</p>
+
+<h2>6.3 Vyhledávání: indexy a match</h2>
+<p>Graf drží obrácený index <code>_by_node</code> (uzel → fakty a role, kde vystupuje) —
+<code>facts_of(node, role=None, predicate=None)</code>
+(<a class="src" href="../../jellyai/graph/graph.py">graph.py:142</a>) je základní přístupová
+cesta. Nad ní stojí odpovědní match (<code>_match</code>,
+<a class="src" href="../../jellyai/answerer/graph_answerer.py">graph_answerer.py:554</a>):
+najdi fakty daného predikátu (včetně synonymního kruhu — bydlet≈žít≈sídlit, tabulka
+<code>predicate_synonyms</code>), které obsahují všechny známé účastníky, a vrať účastníky v roli
+díry, seřazené skóre <em>váha faktu + shoda role/typu díry + jas aktivace</em>. Kapitola
+<a href="10-schemata-role.html">10</a> rozebírá roli díry, kapitola
+<a href="12-clarifikace.html">12</a> co se děje, když match mlčí.</p>
+
+<h2>6.4 Životní cyklus faktů</h2>
+<pre class="mermaid">
+flowchart LR
+    subgraph Z["zrození"]
+        K["korpus (build)&lt;br/&gt;extrakce z anotací"] --> G["graf"]
+        D["dialog (Mnemos)&lt;br/&gt;výrok uživatele"] --> G
+    end
+    subgraph ZI["život"]
+        G --> W["váha roste opakováním"]
+        G --> A["aktivace: jas přichází a pohasíná"]
+        G --> Q["odpovídá na otázky&lt;br/&gt;(match → díra)"]
+    end
+    subgraph S["smrt"]
+        G --> F1["zapomeň fakt"]
+        G --> F2["zapomeň entitu&lt;br/&gt;(„zapomeň na Ronika“)"]
+        G --> F3["zapomeň období&lt;br/&gt;(„…co jsem řekl včera“)"]
+    end
+</pre>
+
+<ol>
+<li><strong>Zrození z korpusu:</strong> extrakce (<a class="src" href="../../jellyai/graph/extract.py">jellyai/graph/extract.py</a>)
+čte anotované věty a vyrábí fakty ze slovesných událostí, spon, apozic, koordinací; pro-drop
+řeší aktivační pole „aktuálního subjektu“; aliasy vznikají jen z textového tvrzení
+(„X řečený Y“).</li>
+<li><strong>Hygiena a kanonizace (build):</strong> korpusová hlasování vyřazují mis-tagované
+účastníky a fakty; kanonizace slévá pádové tvary (aliasy), nominativizace přejmenovává id
+(Betlémě→Betlém); instanční vrstva srůstá jmenné střepy — ale <em>jen z textového tvrzení</em>:
+měřením je doloženo, že kontextový otisk identitu nerozliší (Ježíš–Nazaretský 0.31 ≈
+Jan–Křtitel 0.28, a to první je táž osoba, druzí dva různí lidé).</li>
+<li><strong>Zrození z dialogu:</strong> Mnemos ukládá výrok do grafu i do append-only deníku
+<code>data/memory.jsonl</code>; po restartu se deník přehraje — paměť přežívá proces.</li>
+<li><strong>Zapomínání</strong> je trojí — fakt, celá entita (kmenová shoda přes pády), období —
+a maže konzistentně graf i deník (<code>_forget_command</code>,
+<a class="src" href="../../jellyai/iris/automaton.py">automaton.py:598</a>).</li>
+</ol>
+
+<h3>Provenience a negace</h3>
+<p>Korpusová a uživatelská fakta žijí v <strong>jednom grafu</strong> — liší se proveniencí
+(uživatelská nesou timestamp dialogu a theme=uživatel). Na provenienci stojí i polarita:
+negovaný predikát (<code>neprší</code>) je <em>evidence opaku</em> a při existenční otázce
+vyhrává <strong>nejnovější</strong> evidence — datovaná paměť přebije nedatovaný korpus:</p>
+<div class="dialog-sample">
+<p><span class="u">✍️ Už neprší.</span></p>
+<p><span class="s">💬 Zapamatováno.</span></p>
+<p><span class="u">❓ Prší?</span></p>
+<p><span class="s">💬 Ne, od 19. července 2026 neprší.</span> <em>(šablona <code>negative_existence_answer</code> z cs.json)</em></p>
+</div>
+
+<h2>6.5 Aktivační pole: pozornost systému</h2>
+<p>Nad grafem leží <code>ActivationField</code> — jas uzlů, obdoba klasické spreading activation.
+Je to <strong>jediné médium, kterým smí cokoli ovlivnit pořadí odpovědí</strong>: rozřešení jmen
+otázky rozsvítí kandidáty, časový interval rozsvítí časové uzly, volba z nabídky zahřeje vybraného
+kandidáta, zapsaný výrok své účastníky. Ranking odpovědi je pak váha faktu + role/typ díry + jas —
+a remízy aktivace <em>řadí, nikdy nerozbíjí</em> (výčty zůstávají stabilní napříč konverzací;
+<a class="src" href="../../jellyai/answerer/graph_answerer.py">graph_answerer.py:648–656</a>).</p>
+
+<p>Vedle měkkého světla existují <strong>tvrdé filtry</strong> (brány Q subsystémů): časový
+interval otázky („v 19. století“) fakty mimo interval vyřadí, místní oblast („v Čechách“) pustí
+jen fakty uvnitř kontejnmentu. Světlo řadí, filtr vyřazuje — to je dělba, kterou model otázkového
+grafu později pojmenuje jako <em>dekorace</em> (kapitola <a href="07-otazkovy-graf.html">7.4</a>).</p>
+
+<h2>6.6 Build: hygiena korpusových hlasování</h2>
+<p>Kvalitu korpusové části hlídá při buildu série hlasování
+(<a class="src" href="../../jellyai/graph/hygiene.py">jellyai/graph/hygiene.py</a>): tagger
+v jedné větě lže, ale přes celý korpus se pravda prohlasuje — <code>form_case_votes</code>
+(pádová shoda jmen rozbíjí NER slepence typu „Ježíš Martu“, 827 výskytů!),
+<code>lemma_upos_votes</code> (mis-tag VERB/NOUN), <code>noun_animacy_votes</code> (osoba pod
+neživotným druhem), <code>propn_lemma_votes</code> (nominativizace id). Pořadí kroků ukazuje
+kapitola <a href="03-tok-dat.html">3.1</a>.</p>
+
+<div class="warn">
+<p><strong>Past 1 (draze zaplacená):</strong> dvě chyby modelů se kryjí — NER slepí jména
+a UDPipe současně rozbije syntax, která by NER vyvrátila. Jediná obrana je korpusové hlasování;
+lokálnímu tagu se nevěří (zákon 5).</p>
+</div>
+
+<h2>6.7 Vazba na otázkový graf</h2>
+<p>Faktový graf není jen zdroj odpovědí — je i <strong>zdrojem sémantiky otázek</strong>. Tři vazby:</p>
+<ol>
+<li><strong>Schéma predikátů:</strong> <code>predicate_roles(predicate)</code>
+(<a class="src" href="../../jellyai/graph/graph.py">graph.py:130</a>) čte živě z faktů, jaké role
+predikát nese. Podpis <code>napsat{subj, obj, …}</code> implikuje smysluplné otázky „Kdo napsal X?“,
+„Co napsal Y?“ — <em>otázky jsou stín schématu faktů</em> (kapitola <a href="10-schemata-role.html">10</a>).</li>
+<li><strong>Orákulum entit:</strong> vzorový prvek <code>uzel+</code> se ptá grafu, jestli je
+rozpětí tokenů entita (<code>_span_is_node</code>,
+<a class="src" href="../../jellyai/answerer/graph_answerer.py">graph_answerer.py:153</a>) — bez
+grafu by dotazová vrstva nepoznala „Válku s mloky“ od dvou slov.</li>
+<li><strong>Aktivace:</strong> jas faktového grafu (konverzační těžiště) vybírá téma elidovaných
+otázek („Kdy se narodil?“) a řadí remízy.</li>
+</ol>
+
+<h2>6.8 Srovnávací tabulka obou grafů</h2>
+<table>
+<tr><th></th><th>Faktový graf</th><th>Otázkový graf</th></tr>
+<tr><td>Uzel</td><td>fakt / entita („bydlí(Marcela, Petrovice)“)</td><td>typ otázky („kdo-udělal-co“), worker, zpřesnění</td></tr>
+<tr><td>Hrana</td><td>role účastníka (subj, obj, loc, time…)</td><td>digging: <code>zpresneni</code>, <code>navrat</code></td></tr>
+<tr><td>Životnost</td><td>trvalý, roste zápisem</td><td>trvalý, ale <strong>kompilát</strong> — přegeneruje se ze zdrojů</td></tr>
+<tr><td>Kdo ho píše</td><td>korpus + uživatel (paměť)</td><td>karty + schéma predikátů + telemetrie</td></tr>
+<tr><td>Průchod znamená</td><td>odpověď (match → díra)</td><td>směrování tahu a vedení dialogu</td></tr>
+<tr><td>Když je prázdný</td><td>„nenašel jsem“</td><td>tah propadne pozičním šablonám</td></tr>
+<tr><td>Hlavní metody</td><td><code>add_fact</code>, <code>facts_of</code>, <code>_match</code>, <code>_identity_vote</code>, <code>ActivationField.warm/step</code></td><td><code>compile_qgraph</code>, <code>illuminate</code>, <code>decorate</code>, <code>DialogPosition</code></td></tr>
+</table>
+
+<nav class="pagenav"><a href="05-datovy-model.html">← Datový model</a><a href="index.html">⌂ Obsah</a><span class="spacer"></span><a href="07-otazkovy-graf.html">Otázkový graf →</a></nav>
+</main>
+<footer class="site">Architektura JellyAI · kapitola 6 · stav ke commitu a63e83f</footer>
+<script>
+(function () {
+  var s = document.createElement("script");
+  s.src = "mermaid.min.js";
+  s.onload = function () {
+    mermaid.initialize({ startOnLoad: false, theme: "neutral" });
+    mermaid.run({ querySelector: "pre.mermaid" });
+  };
+  document.body.appendChild(s);
+})();
+</script>
+</body>
+</html>

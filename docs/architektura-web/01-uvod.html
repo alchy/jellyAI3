@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>1 · Úvod do JellyAI — Architektura JellyAI</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="site">
+  <a class="home" href="index.html">JellyAI — architektura</a>
+  <span class="crumb">kapitola 1 z 17</span>
+</header>
+<main>
+<nav class="pagenav"><a href="index.html">⌂ Obsah</a><span class="spacer"></span><a href="02-architektura.html">Celková architektura →</a></nav>
+<details class="toc"><summary>Kapitoly</summary><ol>
+<li><a href="01-uvod.html">Úvod do JellyAI</a></li><li><a href="02-architektura.html">Celková architektura</a></li><li><a href="03-tok-dat.html">Tok dat systémem</a></li><li><a href="04-lingvistika.html">Lingvistické předzpracování</a></li><li><a href="05-datovy-model.html">Interní datový model</a></li><li><a href="06-faktovy-graf.html">Faktový graf</a></li><li><a href="07-otazkovy-graf.html">Otázkový graf</a></li><li><a href="08-dispatch-claims.html">Dispatch a claimy</a></li><li><a href="09-workers.html">Workers</a></li><li><a href="10-schemata-role.html">Predikátová schémata</a></li><li><a href="11-dialog-cyklus.html">Dialog jako cyklus</a></li><li><a href="12-clarifikace.html">Clarifikace</a></li><li><a href="13-proaktivni-nabidky.html">Proaktivní nabídky</a></li><li><a href="14-karty.html">Architektura karet</a></li><li><a href="15-workflow.html">Workflow systému</a></li><li><a href="16-principy.html">Principy</a></li><li><a href="17-rozsirovani.html">Rozšiřování systému</a></li>
+</ol></details>
+
+<h1>1 · Úvod do JellyAI</h1>
+<p class="lead">Co JellyAI je, čemu věří a proč vypadá tak, jak vypadá.</p>
+
+<h2>1.1 Co JellyAI je</h2>
+<p>JellyAI (technicky projekt <code>jellyAI3</code>) je <strong>česky mluvící znalostní systém
+postavený na symbolickém zpracování jazyka</strong>. Z textů (kurátorský korpus) a z dialogu
+s uživatelem staví <strong>reifikovaný faktový graf</strong> — a nad ním odpovídá na otázky,
+pamatuje si, co mu uživatel řekl, plánuje připomínky a učí se nové predikáty za běhu.</p>
+
+<p>Uvnitř není žádná neuronová síť, která by rozhodovala. Statistické jazykové modely
+<strong>ÚFAL MFF UK</strong> (MorphoDiTa, NameTag, UDPipe) slouží výhradně jako <em>anotační
+nástroje na okraji</em>: jednorázově anotují korpus při offline buildu a pomáhají s převodem
+skloněných jmen do nominativu při zápisu paměti. Rozhodování uvnitř systému — kudy poslat otázku,
+jak jí rozumět, co odpovědět — je čitelné, deterministické a měřené. (Pozor na častou záměnu:
+nejde o „nástroje Českého národního korpusu“ — MorphoDiTa, NameTag i UDPipe jsou nástroje
+Ústavu formální a aplikované lingvistiky MFF UK.)</p>
+
+<p>Praktická podoba: REST služba s dialogovým automatem (<a class="src" href="../../services/iris_service.py">services/iris_service.py</a>,
+port 8084), 3D webový prohlížeč grafu (port 8080) a sada příkazů <code>./jelly</code> pro build
+korpusu a měření. Ukázka skutečného dialogu (z benchmarků a provozu):</p>
+
+<div class="dialog-sample">
+<p><span class="u">❓ Kdo napsal R.U.R.?</span></p>
+<p><span class="s">💬 Karel Antonín Čapek</span></p>
+<p><span class="u">❓ Kdy se narodil?</span> <em>(bez podmětu — doplní ho konverzační těžiště)</em></p>
+<p><span class="s">💬 2. října 1842</span></p>
+<p><span class="u">❓ Kde napsal R.U.R.?</span></p>
+<p><span class="s">💬 O ději „napsat“ vím co, kdo; kde nevím.</span> <em>(schéma predikátu roli „kde“ nezná — systém to vysvětlí, nehádá)</em></p>
+</div>
+
+<h2>1.2 Tři přesvědčení</h2>
+<p>Celou stavbu drží pohromadě tři zásady. Vracejí se v každé kapitole; tady jsou poprvé
+a neformálně:</p>
+
+<div class="law">
+<p><strong>1. Rozhodnutí patří do dat, mechanismus do kódu.</strong> Chování systému — od dialogových
+aktů po gramatiku otázek — nesou JSON <em>karty</em> (<a class="src" href="../../jellyai/iris/patterns/cs/">jellyai/iris/patterns/cs/*.json</a>)
+a jazykové tabulky (<a class="src" href="../../jellyai/lang/cs.json">jellyai/lang/cs.json</a>).
+Kód umí jen mechanismy: klasifikovat slova, matchovat vzory, procházet graf, sčítat aktivaci.
+Nový vzor chování znamená novou kartu, ne nový <code>if</code>.</p>
+</div>
+
+<div class="law">
+<p><strong>2. Dialog je víc než figly.</strong> Když si systém není jistý, zeptá se; když neví,
+řekne to. Poctivé „nenašel jsem“ je architektonická hodnota, ne selhání. Systém nikdy nehádá —
+raději vede krátký doostřovací dialog („Mám tu Karla i Josefa Čapka — kterého myslíte?“).</p>
+</div>
+
+<div class="law">
+<p><strong>3. Každá změna se měří.</strong> Pět benchmarků (etalon odpovědí, focus aktivace,
+dialogové scénáře, zápisový etalon paměti, coverage) tvoří bránu každého commitu. Známé nedostatky
+nežijí v hlavách, ale v „gap“ řádcích benchmarků — upozorní na sebe, jakmile je někdo opraví,
+nebo znovu rozbije.</p>
+</div>
+
+<h2>1.3 Dva grafy — hlavní mentální model</h2>
+<p>Nejdůležitější představa, kterou si z úvodu odneste: v systému žijí <strong>dva trvalé
+grafy</strong>, které sdílejí tvar, ale nesou různé věci.</p>
+
+<table>
+<tr><th></th><th>Faktový graf</th><th>Otázkový graf</th></tr>
+<tr><td>Jednou větou</td><td>ví, <strong>CO</strong> systém zná</td><td>ví, <strong>JAK</strong> se lze ptát a <strong>KAM</strong> otázku poslat</td></tr>
+<tr><td>Vzniká z</td><td>korpusu + dialogu (paměť)</td><td>kompilací karet + schématu predikátů</td></tr>
+<tr><td>Kapitola</td><td><a href="06-faktovy-graf.html">6</a></td><td><a href="07-otazkovy-graf.html">7</a></td></tr>
+</table>
+
+<p>K nim se v každém tahu dialogu přidává třetí, <em>efemérní</em> graf — <strong>větný</strong>
+(tokeny věty + hypotézy jejich druhů + nároky expertů), který otázkový graf „osvětlí“ a tím
+vybere cestu tahu. Podrobně v kapitolách <a href="03-tok-dat.html">3</a> a <a href="07-otazkovy-graf.html">7</a>.</p>
+
+<pre class="mermaid">
+flowchart LR
+    U["vstup uživatele"] --> V["větný graf&lt;br/&gt;(efemérní, 1 tah)"]
+    V -- "osvětlení" --> Q["otázkový graf&lt;br/&gt;(trvalý kompilát)"]
+    Q -- "směrování + dekorace" --> F["faktový graf&lt;br/&gt;(trvalá znalost)"]
+    F -- "odpověď / díra / přetečení" --> D["dialog"]
+    D -- "další tah" --> U
+</pre>
+
+<h2>1.4 Proč symbolicky (a ne LLM)?</h2>
+<p>Volba symbolické cesty není nostalgie — je to důsledek požadavků: <em>auditovatelnost</em>
+(každá odpověď má stopu: téma → fakt → hodnota), <em>determinismus</em> (tentýž vstup = tatáž
+odpověď; benchmarky na tom stojí), <em>vysvětlitelnost pro člověka</em> (každá karta nese pole
+<code>teach</code> — výklad svého chování) a <em>poctivost</em> (systém odpovídá jen z toho, co má
+v grafu; neumí halucinovat). Cena je známá a přiznaná: pokrytí jazyka roste enumerací vzorů, ne
+škálováním modelu — proto je celý projekt postavený na tom, aby přidání vzoru bylo levné (karta,
+ne kód) a měřené (benchmark, ne dojem).</p>
+
+<h2>1.5 Stav projektu v číslech</h2>
+<table>
+<tr><th>Měření</th><th>Stav</th><th>Co hlídá</th></tr>
+<tr><td>pytest</td><td>573 testů</td><td>jednotkové kontrakty všech vrstev</td></tr>
+<tr><td>etalon (<span class="src">benchmark/run_etalon.py</span>)</td><td>31/31</td><td>odpovědi na korpusem kryté otázky</td></tr>
+<tr><td>focus (<span class="src">benchmark/run_focus.py</span>)</td><td>12/12</td><td>aktivace správných uzlů (top-K jasu)</td></tr>
+<tr><td>dialog (<span class="src">benchmark/run_dialog.py</span>)</td><td>45/45 (GAP 5/0)</td><td>scénáře automatu s fixními hodinami</td></tr>
+<tr><td>zápis (<span class="src">benchmark/run_mnemos.py</span>)</td><td>34/34</td><td>parsování výroků do paměti</td></tr>
+<tr><td>qgraph shadow (<span class="src">benchmark/run_qgraph.py</span>)</td><td>dialog 11/11 · etalon 42/42 · stav 3/3 · dekorace 42/42</td><td>parita otázkového grafu s reálným chováním</td></tr>
+</table>
+
+<p>Čísla nejsou dekorace: jsou to <em>normativy</em>. Když číslo klesne, je to nález, který se
+vyšetřuje — nikdy neobchází. Podrobně v kapitole <a href="15-workflow.html">15</a>.</p>
+
+<h2>1.6 Slovníček prvních pojmů</h2>
+<table>
+<tr><th>Pojem</th><th>Intuitivně</th><th>Formálně (kapitola)</th></tr>
+<tr><td><strong>karta</strong></td><td>JSON soubor s jedním vzorem chování (kdy sedím, co říkám, co dělám, jak se vysvětluji)</td><td><a href="14-karty.html">14</a></td></tr>
+<tr><td><strong>fakt</strong></td><td>„bydlí(Marcela, Petrovice)“ — děj s účastníky v rolích, uložený jako uzel grafu</td><td><a href="06-faktovy-graf.html">6</a></td></tr>
+<tr><td><strong>díra</strong></td><td>role otázky, na kterou se ptáme („Kdo…?“ = díra subj)</td><td><a href="10-schemata-role.html">10</a></td></tr>
+<tr><td><strong>aktivace</strong></td><td>„jas“ uzlů — pozornost systému; jediné médium, kterým smí cokoli ovlivnit pořadí odpovědí</td><td><a href="06-faktovy-graf.html">6.5</a></td></tr>
+<tr><td><strong>worker / expert</strong></td><td>doménový subsystém (čas, počty, paměť, prostor), který si umí nárokovat tah</td><td><a href="09-workers.html">9</a></td></tr>
+<tr><td><strong>Iris</strong></td><td>dirigent dialogu — stavový automat, který mluví s uživatelem</td><td><a href="11-dialog-cyklus.html">11</a></td></tr>
+<tr><td><strong>osvětlení</strong></td><td>rozsvícení uzlů otázkového grafu větou tahu; nejsilnější uzel tah směruje</td><td><a href="07-otazkovy-graf.html">7</a></td></tr>
+</table>
+
+<nav class="pagenav"><a href="index.html">⌂ Obsah</a><span class="spacer"></span><a href="02-architektura.html">Celková architektura →</a></nav>
+</main>
+<footer class="site">Architektura JellyAI · kapitola 1 · stav ke commitu a63e83f</footer>
+<script>
+(function () {
+  var s = document.createElement("script");
+  s.src = "mermaid.min.js";
+  s.onload = function () {
+    mermaid.initialize({ startOnLoad: false, theme: "neutral" });
+    mermaid.run({ querySelector: "pre.mermaid" });
+  };
+  document.body.appendChild(s);
+})();
+</script>
+</body>
+</html>

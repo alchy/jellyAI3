@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>14 · Architektura karet — Architektura JellyAI</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="site">
+  <a class="home" href="index.html">JellyAI — architektura</a>
+  <span class="crumb">kapitola 14 z 17</span>
+</header>
+<main>
+<nav class="pagenav"><a href="13-proaktivni-nabidky.html">← Proaktivní nabídky</a><a href="index.html">⌂ Obsah</a><span class="spacer"></span><a href="15-workflow.html">Workflow →</a></nav>
+<details class="toc"><summary>Kapitoly</summary><ol>
+<li><a href="01-uvod.html">Úvod do JellyAI</a></li><li><a href="02-architektura.html">Celková architektura</a></li><li><a href="03-tok-dat.html">Tok dat systémem</a></li><li><a href="04-lingvistika.html">Lingvistické předzpracování</a></li><li><a href="05-datovy-model.html">Interní datový model</a></li><li><a href="06-faktovy-graf.html">Faktový graf</a></li><li><a href="07-otazkovy-graf.html">Otázkový graf</a></li><li><a href="08-dispatch-claims.html">Dispatch a claimy</a></li><li><a href="09-workers.html">Workers</a></li><li><a href="10-schemata-role.html">Predikátová schémata</a></li><li><a href="11-dialog-cyklus.html">Dialog jako cyklus</a></li><li><a href="12-clarifikace.html">Clarifikace</a></li><li><a href="13-proaktivni-nabidky.html">Proaktivní nabídky</a></li><li><a href="14-karty.html">Architektura karet</a></li><li><a href="15-workflow.html">Workflow systému</a></li><li><a href="16-principy.html">Principy</a></li><li><a href="17-rozsirovani.html">Rozšiřování systému</a></li>
+</ol></details>
+
+<h1>14 · Architektura karet</h1>
+<p class="lead">Karty jsou jediný zdroj chování systému: deklarativní definice, rodiny
+s dimenzemi, kompilace do otázkového grafu a rozvinutí do konkrétních vzorů.</p>
+
+<h2>14.1 Anatomie karty</h2>
+<p>Karta = jeden JSON soubor v <a class="src" href="../../jellyai/iris/patterns/cs/">jellyai/iris/patterns/cs/</a>
+= jeden vzor chování. Čtyři části:</p>
+<table>
+<tr><th>Klíč</th><th>Význam</th><th>Příklady obsahu</th></tr>
+<tr><td><code>trigger</code></td><td>kdy sedím</td><td><code>event</code> (přesná shoda s událostí automatu), <code>pattern</code> (vzor tříd lexeru), <code>assurance_below</code>, <code>min_candidates</code>, <code>requires</code>/<code>forbids</code> (rysy), <code>priority</code></td></tr>
+<tr><td><code>dialog</code></td><td>co říkám</td><td>šablona věty: „Mohu doplnit: {roles}.“</td></tr>
+<tr><td><code>action</code></td><td>co dělám</td><td><code>warm_candidates</code>, <code>await</code>, <code>query</code> (překlad vzoru na dotaz)</td></tr>
+<tr><td><code>teach</code></td><td>jak se vysvětluji</td><td>výklad vzoru pro člověka (a pro tuto dokumentaci)</td></tr>
+</table>
+<div class="warn">
+<p><strong>Past 3/13:</strong> uvnitř <code>teach</code> řetězců nikdy ASCII uvozovky <code>"</code> —
+vždy „české“. Rozbitá karta = desítky padlých testů.</p>
+</div>
+
+<h2>14.2 Dvě podoby triggeru: rysy × vzor</h2>
+<p><strong>Rysové karty</strong> (starší) žádají rysy tahu: <code>requires</code>/<code>forbids</code>
++ prahy. <strong>Vzorové karty</strong> (#46) nesou <code>pattern</code> — regulární sekvenci tříd
+lexeru; vybírají se matchem sekvence, ne rysy. Obě rodiny sdílejí jednu prioritu decku — e-mailový
+atribut (priorita 12) tak správně přebije kartu krátkých sloves (8) na větě „Karel má email…“.</p>
+
+<p>Vzor smí obsahovat: třídu (<code>otaz</code>), třídu s tvary (<code>otaz:kdo|koho</code>),
+literál (<code>:v|ve|na</code>), <em>vyloučení</em> (<code>l_tvar!spona</code> — „byl“ je
+hypotézově obojí a identitní otázky patří jinému mechanismu), <em>span</em> <code>uzel+</code>
+(1–n tokenů, které graf potvrdí jako entitu; hladově nejdelší, umí ustoupit, nesmí začínat ani
+končit funkčním slovem), <em>zbytek</em> <code>*</code> a volitelnost <code>?</code>. Match je
+<strong>ukotvený na celou větu</strong> — vzor si nemůže „ukrást“ podobnou větu jiného smyslu.
+Vykonavatel: <a class="src" href="../../jellyai/lang/matcher.py">jellyai/lang/matcher.py:75</a>.</p>
+
+<p>Pro čitelnost a DRY se vzory píší <strong>grok-zkratkami</strong> — tabulka
+<code>pattern_aliases</code> v <a class="src" href="../../jellyai/lang/cs.json">cs.json:154</a>
+(<code>%{TAZACI}</code> → <code>otaz</code>, <code>%{SLOVESO_MINULE}</code> →
+<code>l_tvar!spona</code>, <code>%{ENTITA}</code> → <code>uzel+</code>…). Zkratky se rozvíjejí
+rekurzivně (<code>expand_pattern</code>,
+<a class="src" href="../../jellyai/lang/matcher.py">matcher.py:26</a>); neznámé jméno spadne
+nahlas — tichá chyba v gramatice je nepřípustná. Pozor (past 14): víceprvková zkratka se vkládá
+(splice) a posouvá indexy <code>$N</code> v akci.</p>
+
+<h2>14.3 Rodiny karet s dimenzemi</h2>
+<p>Problém, který rodiny řeší: dotazové karty se klonovaly podél skrytých os — q-otaz-minuly /
+-prezens / -minuly-prodrop… a kombinace, kterou nikdo nenapsal („Kde bydlí?“ = prézens-prodrop),
+prostě chyběla. <strong>Rodinná karta</strong> deklaruje kostru + <em>dimenze</em> (enumerativní
+osy) a deck ji při načtení deterministicky rozvine. Skutečná karta:</p>
+
+<pre><code>// jellyai/iris/patterns/cs/q-otaz.json
+{
+  "name": "q-otaz",
+  "trigger": {
+    "event": "utterance.query",
+    "pattern": ["%{TAZACI}", "?%{SE}", "&lt;sloveso&gt;", "&lt;ucastnik&gt;"],
+    "dimensions": [
+      {"slot": "&lt;sloveso&gt;", "values": [
+        {"suffix": "-minuly",  "element": "%{SLOVESO_MINULE}"},
+        {"suffix": "-prezens", "element": "%{SLOVESO}"}]},
+      {"slot": "&lt;ucastnik&gt;", "values": [
+        {"suffix": "",         "element": "%{ENTITA}", "priority": 4},
+        {"suffix": "-prodrop", "element": null,        "priority": 3}]}
+    ]
+  },
+  "action": {"query": {"hole": "$1", "predicate": "$3", "known": ["$4"]}}
+}</code></pre>
+
+<p>Rozvinutí (kartézský součin hodnot os) vyrobí čtyři karty:</p>
+<pre class="mermaid">
+flowchart LR
+    R["rodina q-otaz&lt;br/&gt;kostra: TAZACI ?SE &lt;sloveso&gt; &lt;ucastnik&gt;&lt;br/&gt;dimenze: čas × elipse"]
+    R --> A["q-otaz-minuly&lt;br/&gt;„Kdo napsal R.U.R.?“"]
+    R --> B["q-otaz-prezens&lt;br/&gt;„Kde bydlí Marcela?“"]
+    R --> C["q-otaz-minuly-prodrop&lt;br/&gt;„Kdy se narodil?“"]
+    R --> D["q-otaz-prezens-prodrop&lt;br/&gt;„Kde bydlí?“ ← kombinace,&lt;br/&gt;kterou nikdo ručně nenapsal"]
+</pre>
+
+<p>Mechanismus rozvinutí: <code>_expand_family</code>
+(<a class="src" href="../../jellyai/iris/patterns.py">jellyai/iris/patterns.py:23</a>) —
+hodnota osy jen dosadí prvek do slotu kostry, přidá příponu jména a smí přepsat prioritu.
+Prvek <code>null</code> = slot zmizí (pro-drop) — smí být jen posledním prvkem vzoru, aby se
+neposouvaly odkazy <code>$N</code>; odkaz na zmizelý slot se z <code>known</code> vypustí
+a v <code>hole</code>/<code>predicate</code> spadne nahlas:</p>
+<pre><code># jellyai/iris/patterns.py:37–55 (zkráceno)
+for combo in itertools.product(*(d["values"] for d in dimensions)):
+    chosen = {d["slot"]: v for d, v in zip(dimensions, combo)}
+    pattern, dropped = [], None
+    for index, element in enumerate(skeleton, start=1):
+        value = chosen.get(element)
+        if value is None:
+            pattern.append(element)          # obyčejný prvek kostry
+        elif value["element"] is None:
+            if index != len(skeleton):
+                raise ValueError("prázdný slot musí být posledním prvkem")
+            dropped = f"${index}"
+        else:
+            pattern.append(value["element"])</code></pre>
+
+<div class="law">
+<p><strong>Zákaz ATN platí i tady:</strong> dimenze jsou <em>enumerativní osy</em>, žádné
+podmínky — hodnota osy nesmí přepisovat akci ani větvit. Empirický korekční nález E1:
+<code>q-vyberova-prodrop</code> do rodiny nepatří (implicitní spona „být“ je jiná sémantika,
+ne klon) a svinutí „dekoračních karet“ (q-rekl-adresatovi…) se odložilo, protože osa s přepisem
+akce by byla program v datech.</p>
+</div>
+
+<p>Účet E1: dotazových souborů 19 → 16, rozvinutých karet 20, nová kombinace
+<code>q-otaz-prezens-prodrop</code> zavřela gap („Kde bydlí?“ → Petrovice), <code>teach</code>
+se píše jednou per rodina.</p>
+
+<h2>14.4 Výběr karty: deck.best</h2>
+<p>V obou světech (dialogové akty i gramatika) vybírá <strong>týž mechanismus</strong>
+(<a class="src" href="../../jellyai/iris/patterns.py">patterns.py:198</a>): benefit = těsnost
+triggeru (kolik podmínek sedí) → priorita → jméno. Dvě jemnosti:</p>
+<ul>
+<li>Vzorová karta se přes rysovou cestu <em>nikdy</em> nehlásí
+(<a class="src" href="../../jellyai/iris/patterns.py">patterns.py:160–164</a>) — bez vazby na
+match by vyhrála „naprázdno“ (vakuová logika, past 2: vsuvka s prioritou 9 kdysi přebila
+kratke-sloveso 8 a rozbila zápis).</li>
+<li>U dotazových karet dělá ekvivalentní výběr <code>_card_query</code>
+(<a class="src" href="../../jellyai/answerer/query.py">query.py:182</a>) klíčem
+(priorita, délka vzoru) — a týž klíč používá osvětlení otázkového grafu. Jeden klíč, tři místa —
+proto se nesmí rozejít (hlídá parity gate).</li>
+</ul>
+
+<h2>14.5 Kompilace: karta jako zdrojový kód grafu</h2>
+<p>Otázkový graf (kapitola <a href="07-otazkovy-graf.html">7</a>) je zkompilovaná podoba decku:
+dotazové karty → uzly <code>otazka</code>, zpřesňovací karty → uzly <code>clarify</code> + hrany,
+worker karty dodávají texty expertům. Karty se <strong>editují</strong>, graf se
+<strong>přegenerovává</strong> — nikdy naopak. Deck navíc měří kartám telemetrii (použití
+a měřený zisk aktivace) — z ní by šly váhy uzlů, ale měření ukázalo 0 remíz, takže váhy jsou
+zatím jen diagnostika.</p>
+
+<h2>14.6 Od karty k dotazu: překlad akce</h2>
+<p>U dotazové karty se vítězné vazby vzoru přeloží na pseudo-QL <code>Pattern</code>
+(<code>_card_query</code>, <a class="src" href="../../jellyai/answerer/query.py">query.py:182–297</a>):
+díru určí tázací token tabulkou <code>interrogatives</code>; predikát projde touž normalizací
+jako zápis (prefix match proti slovníku grafu — a <em>neznámé sloveso znamená, že se karta
+nehlásí</em>, past 11: překlep „sworil“ musí propadnout záchranné šabloně); známí účastníci
+dostanou role (explicitní pár na kartě má přednost, jinak: díra subj → známý je obj, jinak subj);
+<code>user_subject</code> doplní identitu uživatele; rod slovesného tvaru filtruje pro-drop
+kandidáty.</p>
+
+<h2>14.7 Dekorace vs. karty</h2>
+<p>Dekorace (chronos:interval, topos:oblast, mnemos:prvni-osoba, role:adresat — kapitola
+<a href="07-otazkovy-graf.html">7.4</a>) <em>nejsou</em> karty: jsou to nároky na části věty,
+čtené z jazykových tabulek. Hranice je návrhově důležitá: co soutěží o tah, je karta (uzel);
+co tah omezuje, je dekorace. Trojice karet, které dnes dekorace „zapékají“ jako celé karty
+(q-rekl-adresatovi, q-kdo-sloveso-misto, q-prvni-osoba-minuly), je známý kompromis — svinutí do
+dimenzí by vyžadovalo přepis akce osou, což je zakázané (viz §14.3).</p>
+
+<h2>14.8 Katalog karet (výběr)</h2>
+<table>
+<tr><th>Karta</th><th>Událost</th><th>Role</th></tr>
+<tr><td><code>q-otaz</code> (rodina ×4)</td><td>utterance.query</td><td>tázací otázka s dírou („Kdo napsal R.U.R.?“, „Kde bydlí?“)</td></tr>
+<tr><td><code>q-zjistovaci</code> (rodina ×2)</td><td>utterance.query</td><td>zjišťovací existence („Napsal Čapek Válku s mloky?“, „Prší?“)</td></tr>
+<tr><td><code>q-spona-identita</code>, <code>q-spona-vztazne-jmeno</code></td><td>utterance.query</td><td>sponové otázky („Kdo je X?“, „Kdo byl bratr X?“)</td></tr>
+<tr><td><code>q-rekl-adresatovi</code></td><td>utterance.query</td><td>dativní adresát („Co řekl Ježíšovi?“)</td></tr>
+<tr><td><code>q-drill-datum</code>, <code>q-hola-otazka</code></td><td>utterance.query</td><td>date drill („V kterém roce…?“), holé „Kdy?“</td></tr>
+<tr><td><code>statement-episode</code>, <code>-observation</code>, <code>-event</code>, <code>-attribute</code>, <code>-kratke-sloveso</code>, <code>-vsuvka</code></td><td>utterance.statement</td><td>klasifikace výroků pro zápis Mnemos</td></tr>
+<tr><td><code>focus-offer-homonym</code>, <code>focus-offer-overflow</code>, <code>clarify-identity</code>, <code>assurance-fail</code></td><td>resolve.ambiguous / data.overflow / statement.subject / focus.low</td><td>dialogové akty zpřesnění (uzly clarify)</td></tr>
+<tr><td><code>answer-offer-roles</code></td><td>answer.offer-roles</td><td>proaktivní nabídka rolí</td></tr>
+<tr><td><code>metron-vypocet</code>, <code>reminder-*</code>, <code>memory-*</code>, <code>meta-focus</code></td><td>metron.compute / reminder.* / memory.* / focus.query</td><td>texty odpovědí expertů</td></tr>
+</table>
+
+<nav class="pagenav"><a href="13-proaktivni-nabidky.html">← Proaktivní nabídky</a><a href="index.html">⌂ Obsah</a><span class="spacer"></span><a href="15-workflow.html">Workflow →</a></nav>
+</main>
+<footer class="site">Architektura JellyAI · kapitola 14 · stav ke commitu a63e83f</footer>
+<script>
+(function () {
+  var s = document.createElement("script");
+  s.src = "mermaid.min.js";
+  s.onload = function () {
+    mermaid.initialize({ startOnLoad: false, theme: "neutral" });
+    mermaid.run({ querySelector: "pre.mermaid" });
+  };
+  document.body.appendChild(s);
+})();
+</script>
+</body>
+</html>
