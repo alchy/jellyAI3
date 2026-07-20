@@ -1,0 +1,17 @@
+{
+  "name": "cmd-forget",
+  "trigger": {
+    "event": "utterance.command",
+    "priority": 19,
+    "requires": [
+      "cmd:forget"
+    ],
+    "forbids": [
+      "otaznik"
+    ]
+  },
+  "action": {
+    "worker": "mnemos"
+  },
+  "teach": "RODINA PRIKAZ (#51 fáze 3): Příkaz zapomenutí („zapomeň na Ronika“, „zapomeň, že…“, „zapomeň, co jsem řekl včera“) — worker Mnemos maže konzistentně graf i deník (fakt/entita/období). Rys příkazu se počítá z DNEŠNÍCH frázových tabulek (substring — korekce specu: tokenové literály by měnily sémantiku); tvar nese karta, nároky na tokeny claims (dekorace)."
+}

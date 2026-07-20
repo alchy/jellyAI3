@@ -1,0 +1,17 @@
+{
+  "name": "cmd-memorize",
+  "trigger": {
+    "event": "utterance.command",
+    "priority": 18,
+    "requires": [
+      "cmd:memorize"
+    ],
+    "forbids": [
+      "otaznik"
+    ]
+  },
+  "action": {
+    "worker": "mnemos"
+  },
+  "teach": "RODINA PRIKAZ (#51 fáze 3): Příkaz zapamatování („zapamatuj si…“, „zapiš si za uši…“) — strukturovaný výrok jde do grafu, přísloví jako doslovná poznámka. Rys příkazu se počítá z DNEŠNÍCH frázových tabulek (substring — korekce specu: tokenové literály by měnily sémantiku); tvar nese karta, nároky na tokeny claims (dekorace)."
+}

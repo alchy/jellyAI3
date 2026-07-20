@@ -1,0 +1,17 @@
+{
+  "name": "cmd-send",
+  "trigger": {
+    "event": "utterance.command",
+    "priority": 16,
+    "requires": [
+      "cmd:send"
+    ],
+    "forbids": [
+      "otaznik"
+    ]
+  },
+  "action": {
+    "worker": "chronos"
+  },
+  "teach": "RODINA PRIKAZ (#51 fáze 3): Odeslání zprávy („pošli zítra mail Marci“) — adresát ≠ čas (claim_words #54), tělo bez adresáta a zprávových jmen. Rys příkazu se počítá z DNEŠNÍCH frázových tabulek (substring — korekce specu: tokenové literály by měnily sémantiku); tvar nese karta, nároky na tokeny claims (dekorace)."
+}

@@ -16,6 +16,8 @@ uzly; pořadí = (tier, priorita, délka vzoru [, váha z telemetrie]).
 DISPATCH SE NEPŘEPÍNÁ — shadow měření dělá benchmark/run_qgraph.py.
 """
 
+import re
+
 from dataclasses import dataclass, field
 from datetime import datetime
 
@@ -83,6 +85,14 @@ def compile_qgraph(deck, predicates=frozenset(), telemetry_rows=(),
                 name=card.name, kind="vyrok", worker="brana-e",
                 pattern=trigger.get("pattern"), card=card.name,
                 priority=trigger.get("priority", 0), trigger=trigger)
+        elif trigger.get("event") == "utterance.command":
+            # rodina PRIKAZ (#51 fáze 3): rysové karty nad frázovými
+            # tabulkami; worker říká, kdo tah odbaví
+            nodes[card.name] = QNode(
+                name=card.name, kind="prikaz",
+                worker=card.action.get("worker", "iris"),
+                card=card.name, priority=trigger.get("priority", 0),
+                trigger=trigger)
         elif trigger.get("event") in _CLARIFY_EVENTS:
             nodes[card.name] = QNode(
                 name=card.name, kind="clarify", worker="dialog",
@@ -118,16 +128,47 @@ def compile_qgraph(deck, predicates=frozenset(), telemetry_rows=(),
                   claims=tuple(claims))
 
 
+_COMMAND_TABLES = (
+    ("cmd:forget", "forget_phrases"),
+    ("cmd:memorize", "memorize_phrases"),
+    ("cmd:send", "send_phrases"),
+    ("cmd:reminder", "reminder_phrases"),
+    ("cmd:recall", "recall_phrases"),
+    ("cmd:focus", "focus_shift_phrases"),
+)
+
+
+def command_features(text):
+    """Rysy příkazů z DNEŠNÍCH frázových tabulek (#51 fáze 3).
+
+    Substring po deaccent — PŘESNĚ sémantika ručních větví (korekce
+    specu: literálové tokenové vzory by sémantiku měnily). Plánové
+    příkazy jdou po TOKENECH (jako _plan_manage)."""
+    from jellyai.graph.canon import deaccent
+    lang = current()
+    low = deaccent(text.lower())
+    found = set()
+    for rys, table in _COMMAND_TABLES:
+        if any(p in low for p in lang.get(table, ())):
+            found.add(rys)
+    tokens = set(re.findall(r"[\w:.]+", low))
+    if tokens & set(lang.get("plan_cancel_words", ())) \
+            or tokens & set(lang.get("plan_move_words", ())):
+        found.add("cmd:plan")
+    return found
+
+
 def turn_features(text, tagged=None):
-    """Povrchové + výrokové rysy tahu (#51) — JEDNA funkce pro osvětlení
-    rodin i karty: requires/forbids čtou tytéž rysy, kterými dnes vybírá
-    parse_statement (utterance_features), plus povrch (otaznik)."""
+    """Povrchové + výrokové + příkazové rysy tahu (#51) — JEDNA funkce
+    pro osvětlení rodin i karty: requires/forbids čtou tytéž rysy,
+    kterými dnes vybírá parse_statement (utterance_features)."""
     from jellyai.iris.subsystems.mnemos import utterance_features
     if tagged is None:
         tagged = classify(text, is_node=None)
     features = set(utterance_features(tagged))
     if "?" in text:
         features.add("otaznik")
+    features |= command_features(text)
     return frozenset(features)
 
 
@@ -234,9 +275,9 @@ def illuminate(text, qgraph, now=None, is_node=None, use_weights=False):
             key = (2, node.priority, len(node.pattern),
                    node.weight if use_weights else 0)
             lit.append((key, node))
-        elif node.kind == "vyrok":
-            # rodina VYROK (#51): rysy tahu rozhodují (otaznik zhasíná
-            # — hranice v datech karet); vzorové karty navíc matcherem
+        elif node.kind in ("vyrok", "prikaz"):
+            # rodiny VYROK a PRIKAZ (#51): rysy tahu rozhodují (otaznik
+            # zhasíná — hranice v datech karet); vzorové navíc matcherem
             tightness = trigger_specificity(node.trigger, features)
             if tightness is None:
                 continue

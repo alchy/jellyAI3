@@ -1,0 +1,17 @@
+{
+  "name": "cmd-reminder",
+  "trigger": {
+    "event": "utterance.command",
+    "priority": 15,
+    "requires": [
+      "cmd:reminder"
+    ],
+    "forbids": [
+      "otaznik"
+    ]
+  },
+  "action": {
+    "worker": "chronos"
+  },
+  "teach": "RODINA PRIKAZ (#51 fáze 3): Nová připomínka („připomeň mi v pět…“) — chytré defaulty času, doplnění rozpracované žádosti je STAVOVÝ tah (pozice), ne dispatch. Rys příkazu se počítá z DNEŠNÍCH frázových tabulek (substring — korekce specu: tokenové literály by měnily sémantiku); tvar nese karta, nároky na tokeny claims (dekorace)."
+}

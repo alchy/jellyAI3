@@ -1,0 +1,17 @@
+{
+  "name": "cmd-plan",
+  "trigger": {
+    "event": "utterance.command",
+    "priority": 17,
+    "requires": [
+      "cmd:plan"
+    ],
+    "forbids": [
+      "otaznik"
+    ]
+  },
+  "action": {
+    "worker": "chronos"
+  },
+  "teach": "RODINA PRIKAZ (#51 fáze 3): Správa plánu („zruš všechno na zítra“, „posuň všechny ze zítra na čtvrtek“) — worker Chronos vybírá záznamy intervalem/hodinou/textem. Rys příkazu se počítá z DNEŠNÍCH frázových tabulek (substring — korekce specu: tokenové literály by měnily sémantiku); tvar nese karta, nároky na tokeny claims (dekorace)."
+}

@@ -1,0 +1,14 @@
+{
+  "name": "cmd-recall",
+  "trigger": {
+    "event": "utterance.command",
+    "priority": 13,
+    "requires": [
+      "cmd:recall"
+    ]
+  },
+  "action": {
+    "worker": "mnemos"
+  },
+  "teach": "RODINA PRIKAZ (#51 fáze 3): Vzpomínání („Co jsem ti řekl včera?“) — Chronos filtr nad timestampy deníku; smí nést otazník (je to otázka na paměť dialogu). Rys příkazu se počítá z DNEŠNÍCH frázových tabulek (substring — korekce specu: tokenové literály by měnily sémantiku); tvar nese karta, nároky na tokeny claims (dekorace)."
+}

@@ -1,0 +1,17 @@
+{
+  "name": "cmd-focus",
+  "trigger": {
+    "event": "utterance.command",
+    "priority": 14,
+    "requires": [
+      "cmd:focus"
+    ],
+    "forbids": [
+      "otaznik"
+    ]
+  },
+  "action": {
+    "worker": "iris"
+  },
+  "teach": "RODINA PRIKAZ (#51 fáze 3): Pokyn k zaostření („v kontextu Bible“) — posvítí na doménu a přehraje předchozí otázku. Rys příkazu se počítá z DNEŠNÍCH frázových tabulek (substring — korekce specu: tokenové literály by měnily sémantiku); tvar nese karta, nároky na tokeny claims (dekorace)."
+}

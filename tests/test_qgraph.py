@@ -24,7 +24,8 @@ def _graph():
 def test_compile_builds_question_worker_and_clarify_nodes():
     qg = _graph()
     kinds = {node.kind for node in qg.nodes.values()}
-    assert kinds == {"otazka", "worker", "clarify", "vyrok"}   # vyrok: #51
+    assert kinds == {"otazka", "worker", "clarify",
+                     "vyrok", "prikaz"}                # rodiny #51
     assert "q-otaz-minuly" in qg.nodes            # karta = uzel typu otázky
     assert qg.nodes["metron-vypocet"].worker == "metron"
     assert qg.nodes["chronos-hodiny"].worker == "chronos"
@@ -204,3 +205,18 @@ def test_kompilace_a_osvetleni_rodiny_vyrok():
     assert lit and any(n.kind == "vyrok" for n in lit)
     lit = illuminate("Prší?", qg, now=NOW)
     assert not any(n.kind == "vyrok" for n in lit)
+
+
+def test_rodina_prikaz_sviti_a_prebiji_vyrok():
+    """#51 fáze 3: příkazové karty (rysy z frázových tabulek) svítí
+    nad výroky — „Zapamatuj si, že…“ je příkaz, ne konstatování."""
+    from jellyai.iris.qgraph import command_features
+    assert "cmd:memorize" in command_features("Zapamatuj si, že Roník je pes.")
+    assert "cmd:plan" in command_features("Zruš všechno na zítra.")
+    qg = _graph()
+    assert qg.nodes["cmd-reminder"].kind == "prikaz"
+    assert qg.nodes["cmd-reminder"].worker == "chronos"
+    lit = illuminate("Zapamatuj si, že Roník je pes.", qg, now=NOW)
+    assert lit and lit[0].name == "cmd-memorize"
+    lit = illuminate("Připomeň mi zítra oběd.", qg, now=NOW)
+    assert lit and lit[0].name == "cmd-reminder"
