@@ -106,6 +106,7 @@ class GraphAnswerer(Answerer):
         self.last_pattern = None  # poslední vykonaný pseudo-QL Pattern (API)
         self.last_query_card = None  # vzorová karta tahu (telemetrie #38)
         self.pick_focus = None   # zvolená oblast overflow dialogu (#5) — 1 tah
+        self._theme_bound = set()  # adresáti dotazu — rolová vazba (#55)
         self.last_resolution = None  # evidence rozlišení (vstup QueryAssurance)
         self.last_overflow = []  # oblasti (theme) přetékajícího výčtu
         self._prev_trace = None  # trasa PŘEDCHOZÍHO tahu (drill „Kdy?")
@@ -345,15 +346,20 @@ class GraphAnswerer(Answerer):
             tuple: (téma | None, hodnota | None, fakt | None).
         """
         self.visited = []                    # uzly protnuté (i)rekurzí → rozsvítit
+        self._theme_bound = set()            # explicitní adresáti dotazu (#55)
         if pat.hole_role == "relation":
             return self._relation_answer(pat)
         if pat.known:
             known_set, first_res = set(), None
-            for _, known in pat.known:
+            for role, known in pat.known:
                 node = self._solve(known, pat.predicate)   # rekurzivně (i vnořené)
                 if node is None:
                     return None, [], None    # pojmenované, ale neznámé → nehádat
                 known_set.add(node)
+                if role == "theme":
+                    # ADRESÁT z dativu („Co řekl Ježíšovi?") — match ho
+                    # vyžaduje v roli theme faktu, ne jako mluvčího (#55)
+                    self._theme_bound.add(node)
                 if first_res is None:
                     first_res = self.last_resolution
             if first_res is not None:
@@ -560,6 +566,12 @@ class GraphAnswerer(Answerer):
         for pred, exact in _synonym_ring(predicate):
             for fact in self.graph.facts_of(node0, predicate=pred):
                 if not known_set <= {p.node for p in fact.participants}:
+                    continue
+                if any(not any(p.node == n and p.role == "theme"
+                               for p in fact.participants)
+                       for n in self._theme_bound):
+                    # ROLOVĚ VÁZANÝ známý (#55): explicitní adresát musí
+                    # být v roli theme — dativ nesmí matchnout mluvčího
                     continue
                 if self._time_excluded(fact):
                     continue

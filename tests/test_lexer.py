@@ -61,3 +61,15 @@ def test_email_survives_tokenization_whole():
 def test_trailing_dot_stripped_but_abbreviations_kept():
     assert tokenize("Venku prší.") == ["Venku", "prší"]
     assert "R.U.R." in tokenize("Napsal R.U.R. Čapek")
+
+
+def test_dative_hypothesis_class():
+    """#55: koncovky -ovi/-ům nesou hypotézu DATIVU (adresát) — lexer
+    nerozhoduje, jen poctivě přizná; krátké tvary a jiné koncovky ne."""
+    from jellyai.lang.lexer import classify
+
+    tagged = {t.form: t.classes for t in
+              classify("Co řekl Ježíšovi a učedníkům?")}
+    assert "dativ" in tagged["Ježíšovi"]
+    assert "dativ" in tagged["učedníkům"]
+    assert "dativ" not in tagged["Co"] and "dativ" not in tagged["řekl"]

@@ -117,6 +117,11 @@ def classify(text, is_node=None):
         stem = l_stem(form)
         if stem is not None:
             classes.add("l_tvar")
+        if len(form) >= 5 and form.lower().endswith(
+                tuple(lang.get("dative_endings", ()))):
+            # HYPOTÉZA dativu (#55: adresát — „Ježíšovi", „učedníkům");
+            # lexer nerozhoduje, roli přiřadí až vzor na kartě
+            classes.add("dativ")
         if (len(form) >= 3
                 and not ({"prvni_osoba", "spona", "funkcni"} & classes)
                 and (norm in finite_catalog

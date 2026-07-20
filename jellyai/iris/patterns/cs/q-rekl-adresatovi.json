@@ -1,0 +1,22 @@
+{
+  "name": "q-rekl-adresatovi",
+  "trigger": {
+    "event": "utterance.query",
+    "priority": 6,
+    "pattern": [
+      "%{TAZACI}",
+      "%{SLOVESO_MINULE}",
+      "%{DATIV}"
+    ]
+  },
+  "action": {
+    "query": {
+      "hole": "$1",
+      "predicate": "$2",
+      "known": [
+        ["theme", "$3"]
+      ]
+    }
+  },
+  "teach": "Směr řeči (#55, nález z živého dialogu): „Co řekl JEŽÍŠOVI?“ — dativ je ADRESÁT, ne mluvčí. Známý jde do role theme a rolově vázaný match ho vyžaduje v TÉ roli faktu — odpovědí jsou slova ŘEČENÁ adresátovi (Marta Ježíšovi: „umřel“), ne jeho vlastní. Mluvčího tvar („Co řekl Ježíš?“) kartu mine — nominativ dativní hypotézu nenese."
+}

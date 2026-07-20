@@ -248,3 +248,20 @@ def test_date_drill_card_builds_time_pattern():
                         {"narodit"},
                         is_node=lambda s: s == "Božena Němcová", is_word=None)
     assert filtr is None         # časový filtr, ne drill — zůstává šabloně
+
+
+def test_dative_recipient_card_builds_theme_known():
+    """#55 směr řeči: „Co řekl Ježíšovi?" — dativ je ADRESÁT, známý jde
+    do role theme (rolově vázaný match ho pak vyžaduje v TÉ roli faktu);
+    mluvčího tvar („Co řekl Ježíš?") karta nebere."""
+    from jellyai.answerer.query import _card_query
+
+    q = _card_query("Co řekl Ježíšovi?", {"říci"},
+                    is_node=lambda s: s == "Ježíšovi", is_word=None)
+    assert q is not None
+    assert q.pattern.predicate == "říci"
+    assert q.pattern.known == [("theme", "Ježíšovi")]
+
+    mluvci = _card_query("Co řekl Ježíš?", {"říci"},
+                         is_node=lambda s: s == "Ježíš", is_word=None)
+    assert mluvci is None or mluvci.pattern.known != [("theme", "Ježíš")]

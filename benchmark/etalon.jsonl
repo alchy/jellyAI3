@@ -35,3 +35,5 @@
 {"q": "Jaka babicka?", "expect": ["postava", "próza"], "cat": "diakritika", "gap": "bezdiakritická otázka — UDPipe nerozpozná 'Jaka'→jaký; cíl pseudo-QL"}
 {"q": "Jaký měl Ježíš vztah k Janu Křtiteli?", "expect": ["poslat"], "cat": "vztah"}
 {"q": "Kde putoval Ježíš?", "expect": ["Kafarnaum"], "cat": "topos"}
+{"q": "Co řekl Ježíšovi?", "expect": ["umřel"], "reject": ["Amen"], "cat": "směr řeči"}
+{"q": "Co řekl učedníkům?", "expect": ["Pojďme"], "reject": ["Amen"], "cat": "směr řeči"}

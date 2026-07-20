@@ -256,3 +256,20 @@ def test_identity_single_layer_keeps_copular_first():
     a = GraphAnswerer(g, FakeUfalClient(), ExtractiveAnswerer(AnswererConfig()))
     text = a.answer("Kdo je Karel Čapek?", []).text
     assert "spisovatel" in text
+
+
+def test_speech_direction_dative_filters_recipient():
+    """#55: „Co řekl Ježíšovi?" vrací slova ŘEČENÁ Ježíšovi (theme role),
+    ne Ježíšova vlastní — rolově vázaný match u explicitního theme."""
+    g = FactGraph()
+    g.add_fact(make_fact("říci", [Participant("subj", "Ježíš", "person"),
+                                  Participant("obj", "Amen", "concept")]))
+    g.add_fact(make_fact("říci", [Participant("subj", "Marta", "person"),
+                                  Participant("obj", "umřel", "concept"),
+                                  Participant("theme", "Ježíš", "person")]))
+    a = GraphAnswerer(g, FakeUfalClient(), ExtractiveAnswerer(AnswererConfig()))
+    text = a.answer("Co řekl Ježíšovi?", []).text
+    assert "umřel" in text and "Amen" not in text
+    a.reset()
+    text = a.answer("Co řekl Ježíš?", []).text     # směr mluvčího drží
+    assert "Amen" in text
