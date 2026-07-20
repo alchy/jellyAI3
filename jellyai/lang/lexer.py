@@ -105,6 +105,7 @@ def classify(text, is_node=None):
               ("cast_data", set(lang.get("date_part_forms", ()))),
               ("vztah_dotazu", set(lang.get("relation_query_nouns", ()))),
               ("vztazne_jmeno", set(lang.get("relational_nouns", ()))),
+              ("trida_deju", set(lang.get("predicate_class_forms", ()))),
               ("cas", temporal))
     tagged = []
     for form in tokenize(text):

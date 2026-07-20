@@ -235,6 +235,13 @@ def _card_query(question, predicates, is_node=None, is_word=None):
         pattern.date_part = lang["date_part_forms"].get(part.norm)
         if pattern.date_part and pattern.hole_role == "attr":
             pattern.hole_role, pattern.hole_type = "time", "time"
+    cls = ref(spec.get("class"))
+    if cls is not None:
+        # TŘÍDA DĚJŮ (A2): „Jaké ZÁZRAKY činil…" — jméno třídy z tabulky
+        pattern.predicate_class = lang.get("predicate_class_forms",
+                                           {}).get(cls.norm)
+        if pattern.predicate_class is None:
+            return None
     cop = ref(spec.get("copula"))
     if cop is not None and pattern.hole_role != "attr":
         # kanonické sponové pravidlo: attr díra („Jaký je X?") zůstává,
@@ -277,7 +284,10 @@ def _card_query(question, predicates, is_node=None, is_word=None):
         # past 11: karta, která predikát ŽÁDALA a nedostala (neznámé
         # sloveso), se nehlásí; bez klíče predicate stačí rozřešená díra
         # (relation literálem, attr „Jaká rodina?", holé „Kdy?")
-        if "predicate" in spec or pattern.hole_role is None:
+        if ("predicate" in spec or pattern.hole_role is None) \
+                and pattern.predicate_class is None:
+            # TŘÍDA dějů (A2) je plnohodnotné rozřešení — díru nemá,
+            # odpovědí je agregace členů třídy
             return None
     # rod slovesného/sponového tvaru filtruje kandidáty při pro-dropu
     # a u identity („byla" → Fem) — stejně jako u šablon; spona má

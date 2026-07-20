@@ -1070,6 +1070,9 @@ class GraphAnswerer(Answerer):
             qa, pat = Query(), Pattern()
         self.last_pattern = pat
         self._resolved_knowns = set()
+        if getattr(pat, "predicate_class", None):
+            # TŘÍDA DĚJŮ (A2): agregace faktů členů třídy pro podmět
+            return self._class_answer(pat, question, retrieved)
         topic, values, fact = self._pattern_answer(question, pat, qa)
         for node in self._resolved_knowns:
             # ROZŘEŠENÍ JE ZAOSTŘENÍ: pojmenované entity otázky svítí i bez
@@ -1161,6 +1164,39 @@ class GraphAnswerer(Answerer):
         return Answer(text=template.format(predicate=predicate, known=known,
                                            missing=missing),
                       sources=["graf"], score=1.0, trace=None)
+
+    def _class_answer(self, pat, question, retrieved):
+        """Otázka na TŘÍDU dějů (A2): „Jaké zázraky činil Ježíš?" —
+        členové třídy z tabulky predicate_classes, odpověď agreguje
+        fakty podmětu po predikátech. Zárodek oceánu #41 nad ději."""
+        lang = current()
+        members = set(lang.get("predicate_classes", {})
+                      .get(pat.predicate_class, ()))
+        known = next((term for _, term in getattr(pat, "known", ()) or ()
+                      if term), None)
+        topic = self._resolve_topic(known.split()) if known else None
+        groups = {}
+        if topic is not None:
+            for fact in self.graph.facts_of(topic):
+                if fact.predicate not in members:
+                    continue
+                for p in fact.participants:
+                    if p.node == topic or p.role in ("theme", "time"):
+                        continue
+                    groups.setdefault(fact.predicate, [])
+                    if p.node not in groups[fact.predicate]:
+                        groups[fact.predicate].append(p.node)
+        template = lang.get("class_answer")
+        if not groups or template is None:
+            return self.fallback.answer(question, retrieved)
+        items = "; ".join(f"{pred} — {', '.join(vs[:4])}"
+                          for pred, vs in groups.items())
+        self.last_trace = {"topic": topic, "predicate": None,
+                           "fact": None, "answer": items}
+        self.context.warm(topic, 1.0)
+        return Answer(text=template.format(cls=pat.predicate_class,
+                                           topic=topic, items=items),
+                      sources=["graf"], score=1.0, trace=self.last_trace)
 
     def _ring_roles(self, predicate):
         """Role schématu přes CELÝ synonymní/vidový kruh — normalizace

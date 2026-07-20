@@ -1,0 +1,12 @@
+{
+  "name": "q-trida-deju",
+  "trigger": {
+    "event": "utterance.query",
+    "priority": 7,
+    "pattern": ["%{TAZACI_VYBER}", "%{TRIDA_DEJU}", "%{SLOVESO_MINULE}", "?%{ENTITA}"]
+  },
+  "action": {
+    "query": {"class": "$2", "known": [["subj", "$4"]]}
+  },
+  "teach": "Otázka na TŘÍDU dějů (A2, nález testovací seance Bible): „Jaké zázraky činil Ježíš?“ — „zázrak“ není predikát, ale KATEGORIE dějů (tabulka predicate_classes: uzdravit, vzkřísit, nasytit…). Odpověď agreguje fakty ČLENŮ třídy pro podmět a vyjmenuje je po predikátech. Zárodek oceánu vrstev (#41) nad ději: druh-vztah mezi predikáty je zatím tabulka, později druh-hrany."
+}

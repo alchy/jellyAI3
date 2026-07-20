@@ -51,6 +51,7 @@ class Pattern:
     hole_role: str = None
     hole_type: str = None
     date_part: str = None                       # „rok/měsíc/den" → 2-skokový drill
+    predicate_class: str = None                 # třída dějů („zázrak") — A2
 
 
 def _genitive_child(head_tok, sent):
