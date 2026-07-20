@@ -111,3 +111,18 @@ def test_default_claims_rozpoznavaji_prime_brany():
     assert (claims["metron-vypocet"].priority
             > claims["chronos-hodiny"].priority
             > claims["meta-focus"].priority)
+
+
+def test_novy_expert_claimem_bez_zasahu_do_kodu_grafu():
+    """Kritérium E2: nový přímý expert = nový claim v registru —
+    kompilace mu postaví worker uzel a osvětlení ho zvedne; do
+    compile_qgraph/illuminate/turn se NEsahá."""
+    from jellyai.iris.claims import ExpertClaim, default_claims
+    deck = PatternDeck.for_language("cs")
+    deck.load()
+    fake = ExpertClaim("pokus-expert", "pokus", 9,
+                       lambda text, now: "pokusný nárok" in text)
+    qg = compile_qgraph(deck, claims=default_claims() + (fake,))
+    assert qg.nodes["pokus-expert"].worker == "pokus"
+    lit = illuminate("Tohle je pokusný nárok na tah.", qg, now=NOW)
+    assert lit and lit[0].name == "pokus-expert"

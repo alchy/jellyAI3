@@ -146,6 +146,18 @@ ho zvedne bez zásahu do compile/turn.
 brána budoucího přepnutí dispatch (samostatné rozhodnutí, bitová parita
 dialog benchmarku).
 
+**Empirie E2 (2026-07-20 večer, commity 992240d–7b1fda5) — PŘIJATO:**
+registr `jellyai/iris/claims.py` (`ExpertClaim` + `default_claims()`);
+`compile_qgraph` staví worker uzly z registru a `illuminate` volá
+rozpoznávače jednotně — smazán ruční výčet tří expertů i přímé importy
+(`compute`, `clock_answer`, `deaccent` + focus fráze). Parita úplná:
+569 testů, benchmarky i harness obě varianty 100 % beze změny čísel
+(tier klíče 3/2/1/0 zachovány). Test rozšiřitelnosti zelený: fiktivní
+expert přidaný JEN claimem dostal worker uzel a osvětlení ho zvedlo
+bez zásahu do compile/illuminate/turn. Brána budoucího přepnutí
+dispatch je otevřena — samo přepnutí zůstává SAMOSTATNÉ rozhodnutí
+(§6) s bitovou paritou dialog benchmarku.
+
 ### E3 — Instance ze schématu predikátů (řeší C)
 
 **Hypotéza:** schéma se rozšíří z množiny jmen na podpisy s rolemi
