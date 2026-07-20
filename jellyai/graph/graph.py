@@ -151,10 +151,24 @@ class FactGraph:
         prázdná množina = graf predikát nezná (žádný verdikt).
         """
         roles = set()
-        for fact in self.facts.values():
-            if fact.predicate == predicate:
-                roles.update(p.role for p in fact.participants)
+        for _, fact in self.facts_of_predicates((predicate,)):
+            roles.update(p.role for p in fact.participants)
         return frozenset(roles)
+
+    def facts_of_predicates(self, predicates):
+        """Fakty daných predikátů (typicky synonymní/vidový kruh)
+        v GLOBÁLNÍM pořadí vložení — korpus předchází paměť, deník
+        je chronologický, takže pořadí je deterministický rozhodčí
+        remíz (evidence #24, kaskáda). Konzumenti iterují TOTO
+        primitivum, nikdy množinu (past 19).
+
+        Yields:
+            tuple: (pořadí v grafu, FactNode).
+        """
+        wanted = frozenset(predicates)
+        for seq, fact in enumerate(self.facts.values()):
+            if fact.predicate in wanted:
+                yield seq, fact
 
     def facts_of(self, node_id, role=None, predicate=None):
         """Fakty, v nichž uzel vystupuje (volitelně filtr role a predikátu).

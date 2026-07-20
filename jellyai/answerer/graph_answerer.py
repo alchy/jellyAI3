@@ -908,9 +908,8 @@ class GraphAnswerer(Answerer):
             (deník paměti je chronologický, korpus předchází paměť).
         """
         rings = {pred for pred, _ in _synonym_ring(predicate)}
-        for seq, fact in enumerate(self.graph.facts.values()):
-            if fact.predicate not in rings or self._time_excluded(fact) \
-                    or self._place_excluded(fact):
+        for seq, fact in self.graph.facts_of_predicates(rings):
+            if self._time_excluded(fact) or self._place_excluded(fact):
                 continue
             if known_set and not known_set <= {p.node
                                                for p in fact.participants}:
@@ -1300,9 +1299,8 @@ class GraphAnswerer(Answerer):
         labels = lang.get("role_labels", {})
         ring = {p for p, _ in _synonym_ring(predicate)}
         found = {}
-        for fact in self.graph.facts.values():
-            if fact.predicate not in ring \
-                    or all(p.node != topic for p in fact.participants):
+        for _, fact in self.graph.facts_of_predicates(ring):
+            if all(p.node != topic for p in fact.participants):
                 continue
             for p in fact.participants:
                 if p.node == topic or p.role == hole_role \
@@ -1317,9 +1315,8 @@ class GraphAnswerer(Answerer):
             return None
         parts = "; ".join(f"{labels[r]}: {', '.join(vs[:4])}"
                           for r, vs in found.items())
-        best = next((f for f in self.graph.facts.values()
-                     if f.predicate in ring
-                     and any(p.node == topic for p in f.participants)),
+        best = next((f for _, f in self.graph.facts_of_predicates(ring)
+                     if any(p.node == topic for p in f.participants)),
                     None)
         if best is not None:
             # trasa: drill („Kde?") po částečné odpovědi funguje (T9/T12)
@@ -1349,9 +1346,7 @@ class GraphAnswerer(Answerer):
         topic_node = self.graph.nodes.get(topic)
         topic_type = topic_node.type if topic_node is not None else None
         carriers = {}
-        for fact in self.graph.facts.values():
-            if fact.predicate not in ring:
-                continue
+        for _, fact in self.graph.facts_of_predicates(ring):
             if any(p.node == topic for p in fact.participants):
                 return None              # téma fakty nese → jiná cesta
             for p in fact.participants:

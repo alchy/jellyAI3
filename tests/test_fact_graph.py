@@ -234,3 +234,18 @@ def test_document_graph_links_co_mentioning_sources():
     }
     g = build_graph(A)
     assert g.doc_links.get("bible1", {}).get("bible2", 0) > 0   # sdílí Marii
+
+
+def test_facts_of_predicates_poradi_vlozeni():
+    """Primitivum kruhu (postřeh: přístup do grafu): fakty predikátů
+    v GLOBÁLNÍM pořadí vložení (korpus před pamětí, deník chronologicky)
+    — deterministický rozhodčí remíz; iteruje se dict, nikdy set."""
+    from jellyai.graph.graph import FactGraph
+    from jellyai.graph.extract import make_fact, Participant
+    g = FactGraph()
+    g.add_fact(make_fact("potkat", [Participant("subj", "A", "person")]))
+    g.add_fact(make_fact("jíst", [Participant("subj", "B", "person")]))
+    g.add_fact(make_fact("potkávat", [Participant("subj", "C", "person")]))
+    rows = list(g.facts_of_predicates({"potkat", "potkávat"}))
+    assert [f.predicate for _, f in rows] == ["potkat", "potkávat"]
+    assert [seq for seq, _ in rows] == [0, 2]      # globální pořadí grafu
