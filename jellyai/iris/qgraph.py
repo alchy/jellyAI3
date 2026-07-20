@@ -19,7 +19,6 @@ DISPATCH SE NEPŘEPÍNÁ — shadow měření dělá benchmark/run_qgraph.py.
 from dataclasses import dataclass, field
 from datetime import datetime
 
-from jellyai.graph.canon import deaccent
 from jellyai.lang import current
 from jellyai.lang.lexer import classify
 from jellyai.lang.matcher import expand_pattern, match_sequence
@@ -50,9 +49,11 @@ class QNode:
 class QGraph:
     nodes: dict
     predicates: frozenset          # schéma datového grafu (líné instance)
+    claims: tuple = ()             # nároky přímých expertů (#57 E2)
 
 
-def compile_qgraph(deck, predicates=frozenset(), telemetry_rows=()):
+def compile_qgraph(deck, predicates=frozenset(), telemetry_rows=(),
+                   claims=None):
     """Zkompiluje otázkový graf z decku karet + schématu predikátů.
 
     Deterministické (týž deck + tatáž telemetrie → týž graf); karty
@@ -74,10 +75,12 @@ def compile_qgraph(deck, predicates=frozenset(), telemetry_rows=()):
                 name=card.name, kind="clarify", worker="dialog",
                 card=card.name,
                 edges=[QEdge("navrat", "*")])   # po volbě přehraj otázku
-    # PŘÍMÍ EXPERTI — brány, které dnes drží ruční pořadí větví v turn()
-    nodes["metron-vypocet"] = QNode("metron-vypocet", "worker", "metron")
-    nodes["chronos-hodiny"] = QNode("chronos-hodiny", "worker", "chronos")
-    nodes["meta-focus"] = QNode("meta-focus", "worker", "iris")
+    # PŘÍMÍ EXPERTI — worker uzly z registru claimů (#57 E2, zárodek #26)
+    if claims is None:
+        from jellyai.iris.claims import default_claims
+        claims = default_claims()
+    for claim in claims:
+        nodes[claim.name] = QNode(claim.name, "worker", claim.worker)
     clarify_names = [n.name for n in nodes.values() if n.kind == "clarify"]
     for node in nodes.values():
         if node.kind == "otazka":
@@ -88,7 +91,8 @@ def compile_qgraph(deck, predicates=frozenset(), telemetry_rows=()):
         for pattern_name in row.get("patterns", ()):
             if pattern_name in nodes:
                 nodes[pattern_name].weight += 1.0
-    return QGraph(nodes=nodes, predicates=frozenset(predicates))
+    return QGraph(nodes=nodes, predicates=frozenset(predicates),
+                  claims=tuple(claims))
 
 
 def decorate(text, now=None):
@@ -174,17 +178,12 @@ def illuminate(text, qgraph, now=None, is_node=None, use_weights=False):
     Returns:
         list[QNode]: Rozsvícené uzly, nejsilnější první ([] = tma).
     """
-    from jellyai.iris.subsystems.chronos import clock_answer
-    from jellyai.iris.subsystems.metron import compute
     lang = current()
     lit = []
-    if compute(text) is not None:
-        lit.append(((3, 2, 0), qgraph.nodes["metron-vypocet"]))
-    if clock_answer(text, now or datetime.now()) is not None:
-        lit.append(((3, 1, 0), qgraph.nodes["chronos-hodiny"]))
-    low = deaccent(text.lower())
-    if any(p in low for p in lang.get("focus_query_phrases", ())):
-        lit.append(((3, 0, 0), qgraph.nodes["meta-focus"]))
+    moment = now or datetime.now()
+    for claim in qgraph.claims:
+        if claim.recognize(text, moment):
+            lit.append(((3, claim.priority, 0), qgraph.nodes[claim.name]))
     tagged = classify(text, is_node=None)
     aliases = lang.get("pattern_aliases", {})
     for node in qgraph.nodes.values():
