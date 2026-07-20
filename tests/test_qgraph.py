@@ -181,3 +181,13 @@ def test_clarify_hrany_se_odvozuji():
     cile = {e.target for e in zjist.edges if e.kind == "zpresneni"}
     assert "focus-offer-overflow" not in cile   # existence nepřeteče
     assert "focus-offer-homonym" in cile
+
+
+def test_turn_features_nese_otaznik_i_vyrokove_rysy():
+    """#51 fáze 1: jedna funkce rysů tahu — povrch (otaznik) +
+    výrokové rysy (tytéž, kterými vybírá parse_statement)."""
+    from jellyai.iris.qgraph import turn_features
+    assert "otaznik" in turn_features("Prší?")
+    features = turn_features("Venku prší.")
+    assert "otaznik" not in features
+    assert "first_person" in turn_features("Dnes jsem měl knedlíky.")

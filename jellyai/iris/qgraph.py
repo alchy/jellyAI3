@@ -102,6 +102,19 @@ def compile_qgraph(deck, predicates=frozenset(), telemetry_rows=(),
                   claims=tuple(claims))
 
 
+def turn_features(text, tagged=None):
+    """Povrchové + výrokové rysy tahu (#51) — JEDNA funkce pro osvětlení
+    rodin i karty: requires/forbids čtou tytéž rysy, kterými dnes vybírá
+    parse_statement (utterance_features), plus povrch (otaznik)."""
+    from jellyai.iris.subsystems.mnemos import utterance_features
+    if tagged is None:
+        tagged = classify(text, is_node=None)
+    features = set(utterance_features(tagged))
+    if "?" in text:
+        features.add("otaznik")
+    return frozenset(features)
+
+
 def decorate(text, now=None):
     """DEKORUJÍCÍ nároky tahu (T3 spec — druhý druh rozsvěcení).
 
