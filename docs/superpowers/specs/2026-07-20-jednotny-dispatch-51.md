@@ -127,7 +127,7 @@ benchmark bitově beze změny.
 **Fáze 3:** rodina `prikaz` = RYSOVÉ karty cmd-* (KOREKCE SPECU:
 frázové tabulky jsou substringové/tokenové — literálové vzory by
 měnily sémantiku; rys zrcadlí sémantiku PŘÍSLUŠNÉHO handleru: forget
-TOKENOVĚ po slovech, „Nezapomeň…“ je correctly memorize). Priority
+TOKENOVĚ po slovech, „Nezapomeň…“ je správně memorize). Priority
 karet nesou dnešní pořadí větví (forget 19 → focus 14, recall 13).
 KOREKCE PLÁNU: separátní shadow rovina příkazů nahrazena BITOVOU
 paritou dialogu po druzích — instrumentace mizejících větví by byla

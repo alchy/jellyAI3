@@ -396,7 +396,12 @@ se dělí mezi oba světy:
 | `utterance.statement` | typ výroku (vzor nebo ploché rysy) | zápis do faktového grafu |
 | `resolve.ambiguous`, `data.overflow`, `focus.low`, `statement.subject` | dialogový akt | uzel `clarify` (zpřesnění) + jeho hrany |
 | `memory.*`, `reminder.*`, `metron.compute`, `focus.query` | odpověď experta | uzel `worker` |
+| `utterance.command` (rysy `cmd:*` z frázových tabulek) | tvar příkazu | uzel `prikaz` (#51) |
 
+Od #51 je graf **jediným dispatcherem vstupu**: rodiny `vyrok`
+(worker = brána E, zápis) a `prikaz` doplnily otázky, workery
+a clarify; ruční pořadí větví v `turn()` nahradily priority karet
+a osvětlení (hranici dotaz × výrok nese rys `otaznik` na kartách).
 Výběr karty dělá v obou světech **týž mechanismus**: `deck.best()` —
 těsnost triggeru, pak priorita, pak jméno. Otázkový graf tedy nezavádí
 druhé rozhodování; jen dává plochému výběru **strukturu**: uzly dostanou
