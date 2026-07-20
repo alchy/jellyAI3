@@ -141,17 +141,28 @@ _COMMAND_TABLES = (
 def command_features(text):
     """Rysy příkazů z DNEŠNÍCH frázových tabulek (#51 fáze 3).
 
-    Substring po deaccent — PŘESNĚ sémantika ručních větví (korekce
-    specu: literálové tokenové vzory by sémantiku měnily). Plánové
-    příkazy jdou po TOKENECH (jako _plan_manage)."""
+    Sémantika ZRCADLÍ příslušné handlery (parita konstrukcí, korekce
+    specu — literálové tokenové vzory by ji měnily): memorize/reminder/
+    recall/focus jdou substringem po deaccent, forget TOKENOVĚ po
+    slovech („zapomeň" ≠ „nezapomeň"), send a plán po tokenech."""
     from jellyai.graph.canon import deaccent
     lang = current()
     low = deaccent(text.lower())
     found = set()
     for rys, table in _COMMAND_TABLES:
+        if rys == "cmd:forget":
+            continue                     # tokenově níže (jako handler)
         if any(p in low for p in lang.get(table, ())):
             found.add(rys)
-    tokens = set(re.findall(r"[\w:.]+", low))
+    lows = [deaccent(t.lower()).rstrip(".")
+            for t in re.findall(r"[\w:.]+", text)]
+    for phrase in lang.get("forget_phrases", ()):
+        words = phrase.split()
+        if any(lows[i:i + len(words)] == words
+               for i in range(len(lows) - len(words) + 1)):
+            found.add("cmd:forget")
+            break
+    tokens = set(lows)
     if tokens & set(lang.get("plan_cancel_words", ())) \
             or tokens & set(lang.get("plan_move_words", ())):
         found.add("cmd:plan")

@@ -250,41 +250,19 @@ class IrisAutomaton:
                             return self._set_reminder(pending["task"], due,
                                                       text, record=pending)
                         return self._set_reminder(pending, due, text)
-            forgot = self._forget_command(text)
-            if forgot is not None:
-                return forgot
-            memo = next((p for p in sorted(current()["memorize_phrases"],
-                                           key=len, reverse=True)
-                         if p in deaccent(text.lower())), None)
-            if memo is not None:
-                memorized = self._memorize_command(text, memo)
-                if memorized is not None:
-                    return memorized
-            managed = self._plan_manage(text)
-            if managed is not None:
-                return managed
-            sent = self._send_command(text)   # „pošli Jindrovi…" (s adresátem)
-            if sent is not None:
-                return sent
-            low = deaccent(text.lower())
-            phrase = next((p for p in current()["reminder_phrases"]
-                           if p in low), None)
-            if phrase is not None:
-                reminder = self._reminder(text, phrase)
-                if reminder is not None:
-                    return reminder
-            # POKYN K ZAOSTŘENÍ („v kontextu Bible") má přednost — posvítí
-            # na doménu a přehraje předchozí otázku (karta, spec §3e)
-            shift = self._focus_shift(text)
-            if shift is not None:
-                return shift
-            # KONSTATOVÁNÍ → Mnemos (brána E): vstup do zápisu řídí
-            # OSVĚTLENÍ grafu (#51 fáze 2 — vítěz je uzel rodiny vyrok);
-            # DRUH výroku dál rozhodují karty (výběr uvnitř parse_clauses
-            # je týž deck — parita konstrukcí), souvětí = fakt na klauzuli
+            # DISPATCH VÝROKOVÉ POLOVINY (#51 fáze 3): JEDNO osvětlení
+            # pro celý blok — vítězná rodina/karta určuje větev; ruční
+            # pořadí větví nahradily PRIORITY příkazových karet.
+            # Sémantika je STRIKTNÍ: selže-li handler vítěze, tah jde
+            # poctivě dál (žádné zkoušení dalších příkazů) — pořadí
+            # nerozhoduje kód, ale data
             lit = illuminate(text, self.qgraph, now=self.clock(),
                              is_node=self.answerer._span_is_node)
-            if lit and lit[0].kind == "vyrok":
+            winner = lit[0] if lit else None
+            handled = self._command_turn(winner, text)
+            if handled is not None:
+                return handled
+            if winner is not None and winner.kind == "vyrok":
                 statements = []
                 for statement in parse_clauses(text, self.clock(), self.deck,
                                                is_node=self._known_word):
@@ -447,6 +425,35 @@ class IrisAutomaton:
             return None
         return card.dialog.format(
             roles=", ".join(sorted(dict.fromkeys(unlit))))
+
+    def _command_turn(self, winner, text):
+        """Tah příkazu podle vítězné karty rodiny prikaz (#51 fáze 3).
+
+        Handlery zůstávají mechanismy (frázi si dohledají samy, kde ji
+        potřebují); dispatch jen říká, KTERÝ poběží. None = vítěz není
+        příkaz, nebo handler poctivě nepochodil (tah pokračuje dál)."""
+        if winner is None or winner.kind != "prikaz":
+            return None
+        card = winner.card
+        if card == "cmd-forget":
+            return self._forget_command(text)
+        if card == "cmd-memorize":
+            memo = next((p for p in sorted(current()["memorize_phrases"],
+                                           key=len, reverse=True)
+                         if p in deaccent(text.lower())), None)
+            return self._memorize_command(text, memo) if memo else None
+        if card == "cmd-plan":
+            return self._plan_manage(text)
+        if card == "cmd-send":
+            return self._send_command(text)
+        if card == "cmd-reminder":
+            low = deaccent(text.lower())
+            phrase = next((p for p in current()["reminder_phrases"]
+                           if p in low), None)
+            return self._reminder(text, phrase) if phrase else None
+        if card == "cmd-focus":
+            return self._focus_shift(text)
+        return None
 
     def _expert_turn(self, worker, text, found=None):
         """Tah přímého experta podle worker atributu uzlu grafu (#57 D).

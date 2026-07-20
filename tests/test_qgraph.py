@@ -220,3 +220,14 @@ def test_rodina_prikaz_sviti_a_prebiji_vyrok():
     assert lit and lit[0].name == "cmd-memorize"
     lit = illuminate("Připomeň mi zítra oběd.", qg, now=NOW)
     assert lit and lit[0].name == "cmd-reminder"
+
+
+def test_nezapomen_je_memorize_ne_forget():
+    """Kolize frází: „Nezapomeň…“ je příkaz ZAPAMATOVÁNÍ (substring
+    memorize tabulky), ne zapomenutí — forget jde tokenově po slovech
+    jako jeho handler („zapomeň" ≠ „nezapomeň")."""
+    from jellyai.iris.qgraph import command_features
+    features = command_features("Nezapomeň, že Roník je pes.")
+    assert "cmd:memorize" in features
+    assert "cmd:forget" not in features
+    assert "cmd:forget" in command_features("Zapomeň na Ronika.")
