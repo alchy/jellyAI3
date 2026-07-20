@@ -109,6 +109,27 @@ i harness 100 %.
 vzory — klíč musí zůstat deterministický (harness počítá remízy dál);
 dimenze nesmí přerůst v podmínky (jen osy enumerace).
 
+**Empirie E1 (2026-07-20 večer, commity f840ffa–f49f34f) — PŘIJATO:**
+zdrojové dotazové soubory **19 → 16** (rodiny `q-otaz.json`
+a `q-zjistovaci.json` nahradily 5 klonů), rozvinutých karet 20
+(+1 generovaná kombinace `q-otaz-prezens-prodrop`, ručně nikdy
+nenapsaná). Gap scénář `kde-bydli-prodrop-prezens` („Kde bydlí?“ po
+zápisu) byl červený (poctivé nenašel — nechytala ho ani poziční
+šablona) a rozvinutím **GAP-FIXED** („Kde bydlí?“ → Petrovice).
+Parita úplná: 568 testů, etalon 31/31, focus 12/12, dialog 45/45
+(GAP 3/0), zápis 34/34, harness obě varianty 100 % (27 uzlů,
+0 remíz). Korekční nálezy: (a) `q-vyberova-prodrop` NENÍ klon
+`q-vyberova-minuly` — implicitní spona „být“ literálem je jiná
+sémantika, do rodiny nepatří; (b) svinutí dekoračních karet
+(q-rekl-adresatovi, q-kdo-sloveso-misto, q-prvni-osoba-minuly) se
+odkládá — jejich `action` se liší strukturně (role theme,
+user_subject) a osa s přepisem akce by byla program v datech (riziko
+ATN); patří k úvaze E3/E4; (c) kartové odpovědní tahy jsou v dialog
+rovině harnessu „mimo rozsah“ odjakživa (`used.patterns` plní jen
+dialogové karty; dotazové karty měří etalonová rovina přes
+`last_query_card`) — dispatch nové karty proto dokládá run_dialog
+GAP-FIXED, ne shadow dialog rovina.
+
 ### E2 — claim() workerů (#26 srůst, řeší E)
 
 **Hypotéza:** experti deklarují nároky formálním `claim()` rozhraním
