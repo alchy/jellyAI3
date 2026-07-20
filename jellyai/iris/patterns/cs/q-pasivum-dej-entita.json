@@ -1,0 +1,23 @@
+{
+  "name": "q-pasivum-dej-entita",
+  "trigger": {
+    "event": "utterance.query",
+    "priority": 4,
+    "pattern": [
+      "%{TAZACI}",
+      "%{SPONA}",
+      "%{PARTICIPIUM}",
+      "%{ENTITA}"
+    ]
+  },
+  "action": {
+    "query": {
+      "hole": "$1",
+      "predicate": "$3",
+      "known": [
+        ["obj", "$4"]
+      ]
+    }
+  },
+  "teach": "Pasivní otázka s dějem před entitou „Kdy byla vydána korespondence?“ (dávka D, dotazová strana): zrcadlo karty q-pasivum-entita-dej pro druhý slovosled — čeština klade participium i před pacienta. Známá entita je PACIENT (obj), predikát z participia (vydána→vydat), bez predikátu grafu se karta nehlásí (past 11)."
+}

@@ -265,3 +265,50 @@ def test_dative_recipient_card_builds_theme_known():
     mluvci = _card_query("Co řekl Ježíš?", {"říci"},
                          is_node=lambda s: s == "Ježíš", is_word=None)
     assert mluvci is None or mluvci.pattern.known != [("theme", "Ježíš")]
+
+
+def test_pasivni_otazka_zna_pacienta_v_obj():
+    """P1b (dávka D, dotazová strana): „Kde byl X pokřtěn?" mapuje známou
+    entitu na PACIENTA (obj) — fakty pasiva ho po dávce D nesou v obj;
+    dřív otázka spadla do identity a odpovídala figlem (Mesiáš)."""
+    a = _answerer(make_fact("pokřtít", [
+        Participant("obj", "Ježíš", "person"),
+        Participant("loc", "Jordán", "geo")]))
+    result = a.answer("Kde byl Ježíš pokřtěn?", [])
+    assert "Jordán" in result.text
+    assert a.turn.query_card and a.turn.query_card.startswith("q-pasivum")
+
+
+def test_pasivni_otazka_dej_pred_entitou():
+    """„Kdy byla vydána korespondence?" — participium před entitou."""
+    a = _answerer(make_fact("vydat", [
+        Participant("obj", "korespondence", "concept"),
+        Participant("time", "2009", "time")]))
+    result = a.answer("Kdy byla vydána korespondence?", [])
+    assert "2009" in result.text
+    assert a.turn.query_card and a.turn.query_card.startswith("q-pasivum")
+
+
+def test_pasivni_karta_se_nehlasi_bez_predikatu():
+    """„Kde byl Petr nemocen?" — „nemocen" má tvar participia, ale predikát
+    grafu z něj nevzejde → karta se nehlásí (past 11) a otázka jde
+    starou cestou; pasivní karta nekrade sponové vlastnosti."""
+    a = _answerer(make_fact("být", [
+        Participant("subj", "Petr", "person"),
+        Participant("attr", "nemocný", "concept")]))
+    a.answer("Kde byl Petr nemocen?", [])
+    card = a.turn.query_card
+    assert not (card or "").startswith("q-pasivum")
+
+
+def test_pasivni_karta_nekrade_sponovou_identitu():
+    """„Kdo je Božena Němcová?" — „Božena" končí na -ena (tvar participia),
+    ale je to JMÉNO: vylučovací prvek participium!jmeno (idiom pasti 9)
+    nechává otázku sponové kartě; bez něj pasivní karta vyhraje výběr
+    delším vzorem a na predikátu shodí celou kartovou cestu."""
+    a = _answerer(make_fact("být", [
+        Participant("subj", "Božena Němcová", "person"),
+        Participant("pred", "spisovatelka", "concept")]))
+    result = a.answer("Kdo je Božena Němcová?", [])
+    assert a.turn.query_card == "q-spona-identita"
+    assert "spisovatelka" in result.text

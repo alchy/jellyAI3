@@ -1,0 +1,23 @@
+{
+  "name": "q-pasivum-entita-dej",
+  "trigger": {
+    "event": "utterance.query",
+    "priority": 4,
+    "pattern": [
+      "%{TAZACI}",
+      "%{SPONA}",
+      "%{ENTITA}",
+      "%{PARTICIPIUM}"
+    ]
+  },
+  "action": {
+    "query": {
+      "hole": "$1",
+      "predicate": "$4",
+      "known": [
+        ["obj", "$3"]
+      ]
+    }
+  },
+  "teach": "Pasivní otázka s entitou před dějem „Kde byl Ježíš pokřtěn?“ / „Kdy byla Theodora pokřtěna?“ (dávka D, dotazová strana): známá entita je PACIENT — fakty pasiva ji po dávce D nesou v roli obj, proto explicitní pár na kartě. Predikát vzejde z participia toutéž normalizací jako u šablon (pokřtěn→pokřtít); bez predikátu grafu se karta nehlásí (past 11 — „Kde byl Petr nemocen?“ nekrade sponovou cestu). Spona se váže vzorem, ale klíč copula na kartě NENÍ — sponové pravidlo by překlopilo místní díru na identitu."
+}

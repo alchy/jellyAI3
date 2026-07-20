@@ -73,3 +73,21 @@ def test_dative_hypothesis_class():
     assert "dativ" in tagged["Ježíšovi"]
     assert "dativ" in tagged["učedníkům"]
     assert "dativ" not in tagged["Co"] and "dativ" not in tagged["řekl"]
+
+
+def test_participium_hypoteza():
+    """Pasivní participium (krátký tvar) dostává třídu `participium`
+    z tabulky koncovek — hypotéza, rozhodne až karta (P1b, dávka D)."""
+    toks = classify("Kde byl Ježíš pokřtěn")
+    krest = next(t for t in toks if t.form == "pokřtěn")
+    assert "participium" in krest.classes
+    toks = classify("Kdy byla vydána korespondence")
+    vydana = next(t for t in toks if t.form == "vydána")
+    assert "participium" in vydana.classes
+
+
+def test_participium_kratka_slova_ne():
+    """Krátká slova („den") participium nejsou — minimální délka."""
+    toks = classify("Který den byl pátek")
+    den = next(t for t in toks if t.form == "den")
+    assert "participium" not in den.classes

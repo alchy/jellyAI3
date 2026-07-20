@@ -123,6 +123,12 @@ def classify(text, is_node=None):
             # HYPOTÉZA dativu (#55: adresát — „Ježíšovi", „učedníkům");
             # lexer nerozhoduje, roli přiřadí až vzor na kartě
             classes.add("dativ")
+        if len(form) >= 4 and form.lower().endswith(
+                tuple(lang.get("participle_endings", ()))):
+            # HYPOTÉZA pasivního participia („pokřtěn", „vydána" — P1b);
+            # kolize s podstatnými jmény („žena") nevadí: karta se nehlásí,
+            # dokud tvar nerozřeší na predikát grafu (past 11)
+            classes.add("participium")
         if (len(form) >= 3
                 and not ({"prvni_osoba", "spona", "funkcni"} & classes)
                 and (norm in finite_catalog

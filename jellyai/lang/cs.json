@@ -40,6 +40,10 @@
                  "tragédie", "publikace", "esej", "fejeton", "trilogie"],
   "work_verbs": ["napsat", "vydat", "natočit", "složit", "namalovat", "vytvořit",
                  "dokončit", "publikovat", "sepsat"],
+  "participle_endings": ["án", "ána", "áno", "áni", "ány",
+                          "en", "ena", "eno", "eni", "eny",
+                          "ěn", "ěna", "ěno", "ěni", "ěny",
+                          "ut", "uta", "uto", "uti", "uty"],
   "interrogatives": {
     "kdo": ["subj", "person", "Kdo"], "koho": ["obj", "person", "Kdo"],
     "co": ["obj", null, "Co"], "ceho": ["obj", null, "Co"], "cemu": ["obj", null, "Co"],
@@ -192,7 +196,8 @@
     "PREDL_MISTA": ":v|ve|na",
     "JMENO": "jmeno",
     "ENTITA": "uzel+",
-    "ZBYTEK": "*"
+    "ZBYTEK": "*",
+                      "PARTICIPIUM": "participium!jmeno"
   },
   "user_entity": "uživatel",
   "focus_shift_phrases": ["v kontextu", "v ramci", "v oblasti", "myslim tim",
