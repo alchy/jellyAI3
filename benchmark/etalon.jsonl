@@ -38,3 +38,4 @@
 {"q": "Co řekl Ježíšovi?", "expect": ["umřel"], "reject": ["Amen"], "cat": "směr řeči"}
 {"q": "Co řekl učedníkům?", "expect": ["Pojďme"], "reject": ["Amen"], "cat": "směr řeči"}
 {"q": "Kde napsal R.U.R.?", "expect": ["nevím"], "cat": "prázdná díra", "gap": "#57 E3: predikát napsat roli loc nikdy nenese — místo generického terminálu má odpovědět chytrá clarifikace (vím kdo a co, kde nevím)"}
+{"q": "Koho vzkřísil Ježíš?", "expect": ["nevím"], "reject": ["den"], "cat": "prázdná díra", "gap": "T4/B6: theme (den) nesmí plnit person díru — po guardu je obj prázdná role a nastoupí chytrá clarifikace"}
