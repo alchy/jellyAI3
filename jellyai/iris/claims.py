@@ -20,7 +20,8 @@ class ExpertClaim:
         worker (str): Subsystém, který tah odbaví.
         priority (int): Přednost mezi přímými experty (vyšší dřív) —
             zrcadlí dnešní pořadí bran v turn().
-        recognize: callable(text, now) -> bool — hlásí se expert o tah?
+        recognize: callable(text, now) -> výsledek | None — nárok
+            NESE i výsledek (postřeh 1.3: rozpoznání = výpočet, jednou)
     """
     name: str
     worker: str
@@ -30,12 +31,12 @@ class ExpertClaim:
 
 def _metron(text, now):
     from jellyai.iris.subsystems.metron import compute
-    return compute(text) is not None
+    return compute(text)
 
 
 def _chronos(text, now):
     from jellyai.iris.subsystems.chronos import clock_answer
-    return clock_answer(text, now) is not None
+    return clock_answer(text, now)
 
 
 def _meta_focus(text, now):

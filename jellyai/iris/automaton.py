@@ -201,9 +201,10 @@ class IrisAutomaton:
         # DATA (claims priorita), ne pořadí větví — konec pasti #51 pro
         # přímé experty; neznámý worker propadá (budoucí claimy)
         for claim in sorted(self.qgraph.claims, key=lambda c: -c.priority):
-            if not claim.recognize(text, self.clock()):
+            found = claim.recognize(text, self.clock())
+            if not found:
                 continue
-            handled = self._expert_turn(claim.worker, text)
+            handled = self._expert_turn(claim.worker, text, found)
             if handled is not None:
                 return handled
         used_patterns = []
@@ -443,17 +444,24 @@ class IrisAutomaton:
         return card.dialog.format(
             roles=", ".join(sorted(dict.fromkeys(unlit))))
 
-    def _expert_turn(self, worker, text):
-        """Tah přímého experta podle worker atributu uzlu grafu (#57 D)."""
-        handler = {"metron": self._metron_query,
-                   "chronos": self._clock_response,
-                   "iris": self._focus_query}.get(worker)
-        return handler(text) if handler else None
+    def _expert_turn(self, worker, text, found=None):
+        """Tah přímého experta podle worker atributu uzlu grafu (#57 D).
 
-    def _clock_response(self, text):
+        `found` = výsledek z recognize claimu (postřeh 1.3) — handler
+        ho použije místo druhého výpočtu."""
+        if worker == "metron":
+            return self._metron_query(text, found)
+        if worker == "chronos":
+            return self._clock_response(text, found)
+        if worker == "iris":
+            return self._focus_query(text)
+        return None
+
+    def _clock_response(self, text, found=None):
         """Hodinová otázka — odpovídá Chronos sám (časová kotva); graf se
         nedotkne, aktivační pole zůstává, jak bylo."""
-        direct = clock_answer(text, self.clock())
+        direct = found if isinstance(found, str) \
+            else clock_answer(text, self.clock())
         if direct is None:
             return None
         response = IrisResponse(
@@ -464,7 +472,7 @@ class IrisAutomaton:
         self.state.remember(text, response)
         return response
 
-    def _metron_query(self, text):
+    def _metron_query(self, text, found=None):
         """ARITMETIKA z řádku (#56): Metronova brána Q — výraz nebo
         součtový výčet (účtenka). Výsledek s PŘEPISEM výrazu nese karta
         metron.compute (kontrola extrakce uživatelem); jistota plná —
@@ -473,9 +481,10 @@ class IrisAutomaton:
         Returns:
             IrisResponse | None: Výsledek, nebo None (řádek není výpočet).
         """
-        from jellyai.iris.subsystems.metron import compute
-        found = compute(text)
-        if found is None:
+        if found is None:              # přímé volání (testy) — spočti sám
+            from jellyai.iris.subsystems.metron import compute
+            found = compute(text)
+        if not isinstance(found, tuple):
             return None
         expression, result = found
         card = self.deck.best("metron.compute", {})
