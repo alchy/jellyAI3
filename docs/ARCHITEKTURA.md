@@ -32,7 +32,9 @@ Tři přesvědčení drží celou stavbu pohromadě:
    opraví — nebo rozbije.
 
 Zbytek dokumentu sleduje cestu jedné české věty systémem: od znaků přes
-tvarosloví a stavbu věty k faktům, aktivaci a odpovědi.
+tvarosloví a stavbu věty k faktům, aktivaci a odpovědi. Kapitola 7 pak
+staví vedle faktového grafu druhý — **otázkový** — a ukazuje na
+příkladech, co mají společné, kde se liší a kde se překrývají.
 
 ---
 
@@ -261,7 +263,169 @@ maso" → Roník je pes → Roník má nejspíš rád maso; přímý fakt vždy
 poráží zděděný) — klasické defeasible inheritance, jehož zárodky
 (predikát `druh`, typový join, kontejnment Toposu) už v systému stojí.
 
-## 7. Build korpusu (offline)
+## 7. Dva grafy: faktový a otázkový
+
+Až potud měl dokument jeden graf — faktový. Od #57 stojí vedle něj
+druhý, **otázkový** (experiment na větvi `otazkovy-graf`,
+`jellyai/iris/qgraph.py`, spec `2026-07-20-otazkovy-graf.md`). Nejsou
+to konkurenti; jsou to dvě různé věci, které jen sdílejí tvar.
+
+**Jednou větou:** faktový graf ví, CO systém zná; otázkový graf ví,
+JAK se lze ptát a KAM otázku poslat.
+
+### 7.1 Co mají společné
+
+Oba jsou grafy uzlů a hran, oba se **rozsvěcují** (aktivace jako jediné
+médium vlivu), oba vznikají z **dat, ne z kódu** (faktový z korpusu
+a dialogu; otázkový kompilací karet a schématu predikátů), a oba jsou
+**měřené** (etalon/focus/dialog × shadow harness). Sdílejí i disciplínu:
+co graf nerozhodne, končí poctivým dialogem, ne heuristikou.
+
+### 7.2 Kde se liší
+
+| | Faktový graf | Otázkový graf |
+|---|---|---|
+| Uzel | fakt / entita („bydlí(Marcela, Petrovice)") | typ otázky („kdo-udělal-co"), worker, zpřesnění |
+| Hrana | role účastníka (subj, obj, loc, time…) | digging: `zpresneni`, `navrat` |
+| Životnost | trvalý, roste zápisem | trvalý, ale **kompilát** — přegeneruje se ze zdrojů |
+| Kdo ho píše | korpus + uživatel (paměť) | karty + schéma predikátů + telemetrie |
+| Průchod znamená | odpověď (match → díra) | směrování tahu a vedení dialogu |
+| Když je prázdný | „nenašel jsem" | tah propadne pozičním šablonám |
+| Hlavní metody | `FactGraph.add_fact`, `facts_of`, `_match`, `_answer_from`, `_identity_vote`, `ActivationField.warm/step` | `compile_qgraph`, `illuminate`, `decorate`, `DialogPosition` |
+
+### 7.3 Kde se překrývají
+
+Tři místa, a všechna jsou zajímavá:
+
+1. **Schéma predikátů.** Otázkový graf odvozuje své instance
+   z faktového: podpis `napsat{subj: person, obj: dílo}` implikuje
+   otázky „Kdo napsal X?", „Co napsal Y?", „Napsal X Y?". *Otázky jsou
+   stín schématu faktů* — proto se sémantika nekurátoruje ručně.
+2. **Orákulum entit.** Vzorový prvek `uzel+` se ptá faktového grafu,
+   jestli je rozpětí entita (`_span_is_node`) — bez datového grafu by
+   otázkový graf neuměl poznat „Válku s mloky" od dvou slov.
+3. **Aktivace.** Efemérní **větný graf** tahu (tokeny + hypotézy lexeru
+   + nároky expertů) rozsvěcuje uzly otázkového grafu; jas
+   *faktového* grafu (těžiště konverzace) zase vybírá téma, když je
+   otázka elidovaná („Kdy se narodil?").
+
+### 7.4 Ukázka A: jednoduchá otázka
+
+„Kdo napsal R.U.R.?" — jeden osvětlený uzel, žádné zpřesňování.
+
+```
+větný graf:   kdo{otaz}  napsal{l_tvar}  R.U.R.{uzel+ ✓ orákulum}
+                 │
+otázkový graf: [q-otaz-minuly] svítí (jediný)   worker = graf
+                 │                               dekorace: —
+faktový graf:  _match(napsat, {R.U.R.}, díra subj/person)
+                 │
+odpověď:       Karel Antonín Čapek
+```
+
+Aktivace faktového grafu po tomto tahu (skutečné okno z provozu):
+
+```
+Karel Antonín Čapek = 2.68   ← odpověď svítí nejvíc
+R.U.R.              = 2.10   ← rozřešená entita otázky
+Josef Čapek         = 0.51   ← vyzářeno po hranách (bratr)
+člověk, bratr       ≈ 0.35   ← okolí tématu
+```
+
+Následující tah těží právě z tohoto jasu: **„Kdy se narodil?"** nemá
+podmět, ale nejteplejší rodově shodná osoba je Karel Čapek — odpověď
+„2. října 1842". Tomu se říká pro-drop na straně dotazu a je to čistý
+příklad toho, že aktivace není ozdoba, ale nosný mechanismus.
+
+### 7.5 Ukázka B: složitá otázka
+
+„Co řekl Ježíšovi?" — dvě věci najednou: soutěž uzlů **a** dekorace.
+
+```
+větný graf:   co{otaz}  řekl{l_tvar}  Ježíšovi{dativ ⇒ hypotéza adresáta}
+                 │
+otázkový graf: svítí DVA uzly, vyhrává těsnější:
+                 [q-rekl-adresatovi]  (priorita 6)  ← vítěz
+                 [q-otaz-minuly]      (priorita 4)
+                 │
+dekorace:      role:adresat   ← NEsoutěží, věší se na vítěze
+                 │
+faktový graf:  _match(říci, {Ježíš}, díra obj) + rolová vazba theme
+                 │            └ známý MUSÍ být v roli theme (adresát)
+odpověď:       „umřel"   (Martina slova Ježíšovi — ne Ježíšova vlastní)
+```
+
+Rozdíl mezi soutěží a dekorací je jádro modelu. Kdyby Chronos, Topos
+nebo dativní vazba **soutěžily** s typem otázky, přebily by ji — ve
+skutečnosti jsou to omezení: „Kdy jsem měl v tomto roce knedlíky?"
+vyhraje uzel otázky a nese dekorace `chronos:interval` (filtr času)
+a `mnemos:prvni-osoba` (podmět = uživatel). Měření na etalonu:
+predikované dekorace odpovídají skutečně aplikovaným filtrům
+(`time_filter`, `place_filter`, `_theme_bound`) ve **41/41** případech.
+
+### 7.6 Ukázka C: dialog jako procházka grafem
+
+Nejsložitější případ nemá jednu odpověď — má jich 143.
+
+```
+❓ Co řekl Ježíš?
+   → uzel [q-co-vime / q-otaz-*] svítí, faktový graf vrací PŘETEČENÍ
+   → hrana `zpresneni` → uzel [focus-offer-overflow]
+💬 Mám tu více dat… Nabízí se: Jeremiáš, Petr, bůh, celník, chleb…
+❓ Petr
+   → stojíme ve zpřesňovacím uzlu; volba = hrana `navrat`
+   → otázka se PŘEHRAJE s dominantní oblastí (pick_focus)
+💬 satane, nemohli jedinou hodinu bdít se mnou
+```
+
+Zpřesňovací uzly jsou plnohodnotnými uzly grafu: je-li takový uzel
+aktivní, dialog pokračuje zpřesňováním a **graf si sám ostří focus**.
+Stav dialogu pak není roztroušený po objektech (`PendingFocus`, drill,
+`pick_focus`), ale je to jediná věc: **pozice v grafu** (`DialogPosition`).
+
+### 7.7 Jak je uspořádaná báze karet
+
+Klíčové zjištění pro čtenáře, který hledá „kde to bydlí": **karty jsou
+jen jedny** — všechny leží v `jellyai/iris/patterns/cs/*.json` a čte je
+jeden `PatternDeck`. Liší se **událostí** v triggeru, a právě podle ní
+se dělí mezi oba světy:
+
+| Událost triggeru | Role karty | Kam patří |
+|---|---|---|
+| `utterance.query` (+`pattern`) | tvar otázky (vzor tříd lexeru) | uzel `otazka` otázkového grafu |
+| `utterance.statement` | typ výroku (vzor nebo ploché rysy) | zápis do faktového grafu |
+| `resolve.ambiguous`, `data.overflow`, `focus.low`, `statement.subject` | dialogový akt | uzel `clarify` (zpřesnění) + jeho hrany |
+| `memory.*`, `reminder.*`, `metron.compute`, `focus.query` | odpověď experta | uzel `worker` |
+
+Výběr karty dělá v obou světech **týž mechanismus**: `deck.best()` —
+těsnost triggeru, pak priorita, pak jméno. Otázkový graf tedy nezavádí
+druhé rozhodování; jen dává plochému výběru **strukturu**: uzly dostanou
+hrany (digging), workery atribut a telemetrie váhu. Karty zůstávají
+zdrojovým kódem, graf je jejich zkompilovaná podoba — proto se nesmí
+rozejít a proto je jeho jedinou bránou parity gate.
+
+### 7.8 Co experiment naměřil (a co to znamená)
+
+`benchmark/run_qgraph.py` neposouvá chování — porovnává, kudy by šel
+graf, s tím, kudy systém reálně šel: **dispatch dialog 11/11, etalon
+41/41, stav dialogu 3/3, dekorace 41/41 — vše 100 %** (v obou
+variantách skórování). Dva nálezy stojí za zapamatování:
+
+- **Vrstva dekorací je popis reality**, ne nová abstrakce — to, co
+  model předpovídá, answerer už dělá.
+- **Váhy z telemetrie jsou zatím mrtvá větev**: naměřeno **0 remíz**
+  základního klíče, takže provoz nemá kde routing ovlivnit — a to
+  při jakémkoli objemu. Otázka „kolik provozu je potřeba" má dřívější
+  otázku „nastávají vůbec remízy?".
+
+Sto procent shody je zároveň silný i slabý signál: kompilace je věrná,
+ale graf zatím nedělá *jiné* rozhodnutí. Jeho hodnota není v přesnosti —
+je ve **struktuře** (jedno místo pro směrování místo ručního pořadí
+bran, hrany pro digging, jedna reprezentace stavu). Prokáže ji až fáze,
+kde dnešní kód nemá odpověď: proaktivní nabídky hran („mohu doplnit
+kdy a kde") a instance odvozené ze schématu predikátů.
+
+## 8. Build korpusu (offline)
 
 ```
 data/raw/*.txt → index → annotate (UDPipe+NameTag, služby :8081–8083)
@@ -276,7 +440,7 @@ annotate → graph`. Etalon je guardrail — po přestavbě grafu se smí id
 uzlů legitimně zlepšit (očekávání se aktualizují SE zdůvodněním), nikdy
 zhoršit.
 
-## 8. Provoz: služby, web, vývojová smyčka
+## 9. Provoz: služby, web, vývojová smyčka
 
 - **REST Iris** (`services/iris_service.py`, :8084) — jediný vstup
   dialogu; vlastní automat, graf i aktivaci; tahy zrcadlí do konzole.
@@ -290,7 +454,7 @@ zhoršit.
   `data/web_inbox.txt` zpracuje web, jako by je uživatel napsal do
   dialogového okna (testování je vidět v GUI včetně aktivace).
 
-## 9. Měření: pět benchmarků jako brány
+## 10. Měření: pět benchmarků jako brány
 
 | benchmark | co měří | normativ |
 |---|---|---|
@@ -305,7 +469,7 @@ nemaže, ale sleduje; jakmile projde, benchmark ohlásí GAP-FIXED —
 a jakmile ho něco znovu rozbije, číslo klesne. Nová feature bez svého
 benchmarkového řádku se nepovažuje za hotovou.
 
-## 10. Shrnutí principů
+## 11. Shrnutí principů
 
 - **Karty, ne kód** — dialogové akty i gramatika jsou JSON; kód jen
   mechanismy.
@@ -315,6 +479,11 @@ benchmarkového řádku se nepovažuje za hotovou.
   „chytrý" algoritmus už jednou rozbil klasifikaci.
 - **Dialog > figly** — ptát se je lepší než hádat; pozorovatel není
   odpověď.
-- **Jeden graf, jedno pole** — vliv na odpovědi jen aktivací a filtry.
+- **Jedna znalost, jedno pole** — do odpovědí smí zasáhnout jen
+  aktivace a filtry; faktů se držíme v jednom grafu (korpus i paměť).
+- **Data vědí, co se ví; struktura ví, jak se ptát** — faktový graf
+  nese znalost, otázkový (kapitola 7) směrování a vedení dialogu;
+  otázky jsou stín schématu faktů.
 - **Korpusová evidence > lokální tag** — hlasování přes celek.
-- **Vše měřeno** — pět benchmarků, gap řádky, parity gate.
+- **Vše měřeno** — pět benchmarků, gap řádky, parity gate; u nových
+  konceptů shadow režim dřív než přepnutí.
