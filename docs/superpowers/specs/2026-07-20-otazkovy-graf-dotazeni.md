@@ -158,6 +158,16 @@ bez zásahu do compile/illuminate/turn. Brána budoucího přepnutí
 dispatch je otevřena — samo přepnutí zůstává SAMOSTATNÉ rozhodnutí
 (§6) s bitovou paritou dialog benchmarku.
 
+**Empirie D (2026-07-20 večer, větev qgraph-dispatch) — PŘEPNUTO:**
+brány přímých expertů (Metron → Chronos hodiny → meta-focus) v
+`_turn()` nahrazeny smyčkou nad `qgraph.claims` seřazenou prioritou
+claimů — pořadí bran je poprvé v DATECH; automat drží kompilát
+(`IrisAutomaton.qgraph`). Neznámý worker propadá (test vetřelce).
+Meta-focus se posunul před resume identity/pick — dialog benchmark
+bitově beze změny (45/45), takže posun je neutrální. Parita úplná:
+571 testů, všechny benchmarky i harness 100 %. Výroková polovina a
+příkazy zůstávají ručnímu větvení — to je etapa #51, ne fáze D.
+
 ### E3 — Instance ze schématu predikátů (řeší C)
 
 **Hypotéza:** schéma se rozšíří z množiny jmen na podpisy s rolemi
@@ -205,8 +215,8 @@ jako nález do spec (sekce Empirie), kód se neponechává.
   jako budoucí směr, projekce do event logu #47 jako zlepšení poté);
 - **výroková polovina** (T6) — jiný graf, nekřížit předčasně;
 - **váhy v dispatch** — mrtvá větev (0 remíz), harness je dál počítá;
-- **přepnutí dispatch** — až po E2, samostatné rozhodnutí s bitovou
-  paritou.
+- **přepnutí dispatch** — ✅ přímí experti přepnuti (fáze D, Empirie
+  výše); zbývá výroková polovina a příkazy (#51 etapa 3).
 
 ## 7. DRY účet a výhledy
 
