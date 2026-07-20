@@ -226,3 +226,23 @@ def test_query_gender_from_verb_form():
 def test_query_copula_flag():
     q = build_query("Kdo je Karel Capek?", PREDS)
     assert q.is_copula is True and q.verb_lemma is None
+
+
+def test_verb_match_deterministic_pres_hash_seedy():
+    """#58: remíza kandidátů („Udělat" šum × „udělat") nesmí záviset na
+    PYTHONHASHSEED — vítěz je deterministický a malopísmenný predikát
+    má přednost před kapitalizovaným šumem (pravidlo #31 dotazovou cestou)."""
+    import os
+    import subprocess
+    import sys
+    code = ("from jellyai.answerer.query import _verb_match;"
+            "print(_verb_match('udělal',"
+            " {'Udělat', 'udělat', 'uzdravit', 'učit', 'uvěřit'}))")
+    results = set()
+    for seed in ("0", "1", "7"):
+        out = subprocess.run(
+            [sys.executable, "-c", code],
+            env={**os.environ, "PYTHONHASHSEED": seed},
+            capture_output=True, text=True, check=True)
+        results.add(out.stdout.strip())
+    assert results == {"udělat"}

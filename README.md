@@ -143,10 +143,10 @@ curl -s localhost:8084/schema     # na co se lze ptát (predikáty, role, karty)
 ## Benchmarky — objektivní řízení změn
 
 Každá změna se měří; normativy neklesají (guardrail). Stav 2026-07-20
-(ověřeno spuštěním): **581 testů, etalon 33/33 (15 gap řádků: 12
-opraveno / 3 otevřeno — jeden řádek mezi běhy kolísá, nález #58),
-focus 12/12, dialog 45/45 tahů ve 20 scénářích, zápis 34/34, otázkový
-graf 5 rovin 100 % v obou variantách.**
+(ověřeno spuštěním): **582 testů, etalon 33/33 (15 gap řádků: 11
+opraveno / 4 otevřeno), focus 12/12, dialog 45/45 tahů ve 20
+scénářích, zápis 34/34, otázkový graf 5 rovin 100 % v obou
+variantách; výstupy deterministické napříč hash seedy (#58).**
 
 ```bash
 .venv/bin/python -m pytest -q               # jednotkové testy

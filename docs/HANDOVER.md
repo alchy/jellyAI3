@@ -41,11 +41,12 @@ vstupu a answerer má kaskádu poctivých odpovědí.
 
 ## 2. Stav (2026-07-20 večer — den otázkového grafu, ~50 commitů)
 
-- **Metriky:** 581 testů; etalon 33/33 (GAP 12 opraveno / 3), focus
-  12/12, dialog 45/45 (GAP 8/0), ZÁPIS 34/34, qgraph harness 5 rovin
-  (dispatch, výroky, stav, dekorace, etalon) 100 % v obou variantách.
-  POZOR: etalonový gap řádek „Co udělal Ježíš v Kafarnaum?" mezi běhy
-  KOLÍSÁ (12/3 ↔ 11/4) — nedeterminismus, nález #58 (past 19).
+- **Metriky:** 582 testů; etalon 33/33 (GAP 11 opraveno / 4 —
+  deterministicky, #58 vyřešen; Kafarnaum řádek čeká na gazetteer
+  seed dávky D), focus 12/12, dialog 45/45 (GAP 8/0), ZÁPIS 34/34,
+  qgraph harness 5 rovin (dispatch, výroky, stav, dekorace, etalon)
+  100 % v obou variantách. Etalon i dialog ověřeny bitově shodné
+  napříč PYTHONHASHSEED.
 - **Otázkový graf (#57 + #51) KOMPLETNÍ:** kompilát karet s PĚTI
   rodinami uzlů (otazka/vyrok/prikaz/worker/clarify) je JEDINÝM
   dispatcherem vstupu — přímí experti přes registr claimů
@@ -209,12 +210,13 @@ nesmí být přepsána (je tracked — nález #17).
     (`cascade_skip_predicates`) do ní NEpatří (identita má vlastní
     patra); s místním filtrem se nespekuluje; verdikty rolí přes
     `_ring_roles` (normalizace smí vybrat člen kruhu bez faktů).
-19. **Nedeterminismus přes iteraci setů** (#58): odpověď na „Co udělal
-    Ježíš v Kafarnaum?" se mezi běhy procesu LIŠÍ (figl „stan" ×
-    kaskáda s predikátem „Udělat") — závisí na PYTHONHASHSEED, tedy
-    někde se vítěz bere z neseřazené množiny (podezření: `_verb_match`
-    s `first=True` nad setem predikátů). Etalonové GAP číslo proto
-    kolísá. Nové iterace přes množiny VŽDY řadit.
+19. **Nedeterminismus přes iteraci setů** (#58, VYŘEŠENO — poučení
+    trvá): vítěz remízy braný z neseřazené množiny závisí na
+    PYTHONHASHSEED („Udělat"ד udělat" v `_verb_match` střídalo
+    odpovědi mezi běhy). Nové iterace přes množiny VŽDY řadit — vzor
+    `_canon_first` v query.py (malopísmenný predikát před
+    kapitalizovaným šumem, pak abecedně); determinismus ověřuj
+    bitovým diffem benchmarků pro dva různé hash seedy.
 
 ## 7. Pracovní smyčka (doporučený postup na 1 úkol)
 

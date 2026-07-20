@@ -99,6 +99,14 @@ def _exact_predicate(token, predicates):
     return stripped.endswith("l") and stripped in normalized
 
 
+def _canon_first(preds):
+    """Deterministické pořadí kandidátů predikátu (#58): malopísmenný
+    před kapitalizovaným (kapitalizovaný slovesný predikát je korpusový
+    šum — totéž pravidlo jako výběr l-predikátu v zápisu, #31), pak
+    abecedně. Remízy tak nikdy nerozhoduje hash-pořadí setu."""
+    return sorted(preds, key=lambda p: (p[:1].isupper(), p))
+
+
 def _verb_match(token, predicates, first=False):
     """Predikát grafu, jehož kmen je prefixem tvaru dotazu (napsal→napsat).
 
@@ -114,8 +122,11 @@ def _verb_match(token, predicates, first=False):
         return None
     # PŘESNÁ shoda s predikátem grafu obchází délkový práh — paměťové
     # predikáty Mnemos jsou krátké l-ové kmeny („měl"); porovná se i kmen
-    # l-formy tvaru („měli" → „měl")
-    normalized = {_norm(p): p for p in predicates}
+    # l-formy tvaru („měli" → „měl"); kolizi _norm („Udělat"×„udělat")
+    # drží deterministické pořadí (#58) — preferovaný se zapíše první
+    normalized = {}
+    for p in _canon_first(predicates):
+        normalized.setdefault(_norm(p), p)
     if low in normalized:
         return normalized[low]
     # NEGAČNÍ PÁR (#24): tvar je slovesem, i když graf zná jen jeho OPAK
@@ -143,8 +154,10 @@ def _verb_match(token, predicates, first=False):
         return None
     best = None
     # páruje se i proti synonymům predikátů (spec 4.2): „žili"→žít, expanzi
-    # na bydlet-fakty pak dělá answererův _synonym_ring
-    for pred in set(predicates) | set(current()["predicate_synonyms"]):
+    # na bydlet-fakty pak dělá answererův _synonym_ring; pořadí kandidátů
+    # deterministické (#58) — remízu common drží první preferovaný
+    for pred in _canon_first(set(predicates)
+                             | set(current()["predicate_synonyms"])):
         p = _norm(pred)
         common = 0
         for a, b in zip(low, p):
