@@ -463,11 +463,15 @@ zhoršit.
 
 | benchmark | co měří | normativ |
 |---|---|---|
-| `run_etalon.py` | odpovědi na korpusem kryté otázky; `--mode templates` je parity gate vzorových karet | 29/29 v OBOU režimech |
+| `run_etalon.py` | odpovědi na korpusem kryté otázky | 33/33 (jádro 100 %) |
 | `run_focus.py` | aktivace správných uzlů (top-K jasu) | 12/12 |
-| `run_dialog.py` | scénáře automatu (fixní hodiny, čerstvý graf per scénář); umí GAP scénáře | 27/27 |
+| `run_dialog.py` | scénáře automatu (fixní hodiny, čerstvý graf per scénář); umí GAP scénáře | 45/45 |
 | `run_mnemos.py` | ZÁPIS: výrok → parse (týmž soukolím jako runtime); `--nom` i nominativizaci | 34/34 |
+| `run_qgraph.py` | otázkový graf: dispatch, výroky, stav, dekorace, etalon (5 rovin, obě varianty) | vše 100 % |
 | `run_coverage.py` | podíl vět korpusu bez faktu | trend |
+
+Aktuální čísla nese `docs/HANDOVER.md` §2 (normativy rostou s gap
+řádky — tabulka je spodní hranice k datu 2026-07-20).
 
 Gap řádky jsou institucionalizovaná poctivost: známý nedostatek se
 nemaže, ale sleduje; jakmile projde, benchmark ohlásí GAP-FIXED —

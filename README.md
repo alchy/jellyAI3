@@ -107,8 +107,13 @@ Chování neřídí kód, ale **JSON pattern-karty**
 (`jellyai/iris/patterns/cs/` — 1 karta = 1 vzor: trigger → dialog → akce →
 teach; i prahy rozhodování nesou karty). Pod prahem jistoty (**QueryAssurance**)
 se automat ptá místo hádání; bez odpovědi přizná „nenašel" a nabídne nejbližší
-kandidáty. Otázky překládá **šablonový parser pseudo-QL**
-(`jellyai/answerer/query.py`, režim `GraphConfig.query_mode = "hybrid"`).
+kandidáty. Otázky překládá **šablonový parser pseudo-QL** (`jellyai/answerer/
+query.py`) — vzorové karty + poziční šablony, dotazová cesta je UDPipe-free
+(řez #14). Vstup směruje **otázkový graf** (#57/#51): kompilát karet s pěti
+rodinami uzlů (otázky, výroky, příkazy, workeři, clarify) — pořadí bran nesou
+data, ne kód. Tápání není terminál: systém dá **částečnou odpověď** z rolí
+faktů, **chytrou clarifikaci** (které role děj zná) nebo **nabídku kandidátů**
+s volbou (kaskáda jistot, princip „data ověř — pak se ptej").
 
 Subsystémy (`jellyai/iris/subsystems/`): **Chronos** (intervaly „dnes/v 19.
 století/minulý týden", tvrdý časový filtr odpovědí, hodinové otázky,
@@ -133,16 +138,22 @@ curl -s localhost:8084/schema     # na co se lze ptát (predikáty, role, karty)
 
 ## Benchmarky — objektivní řízení změn
 
-Každá změna se měří; normativy neklesají (guardrail). Stav: **457 testů,
-etalon 29/29 (+5 sledovaných gapů), focus 12/12, dialog 21/21 — vše 100 %.**
+Každá změna se měří; normativy neklesají (guardrail). Stav 2026-07-20:
+**581 testů, etalon 33/33 (+12 opravených gapů), focus 12/12, dialog
+45/45, zápis 34/34, otázkový graf 5 rovin 100 % — vše 100 %.**
 
 ```bash
 .venv/bin/python -m pytest -q               # jednotkové testy
 .venv/bin/python benchmark/run_etalon.py    # správnost odpovědí (JÁDRO + gap tracking)
 .venv/bin/python benchmark/run_focus.py     # zaostření aktivace: expect uzly v top-K jasu
 .venv/bin/python benchmark/run_dialog.py    # dialogové scénáře Iris (fixní hodiny)
+.venv/bin/python benchmark/run_mnemos.py    # ZÁPIS: výrok → parse (zápisový etalon)
+.venv/bin/python benchmark/run_qgraph.py    # otázkový graf: dispatch/výroky/stav/dekorace
 .venv/bin/python benchmark/run_coverage.py  # výtěžnost extrakce — diagnostika
 ```
+
+Architektonická dokumentace pro nové vývojáře: **`docs/architektura-web/index.html`**
+(17 kapitol, offline, Mermaid) + výkladový `docs/ARCHITEKTURA.md`.
 
 Otevřené body a priority: `docs/BACKLOG.md`. Předání práce mezi sezeními:
 `docs/HANDOVER.md`.

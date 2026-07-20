@@ -1,10 +1,13 @@
-# HANDOVER — předání projektu jellyAI3 (2026-07-20, po maratonu vzorové gramatiky)
+# HANDOVER — předání projektu jellyAI3 (2026-07-20 večer, po dni otázkového grafu)
 
 Tento dokument předává práci další session (jiná instance, pravděpodobně menší
 model). Čti ho CELÝ před první změnou kódu. Doplňuje `docs/BACKLOG.md`
-(CO dělat) o JAK pracovat a ČEHO se vyvarovat. K architektuře jazyka čti
-POVINNĚ `docs/superpowers/specs/2026-07-19-vzorova-gramatika.md` — nová
-vrstva lexer+matcher+vzorové karty je páteř dalšího vývoje (#46).
+(CO dělat) o JAK pracovat a ČEHO se vyvarovat. K architektuře čti
+`docs/ARCHITEKTURA.md` (kap. 7 = dva grafy) a pro hloubku
+`docs/architektura-web/index.html` (17 kapitol offline). Specy dne
+2026-07-20: `2026-07-20-otazkovy-graf.md` (+ dotažení, jednotný
+dispatch, testování Bible) — otázkový graf je nyní JEDINÝM
+dispatcherem vstupu a answerer má kaskádu poctivých odpovědí.
 
 ## 1. Zákony projektu (neporušitelné)
 
@@ -35,39 +38,49 @@ vrstva lexer+matcher+vzorové karty je páteř dalšího vývoje (#46).
    `data/web_inbox.txt` zpracuje web jako vstup dialogového okna —
    testy jsou vidět v GUI (echo "Prší?" >> data/web_inbox.txt).
 
-## 2. Stav (2026-07-20 ráno, po 20 commitech z 19.–20. 7.)
+## 2. Stav (2026-07-20 večer — den otázkového grafu, ~50 commitů)
 
-- **Metriky:** 519 testů, etalon 29/29 v OBOU režimech (hybrid i
-  `--mode templates`), focus 12/12, dialog 27/27 (13 scénářů; GAP scénáře
-  2 opraveno / 0), ZÁPIS 34/34 (GAP 13 opraveno / 3) — jádra 100 %.
-- **Hotovo dříve:** faktový graf; pseudo-QL šablony; Iris karty +
-  QueryAssurance; Chronos (plánování kompletní); Topos jádro; Mnemos
-  (deník `data/memory.jsonl`); hygiena; kanonizace; instanční vrstva f. 1;
-  REST :8084; web 3 okna (viewBase); subsystémový půdorys S0–S3.
-- **Hotovo 19.–20. 7. (velký maraton):** ZÁPISOVÝ etalon (5. benchmark);
-  opravy #31 (l-jména), #35 (nominativ míst), části #32/#24; negace dějů
-  (#24: „Ne, od T neprší"); clarify-identity (#43); DEV most webu
-  (`data/web_inbox.txt`); sklizeň živého dialogu (částice, question_words
-  veto, vokativ guard); **#46 vzorová gramatika fáze 1–4**: lexer
-  (`jellyai/lang/lexer.py`, hypotézové třídy), matcher
-  (`jellyai/lang/matcher.py`, regulární vzory + spany uzel+ + zbytek * +
-  vylučování ! + grok-zkratky %{...} z `pattern_aliases`), vzorové karty
-  dotazů (event `utterance.query`, 7 karet — #44 zavřen) i výroků
-  (event `utterance.statement` s `pattern`, krátká slovesa „jí/má"),
-  klauzulová záchrana souvětí v1.
-- **Klíčová měření** (nedělej znovu, věř jim): kontextový otisk NEROZLIŠÍ
-  identitu (Ježíš–Nazaretský 0.31 ≈ Jan–Křtitel 0.28 — první táž osoba,
-  druzí dva lidé; manželé Němcovi 0.70). Proto srůst jmen jen z textového
-  tvrzení. Viz `docs/superpowers/specs/2026-07-18-jmenny-uzel-instance.md`.
+- **Metriky:** 581 testů; etalon 33/33 (GAP 12 opraveno / 3), focus
+  12/12, dialog 45/45 (GAP 8/0), ZÁPIS 34/34, qgraph harness 5 rovin
+  (dispatch, výroky, stav, dekorace, etalon) 100 % v obou variantách.
+- **Otázkový graf (#57 + #51) KOMPLETNÍ:** kompilát karet s PĚTI
+  rodinami uzlů (otazka/vyrok/prikaz/worker/clarify) je JEDINÝM
+  dispatcherem vstupu — přímí experti přes registr claimů
+  (`jellyai/iris/claims.py`), výroky/příkazy/recall vítězem osvětlení
+  (`_command_turn`), hranice dotaz×výrok = rys `otaznik` na kartách,
+  stavové tahy = pozice (`DialogPosition`). Rodinné karty s dimenzemi
+  (`_expand_family` — q-otaz.json, q-zjistovaci.json), odvozené
+  hrany, instance ze schématu (`predicate_roles`+`instance_lit`),
+  proaktivní nabídky (`answer-offer-roles`).
+- **Kaskáda poctivých odpovědí (princip user: tápání ≠ terminál):**
+  data se VŽDY ověří — chytrá clarifikace (role neexistuje: „…kde
+  nevím"), ČÁSTEČNÁ odpověď (fakty jsou, díra neplnitelná: „kdo
+  nevím; vím kde: …"), NABÍDKA kandidátů s volbou (téma predikát
+  nenese — volba přehraje otázku substitucí). Kontextové patro jen
+  bez verdiktu schématu nebo pro řídká témata (hub hranice
+  `context_hub_limit` — Ježíš 209 sousedů × R.U.R. 24; POZOR:
+  „Kdo napsal R.U.R.?" JE asociační odpověď, fakt napsat neexistuje).
+- **Další novinky:** vidové páry + třída setkání (predicate_synonyms),
+  POHYBOVÁ třída zvlášť (movement_predicates — jen místní díry!),
+  třídy dějů (predicate_classes: zázrak → q-trida-deju), supletivní
+  katalog (přišel→přijít), početní karta q-kolik-pocet (počet =
+  vlastnost situace), typové guardy děr (theme/loc/time/num ≠ osoba).
+- **Dokumentace:** `docs/architektura-web/` (17 kapitol, offline,
+  vč. `postrehy-refaktor.md` — 20 nálezů review, částečně provedeno).
+- **Klíčová měření (nedělej znovu, věř jim):** kontextový otisk
+  NErozliší identitu (spec instance); váhy telemetrie v dispatch =
+  mrtvá větev (0 remíz); hub hranice asociací změřena (209×24).
 
 ## 3. Testování a hodnocení kvality (před KAŽDÝM commitem)
 
 ```bash
 .venv/bin/python -m pytest -q                     # musí: N passed, 0 failed
-.venv/bin/python benchmark/run_etalon.py          # musí: JÁDRO 29/29 (100 %)
+.venv/bin/python benchmark/run_etalon.py          # musí: JÁDRO 100 %
 .venv/bin/python benchmark/run_focus.py           # musí: 12/12
-.venv/bin/python benchmark/run_dialog.py          # musí: 27/27
-.venv/bin/python benchmark/run_mnemos.py          # musí: ZÁPIS 29/29 (100 %)
+.venv/bin/python benchmark/run_dialog.py          # musí: 100 % (gap zvlášť)
+.venv/bin/python benchmark/run_mnemos.py          # musí: ZÁPIS 100 %
+.venv/bin/python benchmark/run_qgraph.py          # musí: všech 5 rovin 100 %
+.venv/bin/python benchmark/run_qgraph.py --variant weights   # i s vahami
 .venv/bin/python benchmark/run_coverage.py        # diagnostika (sleduj trend)
 ```
 
@@ -115,77 +128,28 @@ vrstva lexer+matcher+vzorové karty je páteř dalšího vývoje (#46).
 | `services/iris_service.py` | REST :8084 (spouštět s `--port 8084 --model data/graph.pkl`) |
 | `benchmark/run_*.py` + `*.jsonl` | čtyři benchmarky (guardrail) |
 
-## 5. Zbývající features — implementační tipy
+## 5. Priority a implementační tipy (stav 2026-07-20 večer)
 
-Pořadí dle BACKLOGu. U každého: kudy do toho a na co si dát pozor.
+Plná tabulka priorit: BACKLOG + protokol
+`specs/2026-07-20-testovani-bible-nalezy.md`. Shrnutí:
 
-### #9 Detail uzlu (rychlá výhra — začni tímhle)
-Rozkliknutí uzlu ve webu má ukázat tvary/aliasy (`graph.aliases[id]`),
-kmen a vysvětlené role řádků obj/subj. Kód: `jellyai/viz/detail.py`
-(+ `viewbase_view.py`). Čistě prezentační — benchmarky neohrozí. Dobrý
-první úkol na osahání projektu.
+| P | Bod | Tip kudy do toho |
+|---|---|---|
+| 1 | **D — extrakční/hygienová dávka** (pasivum, imperativy „Tyč"/„Proste", klauzule jako objekt, gazetteer seed — Kafarnaum chybí!) | vzory v `graph/hygiene.py` (hlasování) a `extract.py`; VYŽADUJE přestavbu grafu (`./jelly graph`) + kontrolu id v benchmarcích (past 5); dělej v čerstvé session |
+| 2 | **C10 — formát odpovědí (zárodek Echo #20)** | výroky po jednom v uvozovkách, agregace větami, nominativizace hodnot v textech, kandidáti nabídky bez 2× výpisu; šablony v cs.json, skládání v answereru |
+| 3 | **#8 fáze 2 — střepy Ježíše** | spec `2026-07-18-jmenny-uzel-instance.md`; NEslučuj statisticky (změřeno!); po každém kroku benchmarky |
+| 4 | **T5/E1b — předložkové dekorační prvky karet** („s kým", „k Ježíšovi") | rozšíření rodin q-otaz o volitelné dekorační prvky; pasti 9–11 |
+| 5 | **#41 oceán vrstev** | zárodek nad ději = `predicate_classes`; entity přes druh-hrany; přímý fakt > zděděný |
+| 6 | **Odpovědní graf + TurnResult** (park → otevřít) | spec dotažení §1; sjednotí 9 side-channelů answereru (postrehy-refaktor 2.1) a dokončí rozklad `_turn` |
+| 7 | **#39 provenience, #47 event log, #17 nález** (memory.jsonl tracked × reminders ne) | před dalšími zapisovateli (Ollama #30, STT #42) |
+| — | Drobné: #28 okno Paměť, #36 font, #21 httpx, #15 kbelík, #50 sparse | „při nejbližším dotyku" |
 
-### Ranking identit (etalon gap „Kdo je jezis?" → Kristus)
-Poslední překážka gapu: šumová spona `být(Ježíš, Bůh)` (ze „Syn Boha")
-přebíjí `jmenovat(Kristus)`/`druh(Mesiáš)`. NEřaď natvrdo v kódu — zvaž
-kartu (např. identitní odpověď s více patry → nabídka kandidátů dialogem)
-NEBO oprav data (fakt „Syn Boha" je vadná extrakce apozice — syn čeho/koho
-je vztah, ne identita). Datová cesta je čistší.
-
-### #5 zbytek — clarify karty
-`clarify-period` („Kdy?" bez období → nabídka století/roků z dat grafu),
-`clarify-relation`. Potřebují nové UDÁLOSTI v automatu (`deck.best("…")`
-voláš v místě rozhodnutí, kartu přidáš do `patterns/cs/`). Vzor: jak turn()
-hlásí `data.overflow` s `area_lit` guardem. Plus glow-dominantní řazení
-výčtu po volbě oblasti (dnes aktivace jen řadí remízy).
-
-### #10 — HOTOVO v S2 (tvrdý filtr, tests/test_time_filter.py); navazuje S3 Topos (spec §5).
-
-### #46 vzorová gramatika — kde pokračovat (čti spec!)
-Fáze 1–4 hotové. DALŠÍ KROKY v pořadí:
-(a) **fáze 2d**: převod zbylých šablon query.py na karty po jedné
-    (sponové/identitní otázky, výběrové „Jakou hru…", date drill,
-    vztahové) — VŽDY s parity gate `--mode templates`; kanonický copular
-    handler je subtilní, převáděj až naposled;
-(b) **fáze 4 v2**: klauzulátor pořádně — dnes jen záchrana první
-    klauzule; chybí: uložit VŠECHNY klauzule (multi-memorize v automatu),
-    dědění podmětu do druhé klauzule, vsuvka „To co X jí je Y" (gap řádek
-    v zápisovém etalonu);
-(c) **fáze 5**: smazat vyprázdněné větve query.py — AŽ karty pokryjí
-    i (a); dnes není bezpečně smazatelné nic;
-(d) zbylé zápisové gapy: „byt"≡„být" homograf (chce vzor [X SPONA Y]
-    s pozičním rozlišením — spona uprostřed, ne na konci), #35-nom řádek
-    (měř s --nom a běžícími službami).
-
-### #11 Metron („Kolikrát letos pršelo?")
-Nová díra typu POČET VÝSKYTŮ: tázací tabulka cs.json („kolikrát") →
-qtype count; answerer spočítá fakty predikátu (s Chronos filtrem z #10).
-Zavře i etalon gap „Kolik měla dětí BN?" (počet distinct obj u faktů).
-
-### #8 fáze 2 — instance per odstavec (VELKÉ, čti spec!)
-Spec: `docs/superpowers/specs/2026-07-18-jmenny-uzel-instance.md`.
-Neslučuj statisticky (měření v §2!). Kroky: (a) rozpuštění dvou-osobových
-slepenců („Áronovi Mojžíš" — kmeny pokrývají 2 nezávislé osoby s otiskem
-k oběma → remap k silnější), (b) instance per odstavec při buildu,
-(c) jmenovka jako uzel typu `jméno` + hrana jmenovat. POZOR na poučení
-z „Le": bezkmenná/prázdná množina je vakuově kompatibilní se vším;
-kanon = nejkratší člen umí rozšířit chybu na celý graf. Po každém kroku
-všechny benchmarky.
-
-### #13 Sharpener, #12 Topos, #7 učení pojmů, #14 čistý řez
-- #13: kontext hrany slabší při šíření (config váhy), K-křivka v run_focus.
-- #12: hierarchie míst (Praha ⊂ Čechy) — paralela Chronosu (containment
-  intervalů → containment míst), tabulky v cs.json ne natvrdo.
-- #7: NEBEZPEČNÉ (kvalita/konflikty) — deník verzovat, zdroj=uživatel,
-  fakty od uživatele nikdy nesmí tiše přepsat korpus. Kriticky promysli.
-- #14: ✅ HOTOVO (2026-07-19): fallback větev v answer() smazána,
-  `query_mode` zrušen úplně (config, tasks, run_etalon --mode),
-  `question_pattern` zakonzervován (conserved-components.md);
-  `analyze_question` zůstává ŽIVÝ pro TemplateAnswerer. Díry po řezu
-  zalepily karty: q-otaz-minuly-prodrop („Kdy se narodil?"),
-  q-vyberova-prodrop („Jaká rodina?" — implicitní spona být),
-  q-hola-otazka („Kdy?"), q-co-vime; „žil"→žít katalogem
-  event_verb_forms PŘED délkovým prahem.
+Deploy: produkce `jelly.ithosaudio.eu` (server mail1.lordaudio.eu,
+user tech) — po pushi `git pull` + restart Iris (`--port 8084
+--model data/graph.pkl`); handshake `GET /version` MUSÍ ukázat
+aktuální SHA (past: běžela ranní verze a testovala se stará).
+POZOR: produkční `data/memory.jsonl` je paměť uživatele — při pullu
+nesmí být přepsána (je tracked — nález #17).
 
 ## 6. Pasti (draze zaplacené — neopakuj)
 
@@ -224,6 +188,21 @@ všechny benchmarky.
 14. **Grok-zkratky**: víceprvková zkratka (splice) POSOUVÁ indexy $N
     v action — odkazy míří na ROZVINUTÉ prvky. Jednoprvkové zkratky
     indexy nemění.
+15. **cs.json NIKDY needituj sedem/ručním stringem** — vždy
+    json.load/dump (ensure_ascii=False); visící čárka rozbila celý
+    jazyk. Python heredoc s českými texty: uvnitř "" řetězců jen
+    „…“ uvozovky (ASCII " ukončí string — spadlo to 2×).
+16. **Rodinné karty**: soubor `q-otaz.json` vyrábí karty
+    q-otaz-minuly… — grep jména karty soubor NENAJDE; prázdný slot
+    smí být jen POSLEDNÍ prvek vzoru ($N se neposouvají).
+17. **Synonyma × třídy**: `predicate_synonyms` = vidové páry/těsná
+    synonyma (kruh všude); `movement_predicates` = SMĚROVÁ třída
+    (jen místní díry — u osob obrací děj: odejít≠přijít);
+    `predicate_classes` = kategorie dějů (agregace členů). Nemíchat.
+18. **Kaskáda prázdných odpovědí**: sponové/dekompoziční predikáty
+    (`cascade_skip_predicates`) do ní NEpatří (identita má vlastní
+    patra); s místním filtrem se nespekuluje; verdikty rolí přes
+    `_ring_roles` (normalizace smí vybrat člen kruhu bez faktů).
 
 ## 7. Pracovní smyčka (doporučený postup na 1 úkol)
 
