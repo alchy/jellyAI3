@@ -1,0 +1,7 @@
+{
+  "name": "answer-offer-roles",
+  "trigger": {"event": "answer.offer-roles", "priority": 3},
+  "dialog": "Mohu doplnit: {roles}.",
+  "action": {},
+  "teach": "Proaktivní nabídka (#57 E4): odpovědní fakt nese role, na které se nikdo neptal (neosvětlené role žhavého faktu — T4 spec). Systém je po odpovědi NABÍDNE jedním řádkem (nevnucuje — dialog > figly); navazující holá otázka („Kdy?“) jde existujícím drillem odpovědního faktu. Pozorovatel (theme) se nenabízí — není odpověď; účastníci, na které se otázka ptala nebo které znala, také ne (vyloučení po uzlech — role karty a role faktu se mohou lišit). Nabízí se jen u DĚROVÝCH odpovědí — zjišťovací „Ano“ zůstává stručné."
+}

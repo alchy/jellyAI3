@@ -347,6 +347,11 @@ class IrisAutomaton:
                 card = self.deck.best("data.overflow", over_ctx)
                 if card is not None:
                     return self._dialog(card, over_ctx, text, used_patterns)
+            offer = self._offer_roles()
+            if offer:
+                # PROAKTIVNÍ NABÍDKA (#57 E4): neosvětlené role faktu —
+                # jedna řádka za odpovědí, follow-up obslouží drill
+                answer.text = f"{answer.text}\n{offer}"
             return self._respond(answer, "answer", assur, used_patterns, text)
         card = self.deck.best("focus.low", context)
         if card is not None:
@@ -403,6 +408,38 @@ class IrisAutomaton:
                     card.dialog.format(task=item["task"]) if card
                     else item["task"], recipient=item.get("recipient"))
                 for item in due]
+
+    def _offer_roles(self):
+        """Nabídka neosvětlených rolí odpovědního faktu (#57 E4).
+
+        Vyloučení jde po UZLECH, ne rolích — karta smí znát účastníka
+        v jiné roli, než jakou nese fakt (subj karty × obj faktu).
+        Pozorovatel (theme) není nabídka.
+        """
+        trace = self.answerer.last_trace
+        if not isinstance(trace, dict) or trace.get("fact") is None:
+            return None
+        fact = self.answerer.graph.facts.get(trace["fact"])
+        pat = self.answerer.last_pattern
+        if fact is None or pat is None \
+                or getattr(pat, "hole_role", None) is None:
+            # jen DĚROVÉ odpovědi: zjišťovací „Ano" zůstává stručné
+            # (dialog > figly — nabídka nesmí být šum)
+            return None
+        labels = current().get("role_labels", {})
+        told = {trace.get("answer")}
+        told.update(term for _, term in getattr(pat, "known", ()) or ())
+        unlit = [labels[p.role] for p in fact.participants
+                 if p.role in labels and p.role != "theme"
+                 and p.role != getattr(pat, "hole_role", None)
+                 and p.node not in told]
+        if not unlit:
+            return None
+        card = self.deck.best("answer.offer-roles", {})
+        if card is None:
+            return None
+        return card.dialog.format(
+            roles=", ".join(sorted(dict.fromkeys(unlit))))
 
     def _expert_turn(self, worker, text):
         """Tah přímého experta podle worker atributu uzlu grafu (#57 D)."""
