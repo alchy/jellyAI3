@@ -217,6 +217,20 @@ scénáře nabídek; počet hran jako diagnostika struktury.
 
 **Kritérium:** parita + ≥1 scénář nabídky zelený.
 
+**Empirie E4 (2026-07-20 večer, větev qgraph-dispatch) — PŘIJATO:**
+(a) clarify hrany odvozené z dat karet (statement clarify z otázky
+nevede, overflow jen z výčtových děr): hran 80 → 58, stav 3/3 drží;
+(b) proaktivní nabídka kartou `answer-offer-roles`: „Kde bydlí
+Marcela?" → „Petrovice / Mohu doplnit: kdy." → „Kdy?" → drill
+(existující mechanismus _prev_trace — nabídka je čistě dialogový
+akt). Gap scénář FIXED, 573 testů, vše 100 %. NÁLEZY: (1) vyloučení
+účastníků nabídky musí jít po UZLECH, ne rolích — karta zná Marcelu
+jako subj, fakt ji drží jako obj; (2) nabídka JEN u děrových
+odpovědí — na zjišťovací „Ano" se lepila a rozbila 5 testů;
+stručnost existence je hodnota (dialog > figly); (3) drill hrany na
+úrovni grafu se neenumerují — nabídka se počítá z rolí žhavého faktu
+za běhu (T4 doslova), reifikace hran počká na odpovědní graf (park).
+
 ## 5. Pořadí a závislosti
 
 E1 a E2 jsou nezávislé (libovolné pořadí). E3 vyžaduje rozšíření
