@@ -1,0 +1,23 @@
+{
+  "name": "q-kolik-pocet",
+  "trigger": {
+    "event": "utterance.query",
+    "priority": 5,
+    "pattern": [
+      "otaz:kolik",
+      "%{SLOVESO_MINULE}",
+      "*",
+      "%{ENTITA}"
+    ]
+  },
+  "action": {
+    "query": {
+      "hole": "$1",
+      "known": [
+        "$4",
+        "$3"
+      ]
+    }
+  },
+  "teach": "Početní otázka (#11): „Kolik měla dětí Božena Němcová?“ — POČET je vlastnost SITUACE, ne děje: číslo nese fakt přestěhovat(num: čtyři, theme: dítě, subj: BN), i když se otázka ptá slovesem „měla“. Počítané slovo (děti) je DALŠÍ ZNÁMÝ a číselná díra se hledá napříč predikáty u faktů se všemi známými. Počítání výskytů (Kolikrát pršelo?) zůstává druhé bráně Metronu."
+}

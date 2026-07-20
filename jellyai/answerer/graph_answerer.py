@@ -525,6 +525,19 @@ class GraphAnswerer(Answerer):
             # — má přednost před holým nejtěžším asociátem
             values, fact = self._typed_match(pat.predicate,
                                              known_set | {pat.predicate})
+        if not values and pat.hole_role == "num" and len(known_set) > 1:
+            # POČETNÍ díra (#11): počet je vlastnost SITUACE, ne děje —
+            # „Kolik měla dětí BN?" nese fakt přestěhovat(num čtyři,
+            # theme dítě, subj BN); hledá se fakt se VŠEMI známými
+            # napříč predikáty a bere se jeho číselný účastník
+            for fact in self.graph.facts_of(node0):
+                if not known_set <= {p.node for p in fact.participants}:
+                    continue
+                nums = [p.node for p in fact.participants
+                        if p.role == "num"]
+                if nums:
+                    values, fact_hit = nums, fact
+                    return (node0, values, fact_hit)
         if not values and pat.hole_role in ("subj", "obj"):
             # KONTEXTOVÉ patro (asociace jako odpověď) — NÁLEZ B4:
             # vlajkové „Kdo napsal R.U.R.?" je odpověď asociace (fakt
@@ -611,6 +624,13 @@ class GraphAnswerer(Answerer):
                     # být v roli theme — dativ nesmí matchnout mluvčího
                     continue
                 if self._time_excluded(fact):
+                    continue
+                if self.place_filter is not None \
+                        and hole_role in ("subj", "obj") \
+                        and not any(p.role == "loc"
+                                    for p in fact.participants):
+                    # MÍSTNÍ filtr u obsahové díry (B7/T7): fakt bez
+                    # místa nesmí vyrábět falešné „v Kafarnaum" odpovědi
                     continue
                 for part in fact.participants:
                     if part.node in known_set or len(part.node) < 2:
@@ -1144,6 +1164,25 @@ class GraphAnswerer(Answerer):
         # Pohasíná se jen při úspěchu (v _remember spolu s rozsvícením nového tématu).
         self._log_turn(question, topic, None, None)
         self.pick_focus = None               # volba oblasti platí jeden tah (#5)
+        if getattr(pat, "predicate", None) is None and pat.hole_role \
+                and self._prev_trace:
+            drill_fact = self.graph.facts.get(self._prev_trace.get("fact"))
+            if drill_fact is not None:
+                # DRILL bez role (T9): fakt roli nenese — vysvětli
+                # (empty-role šablona nad predikátem faktu)
+                labels = current().get("role_labels", {})
+                known = ", ".join(labels[r] for r in labels
+                                  if any(p.role == r
+                                         for p in drill_fact.participants))
+                missing = labels.get(pat.hole_role)
+                template = current().get("empty_role_answer")
+                if known and missing and template:
+                    self.last_empty_role = (drill_fact.predicate,
+                                            pat.hole_role)
+                    return Answer(text=template.format(
+                        predicate=drill_fact.predicate, known=known,
+                        missing=missing), sources=["graf"], score=1.0,
+                        trace=None)
         cascade_topic = topic or (self.last_resolution or {}).get("winner")
         empty = (self._empty_role_answer(pat)
                  or self._partial_fact_answer(pat, cascade_topic)
@@ -1229,6 +1268,9 @@ class GraphAnswerer(Answerer):
         """ČÁSTEČNÁ odpověď (princip user, T11): fakty predikátu s tématem
         EXISTUJÍ, jen díru neumí naplnit (typový guard) — graf se
         k výsledku dostat MUSÍ: vyjmenuje role, které fakty nesou."""
+        if self.place_filter is not None:
+            # místní filtr (B7): kaskáda nesmí obejít místo otázky
+            return None
         predicate = getattr(pat, "predicate", None)
         hole_role = getattr(pat, "hole_role", None)
         if not predicate or not topic or hole_role is None:
@@ -1258,15 +1300,26 @@ class GraphAnswerer(Answerer):
             return None
         parts = "; ".join(f"{labels[r]}: {', '.join(vs[:4])}"
                           for r, vs in found.items())
+        best = next((f for f in self.graph.facts.values()
+                     if f.predicate in ring
+                     and any(p.node == topic for p in f.participants)),
+                    None)
+        if best is not None:
+            # trasa: drill („Kde?") po částečné odpovědi funguje (T9/T12)
+            self.last_trace = {"topic": topic, "predicate": best.predicate,
+                               "fact": best.id, "answer": parts}
         return Answer(text=template.format(predicate=predicate, topic=topic,
                                            missing=missing, found=parts),
-                      sources=["graf"], score=1.0, trace=None)
+                      sources=["graf"], score=1.0, trace=self.last_trace)
 
     def _empty_topic_answer(self, pat, topic):
         """PRÁZDNÉ TÉMA (B4, princip user): predikát roli má, ale žádný
         jeho fakt téma nenese — kontext NEhádá (figl); místo toho SE
         PTÁME: kandidáti = nejtěžší podměty faktů predikátu (nabídku
         s volbou z nich staví automat, volba přehraje otázku)."""
+        if self.place_filter is not None:
+            # místní filtr (B7): kaskáda nesmí obejít místo otázky
+            return None
         predicate = getattr(pat, "predicate", None)
         if not predicate or not topic \
                 or getattr(pat, "hole_role", None) is None:

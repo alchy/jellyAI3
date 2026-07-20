@@ -449,6 +449,23 @@ class IrisAutomaton:
         card = self.deck.best("answer.offer-roles", {})
         if card is None:
             return None
+        mentioned_turns = card.action.get("skip_mentioned_turns")
+        if mentioned_turns:
+            # T12: nenabízet hodnoty, které ZAZNĚLY v minulých otázkách
+            # uživatele (Mojžíš z „Kdo se setkal s Mojžíšem?") — kolik
+            # tahů zpět nese KARTA; glow nestačí (zápis hřeje i čas)
+            from jellyai.graph.canon import deaccent
+            recent = " ".join(deaccent(h["text"].lower())
+                              for h in self.state.history[-mentioned_turns:])
+            unlit = [labels[p.role] for p in fact.participants
+                     if p.role in labels and p.role != "theme"
+                     and p.role != getattr(pat, "hole_role", None)
+                     and p.node not in told
+                     and deaccent(p.node.lower().split()[0]
+                                  if p.node.split() else p.node)
+                     not in recent]
+        if not unlit:
+            return None
         return card.dialog.format(
             roles=", ".join(sorted(dict.fromkeys(unlit))))
 

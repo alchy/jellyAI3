@@ -142,3 +142,21 @@ hygienové dávky D). Kandidáti nabídky nově FILTROVÁNI typem tématu
 odpovědi nese špatné lemma); kosmetika nabídky (kandidáti vypsáni
 2× — text answereru i karty); „nemocný" chybí ve výčtu „uzdravoval"
 (ranking, k prozkoumání).
+
+## Dávka drobných kroků (T9/T12/B7/#11) — uzavřeno
+
+- **#11**: „Kolik měla dětí BN?" → „čtyři" — POČET je vlastnost
+  situace, ne děje (číslo neslo přestěhovat, ne mít): karta
+  q-kolik-pocet (počítané slovo = další známý) + num-díra hledá
+  napříč predikáty u faktů se všemi známými. GAP-FIXED.
+- **T9**: drill bez role → vysvětlení empty-role šablonou nad
+  predikátem faktu (místo terminálu); částečná odpověď nese TRASU
+  (drill po ní funguje). GAP-FIXED.
+- **T12**: nabídka nenabízí hodnoty ZAZNĚLÉ v minulých otázkách
+  uživatele (skip_mentioned_turns na kartě; glow nestačí — zápis
+  hřeje i časovou kotvu). GAP-FIXED.
+- **B7**: figl „stan" zmizel kaskádou; NÁLEZ: Kafarnaum NENÍ
+  v gazetteeru (place_filter None) — tvrdý filtr zafunguje až se
+  seedem/učením; guard faktů bez místa je připraven.
+- **„nemocný" ve výčtu NENÍ bug**: výčet = všechny hodnoty TOP skóre
+  (stabilita); plný výčet je designově přes „Kdo další…?" (novelty).
