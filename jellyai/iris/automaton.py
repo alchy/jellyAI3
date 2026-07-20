@@ -42,6 +42,7 @@ from jellyai.iris.subsystems.mnemos import (forget, forget_entity,
                                             parse_statement,
                                             persist, remember, replay)
 from jellyai.iris.patterns import PatternDeck
+from jellyai.iris.qgraph import compile_qgraph
 from jellyai.iris.presenter import activation_window, docs_window
 from jellyai.iris.state import FocusState, PendingFocus, PendingIdentity
 from jellyai.lang import current
@@ -131,6 +132,10 @@ class IrisAutomaton:
             deck = PatternDeck.for_language("cs")
             deck.load()
         self.deck = deck
+        # KOMPILÁT otázkového grafu (#57 fáze D): brány přímých expertů
+        # řídí claims (pořadí = data), ne pořadí větví v _turn()
+        self.qgraph = compile_qgraph(
+            self.deck, getattr(answerer, "_predicates", frozenset()))
         self.clock = clock or datetime.now
         self.memory_path = memory_path
         self.telemetry_path = telemetry_path
@@ -193,22 +198,15 @@ class IrisAutomaton:
 
     def _turn(self, text, temperature=0.0):
         """Vlastní tah (bez odpalu připomínek — replay/focus-shift rekurze)."""
-        counted = self._metron_query(text)
-        if counted is not None:
-            # ARITMETIKA (Metron, #56) — přímý expert jako hodinová otázka:
-            # výraz/součet z řádku, graf se nedotkne
-            return counted
-        direct = clock_answer(text, self.clock())
-        if direct is not None:
-            # hodinová otázka — odpovídá Chronos sám (časová kotva), graf se
-            # nedotkne; aktivační pole zůstává, jak bylo
-            response = IrisResponse(
-                text=direct, kind="answer", assurance=1.0,
-                activation_window=activation_window(self.answerer),
-                docs_window=docs_window(self.answerer),
-                used={"components": ["chronos"], "patterns": []})
-            self.state.remember(text, response)
-            return response
+        # PŘÍMÍ EXPERTI dispatchem grafu (#57 fáze D): pořadí bran nesou
+        # DATA (claims priorita), ne pořadí větví — konec pasti #51 pro
+        # přímé experty; neznámý worker propadá (budoucí claimy)
+        for claim in sorted(self.qgraph.claims, key=lambda c: -c.priority):
+            if not claim.recognize(text, self.clock()):
+                continue
+            handled = self._expert_turn(claim.worker, text)
+            if handled is not None:
+                return handled
         used_patterns = []
         # VOLBA IDENTITY podmětu rozpracovaného výroku (#43) má přednost —
         # PendingIdentity není otázka k přehrání, ale výrok k dopsání
@@ -294,11 +292,6 @@ class IrisAutomaton:
                     statements.append(statement)
             if statements:
                 return self._memorize(text, statements)
-        # META: stav rozhovoru („O kom mluvíme?") — introspekce těžiště,
-        # odpověď zná automat sám (nález z živého dialogu 2026-07-20)
-        focus_state = self._focus_query(text)
-        if focus_state is not None:
-            return focus_state
         # VZPOMÍNÁNÍ („Co jsem ti řekl včera?") — Chronos filtr nad
         # timestampy Mnemos; fráze z tabulky, texty karty memory.recall
         recalled = self._recall_query(text)
@@ -406,6 +399,27 @@ class IrisAutomaton:
                     card.dialog.format(task=item["task"]) if card
                     else item["task"], recipient=item.get("recipient"))
                 for item in due]
+
+    def _expert_turn(self, worker, text):
+        """Tah přímého experta podle worker atributu uzlu grafu (#57 D)."""
+        handler = {"metron": self._metron_query,
+                   "chronos": self._clock_response,
+                   "iris": self._focus_query}.get(worker)
+        return handler(text) if handler else None
+
+    def _clock_response(self, text):
+        """Hodinová otázka — odpovídá Chronos sám (časová kotva); graf se
+        nedotkne, aktivační pole zůstává, jak bylo."""
+        direct = clock_answer(text, self.clock())
+        if direct is None:
+            return None
+        response = IrisResponse(
+            text=direct, kind="answer", assurance=1.0,
+            activation_window=activation_window(self.answerer),
+            docs_window=docs_window(self.answerer),
+            used={"components": ["chronos"], "patterns": []})
+        self.state.remember(text, response)
+        return response
 
     def _metron_query(self, text):
         """ARITMETIKA z řádku (#56): Metronova brána Q — výraz nebo

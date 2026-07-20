@@ -126,3 +126,26 @@ def test_novy_expert_claimem_bez_zasahu_do_kodu_grafu():
     assert qg.nodes["pokus-expert"].worker == "pokus"
     lit = illuminate("Tohle je pokusný nárok na tah.", qg, now=NOW)
     assert lit and lit[0].name == "pokus-expert"
+
+
+def test_automat_dispatchuje_prime_experty_z_grafu():
+    """Fáze D: pořadí bran přímých expertů je v DATECH (claims),
+    ne v pořadí větví _turn(); neznámý worker bezpečně propadá."""
+    from config import Config
+    from jellyai.iris import IrisAutomaton
+    from jellyai.iris.claims import ExpertClaim
+    from jellyai.tasks import make_graph_answerer
+
+    iris = IrisAutomaton(make_graph_answerer(Config()),
+                         clock=lambda: NOW)
+    assert iris.qgraph.nodes["metron-vypocet"].worker == "metron"
+    r = iris.turn("Kolik je hodin?")
+    assert r.used["components"] == ["chronos"]
+    r = iris.turn("Kolik je 1 plus 1?")
+    assert "2" in r.text
+    # claim s neznámým workerem se hlásí o všechno — musí PROPADNOUT
+    vetrelec = ExpertClaim("vetrelec", "neexistuje", 9,
+                           lambda text, now: True)
+    iris.qgraph.claims = (vetrelec,) + tuple(iris.qgraph.claims)
+    r = iris.turn("Kolik je hodin?")
+    assert r.used["components"] == ["chronos"]
