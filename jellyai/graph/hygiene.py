@@ -491,3 +491,61 @@ def scrub(graph, votes):
                 existing.source |= fact.source
     graph.replace_facts(kept)
     return dropped_participants, dropped_facts
+
+
+def fold_participles(graph):
+    """Predikáty z ADJ pasivních participií složí na slovesné lemma (in-place).
+
+    Tagger značí periphrastické pasivum VŽDY jako ADJ s adjektivním lemmatem
+    („pokřtěn" → pokřtěný; VERB dvojník v korpusu neexistuje — změřeno
+    0/408), extrakce proto zakládá predikáty „pokřtěný"/„vydaný" vedle
+    slovesných „pokřtít"/„vydat" z aktivních vět. Fold je složí PREFIXOVOU
+    shodou kmene (týž princip jako `_verb_match` dotazu) — ale jen když
+    slovesný protějšek v grafu UŽ existuje (korpusová evidence). Bez
+    protějšku predikát poctivě zůstává adjektivní; derivací se nespekuluje.
+
+    Returns:
+        int: Počet složených predikátů.
+    """
+    lang = current()
+    structural = (frozenset(lang["relational_nouns"])
+                  | {"být", "druh", "kontext"}
+                  | set(lang["date_part_forms"].values()))
+    preds = {f.predicate for f in graph.facts.values()}
+    sources = [p for p in preds if p.endswith(("ný", "tý"))
+               and p not in structural]
+    targets = [p for p in preds if p.endswith(("t", "ci"))
+               and p not in structural]
+    mapping = {}
+    for src in sorted(sources):
+        best = None
+        for tgt in sorted(targets):          # řazeno = deterministicky (#58)
+            common = 0
+            for a, b in zip(src, tgt):
+                if a != b:
+                    break
+                common += 1
+            # kmen musí pokrýt skoro celé oboje slovo: participium bez
+            # „-ný/-tý" (−3), infinitiv bez koncovky (−2) — „vydaný"→„vydat"
+            # projde, „vydaný"→„vydávat" ne (kmeny se rozcházejí)
+            if common >= 4 and common >= len(src) - 3 \
+                    and common >= len(tgt) - 2 \
+                    and (best is None or common > best[1]):
+                best = (tgt, common)
+        if best is not None:
+            mapping[src] = best[0]
+    if not mapping:
+        return 0
+    kept = {}
+    for fact in graph.facts.values():
+        predicate = mapping.get(fact.predicate, fact.predicate)
+        key = (predicate, fact.participants)
+        existing = kept.get(key)
+        if existing is None:
+            kept[key] = FactNode(key, predicate, fact.weight,
+                                 fact.participants, set(fact.source))
+        else:                                # fold splynul s existujícím
+            existing.weight += fact.weight
+            existing.source |= fact.source
+    graph.replace_facts(kept)
+    return len(mapping)

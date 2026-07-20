@@ -71,6 +71,10 @@ def build_fact_graph(config):
     renamed = nominativize(graph, propn_lemma_votes(annotations))
     print(f"Nominativizace: {renamed} skloněných id → lemma "
           f"(Betlémě→Betlém, Boha→Bůh)")
+    from jellyai.graph.hygiene import fold_participles
+    folded = fold_participles(graph)
+    print(f"Fold participií: {folded} adjektivních predikátů → sloveso "
+          f"(pokřtěný→pokřtít — dávka D, ADJ pasivum)")
     from jellyai.graph.instance import resolve_instances
     merged = resolve_instances(graph)
     print(f"Instance: {merged} jmenných střepů srostlo (tvrzené aliasy), "

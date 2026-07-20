@@ -197,11 +197,31 @@ def _first(tokens, deprels):
     return next((t for t in tokens if t.get("deprel") in deprels), None)
 
 
+def _passive_participle_head(index, sent):
+    """True, když token řídí pasivní větu jako ADJ participium.
+
+    Tagger značí periphrastické pasivum („byl pokřtěn") VŽDY jako ADJ
+    s adjektivním lemmatem — VERB dvojník v korpusu neexistuje (změřeno:
+    0/408). Participium je hlavou pasivní věty jen s dítětem nsubj:pass
+    nebo aux:pass; přívlastkové užití („vydaná kniha") větu neřídí.
+    """
+    tok = sent[index]
+    feats = tok.get("feats") or {}
+    if tok.get("upos") != "ADJ" or feats.get("VerbForm") != "Part" \
+            or feats.get("Voice") != "Pass":
+        return False
+    return any(t.get("head") == index + 1
+               and t.get("deprel") in ("nsubj:pass", "aux:pass")
+               for t in sent)
+
+
 def _verb_head(index, sent):
     """Vrátí 1-based id nejbližšího slovesa-předka tokenu (i sebe), nebo None.
 
     Zanořený atribut (datum/číslo pod přívlastkem) se tak přiřadí slovesu, které ho
     skutečně řídí — a v souvětí zůstane u svého slovesa, ne u sousedního.
+    Pasivní ADJ participium řídící větu je zastávkou také — datum křtu patří
+    křtu, ne slovesu sousední klauzule.
 
     Args:
         index (int): 0-based index tokenu ve větě.
@@ -214,7 +234,8 @@ def _verb_head(index, sent):
     cur = index
     while 0 <= cur < len(sent) and cur not in seen:
         seen.add(cur)
-        if sent[cur].get("upos") == "VERB":
+        if sent[cur].get("upos") == "VERB" \
+                or _passive_participle_head(cur, sent):
             return cur + 1
         head = sent[cur].get("head", 0)
         if not head:
@@ -597,6 +618,50 @@ def extract_facts(annotation, default_subject=None, canon=None, context=None):
                                                         cop_tok, strict=True))
                 facts.extend(_copular_facts(sent, head_id, subj_tok, subj,
                                             entities, canon))
+                continue
+
+            if _passive_participle_head(head_id - 1, sent) \
+                    and subj_tok is not None \
+                    and subj_tok.get("deprel") == "nsubj:pass":
+                # ADJ PASIVUM (dávka D zbytek a): participium řídí pasivní
+                # větu — pacient (nsubj:pass) → obj, konatele nese jen
+                # obl:agent (týž zákon jako VERB pasivum níže). Predikátem
+                # je ADJ lemma; na sloveso ho skládá hygienický fold nad
+                # celým grafem (korpusová evidence, ne lokální derivace).
+                verb = _clean_lemma(head.get("lemma", ""))
+                if _negated(head_id - 1, sent):
+                    verb = "ne" + verb
+                patient_tok = subj_tok
+                if pronoun_subj:
+                    # vztažné zájmeno („která byla pokřtěna") zastupuje
+                    # řídící substantivum participia
+                    gov = (sent[head.get("head") - 1]
+                           if head.get("head") else None)
+                    if head.get("deprel") == "amod" and gov is not None \
+                            and gov.get("upos") in ("NOUN", "PROPN"):
+                        patient_tok = gov
+                    else:
+                        continue
+                patient_node = _node_for(patient_tok, entities, canon)
+                if patient_node is None:
+                    continue
+                patient_group = _subject_group(patient_node, patient_tok,
+                                               sent, entities, canon)
+                attrs = sorted(attrs_by_verb.get(head_id, ()),
+                               key=lambda p: (p.role, p.node))
+                agent_tok = _first(children, {"obl:agent"})
+                agent = (_node_for(agent_tok, entities, canon)
+                         if agent_tok is not None
+                         and agent_tok.get("upos") not in _SKIP_UPOS
+                         else None)
+                if agent is not None:
+                    facts.extend(_distribute(verb, [agent],
+                                             [patient_group], attrs))
+                else:
+                    parts = [Participant("obj", n[0], n[1])
+                             for n in patient_group]
+                    if len(parts) + len(attrs) >= 2:
+                        facts.append(make_fact(verb, parts + attrs))
                 continue
 
             if head.get("upos") != "VERB":

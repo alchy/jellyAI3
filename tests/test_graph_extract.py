@@ -483,6 +483,90 @@ def test_pasivum_bez_agenta_nedostane_default_subjekt():
     assert all(node != "Bůh" for _, node in parts)
 
 
+def test_pasivum_adj_hlava_je_pacient():
+    """Dávka D zbytek (a): tagger periphrastické pasivum značí VŽDY jako ADJ
+    s adjektivním lemmatem („pokřtěn" → pokřtěný) — extrakce ho dosud
+    neviděla. Pacient (nsubj:pass) → obj, konatel (obl:agent) → subj;
+    predikátem je ADJ lemma, na sloveso ho složí hygienický fold."""
+    sent = [
+        {"form": "Ježíš", "lemma": "Ježíš", "upos": "PROPN", "head": 3, "deprel": "nsubj:pass", "start": 0, "end": 5},
+        {"form": "byl", "lemma": "být", "upos": "AUX", "head": 3, "deprel": "aux:pass", "start": 6, "end": 9},
+        {"form": "pokřtěn", "lemma": "pokřtěný", "upos": "ADJ", "head": 0, "deprel": "root", "start": 10, "end": 17,
+         "feats": {"VerbForm": "Part", "Voice": "Pass", "Variant": "Short"}},
+        {"form": "Janem", "lemma": "Jan", "upos": "PROPN", "head": 3, "deprel": "obl:agent", "start": 18, "end": 23},
+    ]
+    ents = [{"text": "Ježíš", "type": "P", "start": 0, "end": 5},
+            {"text": "Jan", "type": "P", "start": 18, "end": 23}]
+    facts = extract_facts(_ann(sent, ents))
+    expected = make_fact("pokřtěný", [Participant("subj", "Jan", "person"),
+                                      Participant("obj", "Ježíš", "person")])
+    assert expected in facts
+
+
+def test_pasivum_adj_bez_agenta_s_mistem():
+    """ADJ pasivum bez konatele: fakt nese pacienta a místo, default_subject
+    se neuplatní (pozorovatel děj neudělal — týž zákon jako VERB větev)."""
+    sent = [
+        {"form": "Ježíš", "lemma": "Ježíš", "upos": "PROPN", "head": 3, "deprel": "nsubj:pass", "start": 0, "end": 5},
+        {"form": "byl", "lemma": "být", "upos": "AUX", "head": 3, "deprel": "aux:pass", "start": 6, "end": 9},
+        {"form": "pokřtěn", "lemma": "pokřtěný", "upos": "ADJ", "head": 0, "deprel": "root", "start": 10, "end": 17,
+         "feats": {"VerbForm": "Part", "Voice": "Pass", "Variant": "Short"}},
+        {"form": "Jordánu", "lemma": "Jordán", "upos": "PROPN", "head": 3, "deprel": "obl", "start": 20, "end": 27},
+    ]
+    ents = [{"text": "Ježíš", "type": "P", "start": 0, "end": 5},
+            {"text": "Jordán", "type": "G", "start": 20, "end": 27}]
+    facts = extract_facts(_ann(sent, ents), default_subject=("Bůh", "person"))
+    fact = next(f for f in facts if f.predicate == "pokřtěný")
+    parts = {(p.role, p.node) for p in fact.participants}
+    assert ("obj", "Ježíš") in parts and ("loc", "Jordán") in parts
+    assert all(node != "Bůh" for _, node in parts)
+
+
+def test_pasivum_adj_atribut_patri_participiu():
+    """„Narodila se dcera, která byla pokřtěna 19. června 1841" — datum visí
+    na participiu, patří tedy faktu křtu, NE faktu narození (dnes ho
+    _verb_head protáhne až na „narodila"). Pacientem je řídící substantivum
+    participia, protože nsubj:pass je vztažné zájmeno."""
+    sent = [
+        {"form": "Narodila", "lemma": "narodit", "upos": "VERB", "head": 0, "deprel": "root", "start": 0, "end": 8},
+        {"form": "se", "lemma": "se", "upos": "PRON", "head": 1, "deprel": "expl:pv", "start": 9, "end": 11},
+        {"form": "dcera", "lemma": "dcera", "upos": "NOUN", "head": 1, "deprel": "nsubj", "start": 12, "end": 17},
+        {"form": "která", "lemma": "který", "upos": "DET", "head": 6, "deprel": "nsubj:pass", "start": 19, "end": 24},
+        {"form": "byla", "lemma": "být", "upos": "AUX", "head": 6, "deprel": "aux:pass", "start": 25, "end": 29},
+        {"form": "pokřtěna", "lemma": "pokřtěný", "upos": "ADJ", "head": 3, "deprel": "amod", "start": 30, "end": 38,
+         "feats": {"VerbForm": "Part", "Voice": "Pass", "Variant": "Short"}},
+        {"form": "19", "lemma": "19", "upos": "NUM", "head": 8, "deprel": "nummod", "start": 39, "end": 41},
+        {"form": "června", "lemma": "červen", "upos": "NOUN", "head": 6, "deprel": "obl", "start": 43, "end": 49},
+        {"form": "1841", "lemma": "1841", "upos": "NUM", "head": 8, "deprel": "nummod", "start": 50, "end": 54},
+    ]
+    ents = [{"text": "19. června 1841", "type": "T", "start": 39, "end": 54},
+            {"text": "června", "type": "tm", "start": 43, "end": 49}]
+    facts = extract_facts(_ann(sent, ents))
+    krest = next(f for f in facts if f.predicate == "pokřtěný")
+    parts = {(p.role, p.node) for p in krest.participants}
+    assert ("obj", "dcera") in parts and ("time", "19. června 1841") in parts
+    assert all(p.role != "time" for f in facts if f.predicate == "narodit"
+               for p in f.participants)
+
+
+def test_atributivni_participium_nekrade_atributy_slovesu():
+    """Přívlastkové participium BEZ nsubj:pass („vydaná kniha") fakt nezakládá
+    a atributy nechává slovesu klauzule — _verb_head se zastavuje jen na
+    participiu, které pasivní větu skutečně řídí."""
+    sent = [
+        {"form": "Četl", "lemma": "číst", "upos": "VERB", "head": 0, "deprel": "root", "start": 0, "end": 4},
+        {"form": "knihu", "lemma": "kniha", "upos": "NOUN", "head": 1, "deprel": "obj", "start": 5, "end": 10},
+        {"form": "vydanou", "lemma": "vydaný", "upos": "ADJ", "head": 2, "deprel": "amod", "start": 11, "end": 18,
+         "feats": {"VerbForm": "Part", "Voice": "Pass"}},
+        {"form": "roku", "lemma": "rok", "upos": "NOUN", "head": 3, "deprel": "obl", "start": 19, "end": 23},
+        {"form": "1920", "lemma": "1920", "upos": "NUM", "head": 4, "deprel": "nummod", "start": 24, "end": 28},
+    ]
+    facts = extract_facts(_ann(sent), default_subject=("Autor", "person"))
+    assert not any(f.predicate == "vydaný" for f in facts)
+    cetl = next(f for f in facts if f.predicate == "číst")
+    assert any(p.node == "1920" for p in cetl.participants)
+
+
 def test_kapitalizovany_predikat_se_sklada_malymi():
     """Dávka D (hygiena #2): predikát je děj — kapitalizace věty do něj
     nepatří („Zhotovíš dva cheruby" nesmí založit predikát „Zhotovit"

@@ -374,3 +374,52 @@ def test_falesna_osoba_z_imperativu_padne():
     assert "Tyč" not in g.nodes
     assert any(p.node == "Verunka" for f in g.facts.values()
                for p in f.participants)
+
+
+def test_fold_participia_na_slovesny_predikat():
+    """Dávka D zbytek (a): predikát z ADJ pasivního participia („pokřtěný")
+    se složí na slovesné lemma („pokřtít"), když sloveso v grafu existuje
+    (korpusová evidence — tagger VERB dvojníka participia nedává)."""
+    from jellyai.graph.hygiene import fold_participles
+    g = FactGraph()
+    g.add_fact(make_fact("pokřtěný", [Participant("subj", "Jan", "person"),
+                                      Participant("obj", "Ježíš", "person")]))
+    g.add_fact(make_fact("pokřtít", [Participant("subj", "Pilát", "person"),
+                                     Participant("theme", "kniha", "concept")]))
+    folded = fold_participles(g)
+    assert folded == 1
+    preds = {f.predicate for f in g.facts.values()}
+    assert "pokřtěný" not in preds
+    krest = next(f for f in g.facts.values()
+                 if ("obj", "Ježíš") in {(p.role, p.node)
+                                         for p in f.participants})
+    assert krest.predicate == "pokřtít"
+
+
+def test_fold_bez_slovesneho_protejsku_zustava():
+    """Participium bez slovesného protějšku v grafu poctivě zůstává
+    adjektivním predikátem — fold nespekuluje derivací."""
+    from jellyai.graph.hygiene import fold_participles
+    g = FactGraph()
+    g.add_fact(make_fact("ukřižovaný", [Participant("obj", "Ježíš", "person"),
+                                        Participant("loc", "Golgota", "geo")]))
+    folded = fold_participles(g)
+    assert folded == 0
+    assert any(f.predicate == "ukřižovaný" for f in g.facts.values())
+
+
+def test_fold_slouci_vahy_shodnych_faktu():
+    """Fold na už existující shodný fakt = agregace vah a zdrojů."""
+    from jellyai.graph.hygiene import fold_participles
+    g = FactGraph()
+    g.add_fact(make_fact("vydaný", [Participant("obj", "kniha", "concept"),
+                                    Participant("num", "1920", "number")]))
+    g.add_fact(make_fact("vydat", [Participant("obj", "kniha", "concept"),
+                                   Participant("num", "1920", "number")]))
+    g.add_fact(make_fact("vydat", [Participant("subj", "Čapek", "person"),
+                                   Participant("obj", "drama", "concept")]))
+    fold_participles(g)
+    merged = next(f for f in g.facts.values()
+                  if ("num", "1920") in {(p.role, p.node)
+                                         for p in f.participants})
+    assert merged.predicate == "vydat" and merged.weight == 2
