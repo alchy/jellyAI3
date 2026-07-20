@@ -11,7 +11,7 @@ souhlasil se skutečnou cestou automatu:
   má zpřesňovací hranu na skutečně vystřelený clarify uzel (graf by
   stál v uzlu otázky a sám si ostřil focus — zadání user).
 - ETALON: shoda vítězného uzlu otázky s kartou, kterou reálně vybral
-  build_query (answerer.last_query_card); „oba bez karty" je shoda
+  build_query (answerer.turn.query_card); „oba bez karty" je shoda
   (poziční šablona je dnešní fallback, graf ji nezná záměrně).
 
 Varianta `--variant weights` láme remízy vahami z telemetrie
@@ -71,9 +71,9 @@ def _actual_decorations(answerer):
         found.add("chronos:interval")
     if answerer.place_filter is not None:
         found.add("topos:oblast")
-    if answerer._theme_bound:                    # pylint: disable=protected-access
+    if answerer.turn.theme_bound:
         found.add("role:adresat")
-    pattern = answerer.last_pattern
+    pattern = answerer.turn.pattern
     if pattern is not None:
         if any(term == current()["user_entity"]
                for _, term in getattr(pattern, "known", ())):
@@ -199,7 +199,7 @@ def main():
                                 is_node=answerer._span_is_node,  # pylint: disable=protected-access
                                 use_weights=use_weights)
             answerer.answer(question, [])
-            actual = answerer.last_query_card
+            actual = answerer.turn.query_card
             # DEKORACE (T3): nároky se měří tam, kde answerer opravdu
             # běžel — shadow předpověď vs. skutečně aplikované filtry
             want = decorate(question, now=_now())

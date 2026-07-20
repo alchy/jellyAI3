@@ -17,13 +17,14 @@ def reflect(view, answerer):
 
     Args:
         view (GraphView): Cílová vizualizace.
-        answerer: Objekt s `.context` (ActivationField) a `.last_trace`.
+        answerer: Objekt s `.context` (ActivationField) a `.turn.trace`.
     """
     context = getattr(answerer, "context", None)
     if context is not None:
         for node_id, weight in context.scores.items():
             view.update_node(node_id, size=1.0 + weight)
-    trace = getattr(answerer, "last_trace", None)
+    turn = getattr(answerer, "turn", None)
+    trace = turn.trace if turn is not None else None
     if trace:
         path = _trace_path(trace)
         if len(path) >= 2:

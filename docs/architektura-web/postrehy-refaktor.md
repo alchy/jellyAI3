@@ -10,9 +10,10 @@ dokumentace) a hrubý návrh směru.
 1.3 (recognize vrací výsledek — Metron/Chronos), 4.5 (harness z registru),
 **2.5 + 3.3** (lint decku: rejstříky KNOWN_EVENTS a QUERY_ACTION_KEYS,
 load spadne nahlas na překlep — první úlovek: mrtvá karta resolve-miss,
-zakonzervována); částečně 1.1 (sdílené jen jádro těsnosti
+zakonzervována), **2.1** (TurnResult: `answerer.turn` + `begin_turn()`,
+pick_focus je parametr answer() — bitová parita, dialog ověřen napříč
+hash seedy); částečně 1.1 (sdílené jen jádro těsnosti
 `trigger_specificity`) a 4.1 (instance_lit přesunut ke grafu).
-2.1 TurnResult vědomě ODLOŽEN k odpovědnímu grafu (BACKLOG #57).
 Zbytek otevřen — provádět „při nejbližším dotyku", každý se svým
 měřením.*
 

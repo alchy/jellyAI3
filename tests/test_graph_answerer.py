@@ -116,8 +116,8 @@ def test_answer_exposes_trace():
     ])
     a = GraphAnswerer(_graph(), client, ExtractiveAnswerer(AnswererConfig()))
     a.answer(q, [])
-    assert a.last_trace["topic"] == "Babička"
-    assert a.last_trace["answer"] == "Božena Němcová"
+    assert a.turn.trace["topic"] == "Babička"
+    assert a.turn.trace["answer"] == "Božena Němcová"
 
 
 def test_drill_v_kterem_roce():
@@ -302,3 +302,22 @@ def test_relation_anaphora_uses_two_hottest_persons():
     a.context.warm("Ježíš", 1.5)
     text = a.answer("Jaký byl mezi nimi vztah?", []).text
     assert "pokřtít" in text
+
+
+def test_begin_turn_vymeni_vysledek_tahu_cely():
+    """TurnResult (postřeh 2.1): begin_turn() vymění výsledek tahu CELÝ
+    — žádné pole minulého tahu neprosákne do dalšího (třída chyb
+    empty_role × assurance-fail z Empirie); trasa se přesune do
+    _prev_trace, aby drill („Kde?") fungoval dál."""
+    q = "kdo napsal Babičku?"
+    client = _client(q, [])
+    a = GraphAnswerer(_graph(), client, ExtractiveAnswerer(AnswererConfig()))
+    a.answer(q, [])
+    old_trace = a.turn.trace
+    assert old_trace is not None
+    a.turn.query_card = "q-fiktivni"
+    a.turn.empty_topic = ("téma", ["kandidát"])
+    a.begin_turn()
+    assert a.turn.query_card is None and a.turn.empty_topic is None
+    assert a.turn.trace is None and a.turn.overflow == []
+    assert a._prev_trace == old_trace

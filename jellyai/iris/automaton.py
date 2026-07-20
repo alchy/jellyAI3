@@ -168,9 +168,9 @@ class IrisAutomaton:
             IrisResponse: Odpověď nebo dialogové doostření + metadata.
         """
         fired = self.fire_due()
-        if self.telemetry_path:
-            # tah bez dotazu (konstatování) nesmí zdědit kartu minulé otázky
-            setattr(self.answerer, "last_query_card", None)
+        # nový tah = čistý TurnResult (postřeh 2.1): telemetrie ani karty
+        # nesmí číst výsledky minulého tahu (kartu otázky, nabídku, trasu)
+        self.answerer.begin_turn()
         response = self._turn(text, temperature=temperature)
         if fired:
             response.text = "\n".join(fired + [response.text])
@@ -183,7 +183,7 @@ class IrisAutomaton:
         Provoz tak plní etalony průběžně — `./jelly triage` shlukuje missy."""
         trace = response.trace if isinstance(response.trace, dict) else {}
         patterns = list(response.used.get("patterns", []))
-        query_card = getattr(self.answerer, "last_query_card", None)
+        query_card = self.answerer.turn.query_card
         if query_card and query_card not in patterns:
             patterns.insert(0, query_card)   # vzorová karta dotazu do stopy
         row = {"ts": self.clock().isoformat(timespec="seconds"),
@@ -213,6 +213,7 @@ class IrisAutomaton:
         identity = self._resume_identity(text)
         if identity is not None:
             return identity
+        pick_focus = None       # volba oblasti (#5) — VSTUP answer(), 1 tah
         pick = self._resume_pick(text)
         if pick is not None:
             chosen, text = pick
@@ -224,7 +225,7 @@ class IrisAutomaton:
                 # VOLBA OBLASTI (overflow) DOMINUJE (#5): fakty s vybraným
                 # uzlem mají při přehrání otázky přednost — aktivace sama
                 # remízy jen řadí a nestačí („Amen" přebilo celníka)
-                self.answerer.pick_focus = chosen
+                pick_focus = chosen
         elif "?" not in text:
             # PŘIPOMÍNKY (Chronos): doplnění času rozpracované žádosti,
             # nebo nová žádost frází z jazykové tabulky; scénáře nesou
@@ -299,8 +300,9 @@ class IrisAutomaton:
         # jas PŘED tahem: „zaostřil už uživatel?" — tah sám si téma rozsvítí,
         # takže čtení po odpovědi by jistotu falešně zvedlo
         before = dict(self.answerer.context.scores)
-        answer = self.answerer.answer(text, [], temperature=temperature)
-        res = self.answerer.last_resolution
+        answer = self.answerer.answer(text, [], temperature=temperature,
+                                      pick_focus=pick_focus)
+        res = self.answerer.turn.resolution
         if res is not None:
             glow = before.get(res["winner"], 0.0)
             assur = assurance(res["quality"], len(res["rivals"]), glow)
@@ -310,11 +312,11 @@ class IrisAutomaton:
             candidates = []
         context = {"assurance": assur, "candidates": candidates,
                    "term": res["term"] if res else text}
-        if getattr(self.answerer, "last_empty_topic", None):
+        if self.answerer.turn.empty_topic:
             # PRÁZDNÉ TÉMA (B4, princip user): tápání = PTÁME SE — nabídka
             # kandidátů predikátu; volba přehraje otázku se substitucí
             # tématu (existující mechanismus _resume_pick)
-            topic0, candidates = self.answerer.last_empty_topic
+            topic0, candidates = self.answerer.turn.empty_topic
             card = self.deck.best("query.empty-topic", {})
             if card is not None:
                 self.state.pending = PendingFocus(
@@ -330,7 +332,7 @@ class IrisAutomaton:
                           "patterns": [card.name]})
                 self.state.remember(text, response)
                 return response
-        if getattr(self.answerer, "last_empty_role", None):
+        if self.answerer.turn.empty_role:
             # PRÁZDNÁ DÍRA (#57 E3): schéma roli nezná — odpověď answereru
             # je definitivní (jistota), dialogové karty ji nepřebíjejí
             return self._respond(answer, "answer", 1.0, used_patterns, text)
@@ -342,7 +344,7 @@ class IrisAutomaton:
             card = self.deck.best("resolve.ambiguous", context)
             if card is not None:
                 return self._dialog(card, context, text, used_patterns)
-            overflow = self.answerer.last_overflow
+            overflow = self.answerer.turn.overflow
             if overflow:
                 # svítila-li oblast už PŘED tahem (uživatel ZAOSTŘIL — volba
                 # hřeje 2.0), výčet se prostě zodpoví; mimoděčné teplo
@@ -424,14 +426,14 @@ class IrisAutomaton:
         v jiné roli, než jakou nese fakt (subj karty × obj faktu).
         Pozorovatel (theme) není nabídka.
         """
-        trace = self.answerer.last_trace
+        trace = self.answerer.turn.trace
         if not isinstance(trace, dict) or trace.get("fact") is None:
             return None
         if trace.get("predicate") == "kontext":
             # asociace není fakt děje — nabídka by figl zesilovala (T3)
             return None
         fact = self.answerer.graph.facts.get(trace["fact"])
-        pat = self.answerer.last_pattern
+        pat = self.answerer.turn.pattern
         if fact is None or pat is None \
                 or getattr(pat, "hole_role", None) is None:
             # jen DĚROVÉ odpovědi: zjišťovací „Ano" zůstává stručné
@@ -1536,10 +1538,10 @@ class IrisAutomaton:
 
     def _used(self, patterns):
         """Metadata použitých komponent (observabilita API — spec §5)."""
-        pat = self.answerer.last_pattern
+        pat = self.answerer.turn.pattern
         components = []
         if pat is not None and pat.predicate is not None:
             components.append("pseudo-ql-parser")
-        components.append("graph-answerer" if self.answerer.last_trace
+        components.append("graph-answerer" if self.answerer.turn.trace
                           else "fallback-extractive")
         return {"components": components, "patterns": patterns}

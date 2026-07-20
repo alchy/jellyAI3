@@ -129,7 +129,7 @@ vstupu a answerer má kaskádu poctivých odpovědí.
 | `jellyai/lang/lexer.py` | JEDEN určovač druhů slov: TaggedToken s MNOŽINOU hypotéz tříd (byt=spona i subst.) — #46 fáze 1 |
 | `jellyai/lang/matcher.py` | vykonavatel vzorů: regulární sekvence tříd, spany `uzel+`, zbytek `*`, vylučování `!`, grok-zkratky `%{…}` (tabulka `pattern_aliases`) |
 | `jellyai/answerer/query.py` | `_card_query` (vzorové karty event `utterance.query` — PŘEDNOST) → poziční pseudo-QL šablony (fallback); UDPipe v dotazu NEEXISTUJE (řez #14) |
-| `jellyai/answerer/graph_answerer.py` | match nad grafem, _resolve_topic (patra evidence), aktivační pole |
+| `jellyai/answerer/graph_answerer.py` | match nad grafem, _resolve_topic (patra evidence), aktivační pole; výsledek tahu = `answerer.turn` (TurnResult, `begin_turn()` ho vymění celý) |
 | `jellyai/graph/extract.py` | extrakce faktů z anotací (spony, apozice, aliasy „řečený") |
 | `jellyai/graph/hygiene.py` | korpusová hlasování (upos/pád/životnost/lemma) + scruby + nominativize |
 | `jellyai/graph/instance.py` | instanční vrstva (srůst z tvrzení, name_families) |

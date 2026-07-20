@@ -71,7 +71,7 @@ def make_routes(automaton, deck):
         return {"answer": r.text, "kind": r.kind, "assurance": r.assurance,
                 "clarify": r.clarify, "trace": _trace_json(r.trace),
                 "sources": r.sources, "alternatives": r.alternatives,
-                "pattern": pattern_to_json(automaton.answerer.last_pattern),
+                "pattern": pattern_to_json(automaton.answerer.turn.pattern),
                 "activation": {"nodes": r.activation_window,
                                "docs": r.docs_window},
                 "used": r.used,

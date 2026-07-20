@@ -7,6 +7,7 @@ i „kdy" čerpají z téhož narozovacího faktu. Když nic nesedí, odpověď 
 poctivé „nenašel" — nehádat je zákon.
 """
 
+from dataclasses import dataclass, field as dc_field
 from datetime import datetime
 
 from jellyai.answerer.base import Answer, Answerer
@@ -90,6 +91,26 @@ def _event_text(fact, exclude=()):
     return fact.predicate + (": " + ", ".join(others[:5]) if others else "")
 
 
+@dataclass
+class TurnResult:
+    """Výsledek JEDNOHO tahu answereru (postřeh 2.1).
+
+    Dřív devět side-channel atributů s křehkým protokolem nulování
+    („nesmí přežít z minula" na třech místech) — teď jeden objekt,
+    který `begin_turn()` vymění celý. Automat i harness čtou
+    `answerer.turn.*`; konverzační stav (těžiště, `_prev_trace`,
+    `_last_values`) zůstává na answereru — přežívá tahy záměrně.
+    """
+    trace: dict = None        # trasa odpovědi (téma → fakt → hodnota)
+    pattern: object = None    # vykonaný pseudo-QL Pattern (API/viz)
+    query_card: str = None    # vzorová karta dotazu (telemetrie #38)
+    resolution: dict = None   # evidence rozlišení (vstup QueryAssurance)
+    overflow: list = dc_field(default_factory=list)   # oblasti přetečení
+    empty_role: tuple = None  # verdikt prázdné díry (#57 E3) — jistota
+    empty_topic: tuple = None  # (téma, kandidáti) — nabídka s volbou (B4)
+    theme_bound: set = dc_field(default_factory=set)  # adresáti (#55)
+
+
 class GraphAnswerer(Answerer):
     """Odpovídá z globálního faktového grafu; jinak fallback.
 
@@ -117,15 +138,10 @@ class GraphAnswerer(Answerer):
         self.context_decay = context_decay
         self.spread_depth = spread_depth
         self.spread_falloff = spread_falloff
-        self.last_trace = None   # trasa poslední odpovědi (téma → fakt → hodnota)
-        self.last_pattern = None  # poslední vykonaný pseudo-QL Pattern (API)
-        self.last_query_card = None  # vzorová karta tahu (telemetrie #38)
+        self.turn = TurnResult()   # výsledek AKTUÁLNÍHO tahu (postřeh 2.1)
         self.pick_focus = None   # zvolená oblast overflow dialogu (#5) — 1 tah
         self.context_hub_limit = context_hub_limit   # hub asociací (B4)
-        self._theme_bound = set()  # adresáti dotazu — rolová vazba (#55)
         self._last_values = []   # hodnoty minulé odpovědi („Kdo další…?", #53a)
-        self.last_resolution = None  # evidence rozlišení (vstup QueryAssurance)
-        self.last_overflow = []  # oblasti (theme) přetékajícího výčtu
         self._prev_trace = None  # trasa PŘEDCHOZÍHO tahu (drill „Kdy?")
         self.visited = []        # uzly protnuté (rekurzivním) matchem → rozsvícení
         self.context = ActivationField(decay=context_decay)   # těžiště (id uzlu → jas)
@@ -159,12 +175,17 @@ class GraphAnswerer(Answerer):
         self.context = ActivationField(decay=self.context_decay)
         self.source_context = ActivationField(decay=self.context_decay)
         self.history = []
-        self.last_trace = None
-        self.last_pattern = None
-        self.last_resolution = None
+        self.turn = TurnResult()
         self.pick_focus = None
         self._last_values = []
         self.domain_docs = frozenset()
+
+    def begin_turn(self):
+        """Nový tah: trasa minulého tahu → `_prev_trace` (drill „Kde?"),
+        výsledek tahu se vymění CELÝ — nulování je jeden řádek, žádný
+        atribut „nesmí přežít z minula" (třída chyb postřehu 2.1)."""
+        self._prev_trace = self.turn.trace or self._prev_trace
+        self.turn = TurnResult()
 
     def _span_is_node(self, span):
         """Přísný test rozpětí (spec 4.3): rozřeší se na uzel A jeho obsahová
@@ -317,7 +338,7 @@ class GraphAnswerer(Answerer):
                       and c[3] != best_cand[3]
                       and (domain_lit is None or c[0] in domain_lit)
                       and (not best_cand[4] or c[4])]
-            self.last_resolution = {"term": " ".join(terms), "winner": best_id,
+            self.turn.resolution = {"term": " ".join(terms), "winner": best_id,
                                     "quality": quality, "rivals": rivals}
             # nejednoznačné jméno rozsvítí VŠECHNY kandidáty se stejnou
             # kmenovou shodou (homonymní vějíř „Marie" → i biblická Maria) —
@@ -365,7 +386,7 @@ class GraphAnswerer(Answerer):
             tuple: (téma | None, hodnota | None, fakt | None).
         """
         self.visited = []                    # uzly protnuté (i)rekurzí → rozsvítit
-        self._theme_bound = set()            # explicitní adresáti dotazu (#55)
+        self.turn.theme_bound = set()            # explicitní adresáti dotazu (#55)
         if pat.hole_role == "relation":
             return self._relation_answer(pat)
         if pat.known:
@@ -378,13 +399,13 @@ class GraphAnswerer(Answerer):
                 if role == "theme":
                     # ADRESÁT z dativu („Co řekl Ježíšovi?") — match ho
                     # vyžaduje v roli theme faktu, ne jako mluvčího (#55)
-                    self._theme_bound.add(node)
+                    self.turn.theme_bound.add(node)
                 if first_res is None:
-                    first_res = self.last_resolution
+                    first_res = self.turn.resolution
             if first_res is not None:
                 # evidence tahu = rozlišení PODMĚTU (první known) — pozdější
                 # předměty („rád") nesmí přepsat, o kom otázka je
-                self.last_resolution = first_res
+                self.turn.resolution = first_res
             self._resolved_knowns = set(known_set)
             filled = self._fill_subject(pat, qa)
             if filled is not None:
@@ -619,7 +640,7 @@ class GraphAnswerer(Answerer):
                     continue
                 if any(not any(p.node == n and p.role == "theme"
                                for p in fact.participants)
-                       for n in self._theme_bound):
+                       for n in self.turn.theme_bound):
                     # ROLOVĚ VÁZANÝ známý (#55): explicitní adresát musí
                     # být v roli theme — dativ nesmí matchnout mluvčího
                     continue
@@ -723,7 +744,7 @@ class GraphAnswerer(Answerer):
             # PŘETÉKAJÍCÍ VÝČET: víc kandidátních hodnot, než odpověď unese
             # („Co řekl Ježíš?" — 143 výroků) — zapamatuj OBLASTI (theme
             # účastníky kandidátních faktů), automat z nich nabídne zaostření
-            self.last_overflow = sorted(
+            self.turn.overflow = sorted(
                 {p.node for _, _, _, f in scored
                  for p in f.participants if p.role == "theme"
                  and p.node not in known_set})[:8]
@@ -806,9 +827,9 @@ class GraphAnswerer(Answerer):
                 return None, [], None
             known_set.add(node)
             if first_res is None:
-                first_res = self.last_resolution
+                first_res = self.turn.resolution
         if first_res is not None:
-            self.last_resolution = first_res
+            self.turn.resolution = first_res
         self._resolved_knowns = set(known_set)
         if not known_set:
             # PLURÁLNÍ ANAFORA („Jaký byl MEZI NIMI vztah?" — #55):
@@ -1065,7 +1086,8 @@ class GraphAnswerer(Answerer):
         top = ranked[0][1]
         return [v for v, w in ranked if w >= top * (1.0 - temperature)]
 
-    def answer(self, question, retrieved, *, temperature=0.0):
+    def answer(self, question, retrieved, *, temperature=0.0,
+               pick_focus=None):
         """Odpoví 2-skokem grafu; při neúspěchu deleguje na fallback.
 
         Uloží i `last_trace` (téma → fakt → hodnota). **Teplota** `> 0` navíc vrátí
@@ -1080,10 +1102,9 @@ class GraphAnswerer(Answerer):
         Returns:
             Answer: Odpověď z grafu (zdroj „graf"), nebo výsledek fallbacku.
         """
-        self._prev_trace = self.last_trace or self._prev_trace
-        self.last_trace = None
-        self.last_resolution = None   # evidence tahu — nesmí přežít z minula
-        self.last_overflow = []
+        self.begin_turn()             # čistý výsledek tahu (postřeh 2.1)
+        self.pick_focus = pick_focus  # volba oblasti (#5) — VSTUP tahu,
+                                      # platí jen tento jeden tah
         # TVRDÝ ČASOVÝ FILTR: časové primitivum otázky („v 19. století",
         # „letos", „21.1.1900") VYŘADÍ fakty s časem mimo interval;
         # nedatované fakty filtr nechává (nelze je vyloučit časem)
@@ -1094,18 +1115,15 @@ class GraphAnswerer(Answerer):
         # VÝHRADNĚ šablony (vzorové karty + pseudo-QL) — řez #14: dotazová
         # strana UDPipe nevolá; šablony nic → nehádat, poctivé „nenašel"
         qa, pat = None, None
-        self.last_query_card = None   # vzorová karta tahu (telemetrie #38)
-        self.last_empty_role = None   # verdikt prázdné díry (#57 E3)
-        self.last_empty_topic = None  # (téma, kandidáti) — nabídka (B4)
         query = build_query(question, self._predicates, self._span_is_node,
                             self._node_word, self._is_area)
         if query is not None:
             qa, pat = query, query.pattern
             self.place_filter = getattr(query, "place", None)
-            self.last_query_card = query.card
+            self.turn.query_card = query.card
         if qa is None:
             qa, pat = Query(), Pattern()
-        self.last_pattern = pat
+        self.turn.pattern = pat
         self._resolved_knowns = set()
         if getattr(pat, "predicate_class", None):
             # TŘÍDA DĚJŮ (A2): agregace faktů členů třídy pro podmět
@@ -1124,11 +1142,11 @@ class GraphAnswerer(Answerer):
             fresh = [v for v in values if v not in self._last_values]
             if not fresh:
                 text = current()["novelty_exhausted_answer"]
-                self.last_trace = {"topic": topic, "predicate": None,
+                self.turn.trace = {"topic": topic, "predicate": None,
                                    "fact": None, "answer": text}
                 self._log_turn(question, topic, None, text)
                 return Answer(text=text, sources=["graf"], score=1.0,
-                              trace=self.last_trace)
+                              trace=self.turn.trace)
             values = fresh
         reverse = False
         focus = None                # UZEL odpovědi (paměť/okolí ≠ složený text)
@@ -1144,7 +1162,7 @@ class GraphAnswerer(Answerer):
             # výčtová odpověď: víc rovnocenných děr se vyjmenuje („Co napsal X?")
             self._last_values = list(values)   # pro „Kdo další…?" (#53a)
             text = ", ".join(values)
-            self.last_trace = {"topic": topic, "predicate": fact.predicate,
+            self.turn.trace = {"topic": topic, "predicate": fact.predicate,
                                "fact": fact.id, "answer": text}
             focus = focus or values[0]
             for node in self.visited:        # rozsvítí celou (rekurzivní) cestu, ne jen konce
@@ -1154,16 +1172,14 @@ class GraphAnswerer(Answerer):
             self._warm_sources(fact)         # attention nad soubory (+ jejich graf)
             self._remember(qa, topic, focus)
             self._log_turn(question, topic, fact.predicate, text)
-            self.pick_focus = None           # volba oblasti platí jeden tah (#5)
             return Answer(text=text, sources=["graf"], score=1.0,
                           alternatives=self._alternatives(qa, topic, focus,
                                                           reverse, temperature),
-                          trace=self.last_trace)
+                          trace=self.turn.trace)
         # neúspěch NErozmělňuje kontext: attention nesmí vyhasnout jen proto, že
         # jsme odpověď nenašli (jinak by po pár marných dotazech spadla k nule).
         # Pohasíná se jen při úspěchu (v _remember spolu s rozsvícením nového tématu).
         self._log_turn(question, topic, None, None)
-        self.pick_focus = None               # volba oblasti platí jeden tah (#5)
         if getattr(pat, "predicate", None) is None and pat.hole_role \
                 and self._prev_trace:
             drill_fact = self.graph.facts.get(self._prev_trace.get("fact"))
@@ -1177,20 +1193,20 @@ class GraphAnswerer(Answerer):
                 missing = labels.get(pat.hole_role)
                 template = current().get("empty_role_answer")
                 if known and missing and template:
-                    self.last_empty_role = (drill_fact.predicate,
+                    self.turn.empty_role = (drill_fact.predicate,
                                             pat.hole_role)
                     return Answer(text=template.format(
                         predicate=drill_fact.predicate, known=known,
                         missing=missing), sources=["graf"], score=1.0,
                         trace=None)
-        cascade_topic = topic or (self.last_resolution or {}).get("winner")
+        cascade_topic = topic or (self.turn.resolution or {}).get("winner")
         empty = (self._empty_role_answer(pat)
                  or self._partial_fact_answer(pat, cascade_topic)
                  or self._empty_topic_answer(pat, cascade_topic))
         if empty is not None:
             # verdikt je JISTOTA (schéma i fakta prohledána) — automat
             # nesmí odpověď přebít clarify dialogem (assurance-fail)
-            self.last_empty_role = (getattr(pat, "predicate", None),
+            self.turn.empty_role = (getattr(pat, "predicate", None),
                                     getattr(pat, "hole_role", None))
             return empty
         return self.fallback.answer(question, retrieved)
@@ -1247,12 +1263,12 @@ class GraphAnswerer(Answerer):
             return self.fallback.answer(question, retrieved)
         items = "; ".join(f"{pred} — {', '.join(vs[:4])}"
                           for pred, vs in groups.items())
-        self.last_trace = {"topic": topic, "predicate": None,
+        self.turn.trace = {"topic": topic, "predicate": None,
                            "fact": None, "answer": items}
         self.context.warm(topic, 1.0)
         return Answer(text=template.format(cls=pat.predicate_class,
                                            topic=topic, items=items),
-                      sources=["graf"], score=1.0, trace=self.last_trace)
+                      sources=["graf"], score=1.0, trace=self.turn.trace)
 
     def _ring_roles(self, predicate):
         """Role schématu přes CELÝ synonymní/vidový kruh — normalizace
@@ -1306,11 +1322,11 @@ class GraphAnswerer(Answerer):
                     None)
         if best is not None:
             # trasa: drill („Kde?") po částečné odpovědi funguje (T9/T12)
-            self.last_trace = {"topic": topic, "predicate": best.predicate,
+            self.turn.trace = {"topic": topic, "predicate": best.predicate,
                                "fact": best.id, "answer": parts}
         return Answer(text=template.format(predicate=predicate, topic=topic,
                                            missing=missing, found=parts),
-                      sources=["graf"], score=1.0, trace=self.last_trace)
+                      sources=["graf"], score=1.0, trace=self.turn.trace)
 
     def _empty_topic_answer(self, pat, topic):
         """PRÁZDNÉ TÉMA (B4, princip user): predikát roli má, ale žádný
@@ -1353,7 +1369,7 @@ class GraphAnswerer(Answerer):
             return None
         top = [n for n, _ in sorted(carriers.items(),
                                     key=lambda kv: -kv[1])][:5]
-        self.last_empty_topic = (topic, top)   # kandidáti pro nabídku
+        self.turn.empty_topic = (topic, top)   # kandidáti pro nabídku
         return Answer(text=template.format(predicate=predicate, topic=topic,
                                            known=", ".join(top)),
                       sources=["graf"], score=1.0, trace=None)

@@ -46,15 +46,15 @@ def test_affinity_filters_rivals():
                                      Participant("obj", "dům", "concept")]))
     a = GraphAnswerer(g, FakeUfalClient(), ExtractiveAnswerer(AnswererConfig()))
     a._resolve_topic(["Ježíš"], "narodit")
-    assert a.last_resolution["winner"] == "Ježíš"
-    assert a.last_resolution["rivals"] == []          # Martu narodit-fakt nemá
+    assert a.turn.resolution["winner"] == "Ježíš"
+    assert a.turn.resolution["rivals"] == []          # Martu narodit-fakt nemá
     a._resolve_topic(["Ježíš"])                       # bez predikátu — beze změny
-    assert "Ježíš Martu" in a.last_resolution["rivals"]
+    assert "Ježíš Martu" in a.turn.resolution["rivals"]
 
 
 def test_resolver_records_resolution_evidence():
     """_resolve_topic po ostrém rozlišení zapíše evidenci (kvalitu, soupeře)
-    do last_resolution — vstup pro assurance; sondy is_node nezapisují."""
+    do turn.resolution — vstup pro assurance; sondy is_node nezapisují."""
     g = FactGraph()
     g.add_fact(make_fact("být", [Participant("subj", "Karel Čapek", "person"),
                                  Participant("pred", "spisovatel", "concept")]))
@@ -62,13 +62,13 @@ def test_resolver_records_resolution_evidence():
                                  Participant("pred", "malíř", "concept")]))
     a = GraphAnswerer(g, FakeUfalClient(), ExtractiveAnswerer(AnswererConfig()))
     winner = a._resolve_topic(["Čapek"])
-    res = a.last_resolution
+    res = a.turn.resolution
     assert res["winner"] == winner
     rivals = set(res["rivals"])
     assert rivals == {"Karel Čapek", "Josef Čapek"} - {winner}
     # jednoznačné jméno soupeře nemá
     a._resolve_topic(["Karel", "Čapek"])
-    assert a.last_resolution["rivals"] == []
+    assert a.turn.resolution["rivals"] == []
     # sonda (warm=False) evidenci nepřepisuje
     a._span_is_node("Josef")
-    assert a.last_resolution["term"] == "Karel Čapek"
+    assert a.turn.resolution["term"] == "Karel Čapek"
