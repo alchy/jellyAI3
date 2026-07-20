@@ -93,3 +93,21 @@ def test_dialog_position_walks_sharpening_edges():
     assert not pos.sharpen("q-cim-sloveso")      # není zpřesnění
     assert pos.resume() == "*"                   # návrat = přehraj otázku
     assert pos.node.name == "q-otaz-minuly"      # pozice zpět u otázky
+
+
+def test_default_claims_rozpoznavaji_prime_brany():
+    """E2 (#26): nároky přímých expertů jako DATA registru — kompilace
+    a osvětlení je čtou jednotně, ruční výčet v kódu grafu mizí."""
+    from jellyai.iris.claims import default_claims
+    claims = {claim.name: claim for claim in default_claims()}
+    assert set(claims) == {"metron-vypocet", "chronos-hodiny",
+                           "meta-focus"}
+    assert claims["metron-vypocet"].recognize("Kolik je 1 plus 1?", NOW)
+    assert not claims["metron-vypocet"].recognize(
+        "Kolik měla dětí Božena Němcová?", NOW)
+    assert claims["chronos-hodiny"].recognize("Kolik je hodin?", NOW)
+    assert claims["meta-focus"].recognize("O kom mluvíme?", NOW)
+    assert not claims["meta-focus"].recognize("Kdo napsal R.U.R.?", NOW)
+    assert (claims["metron-vypocet"].priority
+            > claims["chronos-hodiny"].priority
+            > claims["meta-focus"].priority)
