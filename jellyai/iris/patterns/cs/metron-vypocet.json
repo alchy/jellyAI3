@@ -1,0 +1,9 @@
+{
+  "name": "metron-vypocet",
+  "trigger": {
+    "event": "metron.compute",
+    "priority": 5
+  },
+  "dialog": "{expression} = {result}",
+  "teach": "Aritmetika z řádku uživatele (#56, zadání user): Metron si nárokuje číselné tokeny (cifry i slovní číslovky vč. složenin — osmdesátdva) a operátory (plus/krát i +/*), počítá bezpečnou aritmetikou s prioritou krát/děleno — nikdy eval. Odpověď nese PŘEPIS výrazu („100 + 82 + 30 + 50 + 32 = 294“) — uživatel si extrakci zkontroluje (účtenka). Součtový režim spouští fráze dohromady/celkem/součet."
+}

@@ -193,6 +193,11 @@ class IrisAutomaton:
 
     def _turn(self, text, temperature=0.0):
         """Vlastní tah (bez odpalu připomínek — replay/focus-shift rekurze)."""
+        counted = self._metron_query(text)
+        if counted is not None:
+            # ARITMETIKA (Metron, #56) — přímý expert jako hodinová otázka:
+            # výraz/součet z řádku, graf se nedotkne
+            return counted
         direct = clock_answer(text, self.clock())
         if direct is not None:
             # hodinová otázka — odpovídá Chronos sám (časová kotva), graf se
@@ -401,6 +406,32 @@ class IrisAutomaton:
                     card.dialog.format(task=item["task"]) if card
                     else item["task"], recipient=item.get("recipient"))
                 for item in due]
+
+    def _metron_query(self, text):
+        """ARITMETIKA z řádku (#56): Metronova brána Q — výraz nebo
+        součtový výčet (účtenka). Výsledek s PŘEPISEM výrazu nese karta
+        metron.compute (kontrola extrakce uživatelem); jistota plná —
+        počítá se, nehádá.
+
+        Returns:
+            IrisResponse | None: Výsledek, nebo None (řádek není výpočet).
+        """
+        from jellyai.iris.subsystems.metron import compute
+        found = compute(text)
+        if found is None:
+            return None
+        expression, result = found
+        card = self.deck.best("metron.compute", {})
+        if card is None:
+            return None
+        message = card.dialog.format(expression=expression, result=result)
+        response = IrisResponse(
+            text=message, kind="answer", assurance=1.0,
+            activation_window=activation_window(self.answerer),
+            docs_window=docs_window(self.answerer),
+            used={"components": ["metron"], "patterns": [card.name]})
+        self.state.remember(text, response)
+        return response
 
     def _focus_query(self, text):
         """META-otázka na stav rozhovoru („O kom mluvíme?") — introspekce
