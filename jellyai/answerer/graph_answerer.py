@@ -1033,6 +1033,7 @@ class GraphAnswerer(Answerer):
         # strana UDPipe nevolá; šablony nic → nehádat, poctivé „nenašel"
         qa, pat = None, None
         self.last_query_card = None   # vzorová karta tahu (telemetrie #38)
+        self.last_empty_role = None   # verdikt prázdné díry (#57 E3)
         query = build_query(question, self._predicates, self._span_is_node,
                             self._node_word, self._is_area)
         if query is not None:
@@ -1097,7 +1098,38 @@ class GraphAnswerer(Answerer):
         # Pohasíná se jen při úspěchu (v _remember spolu s rozsvícením nového tématu).
         self._log_turn(question, topic, None, None)
         self.pick_focus = None               # volba oblasti platí jeden tah (#5)
+        empty = self._empty_role_answer(pat)
+        if empty is not None:
+            # verdikt je JISTOTA (schéma roli nezná), ne nejistota — automat
+            # nesmí odpověď přebít clarify dialogem (assurance-fail)
+            self.last_empty_role = (pat.predicate, pat.hole_role)
+            return empty
         return self.fallback.answer(question, retrieved)
+
+    def _empty_role_answer(self, pat):
+        """Chytrá clarifikace prázdné díry (#57 E3, šablona empty_role_answer).
+
+        Fakty predikátu roli díry NIKDY nenesou → hledání je marné;
+        místo generického terminálu vyjmenovat role, které děj zná.
+        Vakuové guardy (past 2): bez predikátu, díry nebo rolí se nesoudí.
+        """
+        from jellyai.iris.qgraph import instance_lit
+        predicate = getattr(pat, "predicate", None)
+        hole_role = getattr(pat, "hole_role", None)
+        if instance_lit(predicate, hole_role,
+                        self.graph.predicate_roles) is not False:
+            return None
+        lang = current()
+        labels = lang.get("role_labels", {})
+        roles = self.graph.predicate_roles(predicate)
+        known = ", ".join(sorted(labels[r] for r in roles if r in labels))
+        missing = labels.get(hole_role)
+        template = lang.get("empty_role_answer")
+        if not known or missing is None or template is None:
+            return None
+        return Answer(text=template.format(predicate=predicate, known=known,
+                                           missing=missing),
+                      sources=["graf"], score=1.0, trace=None)
 
     def _alternatives(self, qa, topic, value, reverse, temperature):  # pylint: disable=too-many-arguments,too-many-positional-arguments
         """Alternativy odpovědi pro teplotu > 0 — fuzzy kandidáti (další hodnoty

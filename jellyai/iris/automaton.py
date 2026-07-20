@@ -322,6 +322,10 @@ class IrisAutomaton:
             candidates = []
         context = {"assurance": assur, "candidates": candidates,
                    "term": res["term"] if res else text}
+        if getattr(self.answerer, "last_empty_role", None):
+            # PRÁZDNÁ DÍRA (#57 E3): schéma roli nezná — odpověď answereru
+            # je definitivní (jistota), dialogové karty ji nepřebíjejí
+            return self._respond(answer, "answer", 1.0, used_patterns, text)
 
         # ROZHODUJÍ KARTY (výběr benefitem — deck.best): automat jen ohlásí
         # událost tahu (odpověď na hádané volbě → resolve.ambiguous;
