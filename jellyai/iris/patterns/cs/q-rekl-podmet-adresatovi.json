@@ -1,0 +1,24 @@
+{
+  "name": "q-rekl-podmet-adresatovi",
+  "trigger": {
+    "event": "utterance.query",
+    "priority": 6,
+    "pattern": [
+      "%{TAZACI}",
+      "%{SLOVESO_MINULE}",
+      "%{ENTITA}",
+      "%{DATIV}"
+    ]
+  },
+  "action": {
+    "query": {
+      "hole": "$1",
+      "predicate": "$2",
+      "known": [
+        ["subj", "$3"],
+        ["theme", "$4"]
+      ]
+    }
+  },
+  "teach": "Směr řeči s explicitním podmětem „Co řekl JEŽÍŠ PETROVI?“ (#55, sourozenec q-rekl-adresatovi; nález parity qgraph): dativ je ADRESÁT (theme, rolově vázaný match) i když mluvčí ve větě stojí — poziční šablona ho mapovala jako druhý podmět a směrová vazba se ztrácela (slova jinému adresátovi by prosákla). Mluvčí = entita span, adresát = holý dativ za ní."
+}

@@ -312,3 +312,20 @@ def test_pasivni_karta_nekrade_sponovou_identitu():
     result = a.answer("Kdo je Božena Němcová?", [])
     assert a.turn.query_card == "q-spona-identita"
     assert "spisovatelka" in result.text
+
+
+def test_adresat_s_podmetem_filtruje_smer():
+    """„Co řekl Ježíš Petrovi?" (#55 + qgraph parita): dativ je ADRESÁT
+    i s explicitním podmětem — bez karty šablona mapovala „Petrovi"
+    jako druhý subj, směrová vazba chyběla a slova Janovi by prosákla."""
+    a = _answerer(
+        make_fact("říci", [Participant("subj", "Ježíš", "person"),
+                           Participant("theme", "Petr", "person"),
+                           Participant("obj", "satane", "výrok")]),
+        make_fact("říci", [Participant("subj", "Ježíš", "person"),
+                           Participant("theme", "Jan", "person"),
+                           Participant("obj", "pojď za mnou", "výrok")]))
+    result = a.answer("Co řekl Ježíš Petrovi?", [])
+    assert "satane" in result.text
+    assert "pojď za mnou" not in result.text
+    assert a.turn.theme_bound == {"Petr"}
