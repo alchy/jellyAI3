@@ -9,6 +9,7 @@ predikátu drží popisky unikátní (klíč metadat) a čitelné.
 """
 
 from jellyai.graph.canon import cluster_key, name_gender
+from jellyai.lang import current
 
 _MAX_GROUPS = 5      # kolik spojení (predikátů) v detailu ukázat — jinak přeteče
 _MAX_PARTNERS = 4    # kolik partnerů na jeden řádek
@@ -25,6 +26,11 @@ _CZ_TYPE = {
     "fact": "fakt",
     "výrok": "výrok (obsah řeči)",
 }
+
+
+def _role_label(role):
+    """Český popisek role (#9) — tabulka role_detail_labels (jazyk = data)."""
+    return current().get("role_detail_labels", {}).get(role, role)
 
 
 def node_detail_rows(graph, node_id):
@@ -49,19 +55,23 @@ def node_detail_rows(graph, node_id):
             ("váha (výskyty v textu)", str(node.weight)),
             ("aktivace (attention)", "0")]     # živě přepisuje web po dotazu
     if node.type == "person":
-        # morfologie osoby: rod z tvaru jména, kmenový klíč clusteru a
-        # pádové tvary, které resolver sloučil do tohoto uzlu
+        # rod jen u osob (z tvaru jména)
         rows.append(("rod (tvar jména)",
                      "ženský" if name_gender(node_id) == "Fem" else "mužský"))
+    if node.type in ("person", "geo"):
+        # kmenový klíč clusteru — jména i místa (#9)
         rows.append(("kmen", " ".join(cluster_key(node_id))))
-        merged = getattr(graph, "aliases", {}).get(node_id)
-        if merged:
-            rows.append(("sloučené tvary", ", ".join(merged)))
+    merged = getattr(graph, "aliases", {}).get(node_id)
+    if merged:
+        # pádové tvary sloučené resolverem — u KAŽDÉHO typu uzlu (#9)
+        rows.append(("sloučené tvary", ", ".join(merged)))
     groups = {}           # popisek → {partneři, váha (opakování), pořadí}
     for order, fact in enumerate(graph.facts_of(node_id)):
-        is_subject = any(p.role == "subj" and p.node == node_id
-                         for p in fact.participants)
-        label = f"{fact.predicate} {'→' if is_subject else '←'}"
+        # popisek nese ROLI uzlu ve faktu česky (#9) — místo šipek →/←
+        # tak čtenář vidí, ve kterých rolích se uzel účastní
+        role = next((p.role for p in fact.participants
+                     if p.node == node_id), None)
+        label = f"{fact.predicate} ({_role_label(role)})"
         group = groups.get(label)
         if group is None:
             group = {"partners": [], "weight": 0, "order": order}
@@ -102,5 +112,7 @@ def fact_detail_rows(fact):
             order.append(participant.role)
         by_role[participant.role].append(participant.node)
     for role in order:
-        rows.append((role, ", ".join(by_role[role])))
+        czech = _role_label(role)
+        label = f"{czech} ({role})" if czech != role else role
+        rows.append((label, ", ".join(by_role[role])))
     return rows

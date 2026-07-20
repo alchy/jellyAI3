@@ -20,14 +20,14 @@ def test_entity_rows_type_weight_and_facts():
     assert rows["typ"] == "osoba"
     assert rows["váha (výskyty v textu)"] == "2"   # figuruje ve 2 faktech
     assert rows["aktivace (attention)"] == "0"     # živě přepisuje web
-    assert rows["napsat →"] == "Babička"
-    assert rows["narodit →"] == "1820"
+    assert rows["napsat (podmět)"] == "Babička"
+    assert rows["narodit (podmět)"] == "1820"
 
 
 def test_object_node_shows_incoming_direction():
     rows = dict(node_detail_rows(_graph(), "Babička"))
     assert rows["typ"] == "pojem"
-    assert rows["napsat ←"] == "Božena Němcová"   # Babička je předmět → šipka dovnitř
+    assert rows["napsat (předmět)"] == "Božena Němcová"   # role uzlu vysvětlená (#9)
 
 
 def test_same_predicate_aggregates_partners():
@@ -36,7 +36,7 @@ def test_same_predicate_aggregates_partners():
         g.add_fact(make_fact("napsat", [Participant("subj", "B. N.", "person"),
                                         Participant("obj", dilo, "concept")]))
     rows = dict(node_detail_rows(g, "B. N."))
-    assert rows["napsat →"] == "Babička, Divá Bára"   # jeden řádek, spojené hodnoty
+    assert rows["napsat (podmět)"] == "Babička, Divá Bára"   # jeden řádek, spojené hodnoty
 
 
 def test_unknown_node_is_graceful():
@@ -58,8 +58,8 @@ def test_caps_to_five_most_frequent_connections():
     assert labels[0] == "typ"
     # typ, váha, aktivace + morfologie osoby (rod, kmen) + top 5 spojení
     assert len(rows) == 3 + 2 + 5
-    assert "pred0 →" in labels                   # nejčastější (3x) se vejde
-    assert dict(rows)["pred0 →"] == "cíl0"
+    assert "pred0 (podmět)" in labels            # nejčastější (3x) se vejde
+    assert dict(rows)["pred0 (podmět)"] == "cíl0"
 
 
 def test_caps_partners_per_row():
@@ -68,7 +68,7 @@ def test_caps_partners_per_row():
     for i in range(8):
         g.add_fact(make_fact("mít", [Participant("subj", "X", "person"),
                                      Participant("obj", f"věc{i}", "concept")]))
-    value = dict(node_detail_rows(g, "X"))["mít →"]
+    value = dict(node_detail_rows(g, "X"))["mít (podmět)"]
     assert value.endswith("…")
     assert value.count(",") < 8                  # ne všech 8 partnerů
 
@@ -80,8 +80,8 @@ def test_fact_rows_predicate_weight_participants():
     assert rows["typ"] == "fakt"
     assert rows["predikát"] == "napsat"
     assert rows["váha"] == "1"
-    assert rows["subj"] == "Božena Němcová"
-    assert rows["obj"] == "Babička"
+    assert rows["podmět (subj)"] == "Božena Němcová"
+    assert rows["předmět (obj)"] == "Babička"
 
 
 def test_person_rows_carry_morphology():
@@ -98,3 +98,33 @@ def test_person_rows_carry_morphology():
     assert rows["rod (tvar jména)"] == "ženský"
     assert rows["kmen"] == "božn nemc"
     assert "Boženy Němcové" in rows["sloučené tvary"]
+
+
+def test_role_labels_explain_participation():
+    """#9: popisek spojení nese ROLI uzlu česky, ne šipku."""
+    rows = dict(node_detail_rows(_graph(), "Božena Němcová"))
+    assert rows["napsat (podmět)"] == "Babička"
+    rows = dict(node_detail_rows(_graph(), "Babička"))
+    assert rows["napsat (předmět)"] == "Božena Němcová"
+
+
+def test_fact_rows_explain_roles():
+    """#9: řádky faktu vysvětlují role česky (technický klíč v závorce)."""
+    g = FactGraph()
+    g.add_fact(make_fact("napsat", [Participant("subj", "B", "person"),
+                                    Participant("obj", "D", "concept")]))
+    rows = dict(fact_detail_rows(next(iter(g.facts.values()))))
+    assert rows["podmět (subj)"] == "B"
+    assert rows["předmět (obj)"] == "D"
+
+
+def test_aliases_and_stem_for_places():
+    """#9: tvary/aliasy a kmen i pro místa, nejen osoby."""
+    g = FactGraph()
+    g.add_fact(make_fact("bydlet", [Participant("obj", "Marcela", "person"),
+                                    Participant("loc", "Petrovice", "geo")]))
+    g.aliases["Petrovice"] = ["Petrovicích"]
+    rows = dict(node_detail_rows(g, "Petrovice"))
+    assert rows["sloučené tvary"] == "Petrovicích"
+    assert "kmen" in rows
+    assert rows["bydlet (místo)"] == "Marcela"
