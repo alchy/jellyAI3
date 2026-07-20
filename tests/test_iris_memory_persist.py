@@ -43,3 +43,25 @@ def test_no_memory_path_keeps_memory_volatile(tmp_path):
     reborn = _iris(None)
     out = reborn.turn("Kdy jsem měl v tomto roce knedlíky?")
     assert "17. července 2026" not in out.text
+
+
+def test_journal_rows_carry_raw_utterance(tmp_path):
+    """#47 krok 1: deník nese SUROVÝ výrok (pole raw) — sklizeň pro
+    etalon (#38) a budoucí re-parse/očistu (#53c) bez ztráty."""
+    import json
+    from datetime import datetime
+    from config import AnswererConfig
+    from jellyai.answerer.extractive import ExtractiveAnswerer
+    from jellyai.answerer.graph_answerer import GraphAnswerer
+    from jellyai.graph.graph import FactGraph
+    from jellyai.iris.automaton import IrisAutomaton
+    from jellyai.ufal_client import FakeUfalClient
+
+    path = str(tmp_path / "memory.jsonl")
+    answerer = GraphAnswerer(FactGraph(), FakeUfalClient(),
+                             ExtractiveAnswerer(AnswererConfig()))
+    iris = IrisAutomaton(answerer, clock=lambda: datetime(2026, 7, 17, 12, 0),
+                         memory_path=path)
+    iris.turn("Roník jí granule.")
+    rows = [json.loads(l) for l in open(path, encoding="utf-8")]
+    assert rows and rows[0]["raw"] == "Roník jí granule."

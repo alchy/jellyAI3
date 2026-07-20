@@ -107,6 +107,7 @@ class GraphAnswerer(Answerer):
         self.last_query_card = None  # vzorová karta tahu (telemetrie #38)
         self.pick_focus = None   # zvolená oblast overflow dialogu (#5) — 1 tah
         self._theme_bound = set()  # adresáti dotazu — rolová vazba (#55)
+        self._last_values = []   # hodnoty minulé odpovědi („Kdo další…?", #53a)
         self.last_resolution = None  # evidence rozlišení (vstup QueryAssurance)
         self.last_overflow = []  # oblasti (theme) přetékajícího výčtu
         self._prev_trace = None  # trasa PŘEDCHOZÍHO tahu (drill „Kdy?")
@@ -146,6 +147,7 @@ class GraphAnswerer(Answerer):
         self.last_pattern = None
         self.last_resolution = None
         self.pick_focus = None
+        self._last_values = []
         self.domain_docs = frozenset()
 
     def _span_is_node(self, span):
@@ -746,6 +748,15 @@ class GraphAnswerer(Answerer):
         if first_res is not None:
             self.last_resolution = first_res
         self._resolved_knowns = set(known_set)
+        if not known_set:
+            # PLURÁLNÍ ANAFORA („Jaký byl MEZI NIMI vztah?" — #55):
+            # „nimi" jsou DVĚ nejteplejší osoby konverzačního těžiště
+            persons = [c for c in self._context_candidates()
+                       if self.graph.nodes.get(c) is not None
+                       and self.graph.nodes[c].type == "person"]
+            if len(persons) < 2:
+                return None, [], None        # bez dvou žhavých osob nehádat
+            known_set = set(persons[:2])
         if len(known_set) == 1:
             anchor = next(iter(known_set))
             other = next((c for c in self._context_candidates()
@@ -1040,6 +1051,18 @@ class GraphAnswerer(Answerer):
             # žhavé z MINULÉHO tahu?" nesmí vidět jas právě probíhajícího
             # rozřešení (svěží identitní otázka by hádala z kontextu)
             self.context.warm(node, 0.5)
+        if getattr(qa, "novelty", False) and values:
+            # „Kdo DALŠÍ…?" (#53a): už jmenovaní z minulé odpovědi vypadnou;
+            # vyčerpaný výčet odpoví poctivě šablonou (jazyk jako data)
+            fresh = [v for v in values if v not in self._last_values]
+            if not fresh:
+                text = current()["novelty_exhausted_answer"]
+                self.last_trace = {"topic": topic, "predicate": None,
+                                   "fact": None, "answer": text}
+                self._log_turn(question, topic, None, text)
+                return Answer(text=text, sources=["graf"], score=1.0,
+                              trace=self.last_trace)
+            values = fresh
         reverse = False
         focus = None                # UZEL odpovědi (paměť/okolí ≠ složený text)
         if not values:
@@ -1052,6 +1075,7 @@ class GraphAnswerer(Answerer):
                 values = [(_to_nominative(v, self.client) or v)
                           for v in values]                    # „Slezsku"→„Slezsko"
             # výčtová odpověď: víc rovnocenných děr se vyjmenuje („Co napsal X?")
+            self._last_values = list(values)   # pro „Kdo další…?" (#53a)
             text = ", ".join(values)
             self.last_trace = {"topic": topic, "predicate": fact.predicate,
                                "fact": fact.id, "answer": text}

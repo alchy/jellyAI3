@@ -49,6 +49,7 @@ class Query:
     gender: str = None
     place: str = None      # oblast otázky („v Čechách") — filtr Topos
     card: str = None       # jméno vítězné vzorové karty (telemetrie #38)
+    novelty: bool = False  # „Kdo DALŠÍ…?" — vyluč už jmenované (#53a)
 
 
 def _known_words(known):
@@ -292,7 +293,8 @@ def _card_query(question, predicates, is_node=None, is_word=None):
                  is_copula=cop is not None,
                  gender=_verb_gender(surface(gender_tok))
                  if gender_tok is not None else None,
-                 card=card.name)
+                 card=card.name,
+                 novelty=ref(spec.get("novelty")) is not None)
 
 
 def build_query(question, predicates, is_node=None, is_word=None,

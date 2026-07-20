@@ -15,6 +15,7 @@
     "query": {
       "hole": "$1",
       "predicate": "$3",
+      "novelty": "$2",
       "known": [
         "$5"
       ]

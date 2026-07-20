@@ -273,3 +273,32 @@ def test_speech_direction_dative_filters_recipient():
     a.reset()
     text = a.answer("Co řekl Ježíš?", []).text     # směr mluvčího drží
     assert "Amen" in text
+
+
+def test_novelty_dalsi_excludes_previous_answer():
+    """#53a: „Kdo DALŠÍ bydlí…?" po odpovědi vylučuje už jmenované;
+    vyčerpaný výčet odpoví poctivě textem z jazykové tabulky."""
+    g = FactGraph()
+    for person in ("Marcela", "Roník"):
+        g.add_fact(make_fact("bydlí", [Participant("obj", person, "concept"),
+                                       Participant("loc", "Petrovice", "geo"),
+                                       Participant("theme", "uživatel", "person")]))
+    a = GraphAnswerer(g, FakeUfalClient(), ExtractiveAnswerer(AnswererConfig()))
+    first = a.answer("Kdo bydlí v Petrovicích?", []).text
+    assert "Marcela" in first and "Roník" in first
+    again = a.answer("Kdo další bydlí v Petrovicích?", []).text
+    assert "Marcela" not in again and "Roník" not in again
+    assert "všichni" in again              # novelty_exhausted_answer
+
+
+def test_relation_anaphora_uses_two_hottest_persons():
+    """#55 zbytek: „Jaký byl mezi nimi vztah?" — „nimi" jsou dvě
+    nejteplejší osoby těžiště → sdílený děj."""
+    g = FactGraph()
+    g.add_fact(make_fact("pokřtít", [Participant("subj", "Jan", "person"),
+                                     Participant("obj", "Ježíš", "person")]))
+    a = GraphAnswerer(g, FakeUfalClient(), ExtractiveAnswerer(AnswererConfig()))
+    a.context.warm("Jan", 2.0)
+    a.context.warm("Ježíš", 1.5)
+    text = a.answer("Jaký byl mezi nimi vztah?", []).text
+    assert "pokřtít" in text

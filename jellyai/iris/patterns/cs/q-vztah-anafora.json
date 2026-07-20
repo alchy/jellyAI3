@@ -1,0 +1,21 @@
+{
+  "name": "q-vztah-anafora",
+  "trigger": {
+    "event": "utterance.query",
+    "priority": 6,
+    "pattern": [
+      "%{TAZACI_VYBER}",
+      "%{SPONA}",
+      ":mezi",
+      ":nimi",
+      "%{VZTAH}"
+    ]
+  },
+  "action": {
+    "query": {
+      "hole": "$1",
+      "hole_role": "relation"
+    }
+  },
+  "teach": "Vztahová otázka s plurální anaforou „Jaký byl MEZI NIMI vztah?“ (#55, nález z živého dialogu): „nimi“ jsou dvě nejteplejší osoby konverzačního těžiště — účastníky doplní answerer, odpovědí jsou jejich sdílené děje. Bez dvou žhavých osob poctivé nenašel — nehádat."
+}

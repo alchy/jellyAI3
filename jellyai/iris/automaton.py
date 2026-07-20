@@ -1220,7 +1220,9 @@ class IrisAutomaton:
                                     current()["user_entity"]))
             stored.append(statement)
             if self.memory_path:
-                persist(statement, self.memory_path)  # přežije restart
+                # SUROVÝ výrok do deníku (#47 krok 1): sklizeň pro etalon
+                # a budoucí re-parse/očistu (#53c) — parse bez ztráty zdroje
+                persist(dict(statement, raw=text), self.memory_path)
             places = statement.get("places", ())
             if len(places) >= 2 and hasattr(self.answerer, "_gazetteer"):
                 # PŘESAH DO TOPOSU: vnořená místa („na Barrandově v Praze")
