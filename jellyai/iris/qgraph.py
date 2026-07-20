@@ -19,6 +19,7 @@ DISPATCH SE NEPŘEPÍNÁ — shadow měření dělá benchmark/run_qgraph.py.
 from dataclasses import dataclass, field
 from datetime import datetime
 
+from jellyai.iris.patterns import trigger_specificity
 from jellyai.lang import current
 from jellyai.lang.lexer import classify
 from jellyai.lang.matcher import expand_pattern, match_sequence
@@ -36,13 +37,15 @@ class QEdge:
 @dataclass
 class QNode:
     name: str
-    kind: str        # "otazka" | "worker" | "clarify"
+    kind: str        # "otazka" | "worker" | "clarify" | "vyrok"
     worker: str      # "graf" | "metron" | "chronos" | "iris" | "dialog"
+                     # | "brana-e" (zápis — #51)
     pattern: list = None
     card: str = None
     priority: int = 0              # priorita zdrojové karty (klíč decku)
     weight: float = 0.0            # zásahy z telemetrie (#38)
     edges: list = field(default_factory=list)
+    trigger: dict = None           # rysový trigger (rodiny #51)
 
 
 @dataclass
@@ -73,6 +76,13 @@ def compile_qgraph(deck, predicates=frozenset(), telemetry_rows=(),
                 priority=trigger.get("priority", 0))
             has_hole[card.name] = bool(
                 card.action.get("query", {}).get("hole"))
+        elif trigger.get("event") == "utterance.statement":
+            # rodina VYROK (#51): worker = brána E (zápis); vzorové
+            # karty nesou pattern, rysové jen trigger (requires/forbids)
+            nodes[card.name] = QNode(
+                name=card.name, kind="vyrok", worker="brana-e",
+                pattern=trigger.get("pattern"), card=card.name,
+                priority=trigger.get("priority", 0), trigger=trigger)
         elif trigger.get("event") in _CLARIFY_EVENTS:
             nodes[card.name] = QNode(
                 name=card.name, kind="clarify", worker="dialog",
@@ -206,18 +216,32 @@ def illuminate(text, qgraph, now=None, is_node=None, use_weights=False):
             lit.append(((3, claim.priority, 0), qgraph.nodes[claim.name]))
     tagged = classify(text, is_node=None)
     aliases = lang.get("pattern_aliases", {})
+    features = turn_features(text, tagged)
     for node in qgraph.nodes.values():
-        if node.kind != "otazka":
-            continue
-        binding = match_sequence(expand_pattern(node.pattern, aliases),
-                                 tagged, is_span=is_node)
-        if binding is None:
-            continue
-        # týž klíč jako deck (priorita, délka vzoru); varianta s vahami
-        # z telemetrie láme remízy provozem — kolik provozu je potřeba,
-        # než váhy něco znamenají, určí testy (zadání user)
-        key = (2, node.priority, len(node.pattern),
-               node.weight if use_weights else 0)
-        lit.append((key, node))
+        if node.kind == "otazka":
+            binding = match_sequence(expand_pattern(node.pattern, aliases),
+                                     tagged, is_span=is_node)
+            if binding is None:
+                continue
+            # týž klíč jako deck (priorita, délka vzoru); varianta s vahami
+            # z telemetrie láme remízy provozem
+            key = (2, node.priority, len(node.pattern),
+                   node.weight if use_weights else 0)
+            lit.append((key, node))
+        elif node.kind == "vyrok":
+            # rodina VYROK (#51): rysy tahu rozhodují (otaznik zhasíná
+            # — hranice v datech karet); vzorové karty navíc matcherem
+            tightness = trigger_specificity(node.trigger, features)
+            if tightness is None:
+                continue
+            length = 0
+            if node.pattern:
+                if match_sequence(expand_pattern(node.pattern, aliases),
+                                  tagged, is_span=is_node) is None:
+                    continue
+                length = len(node.pattern)
+            key = (2, node.priority, tightness + length,
+                   node.weight if use_weights else 0)
+            lit.append((key, node))
     lit.sort(key=lambda pair: pair[0], reverse=True)
     return [node for _, node in lit]

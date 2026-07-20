@@ -99,6 +99,21 @@ class PatternCard:
     teach: str = ""
 
 
+def trigger_specificity(trigger, features):
+    """Těsnost RYSOVÉ části triggeru nad rysy tahu; None = nesedí.
+
+    JEDNA pravda rysového výběru (postřeh 1.1) — čtou ji deck
+    (`_specificity`) i osvětlení otázkového grafu (rodiny #51)."""
+    features = frozenset(features)
+    requires = set(trigger.get("requires", ()))
+    if not requires <= features:
+        return None
+    forbids = set(trigger.get("forbids", ()))
+    if features & forbids:
+        return None
+    return len(requires) + len(forbids)
+
+
 _SHARED = {}
 
 
@@ -187,15 +202,12 @@ class PatternDeck:
                 return None
             score += 1
         # rysové triggery: karta žádá rysy tahu (requires) a zakazuje jiné
-        # (forbids) — klasifikaci dělají KARTY, kód jen počítá rysy
-        features = frozenset(context.get("features", ()))
-        requires = set(trig.get("requires", ()))
-        if not requires <= features:
+        # (forbids) — klasifikaci dělají KARTY, kód jen počítá rysy;
+        # jádro sdílené s osvětlením grafu (trigger_specificity, #51)
+        rysy = trigger_specificity(trig, context.get("features", ()))
+        if rysy is None:
             return None
-        forbids = set(trig.get("forbids", ()))
-        if features & forbids:
-            return None
-        return score + len(requires) + len(forbids)
+        return score + rysy
 
     def match(self, event, context):
         """Vybere PRVNÍ kartu (pořadí priorita→jméno), jejíž trigger sedí.

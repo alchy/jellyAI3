@@ -24,7 +24,7 @@ def _graph():
 def test_compile_builds_question_worker_and_clarify_nodes():
     qg = _graph()
     kinds = {node.kind for node in qg.nodes.values()}
-    assert kinds == {"otazka", "worker", "clarify"}
+    assert kinds == {"otazka", "worker", "clarify", "vyrok"}   # vyrok: #51
     assert "q-otaz-minuly" in qg.nodes            # karta = uzel typu otázky
     assert qg.nodes["metron-vypocet"].worker == "metron"
     assert qg.nodes["chronos-hodiny"].worker == "chronos"
@@ -191,3 +191,16 @@ def test_turn_features_nese_otaznik_i_vyrokove_rysy():
     features = turn_features("Venku prší.")
     assert "otaznik" not in features
     assert "first_person" in turn_features("Dnes jsem měl knedlíky.")
+
+
+def test_kompilace_a_osvetleni_rodiny_vyrok():
+    """#51 fáze 1: výrokové karty jsou uzly rodiny vyrok; svítí rysy
+    tahu (otaznik je zhasíná — hranice dotaz×výrok v datech karet)."""
+    qg = _graph()
+    vyroky = [n for n in qg.nodes.values() if n.kind == "vyrok"]
+    assert vyroky
+    assert all(n.worker == "brana-e" for n in vyroky)
+    lit = illuminate("Venku prší.", qg, now=NOW)
+    assert lit and any(n.kind == "vyrok" for n in lit)
+    lit = illuminate("Prší?", qg, now=NOW)
+    assert not any(n.kind == "vyrok" for n in lit)
