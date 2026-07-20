@@ -5,9 +5,10 @@ model). Čti ho CELÝ před první změnou kódu. Doplňuje `docs/BACKLOG.md`
 (CO dělat) o JAK pracovat a ČEHO se vyvarovat. K architektuře čti
 `docs/ARCHITEKTURA.md` (kap. 7 = dva grafy) a pro hloubku
 `docs/architektura-web/index.html` (17 kapitol offline). Specy dne
-2026-07-20: `2026-07-20-otazkovy-graf.md` (+ dotažení, jednotný
-dispatch, testování Bible) — otázkový graf je nyní JEDINÝM
-dispatcherem vstupu a answerer má kaskádu poctivých odpovědí.
+2026-07-20 (adresář `docs/superpowers/specs/`):
+`2026-07-20-otazkovy-graf.md` (+ dotažení, jednotný dispatch,
+testování Bible) — otázkový graf je nyní JEDINÝM dispatcherem
+vstupu a answerer má kaskádu poctivých odpovědí.
 
 ## 1. Zákony projektu (neporušitelné)
 
@@ -43,6 +44,8 @@ dispatcherem vstupu a answerer má kaskádu poctivých odpovědí.
 - **Metriky:** 581 testů; etalon 33/33 (GAP 12 opraveno / 3), focus
   12/12, dialog 45/45 (GAP 8/0), ZÁPIS 34/34, qgraph harness 5 rovin
   (dispatch, výroky, stav, dekorace, etalon) 100 % v obou variantách.
+  POZOR: etalonový gap řádek „Co udělal Ježíš v Kafarnaum?" mezi běhy
+  KOLÍSÁ (12/3 ↔ 11/4) — nedeterminismus, nález #58 (past 19).
 - **Otázkový graf (#57 + #51) KOMPLETNÍ:** kompilát karet s PĚTI
   rodinami uzlů (otazka/vyrok/prikaz/worker/clarify) je JEDINÝM
   dispatcherem vstupu — přímí experti přes registr claimů
@@ -114,10 +117,12 @@ dispatcherem vstupu a answerer má kaskádu poctivých odpovědí.
 |---|---|
 | `jellyai/iris/automaton.py` | jádro Iris: turn() — hodiny→volba→focus-shift→konstatování→odpověď→karty |
 | `jellyai/iris/patterns.py` + `patterns/cs/*.json` | balíček karet (deck.best = benefit-výběr) |
-| `jellyai/iris/subsystems/{chronos,mnemos,topos}.py` | čas (intervaly, připomínky+plán, tep hodin, tvrdý filtr), paměť (deník, memorize/recall), prostor (gazetteer, kontejnment, učení za pochodu) |
+| `jellyai/iris/subsystems/{chronos,mnemos,topos,metron}.py` | čas (intervaly, připomínky+plán, tep hodin, tvrdý filtr), paměť (deník, memorize/recall), prostor (gazetteer, kontejnment, učení za pochodu), aritmetika (výrazy, slovní číslovky) |
+| `jellyai/iris/qgraph.py` | kompilát otázkového grafu (compile/illuminate/decorate, DialogPosition) — JEDINÝ dispatch vstupu (#57/#51) |
+| `jellyai/iris/claims.py` | registr nároků přímých expertů (Metron/Chronos/meta-focus) — pořadí bran = data |
 | `jellyai/lang/lexer.py` | JEDEN určovač druhů slov: TaggedToken s MNOŽINOU hypotéz tříd (byt=spona i subst.) — #46 fáze 1 |
 | `jellyai/lang/matcher.py` | vykonavatel vzorů: regulární sekvence tříd, spany `uzel+`, zbytek `*`, vylučování `!`, grok-zkratky `%{…}` (tabulka `pattern_aliases`) |
-| `jellyai/answerer/query.py` | `_card_query` (vzorové karty event `utterance.query` — PŘEDNOST) → pseudo-QL šablony (fallback) → UDPipe (hybrid) |
+| `jellyai/answerer/query.py` | `_card_query` (vzorové karty event `utterance.query` — PŘEDNOST) → poziční pseudo-QL šablony (fallback); UDPipe v dotazu NEEXISTUJE (řez #14) |
 | `jellyai/answerer/graph_answerer.py` | match nad grafem, _resolve_topic (patra evidence), aktivační pole |
 | `jellyai/graph/extract.py` | extrakce faktů z anotací (spony, apozice, aliasy „řečený") |
 | `jellyai/graph/hygiene.py` | korpusová hlasování (upos/pád/životnost/lemma) + scruby + nominativize |
@@ -131,7 +136,7 @@ dispatcherem vstupu a answerer má kaskádu poctivých odpovědí.
 ## 5. Priority a implementační tipy (stav 2026-07-20 večer)
 
 Plná tabulka priorit: BACKLOG + protokol
-`specs/2026-07-20-testovani-bible-nalezy.md`. Shrnutí:
+`docs/superpowers/specs/2026-07-20-testovani-bible-nalezy.md`. Shrnutí:
 
 | P | Bod | Tip kudy do toho |
 |---|---|---|
@@ -179,8 +184,9 @@ nesmí být přepsána (je tracked — nález #17).
     span „Pavla v" projde! Matcher proto zakazuje spany začínající/končící
     třídou funkcni — NEOSLABUJ to.
 11. **Karta se NEHLÁSÍ, když predikát nezná** (`_verb_match` → None):
-    překlep „sworil" musí propadnout na UDPipe fallback. Kartová cesta
-    nikdy nebere povrchový tvar neznámého slovesa.
+    překlep „sworil" musí propadnout na poziční šablony (UDPipe
+    fallback zrušen řezem #14). Kartová cesta nikdy nebere povrchový
+    tvar neznámého slovesa.
 12. **Vokativ z izolovaného taggeru je šum**: „Marcele" → vok. „Marcel"
     (rodový flip). Nominativizace jmen tag s pádem 5 ZAHAZUJE.
 13. **ASCII uvozovky v JSON kartách/sadách** (stará past 3 platí dvojnásob):
@@ -203,6 +209,12 @@ nesmí být přepsána (je tracked — nález #17).
     (`cascade_skip_predicates`) do ní NEpatří (identita má vlastní
     patra); s místním filtrem se nespekuluje; verdikty rolí přes
     `_ring_roles` (normalizace smí vybrat člen kruhu bez faktů).
+19. **Nedeterminismus přes iteraci setů** (#58): odpověď na „Co udělal
+    Ježíš v Kafarnaum?" se mezi běhy procesu LIŠÍ (figl „stan" ×
+    kaskáda s predikátem „Udělat") — závisí na PYTHONHASHSEED, tedy
+    někde se vítěz bere z neseřazené množiny (podezření: `_verb_match`
+    s `first=True` nad setem predikátů). Etalonové GAP číslo proto
+    kolísá. Nové iterace přes množiny VŽDY řadit.
 
 ## 7. Pracovní smyčka (doporučený postup na 1 úkol)
 

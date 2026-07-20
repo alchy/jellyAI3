@@ -96,6 +96,8 @@ budoucí provenience faktů (#39) rozliší i zdroje uvnitř grafu.
 | `./jelly annotate` | offline anotace vět (entity + role) — vstup faktového grafu |
 | `./jelly graph [--view]` | postaví faktový graf z anotací (`--view` = export do viewBase) |
 | `./jelly web` | prohlížeč: graf + tři okna Iris (dialog / uzly / dokumenty) |
+| `./jelly triage` | shluky neúspěšných tahů ze stopy provozu (`data/telemetry.jsonl`, #38) |
+| `./jelly qgraph` | vypíše kompilát otázkového grafu (uzly, hrany, schéma predikátů) |
 | `./jelly graph-ask [otázka]` | dotaz nad grafem z příkazové řádky (bez webu) |
 | `./jelly ask "otázka?"` | jednorázový dotaz retrieval cestou (V1) |
 | `./jelly explain <blok>` | vysvětlí blok (bez argumentu vypíše seznam bloků) |
@@ -134,13 +136,17 @@ curl -s localhost:8084/schema     # na co se lze ptát (predikáty, role, karty)
 - `POST /query {"question", "temperature"?}` → odpověď/dialog + metadata
   (assurance, použité karty, aktivační okno uzlů i dokumentů),
 - `POST /graphql {pattern JSON}` → přímé vykonání pseudo-QL patternu,
-- `POST /reset` → nový rozhovor, `GET /schema` → popis dotazovatelného.
+- `POST /reset` → nový rozhovor, `GET /schema` → popis dotazovatelného,
+- `GET /version` → SHA buildu (verzovací handshake #40 — klient křičí,
+  když se lokální kód a běžící služba rozejdou).
 
 ## Benchmarky — objektivní řízení změn
 
-Každá změna se měří; normativy neklesají (guardrail). Stav 2026-07-20:
-**581 testů, etalon 33/33 (+12 opravených gapů), focus 12/12, dialog
-45/45, zápis 34/34, otázkový graf 5 rovin 100 % — vše 100 %.**
+Každá změna se měří; normativy neklesají (guardrail). Stav 2026-07-20
+(ověřeno spuštěním): **581 testů, etalon 33/33 (15 gap řádků: 12
+opraveno / 3 otevřeno — jeden řádek mezi běhy kolísá, nález #58),
+focus 12/12, dialog 45/45 tahů ve 20 scénářích, zápis 34/34, otázkový
+graf 5 rovin 100 % v obou variantách.**
 
 ```bash
 .venv/bin/python -m pytest -q               # jednotkové testy

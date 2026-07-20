@@ -3,8 +3,15 @@
 *Review provedené přirozeně při psaní architektonické dokumentace (stav ke commitu
 `a63e83f`, 2026-07-20). Čtyři osy: DRY, konzistence, pochopitelnost, členění.
 U každého nálezu: co, kde, proč to bolí (ideálně jak se to projevilo při psaní
-dokumentace) a hrubý návrh směru. **Nic z toho není provedeno — jen sepsáno.**
+dokumentace) a hrubý návrh směru.
 Řada nálezů má už dnes svůj backlogový bod; kde ho znám, odkazuji.*
+
+*Stav k 2026-07-20 večer (po #51): ✅ provedeno 1.2 (shared_deck),
+1.3 (recognize vrací výsledek — Metron/Chronos), 4.5 (harness z registru);
+částečně 1.1 (sdílené jen jádro těsnosti `trigger_specificity`) a 4.1
+(instance_lit přesunut ke grafu). 2.1 TurnResult vědomě ODLOŽEN
+k odpovědnímu grafu (BACKLOG #57). Zbytek otevřen — provádět „při
+nejbližším dotyku", každý se svým měřením.*
 
 ---
 

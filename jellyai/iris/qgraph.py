@@ -1,4 +1,4 @@
-"""Otázkový graf (#57, experimentální větev) — kompilace a osvětlení.
+"""Otázkový graf (#57/#51) — kompilace, osvětlení, dekorace, pozice.
 
 Spec `2026-07-20-otazkovy-graf.md`. Graf je deterministický KOMPILÁT
 dnešních zdrojů — nevzniká druhá pravda:
@@ -13,7 +13,9 @@ dnešních zdrojů — nevzniká druhá pravda:
 
 Osvětlení tahu: větný graf (lexer hypotézy + nároky expertů) rozsvítí
 uzly; pořadí = (tier, priorita, délka vzoru [, váha z telemetrie]).
-DISPATCH SE NEPŘEPÍNÁ — shadow měření dělá benchmark/run_qgraph.py.
+Graf je od fáze D + #51 JEDINÝM dispatcherem vstupu (přímí experti,
+výroky, příkazy, recall); paritu kompilace s kartami hlídá
+benchmark/run_qgraph.py (5 rovin).
 """
 
 import re
@@ -39,7 +41,7 @@ class QEdge:
 @dataclass
 class QNode:
     name: str
-    kind: str        # "otazka" | "worker" | "clarify" | "vyrok"
+    kind: str        # "otazka" | "worker" | "clarify" | "vyrok" | "prikaz"
     worker: str      # "graf" | "metron" | "chronos" | "iris" | "dialog"
                      # | "brana-e" (zápis — #51)
     pattern: list = None

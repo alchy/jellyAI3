@@ -45,7 +45,7 @@ case "$cmd" in
       graph)     "$PY" "$ROOT/cli.py" graph "$@" ;;   # postaví faktový graf (příp. --view)
       web)       "$PY" "$ROOT/cli.py" web ;;          # webová vizualizace + prompt (viewBase)
       triage)    "$PY" "$ROOT/cli.py" triage ;;       # shluky missů ze stopy tahů (#38)
-      qgraph)    "$PY" "$ROOT/cli.py" qgraph ;;       # otázkový graf (#57, experiment)
+      qgraph)    "$PY" "$ROOT/cli.py" qgraph ;;       # dump kompilátu otázkového grafu (#57/#51)
       template)
         if [ "$#" -gt 0 ]; then
           "$PY" "$ROOT/cli.py" ask --template "$*"    # pravidlový jednorázový dotaz
@@ -72,6 +72,6 @@ case "$cmd" in
     ;;
 
   *)
-    echo "Použití: ./jelly {setup|prepare|index|ask [otázka]|explain [blok]|wiki|qa-models|qa|annotate|template [otázka]|graph [--view]|graph-ask [otázka]|web|triage}"
+    echo "Použití: ./jelly {setup|prepare|index|ask [otázka]|explain [blok]|wiki|qa-models|qa|annotate|template [otázka]|graph [--view]|graph-ask [otázka]|web|triage|qgraph}"
     ;;
 esac

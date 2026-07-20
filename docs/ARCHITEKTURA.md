@@ -123,7 +123,9 @@ Vzorové karty existují ve dvou rodinách:
 - **Dotazové** (event `utterance.query`): mají přednost před staršími
   pozičními šablonami v `query.py`; když žádná nesedí — nebo když
   predikát nezná slovník grafu (překlep „sworil") — věta propadne
-  šablonám a případně UDPipe fallbacku, které mají vlastní léky.
+  pozičním šablonám, které mají vlastní léky (UDPipe fallback
+  z dotazové cesty zmizel řezem #14; ÚFAL slouží už jen anotaci
+  korpusu a nominativizaci zápisu).
   Z karty vzniká pseudo-QL `Pattern`: díru (roli a typ odpovědi) určuje
   tázací slovo tabulkou `interrogatives`, známé účastníky spany.
 - **Výrokové** (event `utterance.statement` s klíčem `pattern`):
@@ -256,8 +258,15 @@ fakt s Prahou projde kontejnmentem), slovesná třída přesunu rozšiřuje
 „kde" na trasy („Kde putoval Ježíš?"). Topos je zrcadlem Chronosu:
 interval na ose času ⟷ strom kontejnmentu na ose prostoru.
 
-**Plánovaní experti:** Metron (počty — „Kolikrát letos pršelo?", #11)
-a Echo (kompozice odpovědí, #20). Koncepčně největší je **oceán vrstev**
+**Metron (počty a výrazy).** Nejmladší expert (`subsystems/metron.py`):
+aritmetika s prioritou operátorů a slovními číslovkami vč. složenin
+(„Kolik je dvěstě plus osmdesátdva?" — nikdy eval, #56) a početní
+díra nad fakty (počet je VLASTNOST situace: „Kolik měla dětí BN?" →
+čtyři, karta q-kolik-pocet). Zbývá počítání výskytů („Kolikrát letos
+pršelo?", #11).
+
+**Plánovaný expert:** Echo (kompozice odpovědí, #20).
+Koncepčně největší je **oceán vrstev**
 (#41): dědění vlastností po druh-hranách s útlumem („Psi mají rádi
 maso" → Roník je pes → Roník má nejspíš rád maso; přímý fakt vždy
 poráží zděděný) — klasické defeasible inheritance, jehož zárodky
@@ -266,8 +275,9 @@ poráží zděděný) — klasické defeasible inheritance, jehož zárodky
 ## 7. Dva grafy: faktový a otázkový
 
 Až potud měl dokument jeden graf — faktový. Od #57 stojí vedle něj
-druhý, **otázkový** (experiment na větvi `otazkovy-graf`,
-`jellyai/iris/qgraph.py`, spec `2026-07-20-otazkovy-graf.md`). Nejsou
+druhý, **otázkový** (`jellyai/iris/qgraph.py`, spec
+`2026-07-20-otazkovy-graf.md`); začal jako experiment na větvi,
+dnes je zamergovaný a od #51 je JEDINÝM dispatcherem vstupu. Nejsou
 to konkurenti; jsou to dvě různé věci, které jen sdílejí tvar.
 
 **Jednou větou:** faktový graf ví, CO systém zná; otázkový graf ví,
@@ -409,12 +419,16 @@ hrany (digging), workery atribut a telemetrie váhu. Karty zůstávají
 zdrojovým kódem, graf je jejich zkompilovaná podoba — proto se nesmí
 rozejít a proto je jeho jedinou bránou parity gate.
 
-### 7.8 Co experiment naměřil (a co to znamená)
+### 7.8 Co měření ukázalo (a kde experiment skončil)
 
-`benchmark/run_qgraph.py` neposouvá chování — porovnává, kudy by šel
-graf, s tím, kudy systém reálně šel: **dispatch dialog 11/11, etalon
-41/41, stav dialogu 3/3, dekorace 41/41 — vše 100 %** (v obou
-variantách skórování). Dva nálezy stojí za zapamatování:
+Experiment běžel shadow-first: `benchmark/run_qgraph.py` nejdřív
+chování neposouval — porovnával, kudy by šel graf, s tím, kudy systém
+reálně šel. Po 100% shodě byl dispatch PŘEPNUT (fáze D) a rozsah
+dorostl na celý vstup (#51): dnes harness měří **pět rovin — dispatch
+dialog 11/11, výroky 15/15, stav dialogu 4/4, dekorace 50/50, etalon
+50/50, vše 100 % v obou variantách** — a slouží jako parity gate
+kompilace (karty se od grafu nesmí rozejít). Dva nálezy z shadow fáze
+stojí za zapamatování:
 
 - **Vrstva dekorací je popis reality**, ne nová abstrakce — to, co
   model předpovídá, answerer už dělá.
@@ -423,12 +437,13 @@ variantách skórování). Dva nálezy stojí za zapamatování:
   při jakémkoli objemu. Otázka „kolik provozu je potřeba" má dřívější
   otázku „nastávají vůbec remízy?".
 
-Sto procent shody je zároveň silný i slabý signál: kompilace je věrná,
-ale graf zatím nedělá *jiné* rozhodnutí. Jeho hodnota není v přesnosti —
-je ve **struktuře** (jedno místo pro směrování místo ručního pořadí
-bran, hrany pro digging, jedna reprezentace stavu). Prokáže ji až fáze,
-kde dnešní kód nemá odpověď: proaktivní nabídky hran („mohu doplnit
-kdy a kde") a instance odvozené ze schématu predikátů.
+Hodnota grafu se potvrdila tam, kde přesnost nestačila — ve
+**struktuře**: dispatch přímých expertů je smyčka nad registrem claimů
+(pořadí bran = data, `claims.py`), rodinné karty s dimenzemi zrušily
+klony (E1), instance ze schématu daly chytrou clarifikaci prázdné díry
+(E3 — „Kde napsal R.U.R.?" → „…kde nevím") a odvozené hrany proaktivní
+nabídku rolí (E4 — „Mohu doplnit: kdy"). Zaparkovaný zůstává graf
+ODPOVĚDNÍ (efemérní reifikace tahu) — budoucí směr, viz spec dotažení.
 
 ## 8. Build korpusu (offline)
 

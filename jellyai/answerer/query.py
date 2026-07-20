@@ -264,7 +264,7 @@ def _card_query(question, predicates, is_node=None, is_word=None):
                                         first=True)
         if pattern.predicate is None:
             # NEZNÁMÉ sloveso (překlep „sworil") — karta se nehlásí;
-            # otázka jde šablonou/UDPipe fallbackem, který má vlastní léky
+            # otázka jde poziční šablonou, která má vlastní léky
             return None
     elif isinstance(spec.get("predicate"), str) \
             and not spec["predicate"].startswith("$"):
@@ -323,7 +323,8 @@ def build_query(question, predicates, is_node=None, is_word=None,
     Returns:
         Query | None: Pseudo-QL pattern + šablonová analýza (qtype/rod/spona);
         None když věta není otázka nebo z ní nelze vzor bezpečně sestavit
-        (pak volající spadne na UDPipe fallback, dokud existuje).
+        (pak volající poctivě odpoví „nenašel" — UDPipe fallback
+        zrušen řezem #14).
     """
     if "?" not in question:
         return None
