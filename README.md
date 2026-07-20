@@ -61,6 +61,30 @@ text z `data/raw/` a zopakuješ kroky 2–4, zmizí i z korpusu.
 knedlíky.", „Venku prší.") se ukládají do deníku `data/memory.jsonl`
 a přežívají restart — smazáním souboru paměť vynuluješ.
 
+## Mapa `data/` — statická × uživatelská znalost
+
+Tři druhy obsahu s různou cenou: **odvozené** soubory se kdykoli
+přegenerují pipeline (`./jelly index → annotate → graph`), **statické
+zdroje** jsou vstupem buildu, a **uživatelské sklady** jsou
+NENAHRADITELNÉ — vznikají jen dialogem a zaslouží zálohu.
+
+| cesta | druh | vzniká | verzováno | smazání znamená |
+|---|---|---|---|---|
+| `raw/` | statický zdroj (korpus) | uživatel / `./jelly wiki` | ne | ztrátu vlastních textů |
+| `processed/`, `index.pkl` | odvozené | `./jelly index` | ne | nic — přegeneruje se |
+| `annotations.pkl` | odvozené (anotace ÚFAL) | `./jelly annotate` | ne | nic — přegeneruje se |
+| `graph.pkl` | odvozené (faktový graf) | `./jelly graph` | ne | nic — přegeneruje se |
+| `models/` | statické (ÚFAL modely) | stažení při setupu | ne | nutnost stáhnout znovu |
+| `qa/` | odvozené (extraktivní QA) | `./jelly ask` | ne | nic |
+| `memory.jsonl` | **uživatelská paměť** (deník Mnemos, append-only, po restartu se přehrává) | dialog | ano | ztrátu paměti uživatele |
+| `reminders.jsonl` | **uživatelská** (připomínky Chronos) | dialog | ne | ztrátu plánu připomínek |
+| `sub_topos_gazetteer.jsonl` | smíšená (kurátorský seed + učení za pochodu) | seed + dialog | ano | ztrátu naučených míst |
+| `telemetry.jsonl` | provozní stopa (triage #38) | provoz | ne | nic — jen diagnostika |
+| `web_inbox.txt` | dev most do GUI | vývojář | ne | nic — efemérní |
+
+Pozn.: subsystémové sklady nesou prefix `sub_<subsystém>_…` (#28);
+budoucí provenience faktů (#39) rozliší i zdroje uvnitř grafu.
+
 ## Příkazy `./jelly`
 
 | Příkaz | Co dělá |
