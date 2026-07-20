@@ -42,7 +42,7 @@ from jellyai.iris.subsystems.mnemos import (forget, forget_entity,
                                             parse_statement,
                                             persist, remember, replay)
 from jellyai.iris.patterns import PatternDeck, shared_deck
-from jellyai.iris.qgraph import compile_qgraph
+from jellyai.iris.qgraph import compile_qgraph, illuminate
 from jellyai.iris.presenter import activation_window, docs_window
 from jellyai.iris.state import FocusState, PendingFocus, PendingIdentity
 from jellyai.lang import current
@@ -278,20 +278,24 @@ class IrisAutomaton:
             shift = self._focus_shift(text)
             if shift is not None:
                 return shift
-            # KONSTATOVÁNÍ (ne dotaz, ne volba) → Mnemos: timestamp + graf;
-            # DRUH výroku rozhodují karty (utterance.statement), ne kód;
-            # souvětí = fakt na klauzuli (#46 fáze 4 v2, parse_clauses)
-            statements = []
-            for statement in parse_clauses(text, self.clock(), self.deck,
-                                           is_node=self._known_word):
-                if statement.get("needs_subject"):
-                    statement = self._subject_or_clarify(text, statement)
-                    if isinstance(statement, IrisResponse):
-                        return statement  # dialog o identitě podmětu (#43)
-                if statement is not None:
-                    statements.append(statement)
-            if statements:
-                return self._memorize(text, statements)
+            # KONSTATOVÁNÍ → Mnemos (brána E): vstup do zápisu řídí
+            # OSVĚTLENÍ grafu (#51 fáze 2 — vítěz je uzel rodiny vyrok);
+            # DRUH výroku dál rozhodují karty (výběr uvnitř parse_clauses
+            # je týž deck — parita konstrukcí), souvětí = fakt na klauzuli
+            lit = illuminate(text, self.qgraph, now=self.clock(),
+                             is_node=self.answerer._span_is_node)
+            if lit and lit[0].kind == "vyrok":
+                statements = []
+                for statement in parse_clauses(text, self.clock(), self.deck,
+                                               is_node=self._known_word):
+                    if statement.get("needs_subject"):
+                        statement = self._subject_or_clarify(text, statement)
+                        if isinstance(statement, IrisResponse):
+                            return statement  # dialog o identitě (#43)
+                    if statement is not None:
+                        statements.append(statement)
+                if statements:
+                    return self._memorize(text, statements)
         # VZPOMÍNÁNÍ („Co jsem ti řekl včera?") — Chronos filtr nad
         # timestampy Mnemos; fráze z tabulky, texty karty memory.recall
         recalled = self._recall_query(text)
