@@ -86,9 +86,15 @@ def _evidence_date(fact):
 
 def _event_text(fact, exclude=()):
     """Děj jako odpověď: SLOVESO první, pak účastníci. „Co se stalo?" se ptá
-    na děj — faktový uzel je děj reifikovaný, holý podmět odpovědí není."""
+    na děj — faktový uzel je děj reifikovaný, holý podmět odpovědí není.
+    Theme/time/num do obsahu neprosakují (C10/T6: „ctít: den, strach") —
+    ledaže by fakt jinak o obsah přišel (jen-theme fakty)."""
     others = [p.node for p in fact.participants if p.node not in exclude]
-    return fact.predicate + (": " + ", ".join(others[:5]) if others else "")
+    content = [p.node for p in fact.participants
+               if p.node not in exclude
+               and p.role not in ("theme", "time", "num")]
+    tail = content or others
+    return fact.predicate + (": " + ", ".join(tail[:5]) if tail else "")
 
 
 @dataclass
@@ -109,6 +115,7 @@ class TurnResult:
     empty_role: tuple = None  # verdikt prázdné díry (#57 E3) — jistota
     empty_topic: tuple = None  # (téma, kandidáti) — nabídka s volbou (B4)
     theme_bound: set = dc_field(default_factory=set)  # adresáti (#55)
+    value_kind: str = None    # „events" = hodnoty jsou děje (C10: „; ")
 
 
 class GraphAnswerer(Answerer):
@@ -813,6 +820,7 @@ class GraphAnswerer(Answerer):
         self.visited.extend(p.node for p in best_fact.participants)
         values = list(dict.fromkeys(_event_text(f, (node0,))
                                     for _, _, f in scored))[:_MAX_ENUM]
+        self.turn.value_kind = "events"     # C10: děje dělí středník
         return node0, values, best_fact
 
     def _relation_answer(self, pat):
@@ -872,6 +880,7 @@ class GraphAnswerer(Answerer):
         if not chosen:
             return None, [], None
         self.visited.extend(p.node for f in chosen for p in f.participants)
+        self.turn.value_kind = "events"     # C10: děje dělí středník
         return node0, [_event_text(f) for f in chosen], chosen[0]
 
     def _place_anchored(self, pat):
@@ -1194,13 +1203,25 @@ class GraphAnswerer(Answerer):
             topic, single, fact = self._reverse_lookup(question)
             if single is not None:
                 values, focus, reverse = [_event_text(fact, (topic,))], single, True
+                self.turn.value_kind = "events"
         if values:
             if qa.qtype == "Kde":
                 values = [(_to_nominative(v, self.client) or v)
                           for v in values]                    # „Slezsku"→„Slezsko"
             # výčtová odpověď: víc rovnocenných děr se vyjmenuje („Co napsal X?")
             self._last_values = list(values)   # pro „Kdo další…?" (#53a)
-            text = ", ".join(values)
+            # C10 (T6): výrok jde po jednom v uvozovkách — dva obsahy řeči
+            # se nesmí slepit do jedné pseudo-věty; děje dělí středník,
+            # aby hranice skupin nezanikla (šablony v cs.json)
+            lang = current()
+            quote = lang.get("quote_format", "{}")
+            values = [quote.format(v)
+                      if (n := self.graph.nodes.get(v)) is not None
+                      and n.type == "výrok" else v
+                      for v in values]
+            sep = (lang.get("event_separator", ", ")
+                   if self.turn.value_kind == "events" else ", ")
+            text = sep.join(values)
             self.turn.trace = {"topic": topic, "predicate": fact.predicate,
                                "fact": fact.id, "answer": text}
             focus = focus or values[0]

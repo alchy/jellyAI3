@@ -1110,5 +1110,7 @@
         "kolik je ted hodin"
       ]
     }
-  }
+  },
+  "quote_format": "„{}“",
+  "event_separator": "; "
 }

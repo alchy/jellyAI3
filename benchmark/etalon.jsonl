@@ -52,3 +52,5 @@
 {"q": "Kdo prostrčil tyče?", "expect": ["nenašel"], "reject": ["Tyč"], "cat": "hygiena imperativů (D)"}
 {"q": "Kde byl Ježíš pokřtěn?", "expect": ["Jordán"], "reject": ["Mesiáš"], "gap": "mezivětná inference: dotazová strana pasiva HOTOVÁ (karta q-pasivum, pacient→obj) a figl Mesiáš padl (reject drží), ale korpus místo křtu v jedné klauzuli nenese — Jordán je jen v „přišel k Jordánu, aby se dal pokřtít“ (účelová klauzule; směr P1c/klauzule, případně #41)"}
 {"q": "Kdy byla vydána korespondence?", "expect": ["2009"], "cat": "pasivum dotaz (D/P1b)"}
+{"q": "Co řekl Ježíš Petrovi?", "expect": ["„satane“"], "cat": "formát výroků (C10)"}
+{"q": "Co víme o Janu Křtiteli?", "expect": ["pokání;"], "cat": "formát agregace (C10)"}

@@ -321,3 +321,48 @@ def test_begin_turn_vymeni_vysledek_tahu_cely():
     assert a.turn.query_card is None and a.turn.empty_topic is None
     assert a.turn.trace is None and a.turn.overflow == []
     assert a._prev_trace == old_trace
+
+
+def test_c10_vyroky_po_jednom_v_uvozovkach():
+    """C10 (T6): dva obsahy řeči se nesmí slepit čárkou do jedné
+    pseudo-věty — každý výrok jde po jednom v českých uvozovkách."""
+    g = FactGraph()
+    g.add_fact(make_fact("říci", [Participant("subj", "Ježíš", "person"),
+                                  Participant("obj", "satane", "výrok")]))
+    g.add_fact(make_fact("říci", [
+        Participant("subj", "Ježíš", "person"),
+        Participant("obj", "nemohli jedinou hodinu bdít se mnou", "výrok")]))
+    a = GraphAnswerer(g, FakeUfalClient(), ExtractiveAnswerer(AnswererConfig()))
+    text = a.answer("Co řekl Ježíš?", []).text
+    assert "„satane“" in text
+    assert "„nemohli jedinou hodinu bdít se mnou“" in text
+
+
+def test_c10_agregace_oddeluje_skupiny_strednikem():
+    """C10 (T6): souhrn „Co víme o X?" odděluje děje středníkem —
+    hranice skupin nesmí zaniknout v čárkové polévce; theme
+    neprosakuje do obsahu, ale fakt jen s theme o něj nepřijde."""
+    g = FactGraph()
+    g.add_fact(make_fact("potkat", [Participant("subj", "Marie", "person"),
+                                    Participant("obj", "Jan", "person")]))
+    g.add_fact(make_fact("vidět", [Participant("subj", "Marie", "person"),
+                                   Participant("obj", "zástup", "concept"),
+                                   Participant("theme", "strach", "concept")]))
+    g.add_fact(make_fact("podívat", [Participant("subj", "Marie", "person"),
+                                     Participant("theme", "poušť", "concept")]))
+    a = GraphAnswerer(g, FakeUfalClient(), ExtractiveAnswerer(AnswererConfig()))
+    text = a.answer("Co víme o Marii?", []).text
+    assert "; " in text
+    assert "strach" not in text          # theme mimo obsah (je tam obj)
+    assert "poušť" in text               # fallback: fakt jen s theme
+
+
+def test_c10_nabidka_kandidaty_jen_jednou():
+    """C10 (kosmetika 2×): odpověď „…Vím o: X." už kandidáty nese —
+    dialogová karta nabídky je nesmí vypsat podruhé."""
+    from jellyai.iris.patterns import shared_deck
+    card = shared_deck("cs").best("query.empty-topic", {})
+    text = card.dialog.format(
+        answer="O ději „potkat“ nevím nic o: Ježíš. Vím o: Jidáš.",
+        candidates="Jidáš")
+    assert text.count("Jidáš") == 1
