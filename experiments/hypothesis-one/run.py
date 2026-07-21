@@ -51,8 +51,10 @@ def frame_sig(toks, i, modality):
 _VOW = "aeiouyáéíóúůýěäö"
 
 def _epen_stem(stem):
-    """Vlož epentetické -e- do koncového shluku souhlásek (Karl→Karel, Čapk→Čapek)."""
-    if len(stem) >= 3 and stem[-1].lower() not in _VOW and stem[-2].lower() not in _VOW:
+    """Vlož epentetické -e- do koncového shluku souhlásek (Karl→Karel, Čapk→Čapek).
+    Jen mezi písmeny (ne u zkratek typu R.U.R.)."""
+    if len(stem) >= 3 and stem[-1].isalpha() and stem[-2].isalpha() \
+            and stem[-1].lower() not in _VOW and stem[-2].lower() not in _VOW:
         return stem[:-1] + "e" + stem[-1]
     return stem
 
@@ -65,6 +67,8 @@ def canon_lemma(tok):
         for suf in ("ův", "ový", "in"):
             if lemma.endswith(suf) and len(lemma) > len(suf) + 1:
                 return _epen_stem(lemma[:-len(suf)])
+    if tok["upos"] == "PROPN":
+        return _epen_stem(lemma)     # Čapků→„Čapk"→Čapek (uříznuté příjmení), jednotně
     return lemma
 
 # ---- build -----------------------------------------------------------------
