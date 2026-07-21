@@ -30,12 +30,16 @@ ROOT = "/Users/j/Projects/jellyAI3"
 PUNCT_KEEP = {".", "?", "!", ":", ",", ";", "–", "-"}
 
 def slot(tok):
+    """Sektor VZORu: UPOS + nosné syntaktické rysy (pád, slovesný čas). Přesný na
+    gramatiku, abstraktní na lexém — jako mluvnický vzor „pán". Pád v pivotu JE role,
+    proto musí ve vzoru vždy být (rozliší Kdo=Nom/Komu=Dat/Co=Acc). Přesnost není
+    kompromis — je to definice vzoru; pokrytí povrchů dělá KVANTITA vzorů, ne rozmazání."""
     up = tok["upos"]
     if up == "PUNCT":
         return tok["form"] if tok["form"] in PUNCT_KEEP else "PUNCT"
-    if up in ("VERB", "AUX") and tok["feats"].get("Tense"):
-        return f'{up}:{tok["feats"]["Tense"]}'
-    return up
+    feats = tok.get("feats") or {}
+    vals = [feats[k] for k in ("Case", "Tense") if k in feats]
+    return up + (":" + ":".join(vals) if vals else "")
 
 def sentence_modality(toks):
     for t in reversed(toks):
@@ -44,12 +48,13 @@ def sentence_modality(toks):
     return "."
 
 def frame_sig(toks, i, modality, r=None):
-    """Rám při poloměru r (konfig CFG['radius']): r prvků vlevo/vpravo + cíl + modalita.
-    Při r=1 bitově identické s dřívějším left·upos·right·mod (zpětně kompatibilní)."""
+    """VZOR při poloměru r (konfig CFG['radius']): r sektorů vlevo/vpravo + pivot + modalita.
+    Sektor = `slot()` = UPOS + pád/čas (přesný na gramatiku, jako vzor „pán"). r řídí rozsah
+    okna; pokrytí povrchů = mnoho přesných vzorů (Ollama), ne rozostření jednoho."""
     r = CFG["radius"] if r is None else r
     left = [slot(toks[i - k]) if i - k >= 0 else "^" for k in range(r, 0, -1)]
     right = [slot(toks[i + k]) if i + k < len(toks) else "$" for k in range(1, r + 1)]
-    return "·".join(left + [toks[i]["upos"]] + right + [modality])
+    return "·".join(left + [slot(toks[i])] + right + [modality])   # pivot nese pád = roli
 
 import json as _json
 # jazyková data (zákon 3): NIKDY české řetězce v kódu; nový jazyk = nový JSON

@@ -5,7 +5,8 @@ Referenční kotva, aby nedocházelo ke vzájemnému neporozumění. Tři část
 **principy** (proč to tak stavíme). Vše ostatní se poměřuje tímto dokumentem.
 
 Souvisí: `docs/superpowers/specs/2026-07-21-hypothesis-one-synteticky-otazkovy-graf-design.md`
-(návrhový spec), `STATE.md` (stav validace).
+(návrhový spec), `STATE.md` (stav validace), `PRUCHOD.md` (krok po kroku jedna věta +
+slovníček UPOS/pád/deprel).
 
 ---
 
@@ -15,7 +16,7 @@ Souvisí: `docs/superpowers/specs/2026-07-21-hypothesis-one-synteticky-otazkovy-
 |---|---|---|
 | **SOURCE FACT** (zdrojový fakt) | věta z korpusu; zdroj světla, který vrhá stíny-otázky | `annotations.pkl` |
 | **SEKTOR** | jeden slot v okně (token); **ÚFAL ho atribuuje** (upos/lemma/pád/deprel) | `run.slot()` |
-| **VZOR** | *single entita (token) + její r=X frame*; match-klíč | `run.frame_sig()` |
+| **VZOR** | *přesná gramatická šablona*: pivot + r sektorů, každý `UPOS+pád+čas` — jako mluvnický vzor „pán" (přesný na gramatiku, dosaditelný na lexém); match-klíč | `run.frame_sig()` |
 | **r = X** (poloměr) | šířka okna rámu; číselník tvrdosti shody | `CFG["radius"]` |
 | **OCCURRENCE + FRAME** | index: token = Occurrence (lemma+rysy), Frame = signatura okna | `run.frame_sig` |
 | **DÍRA** (hole) | tázaný slot = jedna katalogová role | `roles.decompose` |
@@ -58,7 +59,7 @@ Anotace `data/annotations.pkl` (UDPipe, cache).
 - `gen_variants.py` — dávka parafrází + zpětná verifikace.
 
 **Změřeno:**
-- **VZOR / r**: r=1 ~18 členů na rám (zobecnění, mnoho DOTAZŮ→1 OTÁZKA); r=2 stínové dvojice vrcholí; r=3 ~1 člen (konkordance, 1 DOTAZ≈1 OTÁZKA).
+- **VZOR / r** (přesný slot `UPOS+pád+čas`, pivot nese pád = roli): r=1 → 25 256 vzorů, ⌀ 6,2 členů (ostrý cíl, ale „Kdo svolal" ≈ „Kdo pozval" splývá); r=2 → ⌀ 1,5 (konkordance). Rozlišuje Kdo=Nom / Komu=Dat / Co=Acc. (Dřívější „⌀ 16 / r=1" bylo artefaktem hluchého UPOS.)
 - **bundle**: 10 642 faktů → **57 763 stínů** (⌀ 5,4 na fakt). Ale zatím **NE plně funkční**: 18 % odpovědí paskvil (`on`/`ten`/`který`), 29 % nízkohodnotné díry (`which_attribute`/`how`), 182 mis-segmentovaných obřích vět. **Bůh v katalogu JE** (`state → bůh`).
 - **Ollama dávka K=50** (94 otázek): self-consistent **v1 68 % / v2 34 %**, verify ANO 62 %. Blízká parafráze ~2× spolehlivější než volná.
 
@@ -81,7 +82,7 @@ identitu vypnuté), ale přes **identitní fakt `být(Ježíš,Bůh)` z pro-drop
 3. **Odpověď má vlastní šablonu.** Odpověď-věta je sama fakt → indexuje se stejně → je rekurzivní/skládatelná. Fragment i věta z jedné šablony.
 4. **Deterministické jádro + Ollama jen offline.** Runtime match je frame↔frame (žádné LLM v rozhodování). Ollama generuje DOTAZY (povrchy) **offline**, jako ÚFAL anotace. Jazyk = data.
 5. **Dva světy se slévají, nestavíme od nuly.** Svět 1 (experiment) = **frame front-end**: porozumění otázce přes occurrence+frame katalog, nahrazuje ruční iris karty (= zjednodušení). Svět 2 (originál) = **graf back-end**: asociativní retrieval (= síla, „Bůh"). Šev = výstup `roles.py` → grafový retrieval.
-6. **VZOR = single entita + r=X; sektory atribuuje ÚFAL.** r=X je **číselník závislosti OTÁZKA↔DOTAZ** (nízké r = široké zobecnění, vysoké r = přesná shoda).
+6. **VZOR = přesná gramatická šablona (UPOS + pád + čas), dosaditelná na lexém — jako vzor „pán".** Pád v pivotu JE role (rozliší Kdo/Komu/Co), proto ve vzoru vždy. Přesnost není kompromis, je to definice vzoru. r=X řídí rozsah okna; sektory atribuuje ÚFAL. **Pokrytí povrchů dělá KVANTITA přesných vzorů (Ollama), ne rozostření jednoho** — mnoho ostrých exemplářů > jeden fuzzy.
 7. **Asociaci nesmíme ztratit — „nesmíme ztratit Boha".** Rodí ji těžiště + koreference. Tři pojistky k naroubování (řez): **(a) těžišťová atribuce** (rodí identitu → Bůh), **(b) hub-brána** (trefit vs. zeptat se), **(c) identitní hlas**. Dynamické source-váhy dořeší mezitahovou dvojznačnost (Maria po Ježíši).
 8. **Zákon 3.** Změna češtiny → jen JSON, nikdy kód. Univerzální klíče v kódu (UD deprel/pád/role), české hodnoty v `cs.json`.
 9. **Etalon.** Každá změna měřena; přijmi jen paritu + aspoň jeden nový zelený řádek, jinak nepřijímej.
