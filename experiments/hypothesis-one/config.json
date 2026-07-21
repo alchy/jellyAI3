@@ -1,0 +1,17 @@
+{
+  "_comment": "Konfigurace fáze 1 — NIC natvrdo v kódu (zákon 3 i pro parametry). Parametry VZORu, služby, cesty. Nový jazyk/nasazení = jiný JSON, žádný zásah do kódu.",
+  "lang": "cs",
+  "radius": 1,
+  "modality_marks": [".", "?", "!", ":"],
+  "punct_keep": [".", "?", "!", ":", ",", ";", "–", "-"],
+  "lambda": 0.55,
+  "mesh_eps": 0.05,
+  "services": {
+    "udpipe_url": "http://127.0.0.1:8092/parse"
+  },
+  "paths": {
+    "lang": "lang/cs.json",
+    "curated": "curated.json",
+    "annotations": "../../data/annotations.pkl"
+  }
+}

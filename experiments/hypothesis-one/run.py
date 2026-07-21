@@ -16,18 +16,21 @@ Ostatní jako dřív: kanonizace do 1. pádu (lemma), uzel = základní tvar,
 všechny atributy v meta (detail okno), hrany = sousednost + mesh λ^d,
 per-hranový jas přes edge.meta.brightness (dodělané ve viewBase), obyčejné čáry.
 """
-import sys, pickle, math
+import sys, pickle, math, json
 from collections import Counter, defaultdict
 
 sys.path.insert(0, "/Users/j/Projects/jellyAI3")
 import viewbase as vb
 
-CFG = {"lang": "cs", "radius": 1, "modality_marks": [".", "?", "!", ":"],
-       "lambda": 0.55, "mesh_eps": 0.05}
+ROOT = "/Users/j/Projects/jellyAI3"
+# konfig NENÍ natvrdo — čte se z config.json (zákon 3 i pro parametry VZORu)
+_CONFIG = json.load(open(ROOT + "/experiments/hypothesis-one/config.json", encoding="utf-8"))
+CFG = {"lang": _CONFIG.get("lang", "cs"), "radius": _CONFIG["radius"],
+       "modality_marks": _CONFIG["modality_marks"],
+       "lambda": _CONFIG["lambda"], "mesh_eps": _CONFIG["mesh_eps"]}
 DOC = "wiki_karel_čapek"
 N_SENTS = 25
-ROOT = "/Users/j/Projects/jellyAI3"
-PUNCT_KEEP = {".", "?", "!", ":", ",", ";", "–", "-"}
+PUNCT_KEEP = set(_CONFIG["punct_keep"])
 
 def slot(tok):
     """Sektor VZORu: UPOS + nosné syntaktické rysy (pád, slovesný čas). Přesný na
