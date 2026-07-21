@@ -29,11 +29,34 @@ CONTENT_UPOS = {"NOUN", "PROPN", "VERB", "ADJ", "NUM", "ADV"}
 def _skip(lem, upos):
     return upos == "PUNCT" or (len(lem) == 1 and upos in ("NOUN", "PROPN", "SYM", "X"))
 
+def interrog(role, upos, fe):
+    """Tázací slovo dle role answer-slotu — match si definujeme sami, spolehlivě."""
+    anim = fe.get("Animacy") == "Anim" or bool(fe.get("NameType")) or upos == "PROPN"
+    if role in ("nsubj", "nsubj:pass"):
+        return "Kdo" if anim else "Co"
+    if role == "obj":
+        return "Koho" if anim else "Co"
+    if role == "iobj":
+        return "Komu"
+    if role == "pnom":
+        return "Kdo/Co"          # spona: „Kdo je X" / „Co je X"
+    if role in ("obl", "obl:arg"):
+        case = fe.get("Case")
+        return {"Loc": "Kde", "Dat": "Komu", "Ins": "Čím"}.get(case, "Co/Kde")
+    return "?"
+
 def gen(sent, doc, si, fold):
+    root = next((t for t in sent if t.get("deprel") == "root"), None)
     verb = next((t for t in sent if t.get("deprel") == "root" and t["upos"] == "VERB"), None)
     if verb is None:
         verb = next((t for t in sent if t["upos"] == "VERB"), None)
-    if verb is None:
+    root_nom = None
+    if verb is not None:
+        predicate = fold.get(canon(verb), canon(verb))
+    elif root is not None and root["upos"] in ("NOUN", "ADJ", "PROPN") \
+            and any(t.get("deprel") == "cop" for t in sent):
+        predicate, root_nom = "být", root      # SPONA: „Kdo je/byl X" (identitní fakt)
+    else:
         return None
     answers, context = [], []
     for t in sent:
@@ -41,14 +64,18 @@ def gen(sent, doc, si, fold):
         if _skip(lem, t["upos"]):
             continue
         fe = t.get("feats") or {}
-        if t.get("deprel") in ANSWER_DEPREL and t["upos"] in ("NOUN", "PROPN"):
-            answers.append({"lemma": lem, "role": t["deprel"], "gender": fe.get("Gender"),
-                            "name": bool(fe.get("NameType"))})
+        is_ans = (t.get("deprel") in ANSWER_DEPREL and t["upos"] in ("NOUN", "PROPN")) \
+            or (t is root_nom)                 # u spony i jmenná část (predikativ)
+        if is_ans:
+            role = "pnom" if t is root_nom else t.get("deprel")
+            answers.append({"lemma": lem, "role": role,
+                            "q": interrog(role, t["upos"], fe),
+                            "gender": fe.get("Gender"), "name": bool(fe.get("NameType"))})
         if t["upos"] in CONTENT_UPOS and t is not verb:
             context.append(lem)
     if not answers:
         return None
-    return {"predicate": canon(verb), "hole": "subj/person",
+    return {"predicate": predicate, "hole": "subj/person",
             "answers": answers, "context": context,
             "doc": doc, "sent": si,
             "text": " ".join(t["form"] for t in sent)[:120]}

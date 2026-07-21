@@ -30,15 +30,19 @@ def udpipe(text):
     return json.loads(urllib.request.urlopen(req, timeout=10).read())["sentences"]
 
 def q_words(text):
-    """Obsahová slova otázky v základním tvaru + predikát (první VERB)."""
-    words, pred = [], None
+    """Obsahová slova otázky v základním tvaru + predikát (VERB, nebo „být" u spony)."""
+    words, pred, cop = [], None, False
     for sent in udpipe(text):
         for t in sent:
             lem = canon(t)
+            if lem.lower() == "být":
+                cop = True                     # spona: „Kdo je/byl X"
             if t["upos"] == "VERB" and pred is None and lem.lower() not in STOP:
                 pred = lem
             if t["upos"] in CONTENT and lem.lower() not in STOP:
                 words.append(lem)
+    if pred is None and cop:
+        pred = "být"                           # copula-otázka → predikát „být"
     return list(dict.fromkeys(words)), pred
 
 def build_corpus():
@@ -68,7 +72,7 @@ QUESTIONS = [
     "Kdo je Božena Němcová?",
     "Kdo objevil mloky?",
     # tvrdší: Ježíš je ve všech evangeliích (nízké idf), různé typy díry, spona
-    "Kde kázal Ježíš?",
+    "Co kázal Ježíš?",
     "Co řekl Ježíš Janovi?",
     "Kdo je Ježíš?",
 ]
