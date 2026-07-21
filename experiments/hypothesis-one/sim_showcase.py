@@ -3,8 +3,11 @@
 
 Vezme reálné fakty (diverzně po dokumentech), z každého vyrobí otázku
 (predikát + nejdistinktivnější slovo faktu) a pustí je celou pipeline:
-  ① brána → dokument   ② identifikace faktu   ③ odpověď (belongeři)
-Self-consistency: našel pipeline ZPĚT ten fakt, z něhož otázka vznikla?
+  ① brána → dokument   ② identifikace faktu   ③ ODPOVĚĎ = CELÁ VĚTA faktu
+
+Teď se NEvytahuje podmět — odpověď je celá věta. Přesný tvar (správný podmět
+zasazený do věty) je „SYNTETICKÁ ODPOVĚĎ" (3. synt. objekt vedle synt. otázky
+a synt. matche) — další krok. Self-consistency: našel pipeline zpět svůj fakt?
 
 Spuštění:  .venv/bin/python experiments/hypothesis-one/sim_showcase.py [K]
 """
@@ -78,11 +81,10 @@ def main():
                    reverse=True)
         found = facts[0] if facts else None
         recovered = found is not None and found["sent"] == e["sent"] and found["doc"] == e["doc"]
-        belong = list(dict.fromkeys(a["lemma"] for a in e["answers"] if a["lemma"] != dw))
         ok += recovered
-        print(f"{i:2} {'✓' if recovered else '✗'} Q: Kdo {pred} … ?   (klíč: {dw!r})")
-        print(f"      ① brána → {d.split('_',1)[-1]}    ② fakt: „{e['text'][:62]}…\"")
-        print(f"      ③ odpověď: {', '.join(belong[:6])}")
+        print(f"{i:2} {'✓' if recovered else '✗'} Q: Kdo {pred} … ?   "
+              f"(klíč {dw!r}, brána → {d.split('_', 1)[-1]})")
+        print(f"      A: {(found or e)['text']}")
     print(f"\n=== self-consistency (našel zpět svůj fakt): {ok}/{len(picks)} ===")
 
 if __name__ == "__main__":

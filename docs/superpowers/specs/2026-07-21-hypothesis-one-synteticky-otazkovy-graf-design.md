@@ -134,6 +134,67 @@ A  patřit  frame(NOUN·VERB·ADP·.)   ← jiný rám, NELZE odvodit swapem mod
 Proto vazba **vzniká při generování** (víme mapování Q↔A, protože otázku stavíme
 z tvrzení). Jedna šablona matchne **víc faktů**, každý s **hladinou** (base = salience).
 
+## 10b. Šablona odpovědi (odpověď jako fakt)
+
+Odpověď **není konečný fragment**. Zacházíme s její indexací **stejně jako s ostatními
+částmi věty** — má tedy **vlastní šablonu**. Přichází ve dvou zrnitostech:
+
+| forma | příklad | co to je |
+|---|---|---|
+| **fragment** | `Čapek`, `1980`, `odešel` | výplň díry — answer-slot v příslušném pádě/tvaru |
+| **věta** | `Autorem byl Čapek`, `Stalo se to v roce 1980` | odpověď utvořená jako **tvrzení** |
+
+**Proč odpověď MŮŽE mít vlastní šablonu** — protože věta „Autorem byl Čapek" **je sama
+tvrzení = fakt**. A fakt se u nás indexuje principem Occurrence + Frame (§3). Z toho
+plynou tři věci:
+
+1. **Uniformita.** Answer-slot je týž druh objektu jako podmět, predikát či doplněk —
+   pozice ve faktu popsaná rámem. Šablona otázky, syntetická vazba (§10) i šablona
+   odpovědi jsou **tři Occurrence+Frame struktury téhož typu**; nic zvláštního na konci.
+2. **Rekurze / skládatelnost.** Odpověď-věta je fakt → může generovat **vlastní otázky**
+   („Autorem byl Čapek" → „Kdo byl autorem?" → `Čapek`). Smyčka fakt→otázka→odpověď se
+   **uzavírá sama do sebe**; odpověď je uzel, ze kterého vede další dotazování, ne list.
+3. **Dvě zrnitosti z jedné šablony.** Fragment je holá výplň díry (čte se z answer-slotu
+   přes rolově-tázací mapování §9). Věta vzniká **vsazením rozřešeného účastníka do
+   predikátového rámu** (podmět·predikát·doplněk) — tatáž šablona, jen víc slotů vyplněno.
+
+Právě proto není odpověď „mrtvý" výstup: je to fakt v malém, znovu-indexovatelný a
+znovu-dotazovatelný. To dělá ze systému **generativní graf**, ne jednosměrnou lookup tabulku.
+
+## 10c. Katalog rolí = schéma odpovědi (větné členy)
+
+Odpověď není `{who, where}` ad hoc — je to fakt **rozložený do univerzálního katalogu
+větných členů**, a ten katalog **je schéma odpovědi**. Klíče jsou jazykově NEZÁVISLÉ
+(`who`, `where`, `action`, `state`, `to_whom`, `with_whom_what`…), popisy i mapování
+předložek/pádů jsou **data** v `lang/cs.json` (zákon 3). Katalog pokrývá podměty,
+přísudky (slovesný, jmenný se sponou, příčestí činné/trpné), příslovečná určení
+(místo, čas, způsob, míra, příčina, účel, podmínka, přípustka), předmětové pády
+(2./3./4./6./7.), přívlastek a doplněk.
+
+**Jeden slovník klíčů, žádné dvojí pojmenování.** UD deprel z UDPipe (`nsubj`, `obj`,
+`obl`+pád, …) je jen **vstupní štítek**; přes `deprel_to_role` (+ pád/životnost/předložka)
+se překládá na **jediný** kanonický klíč katalogu. Registr (`gen_registry`), tázací slova
+(`role_ask`) i rozklad odpovědi (`roles.py`) sdílejí týž mapovač `run.role_key` — stejný
+význam má vždy stejný klíč. (`nsubj`+Anim→`who`, `nsubj`+Inan→`what_subject`, `obj`+Acc→
+`whom_what`, `iobj`→`to_whom`, `obl`+Loc/„v"→`where`, `obl`+Ins/„s"→`with_whom_what`,
+kopulní predikativ→`state`.)
+
+**Rozklad je per klauzule.** Každý přísudek zakládá klauzuli; token patří ke svému
+nejbližšímu přísudku. Věta „Josef a Maria odešli do Jeruzaléma, kde se jim narodil Ježíš"
+→ dvě klauzule:
+
+```
+«odejít»            who=[Josef, Maria]  where=Jeruzalém  past_participle=odešli
+«narodit» [acl]     who=[Ježíš]         where=Jeruzalém  to_whom=jim  past_participle=narodil
+                                        ↳ #59: „kde" zděděno z antecedentu Jeruzalém
+```
+
+**Meziklauzulová inference (#59).** Vedlejší (relativní/účelová) klauzule visí na
+antecedentu z řídící věty (`narodit` je `acl` s hlavou `Jeruzalém`). Relativní příslovce
+(`kde`, `kam`, `kdy`) je **díra**, kterou plníme hodnotou antecedentu — sub-klauzule
+zdědí místo. Tak otázka „Kdo se narodil v Jeruzalémě?" trefí druhou klauzuli a vrátí
+`{who: Ježíš, where: Jeruzalém}`, ačkoli slovo „Jeruzalém" v ní přímo není.
+
 ## 11. Aktivační výběr (light-beam)
 
 Výběr správné odpovědi mezi kandidáty **nedělá obálka** (rám), dělá ho **aktivace

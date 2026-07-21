@@ -78,6 +78,31 @@ def canon_lemma(tok):
     # gen_registry) jen když -e- verze reálně existuje jako častější jméno.
     return lemma
 
+def prep_of(sent, tid):
+    """Předložka (case-marker) závislá na tokenu s 1-based id tid, jinak ''."""
+    for t in sent:
+        if t.get("head") == tid and t.get("deprel") == "case":
+            return t["lemma"]
+    return ""
+
+def role_key(deprel, upos, feats, prep="", nominal_pred=False):
+    """UD deprel (+ pád/životnost/předložka) → JEDNOTNÝ klíč katalogu rolí
+    (who/where/whom_what/…). Jediný zdroj mapování — sdílejí gen_registry i roles;
+    stejný význam = stejný klíč. Mapa i předložky jsou data v LANG (zákon 3)."""
+    if nominal_pred:                         # jmenný přísudek se sponou → stav
+        return "state"
+    if prep:                                 # předložka může roli přebít (o kom, s kým)
+        for key, preps in LANG.get("role_prepositions", {}).items():
+            if prep in preps:
+                return key
+    table = LANG["deprel_to_role"].get(deprel)
+    if not table:
+        return None
+    if "anim" in table:                      # subjekt rozlišuje životnost
+        anim = feats.get("Animacy") == "Anim" or bool(feats.get("NameType")) or upos == "PROPN"
+        return table["anim"] if anim else table["inanim"]
+    return table.get(feats.get("Case", ""), table["default"])
+
 # ---- build -----------------------------------------------------------------
 def build():
     with open(f"{ROOT}/data/annotations.pkl", "rb") as f:

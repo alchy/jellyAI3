@@ -29,17 +29,6 @@ CONTENT_UPOS = {"NOUN", "PROPN", "VERB", "ADJ", "NUM", "ADV"}
 def _skip(lem, upos):
     return upos == "PUNCT" or (len(lem) == 1 and upos in ("NOUN", "PROPN", "SYM", "X"))
 
-def interrog(role, upos, fe):
-    """Tázací slovo dle role answer-slotu. Data z LANG (zákon 3); klíče (role,
-    pád, životnost) jsou UNIVERZÁLNÍ UD, hodnoty české. Match si definujeme sami."""
-    m = _run.LANG["interrogatives"].get(role)
-    if m is None:
-        return "?"
-    if "anim" in m:                       # nsubj/obj rozlišuje životnost
-        anim = fe.get("Animacy") == "Anim" or bool(fe.get("NameType")) or upos == "PROPN"
-        return m["anim"] if anim else m["inanim"]
-    return m.get(fe.get("Case", ""), m.get("default", "?"))   # obl dle pádu, jinak default
-
 def gen(sent, doc, si, fold):
     root = next((t for t in sent if t.get("deprel") == "root"), None)
     verb = next((t for t in sent if t.get("deprel") == "root" and t["upos"] == "VERB"), None)
@@ -62,9 +51,11 @@ def gen(sent, doc, si, fold):
         is_ans = (t.get("deprel") in ANSWER_DEPREL and t["upos"] in ("NOUN", "PROPN")) \
             or (t is root_nom)                 # u spony i jmenná část (predikativ)
         if is_ans:
-            role = "pnom" if t is root_nom else t.get("deprel")
+            role = _run.role_key(t.get("deprel"), t["upos"], fe,
+                                 prep=_run.prep_of(sent, sent.index(t) + 1),
+                                 nominal_pred=(t is root_nom))   # JEDNOTNÝ klíč katalogu
             answers.append({"lemma": lem, "role": role,
-                            "q": interrog(role, t["upos"], fe),
+                            "q": _run.LANG["role_ask"].get(role, "?"),
                             "gender": fe.get("Gender"), "name": bool(fe.get("NameType"))})
         if t["upos"] in CONTENT_UPOS and t is not verb:
             context.append(lem)
