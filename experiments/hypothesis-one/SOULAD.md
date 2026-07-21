@@ -17,9 +17,9 @@ slovníček UPOS/pád/deprel).
 | **SOURCE FACT** (zdrojový fakt) | věta z korpusu; zdroj světla, který vrhá stíny-otázky | `annotations.pkl` |
 | **WORD_PLAIN** | holé slovo (bez atributů) | `tok["form"]` (str) |
 | **WORD_PLAIN_ARRAY** | pole holých slov (syrová tokenizace) | list[str] |
-| **WORD_W_ATTR** | slovo + atributy (lemma/upos/pád/deprel…); **ÚFAL ho atribuuje** | `sent[i]` (dict) |
+| **WORD_W_ATTR** | slovo + atributy (lemma/UPOS/CASE/TENSE/deprel…); **ÚFAL ho atribuuje** | `sent[i]` (dict) |
 | **WORD_W_ATTR_ARRAY** | pole slov s atributy = **věta / okno** (workhorse) | `sent` (list[dict]) |
-| **SLOT** | match-obálka jednoho slova (`UPOS:pád`), virtuální | `run.slot()` (str) |
+| **SLOT** | match-obálka jednoho slova (`UPOS:CASE`), virtuální | `run.slot()` (str) |
 | **SLOT_ARRAY** | *přesná gramatická šablona* = pivot + r slotů + modalita (vzor „pán"); match-klíč | `run.frame_sig()` (str) |
 | **VZOR** | přezdívka pro SLOT_ARRAY (metafora „mluvnický vzor pán") | ≡ SLOT_ARRAY |
 | **r = X** (poloměr) | šířka okna rámu; číselník tvrdosti shody | `CFG["radius"]` |

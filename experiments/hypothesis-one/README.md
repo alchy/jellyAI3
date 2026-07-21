@@ -41,7 +41,7 @@ Vše je **deterministické a čisté** (bez sítě, kromě jednorázové anotace
 | **WORD_W_ATTR** | `dict` | slovo + atributy (pole níže) — anotovaná jednotka. |
 | **WORD_W_ATTR_ARRAY** | `list[dict]` | pole slov s atributy = **věta / okno** (workhorse; v kódu `sent`). |
 | **UPOS** | `str` | slovní druh z pevné sady (`VERB`, `NOUN`, …). Slovníček §6.1. |
-| **Pád (Case)** | `str` | `feats["Case"]` ∈ {`Nom`,`Gen`,`Dat`,`Acc`,`Voc`,`Loc`,`Ins`}. Slovníček §6.2. |
+| **CASE** (gramat. pád) | `str` | UD `feats["Case"]` ∈ {Nom,Gen,Dat,Acc,Voc,Loc,Ins}. Slovníček §6.2. |
 | **deprel** | `str` | závislostní vztah z ÚFAL (`nsubj`,`obl`,…). **VNITŘNÍ vstup**, do výstupu se nedostane. |
 | **Role (náš klíč)** | `str` | standardizovaný klíč katalogu (`who`,`where`,`action`,`preposition`,…) nebo `None`. Slovníček §6.3. |
 | **SLOT** | `str` | match-obálka jednoho WORD_W_ATTR: `UPOS[:pád][:čas]` (`"PRON:Nom"`). Fce `run.slot()`. |
@@ -134,7 +134,7 @@ sektor spočte VZOR; je-li v **`curated.json`**, vrátí **opravenou** roli, jin
 
 ## 6. Slovníčky
 
-### 6.1 UPOS — slovní druh
+### 6.1 UPOS — part of speech (slovní druh)
 
 | tag | česky | příklad |
 |---|---|---|
@@ -155,7 +155,10 @@ sektor spočte VZOR; je-li v **`curated.json`**, vrátí **opravenou** roli, jin
 | PUNCT | interpunkce | . , ? ! : |
 | SYM / X | symbol / neznámé | %, cizí token |
 
-### 6.2 Pád (`feats["Case"]`)
+### 6.2 CASE — grammatical case (UD `feats["Case"]`)
+
+> Konvence: **UPPER v dokumentaci** (`UPOS`/`CASE`/`TENSE`), **lower v kódu** (`upos`/`case`/`tense`);
+> syrové klíče z ÚFALu zůstávají verbatim (`feats["Case"]`).
 
 | UD | pád | otázka | typická role |
 |---|---|---|---|
