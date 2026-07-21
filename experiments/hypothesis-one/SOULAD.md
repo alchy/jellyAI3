@@ -5,8 +5,8 @@ Referenční kotva, aby nedocházelo ke vzájemnému neporozumění. Tři část
 **principy** (proč to tak stavíme). Vše ostatní se poměřuje tímto dokumentem.
 
 Souvisí: `docs/superpowers/specs/2026-07-21-hypothesis-one-synteticky-otazkovy-graf-design.md`
-(návrhový spec), `STATE.md` (stav validace), `PRUCHOD.md` (krok po kroku jedna věta +
-slovníček UPOS/pád/deprel).
+(návrhový spec), `STATE.md` (stav validace), `README.md` (fáze 1 po třídách),
+`PRUCHOD.md` (krok po kroku jedna věta), `FAZE2.md` (návrh fáze 2 + mechanismus těžiště).
 
 ---
 
