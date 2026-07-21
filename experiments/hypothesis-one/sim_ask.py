@@ -23,11 +23,14 @@ ROOT = "/Users/j/Projects/jellyAI3"
 CONTENT = {"NOUN", "PROPN", "VERB", "ADJ"}
 STOP = {"kdo", "co", "být", "který", "jaký", "kde", "kdy"}
 
+from jellyai.normalize import merge_abbreviations
+
 def udpipe(text):
     data = json.dumps({"text": text}).encode()
     req = urllib.request.Request("http://127.0.0.1:8092/parse", data=data,
                                  headers={"Content-Type": "application/json"})
-    return json.loads(urllib.request.urlopen(req, timeout=10).read())["sentences"]
+    raw = json.loads(urllib.request.urlopen(req, timeout=10).read())["sentences"]
+    return merge_abbreviations(raw)     # R . U . R . → R.U.R. (jako v korpusu)
 
 def q_words(text):
     """Obsahová slova otázky v základním tvaru + predikát (VERB, nebo „být" u spony)."""
