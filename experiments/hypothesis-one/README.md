@@ -119,16 +119,27 @@ Příklad: `„Kdo svolal svých dvanáct?"` → pivot `Kdo` → `^·PRON:Nom·V
 
 ---
 
-## 5. Krok 1d — VZOR → KURÁTORSKÁ OPRAVA
+## 5. Krok 1d — VZOR → role přes STATICKÝ SLOVNÍK (`PersistentDeterminer`)
 
-Funkce **`roles.curated_standardize(sent, r=2) -> list[(Token, role, curated:bool)]`**. Pro každý
-sektor spočte VZOR; je-li v **`curated.json`**, vrátí **opravenou** roli, jinak `standard_role`.
+Třída **`phase1.PersistentDeterminer`**. `determine(sent, r=2) -> list[(WORD_W_ATTR, role, provenance)]`.
+Vrstvení lookupu, výstup nese **provenienci** (ne binární flag):
 
-- **Proč:** anotace ÚFAL je u některých oken nekonzistentní/chybná. Opravou u VZORu **jednou**
-  se chyba spraví pro **všechny** budoucí výskyty (pákový efekt: 4 vklady → 85 oprav napříč korpusem).
-- **Kdy kuratela (a kdy ne):** nečistota oken má tři příčiny — **zahozená předložka** (řeší
-  precizace VZORu), **chyba ÚFALu** (řeší **kuratela**), **sémantika slova** (strop okna, potřebuje lexém).
-- **Formát zápisu:** `{ "<VZOR>": {"role": "<náš klíč>", "note": "<proč>"} }`.
+```
+VZOR → CURATED    (curated.json, ruční)          ▸ přebíjí
+     → CONFIRMED  (determination.json, ověřené)  ▸ lookup
+     → CANDIDATE  (standard_role, návrh)         ▸ do self.pending (PAMĚŤ)
+```
+
+- **Načítá vždy · ukládá jen explicitně** — `determine()` na disk **nešahá** (determinismus +
+  revizní brána: CANDIDATE se nestane CONFIRMED sám od sebe). Zápis: `save_candidates()` →
+  `candidates.json` (k revizi), `promote(vzory)` → `determination.json` (po revizi), `build(sents)`
+  = offline dávka (naplní `pending`).
+- **Proč:** statický slovník dá **konzistenci** (stejný VZOR → stejná role) a **méně ÚFALu**
+  (lookup nahradí re-derivaci). `standard_role` je jen generátor návrhů, revize je brána.
+- **Nečistota** oken má tři příčiny — **zahozená předložka** (precizace VZORu), **chyba ÚFALu**
+  (kuratela), **sémantika slova** (strop okna, potřebuje lexém).
+- **Formát zápisu:** `{ "<VZOR>": {"role": "<náš klíč>", "note"/"status": … } }`.
+- `Curator` je prostý předchůdce (jen lookup-nebo-přepočítej, binární `kurátorováno`).
 
 ---
 
