@@ -94,6 +94,30 @@ identitu vypnuté), ale přes **identitní fakt `být(Ježíš,Bůh)` z pro-drop
 
 ---
 
+## 3b. Historická kotva — nedělní odpoledne (07-19), na čem stavíme
+
+Před migrací na karty (#46, večer 07-19 od **20:09** `613017b` → **20:20** `3625f5e`
+„vzorové karty dotazů") dávala **grafová** dotazová strana trefné asociativní odpovědi.
+Doložený případ (vzpomínka user, ověřeno v korpusu i gitu):
+
+- **Otázka:** „Co řekl Ježíš Janovi?"
+- **Odpověď:** citát **Jan 3,10** — „Ty jsi učitel Izraele, a tohle nevíš?" (řečeno Nikodémovi;
+  trefné i pro mírně jiného adresáta, dovedeno **asociativně**, když přímý fakt chyběl).
+
+**Mechanismus (na čem stavět):**
+- říci-predikát + **dativ = adresát** (`#55`, `c92a7c4`) + **obsah řeči** jako odpověď (`9a13349`);
+- chybí-li přesný fakt → **asociativní** dohledání nejbližšího říci-faktu (těžiště / kontext);
+- kopulní **identita** pro „Kdo je X?" → „Bůh" (`70fae7b`), podmět z **`ActivationField`** (`5de3fd7`).
+
+**Co to zastínilo:** #46 nahradil pružné grafové routování rigidními vzorovými kartami; ranné
+karty asociativní/citátovou cestu nepokryly → regrese. Karty se pak množily (41 commitů),
+pokrytí rostlo, **grácie asociativní odpovědi se ztratila**.
+
+**Proto hypothesis-two:** grafikon = frame front-end (bez karetní exploze) + graf back-end
+(asociace, identita, obsah řeči) — návrat k té nedělní magii **deterministicky**. „Nesmíme ztratit Boha."
+
+---
+
 ## 4. Cíl (jednou větou)
 
 Vytvořit **dostatečně bohatý a FUNKČNÍ katalog syntetických vazeb FAKT(y) ↔ OTÁZKA(Y) ↔
