@@ -71,6 +71,30 @@ def role_of(t, sent, byid):
         return "as_what_state"
     return None
 
+# ── STANDARDIZACE: každý sektor → NÁŠ čitelný klíč (deprel se ven nedostane) ──
+def standard_role(t, sent, byid, cop_heads=None):
+    """Standardizovaný klíč sektoru. Nečitelné deprel zkratky (nsubj/obl/amod)
+    NAHRAZUJEME katalogovými klíči (who/where/which_attribute) — i pro předložku,
+    spojku, interpunkci. Výstup 1. fáze je vždy v našem slovníku, ne v deprel."""
+    if cop_heads is None:
+        cop_heads = {x["head"] for x in sent if x["deprel"] == "cop"}
+    up, dep = t["upos"], t["deprel"]
+    tid = sent.index(t) + 1
+    if up == "VERB":
+        return "action"                        # přísudek slovesný (i konjunkt)
+    if tid in cop_heads:
+        return "state"                         # jmenný přísudek se sponou
+    struct = LANG["deprel_structural"].get(dep)
+    if struct:
+        return struct                          # preposition/conjunction/punctuation…
+    return role_of(t, sent, byid)              # obsahové role (who/where/…)
+
+def standardize(sent):
+    """Výstup 1. fáze: [(token, náš klíč)] — plně v katalogu, bez deprel."""
+    byid = _byid(sent)
+    cop_heads = {x["head"] for x in sent if x["deprel"] == "cop"}
+    return [(t, standard_role(t, sent, byid, cop_heads)) for t in sent]
+
 # ── rozklad věty na klauzule + role ─────────────────────────────────────────
 def decompose(sent):
     byid, cop_h = _byid(sent), _cop_heads(sent)

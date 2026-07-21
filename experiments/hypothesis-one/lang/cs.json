@@ -62,5 +62,22 @@
     "on_what_condition": ["kdyby", "jestliže", "pokud", "-li"],
     "in_spite_of": ["ačkoli", "ačkoliv", "přestože", "třebaže", "byť", "navzdory"],
     "why": ["protože", "poněvadž", "jelikož", "neboť", "ježto"]
+  },
+
+  "deprel_structural": {
+    "case": "preposition", "cc": "conjunction", "mark": "subordinator",
+    "aux": "auxiliary", "aux:pass": "auxiliary", "cop": "copula",
+    "punct": "punctuation", "flat": "name_part", "flat:name": "name_part",
+    "flat:foreign": "name_part", "appos": "name_part", "fixed": "fixed_expr"
+  },
+  "structural_roles": {
+    "preposition": "Předložka — nese pád a směr své jmenné fráze",
+    "conjunction": "Souřadicí spojka — spojuje rovnocenné členy/věty",
+    "subordinator": "Podřadicí spojka — uvozuje vedlejší větu (že, aby, když)",
+    "auxiliary": "Pomocné sloveso — vyjadřuje čas/rod/způsob přísudku",
+    "copula": "Spona (být) — pojí podmět s jmenným přísudkem",
+    "punctuation": "Interpunkce — koncová nese modalitu věty (. ? !)",
+    "name_part": "Část víceslovného vlastního jména",
+    "fixed_expr": "Součást ustáleného víceslovného výrazu"
   }
 }

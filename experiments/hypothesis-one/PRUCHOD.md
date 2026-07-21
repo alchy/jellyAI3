@@ -12,29 +12,28 @@ Vzorová věta (blob `bible_lukas`):
 
 ## Krok 1 — věta z blobu → SEKTORY (anotace ÚFAL)
 
-**Co děláme teď:** UDPipe (offline, cache `annotations.pkl`) rozseká větu na tokeny;
-každý = **SEKTOR** s `lemma / UPOS / pád / čas / deprel / head`. A bereme to, jak přijde —
-`roles.decompose` pak slepě věří `deprel`.
+**Co děláme teď:** UDPipe (offline, cache `annotations.pkl`) rozseká větu na **SEKTORY**
+(`lemma / UPOS / pád / deprel / head`). `standardize()` pak každý sektor přeloží do **NAŠEHO
+čitelného klíče** (deprel ven — `nsubj`/`obl`/`amod` jsou nečitelné). Obsah ale zatím **dědí
+chyby parseru** (viz sloupec „co je špatně").
 
-**Jak rozsekání dopadne** — všechny sloupce, poslední **„co je špatně"**. `deprel` = surovina
-z ÚFAL (vstup); **`role = role_key(deprel + pád + předložka)`** = náš klíč (`role_catalog`
-z `cs.json`, viz Slovníček). Katalog je jemnější než deprel — JEDEN deprel → víc rolí
-(`obl` → `where`/`when`/…):
+**Standardizovaný výstup 1. fáze** — jen naše klíče; **UPOS zůstává** (čitelný), **`deprel` pryč**.
+Každý sektor dostane klíč katalogu — i předložka/spojka/interpunkce:
 
-| # | sektor | UPOS | lemma | pád | deprel | role (náš klíč) | co je špatně |
-|---|--------|------|-------|-----|--------|-----------------|--------------|
-| **Ø** | *(elidovaný podmět)* | — | *on* | Nom | *chybí* | `who` | **chybí** — pro‑drop; konatel OBOU přísudků = **Ježíš** (doplnit z těžiště) |
-| 1 | Odešel | VERB | odejít | — | root | `action` | — |
-| 2 | do | ADP | do | Gen | case | — | — |
-| 3 | galilejského | ADJ | galilejský | Gen | amod | `which_attribute` | — |
-| 4 | města | NOUN | město | Gen | obl | `where` | — |
-| 5 | Kafarnaum | PROPN | Kafarnaum | Nom | nsubj | `who` | **lže** — jméno města, ne konatel; má být `where` |
-| 6 | a | CCONJ | a | — | cc | — | — |
-| 7 | učil | VERB | učit | — | conj | `action` | — |
-| 8 | je | PRON | on | Acc | obj | `whom_what` | **holé zájmeno** — „je" = zástup; doplnit referent |
-| 9 | v | ADP | v | Acc | case | — | — |
-| 10 | sobotu | NOUN | sobota | Acc | obl | `where` | **špatná role** — „v + akuzativ" = časové → má být `when` |
-| 11 | . | PUNCT | . | — | punct | — | — |
+| # | sektor | UPOS | lemma | pád | role (náš klíč) | co je špatně |
+|---|--------|------|-------|-----|-----------------|--------------|
+| **Ø** | *(elidovaný podmět)* | — | *on* | Nom | `who` | **chybí** — pro‑drop; konatel OBOU přísudků = **Ježíš** (doplnit z těžiště) |
+| 1 | Odešel | VERB | odejít | — | `action` | — |
+| 2 | do | ADP | do | Gen | `preposition` | — |
+| 3 | galilejského | ADJ | galilejský | Gen | `which_attribute` | — |
+| 4 | města | NOUN | město | Gen | `where` | — |
+| 5 | Kafarnaum | PROPN | Kafarnaum | Nom | `who` | **lže** — UDPipe ji chybně označil za podmět; je to jméno města → má být `where` |
+| 6 | a | CCONJ | a | — | `conjunction` | — |
+| 7 | učil | VERB | učit | — | `action` | — |
+| 8 | je | PRON | on | Acc | `whom_what` | **holé zájmeno** — „je" = zástup; doplnit referent |
+| 9 | v | ADP | v | Acc | `preposition` | — |
+| 10 | sobotu | NOUN | sobota | Acc | `where` | **špatná role** — „v + akuzativ" = čas → má být `when` |
+| 11 | . | PUNCT | . | — | `punctuation` | koncová → nese modalitu „." |
 
 **`roles.decompose` reálně vrátí** (dvě klauzule, sdílený elidovaný podmět):
 
@@ -94,25 +93,19 @@ kterou na ně přepočítáváme.** Narovnání dělá Krok 2.
 > Pád je klíčový: **pád pivotu JE role** (Nom→who, Dat→to_whom, Acc→whom_what). Proto
 > musí být ve VZORu vždy — viz `SOULAD.md`, princip vzor „pán".
 
-### deprel — závislostní vztah (co sektor VE VĚTĚ dělá) → katalogová role
+### Standardizované role — NAŠE klíče (výstup 1. fáze; `deprel` PRYČ)
 
-| deprel | česky | → role katalogu |
-|---|---|---|
-| root | kořen věty (hlavní přísudek) | `action` / `state` |
-| nsubj | podmět | `who` / `what_subject` |
-| nsubj:pass | podmět trpného rodu | `who` / `what_subject` |
-| obj | přímý předmět (akuz.) | `whom_what` |
-| iobj | nepřímý předmět (dat.) | `to_whom` |
-| obl | příslovečné/nepřímé určení (s předložkou) | `where` / `when` / `with_whom_what` … (dle pádu+předl.) |
-| cop | spona (být) | → přísudek jmenný (`state`) |
-| amod | adjektivní přívlastek | `which_attribute` |
-| nmod | jmenný přívlastek | `which_attribute` |
-| appos / flat | apozice / víceslovné jméno | *(součást entity)* |
-| case | předložka (case marker) | *(nese pád/směr)* |
-| cc | souřadicí spojka | *(spojuje)* |
-| conj | konjunkt (druhý člen/klauzule) | *(dědí roli řídícího)* |
-| advmod | příslovečné určení (příslovce) | `how` / `where` / `when` (i vztažné „kde/kam") |
-| acl / acl:relcl | vztažná/adnominální klauzule | *(dědí místo #59)* |
-| advcl | příslovečná klauzule | `for_what_purpose` / `on_what_condition` / `in_spite_of` / `why` |
-| xcomp | doplněk (druhotný přísudek) | `as_what_state` |
-| punct | interpunkce | *(modalita věty)* |
+Interně počítáme z UDPipe (`deprel` + pád + předložka), ale **výstup je vždy náš čitelný
+klíč** — nečitelné zkratky `nsubj`/`obl`/`amod` se ven nedostanou.
+
+**Přísudek** — `action` (slovesný děj) · `state` (jmenný se sponou, „byl králem") · `past_participle` (činné příčestí ‑l) · `passive_participle` (trpné ‑n/‑t)
+
+**Podmět** — `who` (osoba: Kdo?) · `what_subject` (věc/jev: Co?)
+
+**Předmět** (dle pádu) — `whom_what` (4. Koho/Co?) · `whose_of_what` (2. Koho/Čeho?) · `to_whom` (3. Komu/Čemu?) · `about_whom_what` (6. O kom/čem?) · `with_whom_what` (7. S kým/čím?)
+
+**Příslovečné určení** — `where` (Kde/Kam/Odkud?) · `when` (Kdy?) · `how` (Jak?) · `how_much` (Kolik?) · `why` (Proč — příčina) · `for_what_purpose` (Za jakým účelem — záměr) · `on_what_condition` (Za jaké podmínky?) · `in_spite_of` (Navzdory čemu?)
+
+**Rozvití** — `which_attribute` (přívlastek: Jaký/Který/Čí?) · `as_what_state` (doplněk: Jako jaký?)
+
+**Strukturní** (glue — neodpovídají na otázku) — `preposition` (předložka) · `conjunction` (souřadicí spojka) · `subordinator` (podřadicí spojka) · `auxiliary` (pomocné sloveso) · `copula` (spona být) · `punctuation` (interpunkce, koncová nese modalitu) · `name_part` (část víceslovného jména) · `fixed_expr` (ustálený výraz)
