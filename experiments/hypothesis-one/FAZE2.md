@@ -179,6 +179,29 @@ necuruje „Ježíš", curuje „vyhraje nejbližší shodný podmět 1–2 klau
   (protagonista). `n` je `r`-obdoba, měřitelné.
 - **co je statické** — vzorec/typ ano; konkrétní entita ne. Slovník curuje resoluční PRAVIDLO, ne entitu.
 
+### 1.11 Naměřeno (build & measure — 5 knih, 3251 osobních zájmen 3. os.)
+
+| shoda | kandidát ≤2 věty | nenalezeno | unikát @n=2 |
+|---|---|---|---|
+| rod **exact** + číslo | 5 % | **89 %** 💀 | 67 % |
+| rod **overlap** + číslo | 38 % | 40 % | 54 % |
+| **jen číslo** | 44 % | 31 % | 53 % |
+
+- **Rod: ZAPNOUT (overlap), je to SPRÁVNÝ silný filtr — ne tie-breaker.** ÚFAL značí 72 % zájmen
+  kombinovaně `Masc,Neut` (ho/mu/jej — syncretismus) → **exact-match je rozbité** (89 % none), ale
+  **overlap to řeší** (permisivní, mužská zájmena nic chybně neodmítnou). Ověřeno: rod odmítne
+  nejbližšího číselného kandidáta v **14 %**, a **295/298 SPRÁVNĚ** (Fem zájmeno → Fem entita:
+  „k **ní**"→Maria ne Gabriel, „za **ni**"→tchyně ne Ježíš). **ÚFAL rod tu NENÍ nepřesný.**
+- **Dřívější „pokles pokrytí rodem" = artefakt KANDIDÁTNÍ MNOŽINY, ne rodu.** Klíč: „za ni" =
+  **tchyně** (obecné jméno, NOUN) — rod správně odmítl Ježíše (Masc), ale `tchyně` nebyla v
+  PROPN-only množině → „none". Rod konal správně; selhala množina kandidátů.
+- **n ≈ 2–3 věty** — přírůstek pokrytí je do ≤2–3 vět, dál plochý.
+- **Score: stačí recency (nejbližší)** — ~47 % má víc kandidátů, ale nejbližší rozhodne; složité
+  vážení na start netřeba.
+- **PRAVÝ gap = kandidátní množina.** Cache MUSÍ obsahovat: **ženská obecná jména** (tchyně, matka),
+  **všechny zmínky**, **řetěz vyřešených zájmen** (vyřešenou hodnotu **vracíme do cache**). Ne jen
+  PROPN osoby. Jinak rod správně odmítne špatného, ale správný Fem referent chybí → díra / `ASSOCIATED`.
+
 ---
 
 ## 2. Kroky 2b–2e (stručně; detail až u stavby)
