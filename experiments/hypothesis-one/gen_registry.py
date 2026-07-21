@@ -29,7 +29,7 @@ CONTENT_UPOS = {"NOUN", "PROPN", "VERB", "ADJ", "NUM", "ADV"}
 def _skip(lem, upos):
     return upos == "PUNCT" or (len(lem) == 1 and upos in ("NOUN", "PROPN", "SYM", "X"))
 
-def gen(sent, doc, si):
+def gen(sent, doc, si, fold):
     verb = next((t for t in sent if t.get("deprel") == "root" and t["upos"] == "VERB"), None)
     if verb is None:
         verb = next((t for t in sent if t["upos"] == "VERB"), None)
@@ -37,7 +37,7 @@ def gen(sent, doc, si):
         return None
     answers, context = [], []
     for t in sent:
-        lem = canon(t)
+        lem = fold.get(canon(t), canon(t))     # podmíněný epentetický fold PROPN
         if _skip(lem, t["upos"]):
             continue
         fe = t.get("feats") or {}
@@ -55,12 +55,27 @@ def gen(sent, doc, si):
 
 def main():
     ann = pickle.load(open(f"{ROOT}/data/annotations.pkl", "rb"))
+    # PODMÍNĚNÝ epentetický fold PROPN nad korpusem: Čapk→Čapek jen když „Čapek"
+    # reálně existuje a je častější (nekorumpuje Egypt→Egypet, Petr→Peter)
+    propn = Counter()
+    for (_d, _s), rec in ann.items():
+        for sent in rec["sentences"]:
+            for t in sent:
+                if t["upos"] == "PROPN":
+                    propn[canon(t)] += 1
+    fold = {}
+    for lem, c in propn.items():
+        cand = _run._epen_stem(lem)
+        if cand != lem and propn.get(cand, 0) > c:
+            fold[lem] = cand
+    print("podmíněný fold PROPN: " + str(len(fold)) + " dvojic "
+          + (("(" + ", ".join(f"{a}→{b}" for a, b in list(fold.items())[:5]) + ")") if fold else ""))
     out = open(f"{ROOT}/experiments/hypothesis-one/registry.jsonl", "w")
     n = 0; preds = Counter(); ans_total = 0; by_doc = Counter()
     sample = {}
     for (doc, si), rec in ann.items():
         for sent in rec["sentences"]:
-            e = gen(sent, doc, si)
+            e = gen(sent, doc, si, fold)
             if e is None:
                 continue
             out.write(json.dumps(e, ensure_ascii=False) + "\n")

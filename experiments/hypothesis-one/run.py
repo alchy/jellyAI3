@@ -67,8 +67,9 @@ def canon_lemma(tok):
         for suf in ("ův", "ový", "in"):
             if lemma.endswith(suf) and len(lemma) > len(suf) + 1:
                 return _epen_stem(lemma[:-len(suf)])
-    if tok["upos"] == "PROPN":
-        return _epen_stem(lemma)     # Čapků→„Čapk"→Čapek (uříznuté příjmení), jednotně
+    # PROPN epentetický fold (Čapk→Čapek) NENÍ bezpodmínečný — korumpoval by
+    # Egypt→Egypet, Petr→Peter…; dělá se PODMÍNĚNĚ nad korpusem (build remap,
+    # gen_registry) jen když -e- verze reálně existuje jako častější jméno.
     return lemma
 
 # ---- build -----------------------------------------------------------------
