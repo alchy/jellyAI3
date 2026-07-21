@@ -1,0 +1,16 @@
+{
+  "_comment": "Jazyková data experimentu (zákon 3: jazyk jako data). Klíče jsou UNIVERZÁLNÍ (UD deprel/pád/animacy), hodnoty jsou české. Nový jazyk = nový soubor (es.json), žádný zásah do kódu.",
+  "copula_lemma": "být",
+  "stopwords": ["kdo", "co", "být", "který", "jaký", "kde", "kdy", "jak", "proč"],
+  "vowels": "aeiouyáéíóúůýěäö",
+  "possessive_adj_suffixes": ["ův", "ový", "in"],
+  "interrogatives": {
+    "nsubj":      {"anim": "Kdo", "inanim": "Co"},
+    "nsubj:pass": {"anim": "Kdo", "inanim": "Co"},
+    "obj":        {"anim": "Koho", "inanim": "Co"},
+    "iobj":       {"default": "Komu"},
+    "pnom":       {"default": "Kdo/Co"},
+    "obl":        {"Loc": "Kde", "Dat": "Komu", "Ins": "Čím", "default": "Co/Kde"},
+    "obl:arg":    {"Loc": "Kde", "Dat": "Komu", "Ins": "Čím", "default": "Co/Kde"}
+  }
+}

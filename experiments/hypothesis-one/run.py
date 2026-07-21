@@ -48,7 +48,10 @@ def frame_sig(toks, i, modality):
     right = slot(toks[i + 1]) if i < len(toks) - 1 else "$"
     return f"{left}·{toks[i]['upos']}·{right}·{modality}"
 
-_VOW = "aeiouyáéíóúůýěäö"
+import json as _json
+# jazyková data (zákon 3): NIKDY české řetězce v kódu; nový jazyk = nový JSON
+LANG = _json.load(open(f"{ROOT}/experiments/hypothesis-one/lang/cs.json", encoding="utf-8"))
+_VOW = LANG["vowels"]
 
 def _epen_stem(stem):
     """Vlož epentetické -e- do koncového shluku souhlásek (Karl→Karel, Čapk→Čapek).
@@ -64,7 +67,7 @@ def canon_lemma(tok):
     se tak rozloží na Karel + univerzita — stejné pravidlo pro všechno, bez výjimek."""
     lemma = tok["lemma"]
     if tok["upos"] == "ADJ" and (tok.get("feats") or {}).get("Poss") == "Yes":
-        for suf in ("ův", "ový", "in"):
+        for suf in LANG["possessive_adj_suffixes"]:
             if lemma.endswith(suf) and len(lemma) > len(suf) + 1:
                 return _epen_stem(lemma[:-len(suf)])
     # PROPN epentetický fold (Čapk→Čapek) NENÍ bezpodmínečný — korumpoval by

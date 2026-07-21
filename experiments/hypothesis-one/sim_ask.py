@@ -20,8 +20,9 @@ _run = importlib.util.module_from_spec(_spec); sys.modules["h1run"] = _run
 _spec.loader.exec_module(_run)
 canon = _run.canon_lemma
 ROOT = "/Users/j/Projects/jellyAI3"
-CONTENT = {"NOUN", "PROPN", "VERB", "ADJ"}
-STOP = {"kdo", "co", "být", "který", "jaký", "kde", "kdy"}
+CONTENT = {"NOUN", "PROPN", "VERB", "ADJ"}        # UPOS = univerzální (UD)
+STOP = set(_run.LANG["stopwords"])                # česká slova z JSONu (zákon 3)
+COPULA = _run.LANG["copula_lemma"]
 
 from jellyai.normalize import merge_abbreviations
 
@@ -38,14 +39,14 @@ def q_words(text):
     for sent in udpipe(text):
         for t in sent:
             lem = canon(t)
-            if lem.lower() == "být":
-                cop = True                     # spona: „Kdo je/byl X"
+            if lem.lower() == COPULA:
+                cop = True                     # spona (data z LANG)
             if t["upos"] == "VERB" and pred is None and lem.lower() not in STOP:
                 pred = lem
             if t["upos"] in CONTENT and lem.lower() not in STOP:
                 words.append(lem)
     if pred is None and cop:
-        pred = "být"                           # copula-otázka → predikát „být"
+        pred = COPULA                          # copula-otázka → predikát spony
     return list(dict.fromkeys(words)), pred
 
 def build_corpus():

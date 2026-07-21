@@ -30,20 +30,15 @@ def _skip(lem, upos):
     return upos == "PUNCT" or (len(lem) == 1 and upos in ("NOUN", "PROPN", "SYM", "X"))
 
 def interrog(role, upos, fe):
-    """Tázací slovo dle role answer-slotu — match si definujeme sami, spolehlivě."""
-    anim = fe.get("Animacy") == "Anim" or bool(fe.get("NameType")) or upos == "PROPN"
-    if role in ("nsubj", "nsubj:pass"):
-        return "Kdo" if anim else "Co"
-    if role == "obj":
-        return "Koho" if anim else "Co"
-    if role == "iobj":
-        return "Komu"
-    if role == "pnom":
-        return "Kdo/Co"          # spona: „Kdo je X" / „Co je X"
-    if role in ("obl", "obl:arg"):
-        case = fe.get("Case")
-        return {"Loc": "Kde", "Dat": "Komu", "Ins": "Čím"}.get(case, "Co/Kde")
-    return "?"
+    """Tázací slovo dle role answer-slotu. Data z LANG (zákon 3); klíče (role,
+    pád, životnost) jsou UNIVERZÁLNÍ UD, hodnoty české. Match si definujeme sami."""
+    m = _run.LANG["interrogatives"].get(role)
+    if m is None:
+        return "?"
+    if "anim" in m:                       # nsubj/obj rozlišuje životnost
+        anim = fe.get("Animacy") == "Anim" or bool(fe.get("NameType")) or upos == "PROPN"
+        return m["anim"] if anim else m["inanim"]
+    return m.get(fe.get("Case", ""), m.get("default", "?"))   # obl dle pádu, jinak default
 
 def gen(sent, doc, si, fold):
     root = next((t for t in sent if t.get("deprel") == "root"), None)
@@ -55,7 +50,7 @@ def gen(sent, doc, si, fold):
         predicate = fold.get(canon(verb), canon(verb))
     elif root is not None and root["upos"] in ("NOUN", "ADJ", "PROPN") \
             and any(t.get("deprel") == "cop" for t in sent):
-        predicate, root_nom = "být", root      # SPONA: „Kdo je/byl X" (identitní fakt)
+        predicate, root_nom = _run.LANG["copula_lemma"], root   # SPONA (identitní fakt)
     else:
         return None
     answers, context = [], []
