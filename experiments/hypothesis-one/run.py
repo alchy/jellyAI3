@@ -43,10 +43,13 @@ def sentence_modality(toks):
             return t["form"]
     return "."
 
-def frame_sig(toks, i, modality):
-    left = slot(toks[i - 1]) if i > 0 else "^"
-    right = slot(toks[i + 1]) if i < len(toks) - 1 else "$"
-    return f"{left}·{toks[i]['upos']}·{right}·{modality}"
+def frame_sig(toks, i, modality, r=None):
+    """Rám při poloměru r (konfig CFG['radius']): r prvků vlevo/vpravo + cíl + modalita.
+    Při r=1 bitově identické s dřívějším left·upos·right·mod (zpětně kompatibilní)."""
+    r = CFG["radius"] if r is None else r
+    left = [slot(toks[i - k]) if i - k >= 0 else "^" for k in range(r, 0, -1)]
+    right = [slot(toks[i + k]) if i + k < len(toks) else "$" for k in range(1, r + 1)]
+    return "·".join(left + [toks[i]["upos"]] + right + [modality])
 
 import json as _json
 # jazyková data (zákon 3): NIKDY české řetězce v kódu; nový jazyk = nový JSON
