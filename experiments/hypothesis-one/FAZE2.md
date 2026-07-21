@@ -128,6 +128,57 @@ plynule upgradovat. **Rozhodnutí:** `ActivationField` jako **vyměnitelný defa
 **změřit** na gold sadě pro-drop případů, a při nedostatečné přesnosti **povýšit na Centering**.
 Nezabetonovat jeden model.
 
+### 1.8 Inventář placeholderů + typová šablona (co nahrazovat)
+
+Placeholdery **neseznamujeme ručně** — ÚFAL je značí rysem; každý má **typ = konečnou množinu**
+přípustných výplní (agreement jako *eval type*):
+
+| placeholder | ÚFAL rys | řeší se NA | typová šablona (fit) |
+|---|---|---|---|
+| **elidovaný podmět (Ø)** | *(chybí nsubj)* | nejteplejší shodná entita | Person/Gender/Number přísudku |
+| **osobní 3. os.** | `PronType=Prs, Person=3`, lemma `on` | koreferenční antecedent | Gender/Number/Animacy |
+| **osobní 1./2. os.** | `PronType=Prs, Person=1/2` (já/ty) | mluvčí / adresát | z rámu přímé řeči |
+| **přivlastňovací** | `Poss=Yes` (jeho/její/jejich) | vlastník = antecedent | Gender/Number vlastníka |
+| **přivlastň. zvratné** | `Poss=Yes` + zvratné (svůj) | podmět klauzule | — |
+| **ukazovací samostatné** | `PronType=Dem` (to/ten) | anaforický antecedent | shoda |
+
+Detekce: `PronType=Prs OR Poss=Yes OR (Dem samostatné) + Ø podmět`.
+**NEnahrazovat:** `Reflex` (se/si — gramatické), `Int,Rel` (kdo/co/který — díra/vazba, #59),
+`Tot/Neg/Ind` (všechen/nikdo/něco — kvantifikace/neurčitost).
+
+### 1.9 Resoluce = zpětné okno se skórováním (persistentní slovník, obdoba fáze 1)
+
+Obdoba `PersistentDeterminer`, ale pro koreferenci — **statický kurátorský slovník**. Mechanismus:
+
+1. u placeholderu znáš **typ** → **konečnou množinu** přípustných entit (agreement = type-check);
+2. **jdeš doleva větu po větě** — okno **n vět** (definovatelné jako `r`; discourse-jednotka > holý počet slov);
+3. **plníš kandidáty dle váhy akumulace** — entita, co v okně padne častěji / blíž, má vyšší **score**;
+4. vybereš **nejvýše skórujícího, který SEDÍ** (agreement). Nesedí → další; nikdo v okně → rozšiř okno / global salience / díra zůstane.
+
+`to tam pasne?` = ten agreement/typový check je právě „sedí"; **score bez shody se nepočítá**.
+
+**Backward cache = předchozích n vět (`WORD_W_ATTR_ARRAY`-ů), které už máme.** Nepotřebujeme zvláštní
+strukturu — kroky 1–4 jsou **zpětný dotaz do předchozích vět**, jdeme **větu po větě** (rysy → agreement,
+**vzdálenost ve větách → recency**). „Jdeme doleva větu po větě" = **lookup do backward cache dle
+`WORD_W_ATTR_ARRAY`**. Pro efektivitu lze držet rolující index `entita → poslední věta`, ale zdrojem jsou
+ta pole. Tím se `scan-left` a `ActivationField` **sjednotí**: decay = recency (vzdálenost ve větách) nad
+backward cache, typová množina = agreement filtr nad ním.
+
+**Persistentní slovník (VZOR placeholderu → resoluce):** klíč = `SLOT_ARRAY` okolo placeholderu;
+hodnota = **vzorec resoluce** (typ + potvrzená relativní pozice kandidáta) s proveniencí
+`CURATED/CONFIRMED/CANDIDATE`. **Statické je PRAVIDLO** (typ, okno, který relativní kandidát
+vyhrává), **dynamická je konkrétní entita** — dokument-lokální, plní se za běhu. Slovník tedy
+necuruje „Ježíš", curuje „vyhraje nejbližší shodný podmět 1–2 klauzule zpět".
+
+**Provenience HODNOTY:** `OBSERVED` (token je tam) · `FILLED` (zpětné okno) · `ASSOCIATED` (global/graf — Bůh).
+
+### 1.10 Otevřené (k měření)
+
+- **okno vs global** — krátké okno = tuhá recency, ale mine vzdáleného protagonistu (zmíněný 40 slov
+  zpět); dlouhé = chytí, ale šum. Možná **dva signály**: lokální okno (recency) + global salience
+  (protagonista). `n` je `r`-obdoba, měřitelné.
+- **co je statické** — vzorec/typ ano; konkrétní entita ne. Slovník curuje resoluční PRAVIDLO, ne entitu.
+
 ---
 
 ## 2. Kroky 2b–2e (stručně; detail až u stavby)
