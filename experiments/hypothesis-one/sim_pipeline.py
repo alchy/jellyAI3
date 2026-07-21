@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """hypothesis-two — SIMULACE: full pipeline (celá smyčka na reálném registru).
 
-  otázka → brána (dokument) → registr (kandidátní fakty s predikátem) →
-  light-beam (slova otázky + kontext) přes doc-graf → vybraná odpověď.
+Správné pořadí (oprava — kontext se NEcpe předčasně):
+  ① otázka → BRÁNA (dokument, ze slov otázky)
+  ② IDENTIFIKACE FAKTU (content-match slov otázky proti faktům s predikátem)
+  ③ ODPOVĚĎ = answer-sloty identifikovaného faktu  (množina belongerů)
+  ④ jen když je belongerů VÍC a je kontext → light-beam rozhodne MEZI nimi
 
-Doc-graf se staví z registru (co-occurrence context+answer v rámci faktu).
-Validuje: brána trefí dokument, a KONTEXT vybere správnou odpověď (táž otázka,
-jiná odpověď dle rozhovoru).
+Fakt i množina odpovědí vznikají ze SLOV OTÁZKY; kontext rozhoduje až uvnitř.
 
 Spuštění:  .venv/bin/python experiments/hypothesis-one/sim_pipeline.py
 """
@@ -40,27 +41,24 @@ def build_corpus():
     idf = lambda w: math.log((D + 1) / (len(lemdocs.get(w, ())) + 1))
     tfidf = lambda w, d: doc_cnt[d][w] * idf(w)
     wtot = {w: sum(tfidf(w, d) for d in lemdocs[w]) for w in lemdocs}
-    # globální salience (tf·idf přes celý korpus, normalizovaná)
-    gsal = {w: sum(tfidf(w, d) for d in lemdocs[w]) for w in lemdocs}
-    smax = max(gsal.values()) or 1
-    emis = {w: gsal[w] / smax for w in gsal}
-    return {"docs": docs, "tfidf": tfidf, "wtot": wtot, "emis": emis}
+    smax = max(wtot.values()) or 1
+    emis = {w: wtot[w] / smax for w in wtot}
+    return {"docs": docs, "tfidf": tfidf, "wtot": wtot, "emis": emis, "idf": idf}
 
 def gate(C, words):
     out = {d: sum((C["tfidf"](w, d) / C["wtot"][w]) for w in words if C["wtot"].get(w))
            for d in C["docs"]}
-    return max(out, key=out.get)
+    return max(out, key=out.get), out
 
 def load_registry():
-    reg_by_doc = defaultdict(list)
+    reg = defaultdict(list)
     with open(f"{ROOT}/experiments/hypothesis-one/registry.jsonl") as f:
         for line in f:
             e = json.loads(line)
-            reg_by_doc[e["doc"]].append(e)
-    return reg_by_doc
+            reg[e["doc"]].append(e)
+    return reg
 
 def doc_graph(entries):
-    """Co-occurrence graf z faktů dokumentu (context ∪ answers v rámci faktu)."""
     adj = Counter()
     for e in entries:
         words = list(dict.fromkeys(e["context"] + [a["lemma"] for a in e["answers"]]))
@@ -87,10 +85,11 @@ def beam(nbr, emis, seed, hops=3, decay=0.6):
         fro = nx
     return act
 
-# (label, predikát, slova otázky, kontext rozhovoru, očekávaná odpověď, očekávaný dok)
+# (label, predikát, slova otázky, kontext, očekávaná odpověď | None=množina, dok)
 CASES = [
-    ("Kdo patřil mezi pátečníky? [ctx Čapek]",  "patřit", ["pátečník"], ["Čapek"],     "Čapek",     "wiki_karel_čapek"),
-    ("Kdo patřil mezi pátečníky? [ctx prezident]","patřit", ["pátečník"], ["prezident"], "prezident", "wiki_karel_čapek"),
+    ("Kdo patřil mezi pátečníky?  [BEZ kontextu]", "patřit", ["pátečník"], [],           None,        "wiki_karel_čapek"),
+    ("   … tentýž dotaz  [ctx Čapek]",              "patřit", ["pátečník"], ["Čapek"],     "Čapek",     "wiki_karel_čapek"),
+    ("   … tentýž dotaz  [ctx prezident]",          "patřit", ["pátečník"], ["prezident"], "prezident", "wiki_karel_čapek"),
 ]
 
 def main():
@@ -98,27 +97,38 @@ def main():
     reg = load_registry()
     graphs = {}
     passed = 0
-    for label, pred, qw, ctx, expect_ans, expect_doc in CASES:
-        d = gate(C, [pred] + qw)
-        if d not in graphs:
-            graphs[d] = doc_graph(reg[d])
-        nbr = graphs[d]
-        # kandidáti = answer lemmata faktů v dok s tímto predikátem
-        cands = set()
-        for e in reg[d]:
-            if e["predicate"] == pred:
-                cands.update(a["lemma"] for a in e["answers"])
-        act = beam(nbr, C["emis"], [pred] + qw + ctx)
-        ranked = sorted(cands, key=lambda w: -act.get(w, 0))
-        top = ranked[0] if ranked else None
+    for label, pred, qw, ctx, expect, expect_doc in CASES:
+        # ① brána (jen slova otázky)
+        d, _ = gate(C, [pred] + qw)
+        # ② identifikace faktu (content-match slov otázky)
+        facts = [e for e in reg[d] if e["predicate"] == pred]
+        facts.sort(key=lambda e: sum(C["idf"](w) for w in qw if w in e["context"]),
+                   reverse=True)
+        fakt = facts[0] if facts else None
+        # ③ answer-sloty faktu (bez skupiny = slova otázky)
+        belong = [a["lemma"] for a in (fakt["answers"] if fakt else [])
+                  if a["lemma"] not in qw]
+        belong = list(dict.fromkeys(belong))
+        # ④ kontext rozhodne MEZI belongery (jen když je jich víc a je kontext)
+        if ctx and len(belong) > 1:
+            if d not in graphs:
+                graphs[d] = doc_graph(reg[d])
+            act = beam(graphs[d], C["emis"], qw + ctx)
+            belong = sorted(belong, key=lambda w: -act.get(w, 0))
+        winner = belong[0] if belong else None
+
         ok_doc = d == expect_doc
-        ok_ans = top == expect_ans
-        passed += ok_doc and ok_ans
-        print(f"{'✓' if ok_doc and ok_ans else '✗'} {label}")
-        print(f"    brána → {d} {'✓' if ok_doc else '✗ (čekáno '+expect_doc+')'}")
-        print(f"    kandidáti (top5 dle aktivace): "
-              + ", ".join(f"{w}:{act.get(w,0):.2f}" for w in ranked[:5]))
-        print(f"    odpověď → {top}   {'✓' if ok_ans else '✗ (čekáno '+expect_ans+')'}")
+        if expect is None:                       # bez kontextu: ověř FAKT + množinu
+            ok = ok_doc and fakt and "pátečníky" in fakt["text"]
+            passed += bool(ok)
+            print(f"{'✓' if ok else '✗'} {label}")
+            print(f"     ① brána → {d}   ② fakt → „{fakt['text'][:60]}…\"")
+            print(f"     ③ odpověď (množina belongerů): {', '.join(belong)}  [BEZ kontextu]")
+        else:                                    # s kontextem: ověř vítěze
+            ok = ok_doc and winner == expect
+            passed += bool(ok)
+            print(f"{'✓' if ok else '✗'} {label}")
+            print(f"     ④ vybráno z {belong}  →  {winner}  {'✓' if winner==expect else '✗'}")
     print(f"\n=== full-pipeline: {passed}/{len(CASES)} ===")
 
 if __name__ == "__main__":
