@@ -1,0 +1,3 @@
+{
+  "_comment": "CONFIRMED statický slovník VZOR(SLOT_ARRAY) → role, OVĚŘENÝ revizí. Prázdný = zatím nic ověřeno; roste JEN přes PersistentDeterminer.promote() po revizi kandidátů (candidates.json). Nikdy se nezapisuje za běhu dotazu — jen explicitně/offline (determinismus + revizní brána)."
+}

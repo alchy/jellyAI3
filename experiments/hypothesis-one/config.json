@@ -12,6 +12,8 @@
   "paths": {
     "lang": "lang/cs.json",
     "curated": "curated.json",
+    "determination": "determination.json",
+    "candidates": "candidates.json",
     "annotations": "../../data/annotations.pkl"
   }
 }

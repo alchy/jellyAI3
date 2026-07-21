@@ -123,6 +123,101 @@ class Curator:
         return out
 
 
+# ── pomůcky pro persistentní slovník ────────────────────────────────────────
+def _resolve(path):
+    """Absolutní cesta beze změny; relativní vůči adresáři experimentu."""
+    return path if path.startswith("/") else _HERE + path
+
+def _load_role_map(path):
+    """Načte {VZOR: {"role": …}} → {VZOR: role}. Chybějící soubor = prázdno."""
+    try:
+        data = json.load(open(path, encoding="utf-8"))
+    except FileNotFoundError:
+        return {}
+    return {k: v["role"] for k, v in data.items()
+            if not k.startswith("_") and isinstance(v, dict) and "role" in v}
+
+
+class PersistentDeterminer:
+    """Krok 1d (persistentní) — SLOT_ARRAY → role přes STATICKÝ SLOVNÍK, vrstveno:
+        CURATED (ruční) → CONFIRMED (ověřený slovník) → CANDIDATE (živý návrh k revizi).
+
+    NAČÍTÁ vždy (curated + determination). UKLÁDÁ jen explicitně (save_candidates /
+    promote) — `determine()` na disk NEŠAHÁ (determinismus + revizní brána).
+
+    determine():        vstup sent (WORD_W_ATTR_ARRAY) → [(WORD_W_ATTR, role, provenance)].
+    build(sents):       offline dávka — naplní self.pending (bez zápisu).
+    save_candidates():  explicitně zapíše self.pending do candidates.json (k revizi).
+    promote(vzory):     po revizi povýší VZORy na CONFIRMED (zapíše determination.json).
+    Konfig: config.json['paths'] (curated/determination/candidates), ['radius'].
+    """
+    CURATED, CONFIRMED, CANDIDATE = "CURATED", "CONFIRMED", "CANDIDATE"
+
+    def __init__(self, config=CONFIG):
+        self.r = config.get("radius", 2)
+        p = config["paths"]
+        self._curated_path = _resolve(p["curated"])
+        self._det_path = _resolve(p["determination"])
+        self._cand_path = _resolve(p["candidates"])
+        self.curated = _load_role_map(self._curated_path)     # VZOR → role (ruční)
+        self.confirmed = _load_role_map(self._det_path)       # VZOR → role (ověřené)
+        self.pending = {}                                     # VZOR → role (CANDIDATE, PAMĚŤ)
+
+    def determine(self, sent, r=2):
+        """Lookup CURATED → CONFIRMED → miss → standard_role (CANDIDATE do self.pending).
+        BEZ zápisu na disk. Vrací trojice (WORD_W_ATTR, role, provenance)."""
+        byid = _roles._byid(sent)
+        mod = _run.sentence_modality(sent)
+        cop = {x["head"] for x in sent if x["deprel"] == "cop"}
+        out = []
+        for i, w in enumerate(sent):
+            if w["upos"] == "PUNCT":                          # strukturní, triviálně jisté
+                out.append((w, _roles.standard_role(w, sent, byid, cop), self.CONFIRMED)); continue
+            vz = _run.frame_sig(sent, i, mod, r)              # SLOT_ARRAY (VZOR)
+            if vz in self.curated:
+                out.append((w, self.curated[vz], self.CURATED))
+            elif vz in self.confirmed:
+                out.append((w, self.confirmed[vz], self.CONFIRMED))
+            else:
+                role = _roles.standard_role(w, sent, byid, cop)   # živý fallback = návrh
+                self.pending[vz] = role                           # poznamenej (jen v PAMĚTI!)
+                out.append((w, role, self.CANDIDATE))
+        return out
+
+    def build(self, sents, r=2):
+        """Offline dávka nad WORD_W_ATTR_ARRAY-y: naplní self.pending (bez zápisu)."""
+        for sent in sents:
+            self.determine(sent, r)
+        return len(self.pending)
+
+    def save_candidates(self):
+        """Explicitně zapíše self.pending do candidates.json (podklad k revizi)."""
+        try:
+            data = json.load(open(self._cand_path, encoding="utf-8"))
+        except FileNotFoundError:
+            data = {"_comment": "CANDIDATE VZOR→role (živě odvozené, ČEKAJÍ na revizi)."}
+        for vz, role in self.pending.items():
+            data[vz] = {"role": role, "status": "pending"}
+        json.dump(data, open(self._cand_path, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
+        return len(self.pending)
+
+    def promote(self, vzory, source=None):
+        """Po revizi: povýší dané VZORy na CONFIRMED (zapíše determination.json).
+        Role bere z `source` (dict VZOR→role), jinak z self.pending."""
+        src = source or self.pending
+        try:
+            data = json.load(open(self._det_path, encoding="utf-8"))
+        except FileNotFoundError:
+            data = {"_comment": "CONFIRMED VZOR→role (ověřeno revizí)."}
+        n = 0
+        for vz in vzory:
+            if vz in src:
+                data[vz] = {"role": src[vz], "status": "confirmed"}
+                self.confirmed[vz] = src[vz]; n += 1
+        json.dump(data, open(self._det_path, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
+        return n
+
+
 class Phase1:
     """Kompozice 1a–1d.
 
