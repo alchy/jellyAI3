@@ -15,10 +15,15 @@ slovníček UPOS/pád/deprel).
 | pojem | význam | kde v kódu |
 |---|---|---|
 | **SOURCE FACT** (zdrojový fakt) | věta z korpusu; zdroj světla, který vrhá stíny-otázky | `annotations.pkl` |
-| **SEKTOR** | jeden slot v okně (token); **ÚFAL ho atribuuje** (upos/lemma/pád/deprel) | `run.slot()` |
-| **VZOR** | *přesná gramatická šablona*: pivot + r sektorů, každý `UPOS+pád+čas` — jako mluvnický vzor „pán" (přesný na gramatiku, dosaditelný na lexém); match-klíč | `run.frame_sig()` |
+| **WORD_PLAIN** | holé slovo (bez atributů) | `tok["form"]` (str) |
+| **WORD_PLAIN_ARRAY** | pole holých slov (syrová tokenizace) | list[str] |
+| **WORD_W_ATTR** | slovo + atributy (lemma/upos/pád/deprel…); **ÚFAL ho atribuuje** | `sent[i]` (dict) |
+| **WORD_W_ATTR_ARRAY** | pole slov s atributy = **věta / okno** (workhorse) | `sent` (list[dict]) |
+| **SLOT** | match-obálka jednoho slova (`UPOS:pád`), virtuální | `run.slot()` (str) |
+| **SLOT_ARRAY** | *přesná gramatická šablona* = pivot + r slotů + modalita (vzor „pán"); match-klíč | `run.frame_sig()` (str) |
+| **VZOR** | přezdívka pro SLOT_ARRAY (metafora „mluvnický vzor pán") | ≡ SLOT_ARRAY |
 | **r = X** (poloměr) | šířka okna rámu; číselník tvrdosti shody | `CFG["radius"]` |
-| **OCCURRENCE + FRAME** | index: token = Occurrence (lemma+rysy), Frame = signatura okna | `run.frame_sig` |
+| **OCCURRENCE + FRAME** | raný název: Occurrence ≈ WORD_W_ATTR, Frame ≈ SLOT_ARRAY (VZOR) | `run.frame_sig` |
 | **DÍRA** (hole) | tázaný slot = jedna katalogová role | `roles.decompose` |
 | **KATALOG ROLÍ** (větné členy) | univerzální schéma odpovědi (who/where/whom_what/state…); klíče univerzální, popisy = data | `cs.json role_catalog` |
 | **OTÁZKA** | kanonický pattern = VZOR **s dírou**; jedna na askable roli (skelet) | `roles` + `role_ask` |

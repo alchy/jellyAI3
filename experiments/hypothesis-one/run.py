@@ -33,10 +33,11 @@ N_SENTS = 25
 PUNCT_KEEP = set(_CONFIG["punct_keep"])
 
 def slot(tok):
-    """Sektor VZORu: UPOS + nosné syntaktické rysy (pád, slovesný čas). Přesný na
-    gramatiku, abstraktní na lexém — jako mluvnický vzor „pán". Pád v pivotu JE role,
-    proto musí ve vzoru vždy být (rozliší Kdo=Nom/Komu=Dat/Co=Acc). Přesnost není
-    kompromis — je to definice vzoru; pokrytí povrchů dělá KVANTITA vzorů, ne rozmazání."""
+    """SLOT — match-obálka jednoho WORD_W_ATTR (`tok`): UPOS + nosné rysy (pád, čas).
+    Vstup: WORD_W_ATTR (dict).  Výstup: SLOT (str), např. 'PROPN:Nom'.
+    Přesný na gramatiku, abstraktní na lexém — mluvnický vzor „pán". Pád v pivotu JE
+    role, proto musí ve VZORu vždy být (Kdo=Nom/Komu=Dat/Co=Acc). Přesnost není
+    kompromis — je to definice vzoru; pokrytí dělá KVANTITA vzorů, ne rozmazání."""
     up = tok["upos"]
     if up == "PUNCT":
         return tok["form"] if tok["form"] in PUNCT_KEEP else "PUNCT"
@@ -51,9 +52,10 @@ def sentence_modality(toks):
     return "."
 
 def frame_sig(toks, i, modality, r=None):
-    """VZOR při poloměru r (konfig CFG['radius']): r sektorů vlevo/vpravo + pivot + modalita.
-    Sektor = `slot()` = UPOS + pád/čas (přesný na gramatiku, jako vzor „pán"). r řídí rozsah
-    okna; pokrytí povrchů = mnoho přesných vzorů (Ollama), ne rozostření jednoho."""
+    """SLOT_ARRAY (≡ VZOR) — pole SLOTŮ kolem pivotu: r slotů vlevo/vpravo + pivot + modalita.
+    Vstup: toks = WORD_W_ATTR_ARRAY, i = index pivotu, modality (str), r = poloměr (CFG['radius']).
+    Výstup: SLOT_ARRAY (str). SLOT = `slot()`. r řídí okno; pokrytí = mnoho přesných vzorů,
+    ne rozostření jednoho (mluvnický vzor „pán")."""
     r = CFG["radius"] if r is None else r
     left = [slot(toks[i - k]) if i - k >= 0 else "^" for k in range(r, 0, -1)]
     right = [slot(toks[i + k]) if i + k < len(toks) else "$" for k in range(1, r + 1)]

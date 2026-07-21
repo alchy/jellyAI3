@@ -10,7 +10,11 @@ Vzorová věta (blob `bible_lukas`):
 
 ---
 
-## Krok 1 — věta z blobu → SEKTORY (anotace ÚFAL)
+## Krok 1 — věta z blobu → WORD_W_ATTR_ARRAY (anotace ÚFAL)
+
+> Slovníček atomů (SOULAD §1): **WORD_PLAIN** (holé slovo) · **WORD_W_ATTR** (slovo+atributy, dict)
+> · **WORD_W_ATTR_ARRAY** (věta/okno) · **SLOT** (`run.slot()`) · **SLOT_ARRAY** = VZOR (`run.frame_sig()`).
+> „SEKTOR" jsme retirovali — pole = přípona `_ARRAY`.
 
 **Co děláme teď:** UDPipe (offline, cache `annotations.pkl`) rozseká větu na **SEKTORY**
 (`lemma / UPOS / pád / deprel / head`). `standardize()` pak každý sektor přeloží do **NAŠEHO

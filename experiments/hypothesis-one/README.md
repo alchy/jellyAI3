@@ -37,19 +37,20 @@ Vše je **deterministické a čisté** (bez sítě, kromě jednorázové anotace
 | typ | Python | popis / pole |
 |---|---|---|
 | **Blob** | — | dokument korpusu; identifikátor `doc` (např. `"bible_lukas"`). V `annotations.pkl` klíč `(doc, sentence_index)`. |
-| **Věta** | `list[Token]` | uspořádaný seznam sektorů (tokenů). |
-| **Token / SEKTOR** | `dict` | jeden atomický kus věty (viz níže). |
+| **WORD_PLAIN** | `str` | holé slovo (bez atributů) = `tok["form"]`. |
+| **WORD_W_ATTR** | `dict` | slovo + atributy (pole níže) — anotovaná jednotka. |
+| **WORD_W_ATTR_ARRAY** | `list[dict]` | pole slov s atributy = **věta / okno** (workhorse; v kódu `sent`). |
 | **UPOS** | `str` | slovní druh z pevné sady (`VERB`, `NOUN`, …). Slovníček §6.1. |
 | **Pád (Case)** | `str` | `feats["Case"]` ∈ {`Nom`,`Gen`,`Dat`,`Acc`,`Voc`,`Loc`,`Ins`}. Slovníček §6.2. |
 | **deprel** | `str` | závislostní vztah z ÚFAL (`nsubj`,`obl`,…). **VNITŘNÍ vstup**, do výstupu se nedostane. |
 | **Role (náš klíč)** | `str` | standardizovaný klíč katalogu (`who`,`where`,`action`,`preposition`,…) nebo `None`. Slovníček §6.3. |
-| **Slot** | `str` | příspěvek jednoho sektoru do VZORu: `UPOS[:pád][:čas]` (`"PRON:Nom"`,`"VERB:Past"`). Fce `run.slot()`. |
+| **SLOT** | `str` | match-obálka jednoho WORD_W_ATTR: `UPOS[:pád][:čas]` (`"PRON:Nom"`). Fce `run.slot()`. |
 | **Modalita** | `str` | koncové znaménko věty ∈ {`.`,`?`,`!`,`:`}; `run.sentence_modality()`. |
-| **VZOR** | `str` | signatura okna: `slot·…·PIVOT·…·slot·modalita`. Hranice okna: `^` (před začátkem), `$` (za koncem). Fce `run.frame_sig()`. |
-| **Kurátorský zápis** | `dict` | v `curated.json`: `{ VZOR: {"role": str, "note": str} }`. |
-| **Výstup fáze 1** | `list[tuple[Token, str, bool]]` | `(sektor, role, kurátorováno?)` z `roles.curated_standardize()`. |
+| **SLOT_ARRAY** (≡ VZOR) | `str` | pole slotů: `slot·…·PIVOT·…·slot·modalita`. Hranice `^`/`$`. Fce `run.frame_sig()`. |
+| **Kurátorský zápis** | `dict` | v `curated.json`: `{ SLOT_ARRAY: {"role": str, "note": str} }`. |
+| **Výstup fáze 1** | `list[tuple[WORD_W_ATTR, str, bool]]` | `(word_w_attr, role, kurátorováno?)` z `Phase1.run()`. |
 
-### Token / SEKTOR — pole
+### WORD_W_ATTR — pole
 
 | pole | typ | příklad | zdroj |
 |---|---|---|---|
@@ -62,7 +63,7 @@ Vše je **deterministické a čisté** (bez sítě, kromě jednorázové anotace
 
 ---
 
-## 2. Krok 1a — BLOB → VĚTA → SEKTORY (anotace ÚFAL)
+## 2. Krok 1a — BLOB → VĚTA → WORD_W_ATTR_ARRAY (anotace ÚFAL)
 
 - **Vstup:** text věty z blobu.
 - **Nástroj:** **UDPipe** (`:8092`, offline), výsledek cachován v `data/annotations.pkl`.
