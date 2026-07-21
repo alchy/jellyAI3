@@ -95,6 +95,29 @@ def standardize(sent):
     cop_heads = {x["head"] for x in sent if x["deprel"] == "cop"}
     return [(t, standard_role(t, sent, byid, cop_heads)) for t in sent]
 
+# ── kurátorská DB: VZOR → ruční oprava (přebíjí standard_role u chyb ÚFALu) ───
+_CURATED = {k: v["role"] for k, v in json.load(open(
+    "/Users/j/Projects/jellyAI3/experiments/hypothesis-one/curated.json")).items()
+    if not k.startswith("_")}
+
+def curated_standardize(sent, r=2):
+    """Standardizace 1. fáze S kurátorskou opravou. Nejdřív se spočte VZOR okna;
+    je-li v kurátorské DB → OPRAVENÁ role (konzistentní, ruční), jinak standard_role.
+    Vrací [(token, role, kurátorováno?)]. Tak DB roste a známé bereme z ní."""
+    byid = _byid(sent)
+    mod = _run.sentence_modality(sent)
+    cop_heads = {x["head"] for x in sent if x["deprel"] == "cop"}
+    out = []
+    for i, t in enumerate(sent):
+        if t["upos"] == "PUNCT":
+            out.append((t, standard_role(t, sent, byid, cop_heads), False)); continue
+        vz = _run.frame_sig(sent, i, mod, r)
+        if vz in _CURATED:
+            out.append((t, _CURATED[vz], True))
+        else:
+            out.append((t, standard_role(t, sent, byid, cop_heads), False))
+    return out
+
 # ── rozklad věty na klauzule + role ─────────────────────────────────────────
 def decompose(sent):
     byid, cop_h = _byid(sent), _cop_heads(sent)

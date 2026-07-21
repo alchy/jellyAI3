@@ -1,0 +1,19 @@
+{
+  "_comment": "Kurátorská DB: VZOR (frame_sig r=2) → OPRAVENÁ role. Přebíjí standard_role u nečistých oken, kde ÚFAL nekonzistentně/chybně určuje deprel. Data (zákon 3), ručně kurátorováno. Klíč = signatura okna, hodnota = náš standardizovaný klíč + proč.",
+  "^·VERB:Past·PRON:Dat·:·PUNCT·.": {
+    "role": "to_whom",
+    "note": "dativ zájmeno (jim/mi/si) před přímou řečí = adresát; ÚFAL část značil chybně jako předmět (whom_what)"
+  },
+  "CCONJ·VERB:Past·PRON:Dat·:·PUNCT·.": {
+    "role": "to_whom",
+    "note": "totéž po souřadicí spojce (a řekl jim :)"
+  },
+  "^·PROPN:Nom·PRON:Dat·VERB:Past·:·.": {
+    "role": "to_whom",
+    "note": "podmět + dativ adresát + řekl/vyčítal + přímá řeč (Mojžíš jim řekl :)"
+  },
+  "PROPN:Nom·,·PROPN:Nom·,·PROPN:Nom·.": {
+    "role": "who",
+    "note": "výčet vlastních jmen osob = činitelé (podmět); ÚFAL část konjunktů značil jako přívlastek"
+  }
+}
