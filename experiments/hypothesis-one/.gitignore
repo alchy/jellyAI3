@@ -4,3 +4,4 @@ __pycache__/
 registry.jsonl
 candidates.json
 variants.log
+.viz.pid

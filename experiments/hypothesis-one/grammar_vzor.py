@@ -149,6 +149,11 @@ class GrammarVzor:
         Vstup: věta (list tokenů). Výstup: bool.
         Příklad: `is_factual(parse("Tak nějak nevím."))` → False.
         """
+        # KONCOVÁ otázka = není fakt. Ale stray „?" UVNITŘ věty (závorková nejistota
+        # „Vídeň ?" v definici) NESMÍ zahodit celou oznamovací větu — jinak se ztratí
+        # úvodní kopula („byla česká spisovatelka"). Sladěno se sentence_modality.
+        if self.sentence_modality(tokens) == "?":
+            return False
         for t in tokens:
             f = t.get("feats") or {}
             lem = t["lemma"].lower()
@@ -161,8 +166,6 @@ class GrammarVzor:
                     return False
             if lem == "vědět" and f.get("Polarity") == "Neg" and f.get("Person") == "1":
                 return False                                 # „nevím" = nejistota mluvčího
-            if t["upos"] == "PUNCT" and t["form"] == "?":
-                return False
         return True
 
 

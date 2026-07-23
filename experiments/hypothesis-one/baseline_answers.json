@@ -1,21 +1,21 @@
 {
- "accuracy": 0.64,
- "hits": 16,
+ "accuracy": 0.72,
+ "hits": 18,
  "n": 25,
  "outcomes": {
-  "HIT": 16,
-  "WRONG": 2,
-  "CLARIFY": 6,
+  "HIT": 18,
+  "WRONG": 1,
+  "CLARIFY": 5,
   "NO_QVZOR": 1
  },
  "ceiling": {
-  "wrong_only": 6,
-  "retrievable": 17,
+  "wrong_only": 5,
+  "retrievable": 18,
   "no_template": 2
  },
  "by_role": {
   "who": [
-   6,
+   8,
    9
   ],
   "whom_what": [
@@ -49,11 +49,11 @@
    1
   ],
   "predicate": [
-   1,
+   2,
    4
   ],
   "copula": [
-   6,
+   7,
    9
   ],
   "temporal": [
@@ -131,8 +131,8 @@
    "via": "vzor",
    "offer": [
     "Hašek",
-    "Vančura",
     "Němcová",
+    "Vančura",
     "Kundera"
    ],
    "offer_has": true,
@@ -150,14 +150,14 @@
     "barbora"
    ],
    "got": "Němcová",
-   "outcome": "CLARIFY",
+   "outcome": "HIT",
    "ceiling": "retrievable",
    "via": "vzor",
    "offer": [
     "Němcová",
-    "Barbora",
     "Šalda",
-    "Fučík"
+    "Fučík",
+    "Jaromil"
    ],
    "offer_has": true,
    "extracted": true,
@@ -178,19 +178,19 @@
     "hovor",
     "drama"
    ],
-   "got": "množství",
-   "outcome": "WRONG",
+   "got": "známka",
+   "outcome": "CLARIFY",
    "ceiling": "wrong_only",
-   "via": "pred",
+   "via": "vzor",
    "offer": [
-    "množství",
     "známka",
     "tisk",
-    "hudba"
+    "hudba",
+    "premiéra"
    ],
    "offer_has": false,
    "extracted": true,
-   "cands": 13,
+   "cands": 12,
    "doc": "wiki_karel_čapek"
   },
   {
@@ -211,13 +211,13 @@
    "via": "pred",
    "offer": [
     "šelma",
+    "zvíře",
     "mazlíček",
-    "chovaný",
-    "černý"
+    "chovaný"
    ],
    "offer_has": true,
    "extracted": true,
-   "cands": 84,
+   "cands": 86,
    "doc": "wiki_pes_domácí"
   },
   {
@@ -301,19 +301,19 @@
    "expect": [
     "spisovatelka"
    ],
-   "got": "zakladatelka",
-   "outcome": "CLARIFY",
-   "ceiling": "wrong_only",
+   "got": "spisovatelka",
+   "outcome": "HIT",
+   "ceiling": "retrievable",
    "via": "pred",
    "offer": [
+    "spisovatelka",
     "zakladatelka",
     "odkaz",
-    "malý",
-    "kontroverzní"
+    "malý"
    ],
-   "offer_has": false,
+   "offer_has": true,
    "extracted": true,
-   "cands": 28,
+   "cands": 29,
    "doc": "wiki_božena_němcová"
   },
   {
@@ -641,7 +641,7 @@
    ],
    "offer_has": true,
    "extracted": true,
-   "cands": 79,
+   "cands": 80,
    "doc": "wiki_kočka_domácí"
   }
  ]
