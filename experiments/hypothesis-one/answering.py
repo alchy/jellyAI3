@@ -340,19 +340,46 @@ class Answering:
                 return self._polar_result("ano", [f.doc, f.sent])
         return None                                          # nenašli → nehádej (ne „ne" z absence)
 
-    def answer(self, question, carry_context=False):
+    def _gate_feats(self, best, cands, known_lemmas, hole_role):
+        """Rysy VÍTĚZE pro NAUČENOU ASSURANCE bránu — má rozlišit glow-správně (Švejk→Hašek)
+        od confident-wrong (bratr→Eliáš). Base signály + glow + odstup od rivala + DOMÉNA
+        (je vítězův soubor horký, nebo cizí?) + počet kandidátů. Vstup: vítěz, kandidáti,
+        lemmata otázky, role díry. Výstup: rys-vektor (list).
+        """
+        known = {l.lower() for l in known_lemmas}
+        ans = (best["answer"] or "").lower()
+        echo = 0 if ans in known else 1
+        rf = 1 if hole_role and best["role"] == hole_role else 0
+        ko = 1 if self._known_overlap(best.get("fact_ref"), best["role"], known) else 0
+        df = 1 if best["role"] == "state" and (best.get("fact_ref") or [0, 1])[1] == 0 else 0
+        tf = 1 if hole_role == "where" and self.topos.is_place(best["answer"]) else 0
+        kp = 1 if best["kind"] == "pred" else 0
+        gb = self.field.weight_answer(best["answer"], best["doc"])
+        rivals = [self.field.weight_answer(c["answer"], c["doc"]) for c in cands
+                  if (c["answer"] or "").lower() != ans]
+        margin = gb / ((max(rivals) if rivals else 0.0) + 1e-6)      # dominance nad 2. odpovědí
+        n_ans = len({(c["answer"] or "").lower() for c in cands})
+        fmax = max(self.field.files.values(), default=1.0) or 1.0
+        doc_act = self.field.files.get(best["doc"], 0.0) / fmax      # je vítězův soubor horký?
+        return [echo, rf, ko, df, tf, kp, round(gb, 4), round(margin, 4), n_ans, round(doc_act, 4)]
+
+    def answer(self, question, carry_context=False, hole_override=None, return_features=False):
         """Živá otázka → odpověď / klarifikace / upřímný terminál (dialogový stavový automat).
 
         `carry_context=True` = interaktivní session: světlo i mount PŘETRVAJÍ mezi tahy (jen
         `decay` je utlumí), navazující otázka bez entity si vezme TÉMA z horkých entit minula
         („Kdy se narodil?" po „Kdo je Karel Čapek?" → Karel je horký → narodit-fakt Karla).
         Default False = samostatný tah (volající si pole/mount čistí sám, např. etalon).
+        `hole_override` = vnucená role díry (měření routing-stropu / naučený router místo
+        ručního _answer_role) — obejde odvození role z tvaru.
 
         Výstup: dict {answer, mode, offer, fact_ref, hole_role, candidates, via} nebo None.
         """
         toks = self._parse(question)
         q_vzor, lemmas, hole_role = self._question(toks)
         hole_role = self._answer_role(toks, hole_role)          # kopula → komplement (state)
+        if hole_override is not None:                           # router / oracle vnutí roli
+            hole_role = hole_override
         predicate = self._predicate(toks)
         if q_vzor is None and hole_role is None:            # bez tázacího slova → možná POLÁRNÍ
             pol = self._polar(toks)
@@ -406,9 +433,12 @@ class Answering:
             if carry_context:                                    # udrž téma i entity otázky horké
                 for e in known:
                     self.field.words[e] = self.field.words.get(e, 0.0) + 1.0
-        return {"answer": best["answer"], "mode": mode,
-                "offer": [c["answer"] for c in offer], "fact_ref": best.get("fact_ref"),
-                "hole_role": hole_role, "candidates": len(cands), "via": best["kind"]}
+        result = {"answer": best["answer"], "mode": mode,
+                  "offer": [c["answer"] for c in offer], "fact_ref": best.get("fact_ref"),
+                  "hole_role": hole_role, "candidates": len(cands), "via": best["kind"]}
+        if return_features:                                      # telemetrie pro naučenou bránu
+            result["features"] = self._gate_feats(best, cands, lemmas, hole_role)
+        return result
 
 
 def _demo():
