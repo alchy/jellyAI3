@@ -50,6 +50,9 @@ class Answering:
         # KVANTIFIKÁTORY („množství povídek") nejsou nikdy faktická odpověď — data v configu,
         # filtrují se z kandidátů jako echo (viz _candidates). Jazyk = JSON, ne kód.
         self.nonanswer = set(cfg.get("answering", {}).get("nonanswer_lemmas", []))
+        # ALIASY (vztah mezi tokeny = táž identita): {doc: {alias: kanon}} — sloučí rozpadlé
+        # jméno v assurance (Barbora Panklová ≡ Božena Němcová → jeden vítěz místo remízy).
+        self.aliases = self.dl._load_aliases()
 
     def _parse(self, question):
         res = self.parser._udpipe2(question)
@@ -150,6 +153,12 @@ class Answering:
         link = {l.lower() for r, lems in f.roles.items() if r != role for l in lems}
         return len(link & known)
 
+    def _canon(self, lemma, doc):
+        """Kanonická entita: alias (jiné jméno téže osoby v tomtéž dokumentu) → hlavní jméno.
+        Doc-scoped (Barbora→Němcová jen ve wiki_božena_němcová) → merge nezasáhne cizí entity."""
+        lem = (lemma or "").lower()
+        return self.aliases.get(doc, {}).get(lem, lem)
+
     def _rank(self, cands, known_lemmas, hole_role):
         """Vybere nejlepší kandidát (glow-orders-ties, jako parent).
 
@@ -210,6 +219,21 @@ class Answering:
             a = (c["answer"] or "").lower()
             if a not in best or (base, glow) > best[a][0]:
                 best[a] = ((base, glow), c, stg)
+        # SLOUČENÍ ALIASŮ (vztah mezi tokeny = táž identita): variantní jména téže osoby
+        # → kanonické, glow se SEČTE. Rozpadlá remíza („Barbora" 0.16 vs „Němcová" 0.28)
+        # se stane jasným vítězem (0.44). Blast-radius = jen kandidáti s alias variantami.
+        if self.aliases:
+            merged = {}
+            for lem, ((base, glow), c, stg) in best.items():
+                canon = self._canon(lem, c.get("doc"))
+                if canon not in merged:
+                    merged[canon] = [base, glow, c, stg]
+                else:
+                    m = merged[canon]
+                    m[1] += glow                                 # SEČTI světlo přes varianty
+                    if base > m[0] or (base == m[0] and lem == canon):
+                        m[0], m[2], m[3] = base, c, stg          # reprezentant = kanon/nejsilnější
+            best = {k: ((v[0], v[1]), v[2], v[3]) for k, v in merged.items()}
         ranked = sorted(best.values(), key=lambda x: x[0], reverse=True)
         (win_base, win_glow), win_c, win_stg = ranked[0]
         offer = [c for _bg, c, _s in ranked[:4]]

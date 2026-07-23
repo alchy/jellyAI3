@@ -118,6 +118,38 @@ class Dataloader:
                                 sc[lem] += 1
             subj[d] = dict(sc)                    # RAW počty (idf entity je konstantní → stačí count)
         pickle.dump(subj, open(os.path.join(self.index_dir, "_subjects.pkl"), "wb"))
+        # ALIASY (vztah mezi tokeny = TÁŽ identita): z ÚVODNÍ věty jmenný cluster
+        # (podmět + flat/apozice PROPN) → {alias: kanon}; kanon = dominantní podmět dokumentu.
+        # Rozpouští rozpadlé jméno v glow-remíze („Barbora Panklová ≡ Božena Němcová").
+        name_dep = ("flat", "flat:name", "flat:foreign", "appos")
+        aliases = {}
+        for d in docs:
+            first = next((rec["sentences"][0]
+                          for _k, rec in sorted(self.load_shard(d).items(), key=lambda x: x[0][1])
+                          if rec["sentences"]), None)
+            if not first:
+                continue
+            toks = list(enumerate(first, 1))          # 1-based id = cíl `head`
+            seeds = [i for i, t in toks if t["upos"] == "PROPN"
+                     and t["deprel"] in ("nsubj", "nsubj:pass", "root")]
+            cluster, frontier = set(), list(seeds)
+            while frontier:                           # zárodek + name/apozice děti (jméno téže osoby)
+                cur = frontier.pop()
+                cluster.add(cur)
+                for i, t in toks:
+                    if i not in cluster and t["head"] == cur \
+                            and t["deprel"] in name_dep and t["upos"] == "PROPN":
+                        frontier.append(i)
+            lem = {toks[i - 1][1]["lemma"].lower() for i in cluster}
+            lem = {l for l in lem if len(l) >= 2}
+            if len(lem) < 2:
+                continue
+            sc = subj.get(d, {})
+            canon = max(lem, key=lambda l: sc.get(l, 0))
+            m = {l: canon for l in lem if l != canon}
+            if m:
+                aliases[d] = m
+        pickle.dump(aliases, open(os.path.join(self.index_dir, "_aliases.pkl"), "wb"))
         # DOC-GRAF (#60 doc_links): hrany MEZI dokumenty = sdílené distinktivní entity (PROPN×idf).
         # Uplatní se při mountu jako BONUS co-mount (drží ekosystém entity: seed Čapek → i R.U.R.).
         ent = {}
@@ -155,6 +187,14 @@ class Dataloader:
             path = os.path.join(self.index_dir, "_subjects.pkl")
             self._subjects = pickle.load(open(path, "rb")) if os.path.exists(path) else {}
         return self._subjects
+
+    def _load_aliases(self):
+        """Načte alias index `{doc: {alias_lemma: kanon_lemma}}` (líně, cache).
+        Táž osoba psaná víc jmény (Barbora Panklová ≡ Božena Němcová) → jedna identita."""
+        if not hasattr(self, "_aliases"):
+            path = os.path.join(self.index_dir, "_aliases.pkl")
+            self._aliases = pickle.load(open(path, "rb")) if os.path.exists(path) else {}
+        return self._aliases
 
     def load_idf(self):
         """Načte globální idf tabulku: `{"idf": {lemma: idf}, "n": počet}`."""
