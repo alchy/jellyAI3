@@ -4,8 +4,8 @@
  "n": 25,
  "outcomes": {
   "HIT": 18,
-  "WRONG": 1,
-  "CLARIFY": 5,
+  "WRONG": 2,
+  "CLARIFY": 4,
   "NO_QVZOR": 1
  },
  "ceiling": {
@@ -213,11 +213,11 @@
     "šelma",
     "zvíře",
     "mazlíček",
-    "chovaný"
+    "příbuzný"
    ],
    "offer_has": true,
    "extracted": true,
-   "cands": 86,
+   "cands": 137,
    "doc": "wiki_pes_domácí"
   },
   {
@@ -227,19 +227,19 @@
    "expect": [
     "drama"
    ],
-   "got": "bůh",
+   "got": "jiný",
    "outcome": "CLARIFY",
    "ceiling": "wrong_only",
    "via": "vzor",
    "offer": [
+    "jiný",
+    "věrný",
     "bůh",
-    "tělo",
-    "žena",
-    "láska"
+    "tělo"
    ],
    "offer_has": false,
    "extracted": true,
-   "cands": 15,
+   "cands": 17,
    "doc": "wiki_r.u.r."
   },
   {
@@ -259,13 +259,13 @@
    "via": "pred",
    "offer": [
     "malíř",
+    "výstava",
     "soubor",
-    "odkaz",
-    "dášeňka"
+    "člen"
    ],
    "offer_has": true,
    "extracted": true,
-   "cands": 29,
+   "cands": 44,
    "doc": "wiki_josef_čapek"
   },
   {
@@ -286,12 +286,12 @@
    "offer": [
     "spisovatel",
     "léta",
-    "odkaz",
-    "aktér"
+    "část",
+    "odkaz"
    ],
    "offer_has": true,
    "extracted": true,
-   "cands": 27,
+   "cands": 38,
    "doc": "wiki_karel_čapek"
   },
   {
@@ -307,13 +307,13 @@
    "via": "pred",
    "offer": [
     "spisovatelka",
+    "ulice",
     "zakladatelka",
-    "odkaz",
-    "malý"
+    "teorie"
    ],
    "offer_has": true,
    "extracted": true,
-   "cands": 29,
+   "cands": 47,
    "doc": "wiki_božena_němcová"
   },
   {
@@ -562,19 +562,19 @@
    "expect": [
     "slovo"
    ],
-   "got": "zákon",
-   "outcome": "CLARIFY",
+   "got": "otec",
+   "outcome": "WRONG",
    "ceiling": "wrong_only",
-   "via": "vzor",
+   "via": "pred",
    "offer": [
+    "otec",
     "zákon",
     "slib",
-    "svatyně",
-    "hřích"
+    "svatyně"
    ],
    "offer_has": false,
    "extracted": true,
-   "cands": 7,
+   "cands": 8,
    "doc": "bible_jan"
   },
   {
@@ -591,13 +591,13 @@
    "via": "pred",
    "offer": [
     "počátek",
-    "pravda",
-    "vychovaný",
-    "zákon"
+    "svět",
+    "bláznovství",
+    "spolehlivý"
    ],
    "offer_has": true,
    "extracted": true,
-   "cands": 12,
+   "cands": 20,
    "doc": "bible_jan"
   },
   {
@@ -637,11 +637,11 @@
     "forma",
     "plemeno",
     "zvíře",
-    "hostitel"
+    "malý"
    ],
    "offer_has": true,
    "extracted": true,
-   "cands": 80,
+   "cands": 110,
    "doc": "wiki_kočka_domácí"
   }
  ]

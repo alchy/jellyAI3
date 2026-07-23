@@ -89,7 +89,7 @@
     "tau": 2.0
   },
   "answering": {
-    "_comment": "⑤ queryparser (answering.py). nonanswer_lemmas = KVANTIFIKÁTORY a měrová slova, která NIKDY nejsou faktická odpověď: napsal množství povídek nesmí dát odpověď množství. Filtrují se z kandidátů jako echo (odpověď=slovo otázky). Jazyk = data (nový jazyk = jiný JSON, žádný zásah do kódu).",
+    "_comment": "⑤ queryparser (answering.py). nonanswer_lemmas = KVANTIFIKÁTORY a měrová slova, která NIKDY nejsou faktická odpověď: napsal množství povídek nesmí dát odpověď množství. Filtrují se z kandidátů jako echo. interrog_lemmas = tázací slova (i ta bez PronType=Int, jako kolik) — jejich NEPŘÍTOMNOST + modalita ? značí POLÁRNÍ (ano/ne) otázku. Jazyk = data.",
     "nonanswer_lemmas": [
       "množství",
       "řada",
@@ -97,6 +97,22 @@
       "mnoho",
       "hromada",
       "počet"
+    ],
+    "interrog_lemmas": [
+      "kdo",
+      "co",
+      "kde",
+      "kam",
+      "odkud",
+      "kudy",
+      "kdy",
+      "kolik",
+      "kolikátý",
+      "jaký",
+      "který",
+      "čí",
+      "proč",
+      "jak"
     ]
   },
   "paths": {

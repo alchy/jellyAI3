@@ -74,17 +74,21 @@ class SynthRegistry:
             return None
         canon = self.g.canon_lemma
         root = next((t for t in sent if t.get("deprel") == "root"), None)
-        verb = next((t for t in sent if t.get("deprel") == "root" and t["upos"] == "VERB"), None)
-        if verb is None:
-            verb = next((t for t in sent if t["upos"] == "VERB"), None)
+        root_verb = next((t for t in sent if t.get("deprel") == "root" and t["upos"] == "VERB"), None)
+        has_cop = any(t.get("deprel") == "cop" for t in sent)
         root_nom = None
-        if verb is not None:
-            predicate = fold.get(canon(verb), canon(verb))
-        elif root is not None and root["upos"] in ("NOUN", "ADJ", "PROPN") \
-                and any(t.get("deprel") == "cop" for t in sent):
-            predicate, root_nom = self.g.LANG["copula_lemma"], root
+        if root_verb is not None:
+            predicate = fold.get(canon(root_verb), canon(root_verb))
+            verb = root_verb
+        elif root is not None and root["upos"] in ("NOUN", "ADJ", "PROPN") and has_cop:
+            # KOPULA hlavní klauzule má PŘEDNOST před slovesem VEDLEJŠÍ věty:
+            # „Králík je býložravec, který VYUŽÍVÁ…" → stav=býložravec (ne predikát využívat).
+            predicate, root_nom, verb = self.g.LANG["copula_lemma"], root, None
         else:
-            return None
+            verb = next((t for t in sent if t["upos"] == "VERB"), None)   # fallback: jakékoli sloveso
+            if verb is None:
+                return None
+            predicate = fold.get(canon(verb), canon(verb))
         mod = self.g.sentence_modality(sent)
         answers, context = [], []
         for i, t in enumerate(sent):

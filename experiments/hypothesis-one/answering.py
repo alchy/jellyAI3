@@ -53,6 +53,9 @@ class Answering:
         # ALIASY (vztah mezi tokeny = táž identita): {doc: {alias: kanon}} — sloučí rozpadlé
         # jméno v assurance (Barbora Panklová ≡ Božena Němcová → jeden vítěz místo remízy).
         self.aliases = self.dl._load_aliases()
+        # POLÁRNÍ (ano/ne) otázky: tázací lemmata (i „kolik" bez PronType=Int); jejich
+        # NEPŘÍTOMNOST + modalita ? = polární tvar (viz _polar).
+        self.interrog = set(cfg.get("answering", {}).get("interrog_lemmas", []))
 
     def _parse(self, question):
         res = self.parser._udpipe2(question)
@@ -268,6 +271,75 @@ class Answering:
                     break
         return out
 
+    def _copula_states(self, subj):
+        """Kopulové STAVY podmětu (co daný subjekt JE) — z copula faktů, kde subjekt stojí
+        v JINÉ roli než state. Pro polární „Je/Byl X Y?" (Y ∈ states → ano, jinak ne)."""
+        cop = self.g.LANG["copula_lemma"]
+        subj = set(subj)
+        states = []
+        for f in self.facts.by_predicate.get(cop, []):
+            link = {l.lower() for r, lems in f.roles.items() if r != "state" for l in lems}
+            if link & subj:
+                states += [l.lower() for l in f.roles.get("state", [])]
+        return states
+
+    def _fact_cooccur(self, subj, objs):
+        """Sejdou se PODMĚT ∈ subj a OBJEKT ∈ objs v JEDNOM faktu (napříč predikáty)?
+
+        Predikát se ZÁMĚRNĚ neváže — obchází synonymii (získat/obdržet cenu, mít/mateřství).
+        Spolu-výskyt v jednom faktu = silná evidence spoje → polární „ano". Vrací fakt / None.
+        """
+        subj, objs = set(subj), set(objs)
+        for f in self.facts.by_ref.values():
+            vals = [{l.lower() for l in lems} for lems in f.roles.values()]
+            if any(v & subj for v in vals) and any(v & objs for v in vals):
+                return f
+        return None
+
+    def _polar_result(self, ans, fact_ref=None):
+        """Odpovědní dict polární smyčky (kontrakt answer())."""
+        return {"answer": ans, "mode": "answer", "offer": [], "fact_ref": fact_ref,
+                "hole_role": "polar", "candidates": 1, "via": "polar"}
+
+    def _polar(self, toks):
+        """POLÁRNÍ (ano/ne) — uzavřená smyčka VZORŮ: tvar dotazu (přísudek+podmět+objekt,
+        modalita ?, BEZ tázacího slova) → EXISTENCE fakt-tvaru (predikát+role) → ano/ne.
+
+        Kopulová „Je/Byl X Y?": Y ∈ stavech X → ano; X stavy má, Y mezi nimi ne → ne; jinak
+        nevíme (None → nehádá). Predikátová „Napsal/Měl X Z?": fakt predikát(X,Z) existuje →
+        ano; nenašli → None (nehádá, ne „ne" z absence). Vstup: tokeny. Výstup: dict / None.
+        """
+        if not self.facts_enabled or self.g.sentence_modality(toks) != "?":
+            return None
+        if any("Int" in (t.get("feats") or {}).get("PronType", "") for t in toks):
+            return None                                      # tázací zájmeno → wh-otázka
+        if any((t["lemma"] or "").lower() in self.interrog for t in toks):
+            return None                                      # kolik/jaký/… → wh-otázka
+        subj = [self.g.canon_lemma(t).lower() for t in toks
+                if t.get("deprel") in ("nsubj", "nsubj:pass")]
+        if not subj:
+            return None
+        hot = [d for d, _s in self.dl.select_files(subj)]    # doména podmětu
+        if not hot:
+            return None
+        self.facts.mount(hot)
+        root = next((t for t in toks if t.get("deprel") == "root"), None)
+        has_cop = any(t.get("deprel") == "cop" for t in toks)
+        if has_cop and root is not None and root["upos"] in ("NOUN", "ADJ", "PROPN"):
+            obj = self.g.canon_lemma(root).lower()           # komplement „Je X <obj>?"
+            states = self._copula_states(subj)
+            if not states:
+                return None                                  # o subjektu nic → nehádej
+            hit = any(obj == s or obj in s or s in obj for s in states)
+            return self._polar_result("ano" if hit else "ne")
+        objs = [self.g.canon_lemma(t).lower() for t in toks   # predikátová polární
+                if t.get("deprel") in ("obj", "obl", "obl:arg", "xcomp", "iobj")]
+        if objs:
+            f = self._fact_cooccur(subj, objs)               # podmět+objekt v jednom faktu → ano
+            if f is not None:
+                return self._polar_result("ano", [f.doc, f.sent])
+        return None                                          # nenašli → nehádej (ne „ne" z absence)
+
     def answer(self, question, carry_context=False):
         """Živá otázka → odpověď / klarifikace / upřímný terminál (dialogový stavový automat).
 
@@ -282,6 +354,10 @@ class Answering:
         q_vzor, lemmas, hole_role = self._question(toks)
         hole_role = self._answer_role(toks, hole_role)          # kopula → komplement (state)
         predicate = self._predicate(toks)
+        if q_vzor is None and hole_role is None:            # bez tázacího slova → možná POLÁRNÍ
+            pol = self._polar(toks)
+            if pol is not None:
+                return pol
         if not (q_vzor or (predicate and hole_role)):
             return None
         known = {l.lower() for l in lemmas}
