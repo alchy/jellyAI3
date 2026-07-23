@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Termíny a klíče</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+
+<nav class="crumbs"><a href="index.html">Dokumentace</a> › Termíny a klíče</nav>
+
+<p class="eyebrow">Referenční</p>
+<h1>Termíny a klíče</h1>
+<p class="lead">Jednotný slovník, aby stejná slova znamenala totéž ve všech vrstvách i v kódu.
+Když v dokumentaci narazíš na pojem, hledej ho tady.</p>
+
+<h2>Atomy (stavební kameny)</h2>
+<p>Dvě rodiny: <b>WORD*</b> je konkrétní (skutečné slovo/token), <b>SLOT*</b> je virtuální
+(předpis, co se má trefit). Přípona <code>_ARRAY</code> znamená „pole toho".</p>
+<table>
+<tr><th>atom</th><th>typ</th><th>význam</th></tr>
+<tr><td>WORD_PLAIN</td><td>str</td><td>holé slovo / lemma („Čapek")</td></tr>
+<tr><td>WORD_PLAIN_ARRAY</td><td>list[str]</td><td>pole holých slov</td></tr>
+<tr><td>WORD_W_ATTR</td><td>dict</td><td>token s rysy (form, lemma, upos, feats, head, deprel…)</td></tr>
+<tr><td>WORD_W_ATTR_ARRAY</td><td>list[dict]</td><td>věta = pole tokenů s rysy</td></tr>
+<tr><td>SLOT</td><td>str</td><td>virtuální match jednoho místa: <code>UPOS[:CASE[:TENSE]]</code></td></tr>
+<tr><td>SLOT_ARRAY ≡ <b>VZOR</b></td><td>str</td><td>posloupnost slotů okolo jedné entity (viz níže)</td></tr>
+</table>
+
+<h2>Klíčové pojmy</h2>
+<div class="member"><p class="sig">VZOR (frame_sig)</p>
+<p>Přesný podpis okolí <b>jedné entity</b> v okně o poloměru <code>r</code>. Jméno „od slova
+vzor": je <b>přesný na gramatiku</b> (pád, slovní druh, čas), ale <b>abstraktní na lexém</b> —
+pokrytí se získává KVANTITOU přesných vzorů, ne rozmazáním jednoho. Otázka i fakt se rozloží
+na stejné VZORy → shoda = odpověď.</p></div>
+
+<div class="member"><p class="sig">DÍRA (hole)</p>
+<p>Nevyplněná role ve faktu. <b>Otázka je stín faktu s jednou dírou</b> — „Kdo napsal R.U.R.?"
+je fakt <code>napsat(?, R.U.R.)</code> s dírou v roli <i>kdo</i>. Každá otázka se musí do
+něčeho trefit, protože je stínem něčeho, co ji generovalo.</p></div>
+
+<div class="member"><p class="sig">FRAGMENT</p>
+<p>Provenienční jednotka: korpus → soubor → kapitola → odstavec. Soubor je fragment a zároveň
+<b>mountovatelná jednotka</b> (viz <a href="dynamicke-nahravani.html">dynamické nahrávání</a>).</p></div>
+
+<div class="member"><p class="sig">tf·idf (četnost × unikátnost)</p>
+<p><b>tf</b> = jak často je slovo v souboru; <b>idf</b> = jak vzácné je napříč korpusem
+(distinktivita). Součin říká „tento soubor nese toto slovo silněji než ostatní" — tím se cílí
+správné soubory k nahrání.</p></div>
+
+<div class="member"><p class="sig">FAKT ↔ OTÁZKA ↔ ODPOVĚĎ (grafikon)</p>
+<p>Cíl systému: bohatý katalog syntetických vazeb mezi fakty, otázkami a odpověďmi. Odpověď je
+sama fakt (indexuje se stejně) — proto má vlastní šablonu a princip je rekurzivní.</p></div>
+
+<h2>Rolový katalog — NAŠE KLÍČE</h2>
+<p>Do těchto klíčů se rozkládá věta (vrstva ③). Vstup je surová ÚFAL závislost
+(<code>deprel</code>), <b>náš klíč</b> = <code>role_key(deprel + pád + předložka)</code> — je
+jazykově nezávislý a jemnější než deprel. Zdroj: <code>lang/cs.json</code> → <code>role_catalog</code>.</p>
+
+<h3>Obsahové klíče</h3>
+<div style="overflow-x:auto">
+<table>
+<tr><th>náš klíč</th><th>větný člen</th><th>trefí otázku</th></tr>
+<tr><td><code>who</code></td><td>podmět — činitel (osoba)</td><td>Kdo?</td></tr>
+<tr><td><code>what_subject</code></td><td>podmět — neživá věc / jev</td><td>Co?</td></tr>
+<tr><td><code>action</code></td><td>přísudek slovesný (děj)</td><td>Co dělá?</td></tr>
+<tr><td><code>state</code></td><td>přísudek jmenný se sponou („byl králem")</td><td>Kdo/Co je?</td></tr>
+<tr><td><code>past_participle</code></td><td>příčestí činné (-l, -la, -li)</td><td>Co se stalo?</td></tr>
+<tr><td><code>passive_participle</code></td><td>příčestí trpné (-n, -t)</td><td>Co bylo uděláno?</td></tr>
+<tr><td><code>where</code></td><td>příslovečné určení místa</td><td>Kde? Kam? Odkud?</td></tr>
+<tr><td><code>when</code></td><td>příslovečné určení času</td><td>Kdy? Jak dlouho?</td></tr>
+<tr><td><code>how</code></td><td>příslovečné určení způsobu</td><td>Jak?</td></tr>
+<tr><td><code>how_much</code></td><td>příslovečné určení míry</td><td>Kolik? Jak moc?</td></tr>
+<tr><td><code>why</code></td><td>příslovečné určení příčiny (okolnost)</td><td>Proč?</td></tr>
+<tr><td><code>for_what_purpose</code></td><td>příslovečné určení účelu (záměr)</td><td>Za jakým účelem?</td></tr>
+<tr><td><code>on_what_condition</code></td><td>příslovečné určení podmínky</td><td>Za jaké podmínky?</td></tr>
+<tr><td><code>in_spite_of</code></td><td>příslovečné určení přípustky</td><td>Navzdory čemu?</td></tr>
+<tr><td><code>whose_of_what</code></td><td>předmět genitiv (2. pád)</td><td>Koho? Čeho?</td></tr>
+<tr><td><code>to_whom</code></td><td>předmět dativ (3. pád)</td><td>Komu? Čemu?</td></tr>
+<tr><td><code>whom_what</code></td><td>předmět akuzativ (4. pád)</td><td>Koho? Co?</td></tr>
+<tr><td><code>about_whom_what</code></td><td>předmět lokál (6. pád)</td><td>O kom? O čem?</td></tr>
+<tr><td><code>with_whom_what</code></td><td>předmět instrumentál (7. pád)</td><td>S kým? Čím?</td></tr>
+<tr><td><code>which_attribute</code></td><td>přívlastek (rozvíjí podstatné jméno)</td><td>Jaký? Který? Čí?</td></tr>
+<tr><td><code>as_what_state</code></td><td>doplněk (stav podmětu během děje)</td><td>Jako jaký?</td></tr>
+</table>
+</div>
+
+<h3>Strukturální klíče (lepidlo, ne obsah)</h3>
+<table>
+<tr><th>náš klíč</th><th>co je</th></tr>
+<tr><td><code>preposition</code></td><td>předložka — nese pád a směr své jmenné fráze</td></tr>
+<tr><td><code>conjunction</code></td><td>souřadicí spojka — spojuje rovnocenné členy</td></tr>
+<tr><td><code>subordinator</code></td><td>podřadicí spojka — uvozuje vedlejší větu (že, aby, když)</td></tr>
+<tr><td><code>auxiliary</code></td><td>pomocné sloveso — čas/rod/způsob přísudku</td></tr>
+<tr><td><code>copula</code></td><td>spona (být) — pojí podmět s jmenným přísudkem</td></tr>
+<tr><td><code>punctuation</code></td><td>interpunkce — koncová nese modalitu věty (. ? !)</td></tr>
+<tr><td><code>name_part</code></td><td>část víceslovného vlastního jména</td></tr>
+<tr><td><code>fixed_expr</code></td><td>součást ustáleného víceslovného výrazu</td></tr>
+</table>
+
+<h2>Klíče v použití — rozklad věty na sektory</h2>
+<p>Takhle vypadá náš klíč při kategorizaci slova. Věta se rozloží na sektory (tokeny), každý
+dostane náš klíč; sloupec <b>co je špatně</b> ukazuje, co vrstva ③ / kurátor hlídá a opravuje.
+Příklad: <i>„Odešel do galilejského města Kafarnaum a učil je v sobotu."</i></p>
+<div style="overflow-x:auto">
+<table>
+<tr><th>#</th><th>sektor</th><th>UPOS</th><th>lemma</th><th>pád</th><th>role (náš klíč)</th><th>co je špatně</th></tr>
+<tr><td>Ø</td><td>(elidovaný podmět)</td><td>—</td><td>on</td><td>Nom</td><td><code>who</code></td><td>chybí — pro-drop → Ježíš</td></tr>
+<tr><td>1</td><td>Odešel</td><td>VERB</td><td>odejít</td><td>—</td><td><code>action</code></td><td>—</td></tr>
+<tr><td>2</td><td>do</td><td>ADP</td><td>do</td><td>Gen</td><td><code>preposition</code></td><td>—</td></tr>
+<tr><td>3</td><td>galilejského</td><td>ADJ</td><td>galilejský</td><td>Gen</td><td><code>which_attribute</code></td><td>—</td></tr>
+<tr><td>4</td><td>města</td><td>NOUN</td><td>město</td><td>Gen</td><td><code>where</code></td><td>—</td></tr>
+<tr><td>5</td><td>Kafarnaum</td><td>PROPN</td><td>Kafarnaum</td><td>Nom</td><td><code>who</code></td><td>lže → má být <code>where</code></td></tr>
+<tr><td>6</td><td>a</td><td>CCONJ</td><td>a</td><td>—</td><td><code>conjunction</code></td><td>—</td></tr>
+<tr><td>7</td><td>učil</td><td>VERB</td><td>učit</td><td>—</td><td><code>action</code></td><td>—</td></tr>
+<tr><td>8</td><td>je</td><td>PRON</td><td>on</td><td>Acc</td><td><code>whom_what</code></td><td>zájmeno → doplnit „zástup"</td></tr>
+<tr><td>9</td><td>v</td><td>ADP</td><td>v</td><td>Acc</td><td><code>preposition</code></td><td>—</td></tr>
+<tr><td>10</td><td>sobotu</td><td>NOUN</td><td>sobota</td><td>Acc</td><td><code>where</code></td><td>má být <code>when</code> (v+akuz = čas)</td></tr>
+<tr><td>11</td><td>.</td><td>PUNCT</td><td>.</td><td>—</td><td><code>punctuation</code></td><td>modalita „."</td></tr>
+</table>
+</div>
+<div class="note"><span class="lbl">Poznámka:</span> chybu <code>Kafarnaum → who</code> dělal
+UDPipe 1; <b>UDPipe 2 už čte <code>Kafarnaum</code> správně jako místní modifikátor</b>
+(<code>nmod</code>). Sloupec „co je špatně" tak ukazuje typy chyb, které řeší anotace ①
+(lepší parser) a kurátor ve vrstvě ③.</div>
+
+<h2>Rysy (atributy tokenu)</h2>
+<table>
+<tr><th>rys</th><th>význam</th><th>hodnoty</th></tr>
+<tr><td>UPOS</td><td>slovní druh</td><td>NOUN, PROPN, VERB, ADJ, ADP, PRON, DET, PUNCT…</td></tr>
+<tr><td>CASE (Case)</td><td>pád</td><td>Nom, Gen, Dat, Acc, Voc, Loc, Ins (1–7)</td></tr>
+<tr><td>TENSE (Tense)</td><td>čas</td><td>Past, Pres, Fut</td></tr>
+<tr><td>NameType</td><td>typ jména</td><td>Giv/Sur → osoba, Geo → místo (zdroj entit)</td></tr>
+</table>
+<p>V dokumentaci píšeme rysy VELKÝMI (UPOS/CASE), v kódu přesně jak je dává UDPipe (Case/Tense).</p>
+
+<h2>Vrstvy a moduly</h2>
+<table>
+<tr><th>vrstva</th><th>modul (třída)</th><th>role</th></tr>
+<tr><td>① preprocessing</td><td><code>annotate_corpus.py</code> (<code>AnnotateCorpus</code>)</td><td>raw → anotovaný korpus (shardy)</td></tr>
+<tr><td>② dataloader</td><td><code>dataloader.py</code> (<code>Dataloader</code>)</td><td>tf·idf indexy + mount podle matche</td></tr>
+<tr><td>③ grammar</td><td><code>grammar_vzor.py</code>, <code>role_catalog.py</code></td><td>VZOR + rozklad na role</td></tr>
+<tr><td>④ synthesis</td><td><code>synth_registry.py</code>, <code>synth_determination.py</code></td><td>grafikon FAKT↔OTÁZKA↔ODPOVĚĎ</td></tr>
+<tr><td>⑤ queryparser</td><td><code>answering.py</code>, <code>phase1_api.py</code></td><td>živá otázka → odpověď</td></tr>
+</table>
+<p>Pravidlo pojmenování: <b>jméno modulu nese vrstvu</b>, jméno třídy odpovídá jménu souboru.
+Sdílené: <code>logger.py</code> (<code>logger(severity, message)</code>), <code>config.json</code>
+(vše konfigurovatelné, nic natvrdo).</p>
+
+<nav class="crumbs" style="margin-top:2.5rem"><a href="index.html">← zpět na rozcestník</a></nav>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,99 @@
+/* Sdílený styl dokumentace experimentu hypothesis-one.
+   Offline, bez externích zdrojů. Světlé i tmavé téma (dle OS).
+   Účel: technická dokumentace srozumitelná i juniorovi — čitelnost > efekt. */
+
+:root {
+  --bg: #f5f7f9;  --surface: #ffffff;  --ink: #1a1d21;  --muted: #5b6470;
+  --line: #e2e6ea;  --accent: #2f6f8f;  --accent-soft: #e8f0f4;
+  --in-bg: #eef1f4;  --act-bg: #e8f0f4;  --out-bg: #e8f2ec;  --ok: #327a56;
+  --code-bg: #f0f2f5;  --code-ink: #223; --warn: #9a5a2f;
+  --serif: Georgia, "Iowan Old Style", "Times New Roman", serif;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14171a;  --surface: #1c2024;  --ink: #e6e9ec;  --muted: #9aa4ae;
+    --line: #2b3138;  --accent: #74b4d0;  --accent-soft: #1d2a30;
+    --in-bg: #20262b;  --act-bg: #1d2a30;  --out-bg: #16241d;  --ok: #6fbf95;
+    --code-bg: #11151a;  --code-ink: #cdd6df; --warn: #d19a6a;
+  }
+}
+:root[data-theme="light"] {
+  --bg: #f5f7f9;  --surface: #ffffff;  --ink: #1a1d21;  --muted: #5b6470;
+  --line: #e2e6ea;  --accent: #2f6f8f;  --accent-soft: #e8f0f4;
+  --in-bg: #eef1f4;  --act-bg: #e8f0f4;  --out-bg: #e8f2ec;  --ok: #327a56;
+  --code-bg: #f0f2f5;  --code-ink: #223; --warn: #9a5a2f;
+}
+:root[data-theme="dark"] {
+  --bg: #14171a;  --surface: #1c2024;  --ink: #e6e9ec;  --muted: #9aa4ae;
+  --line: #2b3138;  --accent: #74b4d0;  --accent-soft: #1d2a30;
+  --in-bg: #20262b;  --act-bg: #1d2a30;  --out-bg: #16241d;  --ok: #6fbf95;
+  --code-bg: #11151a;  --code-ink: #cdd6df; --warn: #d19a6a;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font-family: var(--sans); line-height: 1.65;
+  font-size: 17px; -webkit-font-smoothing: antialiased;
+}
+.wrap { max-width: 880px; margin: 0 auto; padding: 2.5rem 1.4rem 5rem; }
+
+/* hlavička + drobečky */
+.crumbs { font-size: .85rem; color: var(--muted); margin-bottom: 1.5rem; }
+.crumbs a { color: var(--accent); text-decoration: none; }
+.crumbs a:hover { text-decoration: underline; }
+.eyebrow { font-family: var(--mono); font-size: .78rem; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--accent); margin: 0 0 .4rem; }
+
+h1 { font-family: var(--serif); font-weight: 600; font-size: 2.3rem;
+  line-height: 1.15; margin: 0 0 .6rem; text-wrap: balance; }
+h2 { font-family: var(--serif); font-weight: 600; font-size: 1.5rem;
+  margin: 2.6rem 0 .8rem; padding-bottom: .35rem; border-bottom: 1px solid var(--line); }
+h3 { font-size: 1.12rem; margin: 1.8rem 0 .5rem; }
+p, li { color: var(--ink); }
+.lead { font-size: 1.15rem; color: var(--muted); margin: 0 0 1.5rem; }
+a { color: var(--accent); }
+
+/* tok vstup → akce → výstup */
+.flow { display: grid; grid-template-columns: 1fr; gap: .8rem; margin: 1.4rem 0; }
+@media (min-width: 720px) { .flow { grid-template-columns: 1fr 1fr 1fr; align-items: stretch; } }
+.step { border: 1px solid var(--line); border-radius: 10px; padding: 1rem 1.1rem; }
+.step.in  { background: var(--in-bg); }
+.step.act { background: var(--act-bg); }
+.step.out { background: var(--out-bg); }
+.step .tag { font-family: var(--mono); font-size: .72rem; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--muted); display: block; margin-bottom: .4rem; }
+.step.out .tag { color: var(--ok); }
+
+/* kód */
+pre { background: var(--code-bg); color: var(--code-ink); border: 1px solid var(--line);
+  border-radius: 8px; padding: .9rem 1rem; overflow-x: auto; font-family: var(--mono);
+  font-size: .84rem; line-height: 1.5; margin: .6rem 0; }
+code { font-family: var(--mono); font-size: .88em; background: var(--code-bg);
+  padding: .1em .35em; border-radius: 4px; }
+pre code { background: none; padding: 0; }
+
+/* karta metody / třídy */
+.member { border: 1px solid var(--line); border-radius: 10px; background: var(--surface);
+  padding: 1.1rem 1.2rem; margin: 1rem 0; }
+.member .sig { font-family: var(--mono); font-size: .9rem; color: var(--accent);
+  font-weight: 600; margin: 0 0 .5rem; word-break: break-word; }
+.member .io { display: grid; grid-template-columns: max-content 1fr; gap: .2rem .8rem;
+  font-size: .9rem; margin-top: .6rem; }
+.member .io b { font-family: var(--mono); font-size: .8rem; color: var(--muted); }
+
+/* poznámky */
+.note { border-left: 3px solid var(--accent); background: var(--accent-soft);
+  padding: .7rem 1rem; border-radius: 0 8px 8px 0; margin: 1.2rem 0; font-size: .95rem; }
+.note.warn { border-left-color: var(--warn); }
+.note .lbl { font-weight: 700; }
+
+/* tabulka */
+table { border-collapse: collapse; width: 100%; margin: 1rem 0; font-size: .92rem; }
+th, td { border: 1px solid var(--line); padding: .45rem .7rem; text-align: left; vertical-align: top; }
+th { background: var(--accent-soft); font-family: var(--mono); font-size: .8rem; }
+
+.pill { display: inline-block; font-family: var(--mono); font-size: .74rem;
+  padding: .12em .5em; border-radius: 20px; background: var(--accent-soft); color: var(--accent); }

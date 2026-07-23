@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fáze ② Dataloader — dataloader.py</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+
+<nav class="crumbs"><a href="index.html">Dokumentace</a> › Fáze ② Dataloader</nav>
+
+<p class="eyebrow">Fáze ② · Dataloader</p>
+<h1>Z anotace indexy a nahrávání do grafu</h1>
+<p class="lead">Ze shardů vrstvy ① staví pro každý soubor <b>tf·idf index</b> (četnost ×
+unikátnost termínů) a globální idf. Za běhu podle slov rozhovoru vybere nejbližší soubory
+a nahraje jen je do grafu — ne celý korpus naráz.</p>
+
+<p>Soubor: <code>dataloader.py</code> · třída <code>Dataloader</code> · konfigurace: blok
+<code>dataloader</code> v <code>config.json</code> · výstup: <code>data/index/&lt;doc&gt;.pkl</code>
++ <code>_idf.pkl</code>. Koncept viz <a href="dynamicke-nahravani.html">Dynamické nahrávání</a>.</p>
+
+<h2>Příklad: vstup → akce → výstup</h2>
+<div class="flow">
+  <div class="step in"><span class="tag">vstup — shardy ①</span>
+    <pre>data/corpus/
+  bible_exodus.pkl
+  wiki_karel_čapek.pkl
+  … (13 souborů)</pre></div>
+  <div class="step act"><span class="tag">akce — indexy + výběr</span>
+    <pre>dl = Dataloader()
+dl.build_indexes()
+dl.select_files(
+  ["faraón","Hospodin"])</pre></div>
+  <div class="step out"><span class="tag">výstup — žebříček souborů</span>
+    <pre>[("bible_exodus", 0.61),
+ ("bible_zalmy",  0.28),
+ ("bible_genesis",0.13)]
++ data/index/&lt;doc&gt;.pkl</pre></div>
+</div>
+<p>Distinktivní slova (faraón, Hospodin) nasměrují správné soubory; obecná slova skoro nic
+neváží. Index každého souboru je L2-normovaný, aby délka souboru výběr nezkreslila.</p>
+
+<h2>Třída <code>Dataloader</code></h2>
+<p>Staví a čte fragmentové indexy a nahrává soubory (shardy) do grafu. Indexy jsou per-soubor
+na disku a čtou se líně, takže mechanismus unese tisíce souborů: studený soubor = jen index
+na disku, horký se namountuje.</p>
+
+<div class="member">
+  <p class="sig">Dataloader(config_path="config.json")</p>
+  <p>Načte blok <code>dataloader</code> z JSON configu (cesty ke shardům a indexům, prahy).
+  Uloží si <code>corpus_dir</code> a <code>index_dir</code> pro všechny další metody.</p>
+  <pre>dl = Dataloader()</pre>
+  <div class="io"><b>vstup</b><span>cesta ke <code>config.json</code> (volitelná)</span>
+  <b>výstup</b><span>instance vrstvy ②</span></div>
+</div>
+
+<div class="member">
+  <p class="sig">build_indexes() → dict</p>
+  <p>Přepočítá VŠECHNY staty pro dynamické nahrávání z aktuálních shardů: per-soubor tf·idf
+  indexy + globální idf. Je idempotentní — voláš ji po každém přidání raw dat (idf závisí na
+  počtu souborů, proto se přepočítává vše, ne jen nový soubor).</p>
+  <pre>dl.build_indexes()
+# [i] 2207260654 : indexy: 13 souborů, 12877 termů, práh výskytů 2
+# → {"documents": 13, "terms": 12877}</pre>
+  <div class="io"><b>vstup</b><span>shardy v <code>corpus_dir</code></span>
+  <b>výstup</b><span>indexy v <code>index_dir</code> + počty</span></div>
+</div>
+
+<div class="member">
+  <p class="sig">select_files(query_lemmas, top_files=None) → list[(doc_id, skóre)]</p>
+  <p>To je ta brána: seřadí soubory podle shody s dotazem <code>Σ teplo(slovo) ×
+  váha_souboru(slovo)</code>. Přijme seznam lemmat, nebo dict lemma→teplo; vrací nejteplejší
+  soubory sestupně, jen se skóre&nbsp;&gt;&nbsp;0, deterministicky (remízy dle jména).</p>
+  <pre>dl.select_files(["spisovatel","drama","hra"], top_files=3)
+# → [("wiki_josef_čapek", 0.13), ("wiki_r.u.r.", 0.12), ("wiki_karel_čapek", 0.08)]</pre>
+  <div class="io"><b>vstup</b><span>slova/teplo dotazu, kolik souborů</span>
+  <b>výstup</b><span>žebříček <code>(doc_id, skóre)</code></span></div>
+</div>
+
+<div class="member">
+  <p class="sig">mount(doc_ids) → dict</p>
+  <p>Nahraje shardy vybraných souborů a sloučí je do jednoho korpusu pro stavbu grafu
+  (jas + hrany). Unmount = tento slovník nedržet / u trvalého grafu zahodit fakty se
+  <code>source=doc</code>.</p>
+  <pre>corpus = dl.mount(["wiki_r.u.r.", "wiki_karel_čapek"])
+# výstup: sloučené shardy — {(doc, idx): {entities, sentences}}
+len(corpus)                  # → 373  (59 + 314 vět)
+corpus[("wiki_r.u.r.", 1)]   # → {"entities": [], "sentences": [[…]]}</pre>
+  <div class="io"><b>vstup</b><span>seznam doc_id k nahrání</span>
+  <b>výstup</b><span><code>{(doc,idx): rec}</code> přes vybrané soubory</span></div>
+</div>
+
+<div class="member">
+  <p class="sig">document_ids() → list &nbsp;·&nbsp; load_shard(doc_id) → dict &nbsp;·&nbsp; load_idf() → dict</p>
+  <p>Pomocné čtení: seznam dostupných souborů (jen názvy, levné i u tisíců), jeden shard
+  z disku, globální idf tabulka. Slouží výběru i mountu a čtou se líně.</p>
+  <pre>dl.document_ids()   # → ["bible_exodus", …, "wiki_válka_s_mloky"]
+dl.load_idf()["n"] # → 13 (počet souborů)</pre>
+  <div class="io"><b>vstup</b><span>doc_id / nic</span>
+  <b>výstup</b><span>seznam id / shard / idf tabulka</span></div>
+</div>
+
+<h2>Konfigurace (blok <code>dataloader</code>)</h2>
+<table>
+<tr><th>klíč</th><th>význam</th></tr>
+<tr><td>corpus_dir</td><td>složka se shardy vrstvy ① (vstup)</td></tr>
+<tr><td>index_dir</td><td>složka pro per-soubor indexy + <code>_idf.pkl</code> (výstup)</td></tr>
+<tr><td>min_count</td><td>práh výskytů slova V SOUBORU (odfiltruje šum hapaxů)</td></tr>
+<tr><td>top_files</td><td>výchozí počet souborů vrácených z <code>select_files</code></td></tr>
+</table>
+
+<div class="note"><span class="lbl">Souvislost:</span> formát ukládání, předdefinovaný index
+a tok za běhu popisuje <a href="dynamicke-nahravani.html">Dynamické nahrávání a formát</a>;
+jak přidat nový soubor a přepočítat staty je na <a href="anotacni-cache.html">Anotační cache</a>.</div>
+
+<nav class="crumbs" style="margin-top:2.5rem"><a href="index.html">← zpět na rozcestník</a></nav>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fúze dvou světů — parent × experiment</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  .verdict { font-size: .88rem; }
+  .take { color: var(--ok); font-weight: 600; }
+  .drop { color: var(--warn); font-weight: 600; }
+  .cmp td:first-child { font-family: var(--mono); font-size: .78rem; white-space: nowrap; }
+  .cmp { font-size: .88rem; }
+  .keepdrop { display: grid; grid-template-columns: 1fr; gap: .8rem; margin: 1.2rem 0; }
+  @media (min-width: 720px) { .keepdrop { grid-template-columns: 1fr 1fr 1fr; } }
+  .col { border: 1px solid var(--line); border-radius: 10px; padding: 1rem 1.1rem; background: var(--surface); }
+  .col h3 { margin: 0 0 .6rem; font-family: var(--mono); font-size: .82rem; letter-spacing: .08em;
+    text-transform: uppercase; }
+  .col.k h3 { color: var(--ok); }  .col.a h3 { color: var(--accent); }  .col.d h3 { color: var(--warn); }
+  .col ul { margin: 0; padding-left: 1.1rem; font-size: .9rem; }
+  .col li { margin: .35rem 0; }
+  .steps { counter-reset: k; list-style: none; padding: 0; }
+  .steps > li { border: 1px solid var(--line); border-radius: 10px; background: var(--surface);
+    padding: 1rem 1.15rem 1rem 3rem; margin: .8rem 0; position: relative; }
+  .steps > li::before { counter-increment: k; content: "K" counter(k); position: absolute;
+    left: 1rem; top: 1rem; font-family: var(--mono); font-size: .82rem; color: var(--accent); font-weight: 700; }
+  .steps .g { font-family: var(--mono); font-size: .78rem; color: var(--ok); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<nav class="crumbs"><a href="index.html">Dokumentace</a> › Fúze parent × experiment</nav>
+
+<p class="eyebrow">Studie · vzít nejlepší, zbytek zahodit</p>
+<h1>Fúze dvou světů — parent × experiment</h1>
+<p class="lead">Parent (<code>jellyai/</code>) je bohatá studnice tvořená dlouho; experiment
+(<code>hypothesis-one/</code>) je jeho <b>odlehčení</b> — čistý VZOR + aktivace bez karet. Cíl
+není nahradit, ale <b>vzít z parentu to nejlepší</b>, zbytek zahodit. Tahle stránka je srovnání
+po dimenzích a plán fúze.</p>
+
+<div class="note"><span class="lbl">Dvě zásady fúze (user):</span>
+<ol style="margin:.4rem 0 0; padding-left:1.2rem">
+<li><b>Měřením, ne vírou.</b> Převzetí konceptu je přijato, jen když <b>MĚŘENÍ</b> (gold
+otázka→odpověď / etalon) ukáže <b>paritu + ≥1 nový zelený řádek</b>. Jinak zahodit. Stejná brána
+jako u experimentů E1–E4.</li>
+<li><b>Refaktor před použitím.</b> Parent je battle-tested <b>chováním</b>, ale strukturou
+nedotažený — vznikal bez optimalizace a nabaloval se. Převzatý díl bereme jako <b>koncept /
+mechanismus</b> a přepíšeme do čistého vrstevnatého standardu experimentu (třída = soubor, data
+v JSON, <code>logger</code>, DRY). <b>Nikdy import verbatim.</b></li>
+</ol></div>
+
+<h2>Dva světy — čím každý je</h2>
+<p><b>Parent (<code>jellyai/</code>).</b> KARTY (bohaté, ale exploze složitosti → <i>kámen
+úrazu</i>) + <code>graph_answerer</code> se světlem, jednotný <code>qgraph</code> dispatch, registr
+expertů <code>claims.py</code> a doménové subsystémy <b>Mnemos / Chronos / Topos / Metron / Echo</b>
+(čtyři schopnosti jako JSON data). Nasazeno v produkci, otestované chováním.</p>
+<p><b>Experiment (<code>hypothesis-one/</code>).</b> VZOR stínové páry (FAKT×OTÁZKA×ODPOVĚĎ),
+<code>TemplateStore</code> (append-only event-log), <code>ActivationField</code> (světlo),
+<code>RoleCatalog</code> s <b>univerzálními rolovými klíči na KAŽDÉ díře</b>, <code>Dataloader</code>
+(dynamický fragmentový graf #60). Čistý, deterministický, bez karet — ale mladý a hrubý.</p>
+
+<h2>Srovnání po dimenzích</h2>
+<div style="overflow-x:auto">
+<table class="cmp">
+<tr><th>dimenze</th><th>parent (jellyai/)</th><th>experiment (hypothesis-one/)</th><th>fúzní verdikt</th></tr>
+
+<tr><td>reprezentace znalosti</td>
+<td>KARTY — bohaté, ale exploze → kámen úrazu</td>
+<td>VZOR stínové páry (FAKT×OTÁZKA×ODPOVĚĎ)</td>
+<td class="verdict"><span class="take">vzít VZOR jádro experimentu</span>; <span class="drop">zahodit karty</span></td></tr>
+
+<tr><td>dispatch</td>
+<td><code>claims.py</code> — registr <code>ExpertClaim</code> (prio, <code>recognize</code>→výsledek), hot-swap</td>
+<td>jeden <code>store.match(q_vzor)</code></td>
+<td class="verdict"><span class="take">vzít ExpertClaim registr</span> (přepsaný) jako bránu; VZOR match = fallback</td></tr>
+
+<tr><td>světlo / aktivace</td>
+<td>3-úrovňová anti-leak (funkční 0.2, renorm na max, floor cull, okno+útlum)</td>
+<td>plochá v1: funkční slova jas 1.0, spread bez renorm/floor — <b>prosakuje</b></td>
+<td class="verdict"><span class="take">vzít anti-leak</span>; <span class="drop">zahodit leaky v1</span></td></tr>
+
+<tr><td>rozhodnutí přesnosti</td>
+<td><code>glow-orders-ties</code> — base match první, glow jen řadí remízu (<code>graph_answerer:747</code>)</td>
+<td><code>max(cands, 1.0 + weight)</code> — base je KONSTANTA, <b>rozhoduje jen aktivace</b> (<code>answering.py:76</code>)</td>
+<td class="verdict"><span class="take">vzít glow-orders-ties</span> — přímo opraví „Co napsal Čapek?→Čapek"</td></tr>
+
+<tr><td>perzistence</td>
+<td>karty JSONL + <code>memory.jsonl</code> (Mnemos diář)</td>
+<td><code>TemplateStore</code> append-only event-log (per-doc, dedup, mount/unmount)</td>
+<td class="verdict"><span class="take">vzít experiment event-log</span>; Mnemos <code>persist/replay</code> ↔ <code>mount</code> 1:1</td></tr>
+
+<tr><td>rolový model</td>
+<td><code>cs.json</code> role mapy</td>
+<td><code>cs.json</code> role mapy + <b>role na KAŽDÉ díře</b> (who/where/when/how_much…)</td>
+<td class="verdict"><span class="take">sdílené</span> — experiment má navíc klíč pro routování expertů</td></tr>
+
+<tr><td>nahrávání dat</td>
+<td>statický deck karet</td>
+<td>dynamický fragmentový graf #60 (tf·idf, <code>select_files</code>, mount dle otázky)</td>
+<td class="verdict"><span class="take">vzít fragment graph experimentu</span></td></tr>
+
+<tr><td>doménové uvažování<br>(when/where/how_much)</td>
+<td>Chronos (interval), Topos (hierarchie míst), Metron (aritmetika/počet)</td>
+<td><b>PLOCHÉ</b> — VZOR+světlo, žádné uvažování o čase/prostoru/počtu</td>
+<td class="verdict"><span class="take">vzít experty</span> — přesně naše mezera (<code>where</code> = 12146 rolí!)</td></tr>
+
+<tr><td>zápis / paměť</td>
+<td>Mnemos write-path + epizodická paměť (výroky, atributy, forget)</td>
+<td>READ-ONLY nad statickým korpusem</td>
+<td class="verdict"><span class="take">vzít Mnemos</span> — největší mezera experimentu</td></tr>
+
+<tr><td>kompozice odpovědi</td>
+<td>Echo zárodek + card templates; tautology-echo guard</td>
+<td>holé lemma (<code>best.answer</code>)</td>
+<td class="verdict"><span class="take">vzít Echo compose</span> — <code>role_ask</code> šablony už v <code>cs.json</code> máme</td></tr>
+
+<tr><td>subsystémový kontrakt</td>
+<td>Iris — 4 schopnosti jako JSON data (POZNÁNÍ / KANONIZACE / AKTIVACE / ZÁZNAMY)</td>
+<td>—</td>
+<td class="verdict"><span class="take">vzít kontrakt</span> (mechanismus); <span class="drop">zahodit card-coupling</span></td></tr>
+</table>
+</div>
+
+<h2>Ověření: světlo parentu neprosakuje</h2>
+<p>User dal hypotézu: <i>„battle-tested světlo možná nemá průsak prosvícení, což je dobrá věc — to
+over."</i> <b>Ověřeno — parent průsak nemá, kontroluje ho na TŘECH úrovních:</b></p>
+<div style="overflow-x:auto">
+<table>
+<tr><th>úroveň</th><th>kde</th><th>mechanismus</th><th>náš v1</th></tr>
+<tr><td>zdroj</td><td><code>spread.py</code></td>
+<td>funkční slova jas 0.2 (ztlumená) · renormalizace na max 1.0 každý krok · okno + exp(−d/τ) · alpha 0.5 (base dominuje)</td>
+<td><span class="drop">funkční 1.0, aditivní bez renorm</span></td></tr>
+<tr><td>pole</td><td><code>activation.py</code></td>
+<td><code>floor=1e-3</code> — slabé teplo se ZAPOMENE · <code>decay=0.55</code></td>
+<td><span class="drop">bez floor</span></td></tr>
+<tr><td>rozhodnutí</td><td><code>graph_answerer:747</code></td>
+<td><code>sort(-base, -glow)</code> — <b>glow (aktivace) NIKDY nepřebije base; jen řadí remízu</b></td>
+<td><span class="drop">base = konstanta, rozhoduje jen glow</span></td></tr>
+</table>
+</div>
+<p><b>Klíč je úroveň rozhodnutí.</b> I kdyby světlo prosáklo, špatnou odpověď způsobit <b>nemůže</b> —
+struktura (VZOR match) je primární klíč, aktivace řadí jen remízu. Náš <code>answering.py:76</code>
+dělá pravý opak: <code>1.0&nbsp;+&nbsp;weight</code> je pro všechny kandidáty base 1.0, takže o vítězi
+rozhoduje <b>jen</b> aktivace → salientní entita přebije správnou roli. To je přesně náš bug
+„Co napsal Čapek? → Čapek".</p>
+
+<h2>Fúzní plán — vzít nejlepší, zbytek zahodit</h2>
+<div class="keepdrop">
+  <div class="col k"><h3>◆ Nechat (jádro experimentu)</h3>
+  <ul>
+    <li>VZOR stínové páry FAKT×OTÁZKA×ODPOVĚĎ</li>
+    <li><code>TemplateStore</code> event-log (append-only)</li>
+    <li><code>RoleCatalog</code> — univerzální role na dírách</li>
+    <li><code>Dataloader</code> fragment graph #60 (mount dle otázky)</li>
+    <li>deterministický runtime, vrstvy ①–⑤</li>
+  </ul></div>
+  <div class="col a"><h3>▲ Převzít (z parentu, po refaktoru)</h3>
+  <ul>
+    <li><b>glow-orders-ties</b> + anti-leak světla (opraví přesnost)</li>
+    <li><b>ExpertClaim registr</b> — role-routovaný dispatch</li>
+    <li><b>5 expertů dle role:</b> Chronos (when), Topos (where), Metron (how_much), Echo (compose), Mnemos (zápis)</li>
+    <li><b>Iris 4-schopnostní kontrakt</b> jako čistý mechanismus</li>
+  </ul></div>
+  <div class="col d"><h3>✕ Zahodit</h3>
+  <ul>
+    <li>KARTY (kámen úrazu — nezavádět zpět)</li>
+    <li>card-coupled rozhodovací vrstvy subsystémů</li>
+    <li>náš leaky ploché-světlo v1</li>
+    <li><code>max(1.0 + weight)</code> rozhodnutí</li>
+    <li>nabalený/neoptimalizovaný kód parentu (přepsat)</li>
+  </ul></div>
+</div>
+
+<h2>Routovací rozhraní — experti dle role díry</h2>
+<p>Experiment už tká rolový klíč na každou díru — routování je proto triviální. Kolem
+<code>store.match(q_vzor)</code> se vloží dispatch ve stylu <code>claims.py</code>:</p>
+<pre>experti řazeni prioritou; každý: recognize(text, now, role_díry) → výsledek | None
+  role == "how_much"  → Metron   (aritmetika zkratem; jinak počítání faktů)
+  role == "when"      → Chronos  (resolve_temporal interval filtr/kotva; clock_answer přímo)
+  role == "where"     → Topos    (place_within hierarchie nad kandidáty)
+  bez tázacího pivotu &amp; bez "?"  → Mnemos  (write-path: parse_statement → user shard)
+první non-None vyhrává; jinak spadne na  TemplateStore VZOR × ActivationField
+finále:  Echo.compose(role, výplně, cs.json role_ask šablony)</pre>
+<p>Experti jsou tencí — <code>Chronos/Topos/Metron</code> už berou <code>(text, now)</code> a vrací
+normalizovaný výsledek nebo None, vše ve slovníkovém JSON. Chronos i Topos navíc slouží jako
+<b>reflektory</b> do <code>ActivationField</code> (přisvítí fakty uvnitř intervalu / uvnitř oblasti),
+což sedí do modelu světla nad stíny — ne tvrdý filtr, ale světlo.</p>
+
+<h2>Pořadí kroků — každý krok MĚŘENÍM otevřený</h2>
+<p>Každý krok = <b>(a)</b> přepsat koncept do čistého standardu experimentu, <b>(b)</b> změřit na
+gold, <b>(c)</b> přijmout jen když zelené (parita + ≥1 nový zelený řádek), jinak zahodit.</p>
+<ol class="steps">
+  <li><b>Gold otázka→odpověď + harness (enabler).</b> Bez měřítka nelze nic prokázat. Ručně
+  anotovaný gold napříč doménami (Čapek, R.U.R., pes, bible), baseline = dnešní matcher.
+  <span class="g">brána: existuje tvrdé číslo přesnosti.</span></li>
+  <li><b>glow-orders-ties</b> — refaktor rozhodnutí <code>answering.py</code>: base = kvalita VZOR
+  matche (exact/fuzzy + rolový fit), glow řadí jen remízu. <span class="g">brána: přesnost ↑,
+  „Co napsal Čapek?" už ne Čapek.</span></li>
+  <li><b>Anti-leak <code>ActivationField</code></b> — idf váhy hran, renormalizace kroku, floor cull.
+  <span class="g">brána: parita/zisk, žádný regres.</span></li>
+  <li><b>ExpertClaim registr</b> — čistý přepis <code>claims.py</code> konceptu, role-routovaná
+  brána kolem <code>store.match</code>. <span class="g">brána: parita (nesmí nic rozbít).</span></li>
+  <li><b>Experti po jednom</b> — Chronos (when) · Topos (where) · Metron (how_much) · Echo (compose)
+  · Mnemos (write-path). Každý přepsán do standardu + <b>vlastní gold řádky</b> pro svou roli.
+  <span class="g">brána: jeho gold řádky zezelenají při paritě zbytku.</span></li>
+</ol>
+
+<h2>K0 hotovo — baseline změřen (8 %)</h2>
+<p>Gold set <code>gold_answers.json</code> (25 otázek napříč doménami, fakty ověřené proti
+korpusu) + harness <code>eval_answers.py</code>. Nejdřív <code>build_templates_all.py</code>
+postavil deterministické šablony pro <b>celý korpus</b> (43 540 šablon, 52 souborů — dosud jen 4).
+Dnešní matcher: <b>2/25 = 8 %</b>. Harness ke každému tahu měří i <b>strop</b> (kdyby se vynutil
+správný soubor, je odpověď mezi kandidáty?) — tím odděluje, kterou páku který řádek potřebuje:</p>
+<div style="overflow-x:auto">
+<table>
+<tr><th>strop</th><th>#</th><th>co to znamená</th><th>řeší krok</th></tr>
+<tr><td><code>retrievable</code></td><td>3</td>
+<td>správná odpověď JE mezi kandidáty, ale aktivace vybrala salientní entitu (Švejk m. Hašek, pes m. šelma) — base je konstanta, řadí jen glow</td>
+<td class="verdict"><span class="take">K1 glow-orders-ties</span> (přímý zisk +3)</td></tr>
+<tr><td><code>wrong_only</code></td><td>20</td>
+<td>i s vynuceným souborem query-VZOR nekonverguje se šablonou správného faktu — z toho <b>~11</b> je expert-gap (when 6 / where 4 / count 1: odpověď = datum/místo/počet, dnes bez uvažování) a <b>~9</b> kopula/atribut (rolová shoda VZORu)</td>
+<td class="verdict"><span class="take">K5 experti</span> (11) + <span class="take">rolový VZOR match</span> (9)</td></tr>
+<tr><td><code>no_template</code> / <code>no_qvzor</code></td><td>2</td>
+<td>„Kolik" bez tázacího pivotu; „Z jakého roku" bez query-VZORu — parse/pokrytí</td>
+<td class="verdict">Metron detekce + Ollama povrchy</td></tr>
+</table>
+</div>
+<div class="note"><span class="lbl">Klíčový nález baseline:</span> ranking (glow-orders-ties) sám
+zvedne jen <b>3 řádky</b> (8 → ~20 %). Největší jediný řez je <b>expert-gap</b> (11 řádků
+temporal/spatial/count) — přesně to, co Chronos/Topos/Metron cílí. Měření tedy potvrdilo pořadí:
+levný K1 první (opraví salient-override), ale hlavní zisk přijde s experty. Každý krok se teď
+poměřuje proti <code>baseline_answers.json</code>.</div>
+
+<h2>K1 hotovo — glow-orders-ties (8 → 12 %, +1, 0 regrese)</h2>
+<p>Refaktor rozhodnutí (<code>answering._rank</code> + <code>template_store.match_scored</code>,
+sdílené s harnessem — DRY): místo <code>max(1.0+weight)</code> teď <b>base first, glow řadí jen
+remízu</b>. Base tuple sestupně: <b>echo_ok</b> (odpověď není slovo z otázky — „Kdo je pes?"→pes je
+self-answer), <b>role_fit</b> (role kandidáta sedí na roli díry, přes týž <code>role_of</code> jako
+fakty), <b>mq</b> (exakt VZOR &gt; fuzzy), <b>glow</b> (poslední).</p>
+<p><b>Výsledek: 3/25 = 12 %</b> (baseline 8 %). Přesně předpovězený zisk: <code>„Kdo napsal
+Švejka?" → Hašek</code> — Švejk potlačen jako echo, Hašek/who bije román/what_subject. <b>Dva prior
+HITy drží → nulová regrese</b> (strict improvement).</p>
+<div class="note warn"><span class="lbl">Poctivě — cíl byl +3, dodáno +1:</span> ze 3 „retrievable"
+řádků byl jen 1 čistý predikátový případ. Zbylé 2 jsou <b>kopula</b> („Kdo je pes / Co je R.U.R."):
+tam role tázacího slova (who/what) ≠ role žádané odpovědi (<b>komplement</b>, role state), a navíc
+<code>select_files</code> přimíchá cizí doménu (odpověď „bůh" z bible). To <b>není vada
+glow-orders-ties</b> — mechanismus je prokázán správně a bez regrese; kopulový komplement +
+přesnost select_files jsou samostatný krok. Koncept <b>přijat</b> (měřením: strict improvement).
+Zbývající velké řezy: kopula 0/9 a expert-gap temporal/spatial 0/10 → <b>K5 experti</b>.</div>
+
+<h2>Pivot na predicate+role — MĚŘENO: regresuje bez koreference</h2>
+<p>Ověření hlavní zdi (window-VZOR nesouměří otázku a fakt) vedlo k pivotu na
+<b>parent-model matching</b>: fakt a otázka se potkají <b>predikátem + rolí díry</b>, nezávisle
+na slovosledu. Postaveno: <code>FactStore</code> (registry → fakty predikát + role-sloty,
+sharded #60), <code>build_facts_all.py</code> (15 912 faktů / 52 souborů), sjednocené kandidáty
+<code>pred ∪ vzor</code> pod jedním glow-orders-ties + entitní vazba (known-overlap).</p>
+<div style="overflow-x:auto">
+<table>
+<tr><th>varianta</th><th>přesnost</th><th>vs K1 (12 %)</th></tr>
+<tr><td>predicate+role (broad)</td><td>4 %</td><td class="verdict"><span class="drop">regrese</span></td></tr>
+<tr><td>+ known-overlap (entita)</td><td>4 %</td><td class="verdict"><span class="drop">regrese</span></td></tr>
+<tr><td>+ přesný guard (jen fakt s entitou)</td><td>8 %</td><td class="verdict"><span class="drop">regrese</span></td></tr>
+</table>
+</div>
+<div class="note warn"><span class="lbl">Nález (proč regrese):</span> fakty jsou <b>větně lokální
+bez koreference</b>. Pro-drop podmět → <code>napsal(Hašek, Švejk)</code> NEEXISTUJE jako jeden
+fakt („začal psát Švejka" nemá podmět; „Napsal…" jinde). Predikát+role tedy zaplaví sourozenci
+(všichni autoři) a glow mispickne; known-overlap je nespojí, protože podmět a předmět nejsou
+v jednom faktu. <b>Ale strop ukázal, že FactStore fakty ZPŘÍSTUPNIL</b> (retrievable 3 → 6) —
+směr je správný, chybí <b>resolvované podměty</b>.</div>
+<p><b>Závěr (měření rozhoduje):</b> pivot bez koreference regresuje → <b>gated OFF</b>
+(<code>config: fact_store.enabled=false</code>; substrát hotový + otestovaný, čeká). Runtime drží
+proven K1 (12 %, 0 regrese). <b>Koreference je empiricky potvrzený prerekvizit</b> — přesně
+princip „<b>díry napřed</b>". Experiment už má <code>fill_holes.py</code> + <code>gold_coref.json</code>
+(identita 43 %). <b>NEXT: koreference</b> (vyplnit pro-drop podměty do fakt-slotů) → pak
+predicate+role zapnout a přeměřit; teprve pak experti (Chronos/Topos) na naplněných faktech.</p>
+<div class="note"><span class="lbl">Rozhodnutí — FactStore zůstal staged, koreference ho ODEMKLA:</span>
+gated OFF ≠ adoptováno; koreference (aditivní k fakt-modelu) doplnila pro-drop podměty do slotů
+a substrát přežil beze změny.</p></div>
+
+<h2>Koreference do faktů — HOTOVO (pred cesta LIVE, aditivní 12 %)</h2>
+<p>Detailní plán + výsledek: <a href="koreference-do-faktu.html">Koreference do faktů</a>.
+Implementováno: <code>fill_holes.resolved_subjects</code> + obohacení faktů ve
+<code>build_facts_all</code> (2467 who-slotů doplněno) + <code>fact_store.enabled=true</code>.
+<b>12 %, 0 regrese</b> — predikátová cesta je LIVE a aditivní, dva zámky: (1) koreference vplní
+podmět (narodit-fakt Čapka nese <code>who:[Karel]</code>), (2) entitní vazba musí být v JINÉ roli
+než odpověď (guard proti slepenci <code>who:[Švejk,Olbracht]</code>; bez něj regrese 12→8 %).</p>
+<h2>Topos (expert MÍSTO) — HOTOVO (16 %, +1, 0 regrese)</h2>
+<p>Implementováno: <code>build_gazetteer.py</code> (770 lemmat míst z GEO NER),
+<code>topos.py</code> (<code>is_place</code>), signál <b>type_fit</b> v <code>_rank</code>
+(where díra → MÍSTO bije ne-místo). Výsledek: <b>„Kde se narodil Karel Čapek?" → Svatoňovice ✓</b>
+(place bije <code>rodina</code>). Řez where 0/4 → 1/4, gold <b>16 %</b>, nulová regrese.</p>
+<p><b>Zbylé 3 where míří na extrakci/koreferenci, ne Topos:</b> Josefovo místo (Hronov) není
+vytěženo jako where-slot; Karlovo úmrtí (Praha) je v závorce, ne v klauzuli <code>zemřít</code>;
+Haškův pro-drop se resolvoval na „rod" (potřeba doc-protagonista prior). Topos svou práci (typ)
+udělal; tohle je další vrstva.</p>
+<div class="note"><span class="lbl">Měřená stoupavá křivka (každý krok aditivní):</span>
+K0 8 % → K1 glow-orders-ties 12 % → koreference do faktů 12 % (správné fakty) → Topos 16 %.
+Predikátová cesta je LIVE; každý expert/prereq konvertuje řez pod přímým měřením.</p></div>
+
+<h2>Co to řeší (mapa na K dořešení)</h2>
+<ul>
+<li><a href="k-doreseni.html">Rolová shoda VZORu + aktivace přepíná na salientní entitu</a> →
+řeší <b>K2 glow-orders-ties</b> (base first) + <b>K3 anti-leak</b>.</li>
+<li><b>Ploché when/where/how_much</b> (dnes bez uvažování) → řeší <b>K5 experti</b>
+(Chronos/Topos/Metron) routovaní rolí díry.</li>
+<li><b>Read-only nad korpusem</b> (žádný zápis) → řeší <b>Mnemos write-path</b> nad
+<code>TemplateStore</code> event-logem.</li>
+<li><b>Holá odpověď (lemma)</b> → řeší <b>Echo compose</b> přes <code>role_ask</code> šablony.</li>
+</ul>
+
+<div class="note warn"><span class="lbl">Klíčová zásada:</span> nic se nepřebírá na víru. Parent
+ukazuje SMĚR (co funguje chováním); MĚŘENÍ na experimentu rozhoduje, zda přebrání přijmout. A přebírá
+se jako <b>refaktorovaný koncept</b>, ne nabalený kód.</div>
+
+<nav class="crumbs" style="margin-top:2.5rem"><a href="index.html">← zpět na rozcestník</a></nav>
+
+</div>
+</body>
+</html>

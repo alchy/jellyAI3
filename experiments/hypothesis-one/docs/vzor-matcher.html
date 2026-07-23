@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VZOR matcher — šablony × aktivace</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+
+<nav class="crumbs"><a href="index.html">Dokumentace</a> › VZOR matcher — šablony × aktivace</nav>
+
+<p class="eyebrow">Design · důležitá fáze · sjednocení dvou světů</p>
+<h1>VZOR matcher — šablony × aktivace</h1>
+<p class="lead">Vyvrcholení celého oblouku: persistentní šablony <b>FAKT-VZOR × QUERY-VZOR ×
+ODPOVĚĎ</b>, nad nimiž běží <b>VZOR matcher</b> — strukturu (stín) najde VZOR, mezi
+překrývajícími se stíny rozhodne <b>AKTIVACE</b> (světlo z kontextu rozhovoru).</p>
+
+<h2>Princip: stín × světlo</h2>
+<p>Výchozí věta systému: <i>„každá otázka se musí do něčeho trefit, protože je stínem něčeho,
+co ji generovalo."</i> Dodatek principu stínu:</p>
+<ul>
+<li><b>VZOR = STÍN (struktura).</b> Query-VZOR otázky trefí shadow-pár šablony. Vrátí VŠECHNY
+strukturně shodné → mohou to být překrývající se stíny.</li>
+<li><b>AKTIVACE = SVĚTLO (kontext).</b> Slova rozhovoru rozsvítí soubory a entity; mezi
+překrývajícími se stíny rozhodne, který je právě osvětlený.</li>
+</ul>
+<pre>odpověď = argmax( vzor_fit(šablona) × aktivace(šablona) )</pre>
+<div class="note"><span class="lbl">Neztratit Boha:</span> aktivace drží TÉMA přes stíny —
+stejný mechanismus, který v koreferenci držel Slovo přes prolog (kotva identity), tady rozhoduje
+mezi kandidáty odpovědi. Viz <a href="koreference.html">Koreference</a>.</div>
+
+<h2>Persistentní jednotka — <code>QueryTemplate</code></h2>
+<p>Jeden shadow-pár = jeden řádek. Šablony jsou <b>SHARDOVANÉ per zdrojový soubor</b>
+(<code>data/templates/&lt;doc&gt;.jsonl</code>) — stejně jako korpus — aby se daly NAHRÁT
+DLE OTÁZKY (jen horké soubory, koncept #60). Append-only (event-log, mergeable,
+přírůstkově), deduplikace dle <code>id</code>:</p>
+<pre>{
+  "id":         "hash(fact_ref, role, query_vzor)",   // stabilní, dedup
+  "fact_vzor":  "PROPN:Nom·VERB:Past·PROPN:Acc·.",     // ŠABLONA FAKTU (díra)
+  "query_vzor": "^·PRON:Nom·VERB:Past·?",              // ŠABLONA OTÁZKY
+  "role":       "who",                                  // role díry
+  "answer":     "Čapek",                                // ODPOVĚĎ (hodnota slotu)
+  "surface_q":  "Kdo napsal R.U.R.?",                   // povrch otázky (Ollama)
+  "fact_ref":   ["wiki_r.u.r.", 3],                     // provenience (doc, věta)
+  "origin":     "ollama"                                // ollama | deterministic
+}</pre>
+<p>To je přesně <b>FAKT-VZOR × QUERY-VZOR × ODPOVĚĎ</b> — samostatné, matchovatelné, s proveniencí.</p>
+
+<h2>Struktury šablonou-řízených prvků</h2>
+<table>
+<tr><th>prvek</th><th>struktura</th><th>role</th></tr>
+<tr><td>persistence</td><td><code>QueryTemplate</code> řádky (append-only JSONL, dedup dle id)</td><td>shadow-páry FAKT × VZOR × ODPOVĚĎ</td></tr>
+<tr><td>vyčítáno</td><td><code>TemplateStore</code> (indexy by_query_vzor / by_fact_vzor)</td><td>VZOR matcher</td></tr>
+<tr><td>aktivace</td><td><code>ActivationField</code> (files/entities/words, decay, feed, weight, reinforce)</td><td>světlo nad stíny</td></tr>
+<tr><td>statistiky</td><td><code>TemplateStats</code> (meta.json)</td><td>měření pokrytí / saturace</td></tr>
+</table>
+
+<h3><code>TemplateStore</code> — VZOR matcher s dynamickým nahráváním</h3>
+<pre>class TemplateStore:
+    append(doc, tpl)                      # persistence: šardy per soubor (append-only, dedup id)
+    mount(doc_ids)                        # DLE OTÁZKY nahraj jen šablony HORKÝCH souborů (#60)
+    unmount(doc_ids)                      # studený soubor = šardy zase zahodit
+    match(query_vzor)  → [tpl]            # match jen nad NAMOUNTOVANÝMI (exakt + fuzzy překryv)
+    match_fact(fact_vzor) → [tpl]         # druhý směr: strukturální stín
+    answer(question, field) → (fakt, ODPOVĚĎ, jistota)
+  indexy (build on mount, jen horké):
+    by_query_vzor: {vzor → [tpl]}         # klíč matcheru
+    by_fact_vzor:  {vzor → [tpl]}</pre>
+<p>Studený soubor = jen šarda na disku; horký se namountuje. Matcher nikdy nedrží celý korpus
+šablon — jen to, co otázka rozsvítí. Škáluje na tisíce souborů (past #60 F4).</p>
+
+<h3><code>ActivationField</code> — SPREADING nad váženým grafem vazeb</h3>
+<p>Ne jen per-uzel teplo — aktivace <b>TEČE po hranách s VÁHOU</b> (spreading / light-beam).
+To plně využívá graf back-end (mesh, doc_links, shadow-páry, koreference):</p>
+<pre>class ActivationField:
+    nodes: {id → teplo}          # slova / soubory / entity / fakty
+    edges: {(a,b) → váha}        # HRANY s vahou (viz „graf vazeb" níže)
+    feed(question_lemmas, dataloader)   # rozsvítí slova (tf·idf) + soubory (brána ②)
+    spread()                            # teplo teče po hranách × VÁHA (mesh λ^d, doc_links, koref)
+    decay()                             # útlum mezi tahy
+    weight(tpl) → float                 # aktivace šablony = teplo(doc)+teplo(answer) PO spreadu
+    reinforce(tpl)                      # odpověď zpětně přihřeje po hranách (řetěz)</pre>
+
+<h3>Graf vazeb — hrany a váhy</h3>
+<p>Vše je uzly + <b>vážené hrany</b>; aktivace se šíří po nich. Většina hran už žije:</p>
+<div style="overflow-x:auto">
+<table>
+<tr><th>vazba (hrana)</th><th>mezi</th><th>váha</th><th>kde žije</th></tr>
+<tr><td>adjacence / mesh</td><td>slovo ↔ slovo</td><td>co-occurrence · λ^d (útlum vzdáleností)</td><td>run.py <code>adj</code> + mesh</td></tr>
+<tr><td>doc-links</td><td>soubor ↔ soubor</td><td>sdílené entity</td><td><code>graph.doc_links</code> (#60)</td></tr>
+<tr><td>tf·idf</td><td>soubor ↔ slovo</td><td>tf × idf</td><td>② dataloader index</td></tr>
+<tr><td><b>shadow-pár</b></td><td>fakt ↔ otázka</td><td>VZOR fit</td><td><code>QueryTemplate</code></td></tr>
+<tr><td>koreference / relace</td><td>entita ↔ entita</td><td>asociace (kontext, těžiště)</td><td>fill_holes / kontext fakty</td></tr>
+</table>
+</div>
+<p><b>Aktivace × VZOR:</b> teplo se rozsvítí ze slov otázky, <b>rozteče po vážených hranách</b>
+(hot slovo přihřeje sousedy meshem, hot soubor linkované soubory, hot entita příbuzné), a
+mezi VZOR-kandidáty rozhodne to, které místo grafu je nejvíc osvětlené. Odpověď zpětně
+přihřeje po hranách → kontext drží řetěz.</p>
+
+<h3>Statistiky — <code>TemplateStats</code> (<code>meta.json</code>)</h3>
+<pre>{ "templates": 5321, "distinct_query_vzor": 214, "distinct_fact_vzor": 340,
+  "roles": {"who": 1203, "where": 640, …},
+  "complete_rate": 0.78,                        // podíl faktů s kompletním setem
+  "saturation": [[20,80],[40,140],[60,175]],    // křivka distinktních VZORů
+  "top_query_vzor": [["^·PRON:Nom·VERB:Past·?", 312], …] }</pre>
+
+<h2>Matcher s aktivací a dynamickým nahráním (runtime ⑤)</h2>
+<div class="flow">
+  <div class="step in"><span class="tag">vstup — živá otázka</span>
+    <pre>"Co napsal Čapek?"
+→ lemmata + query-VZOR</pre></div>
+  <div class="step act"><span class="tag">akce — NAHRAJ × VZOR × aktivace</span>
+    <pre>hot = select_files(lemmata)  # ② brána DLE OTÁZKY
+store.mount(hot)             # NAHRAJ jen horké
+field.feed(lemmata, …)       # rozsvícení
+cands = store.match(q_vzor)  # stín nad namount.
+best  = max(cands,
+  vzor_fit × field.weight)   # × aktivace</pre></div>
+  <div class="step out"><span class="tag">výstup — fakt + ODPOVĚĎ</span>
+    <pre>fakt: „…napsal R.U.R."
+odpověď: R.U.R.
++ field.reinforce(best)</pre></div>
+</div>
+<p>Krok „NAHRAJ" je klíč: matcher <b>dle otázky nahraje dataset</b> — distinktivní slova otázky
+rozsvítí soubory (tf·idf brána ②) a mountnou se jen jejich šablony. Detail formátu a indexů:
+<a href="dynamicke-nahravani.html">Dynamické nahrávání a formát</a>.</p>
+
+<h2>Aktivace — co UŽ máme (jen zapojit)</h2>
+<table>
+<tr><th>zdroj aktivace</th><th>kde žije</th><th>stav</th></tr>
+<tr><td>soubory (tf·idf brána)</td><td><code>dataloader.select_files</code> (②)</td><td>hotové, cílí správně</td></tr>
+<tr><td>entity / těžiště</td><td>mechanismus z <code>fill_holes</code> (pole + kotva identity)</td><td>hotové (43 % na tvrdém gold)</td></tr>
+<tr><td>slova / jas uzlů</td><td>tf·idf (run.py / dataloader)</td><td>hotové</td></tr>
+</table>
+
+<h2>Sjednocení dvou světů</h2>
+<p>Tohle je to „sloučit dva světy" z počátku:</p>
+<ul>
+<li><b>svět rámců/VZORů</b> (přesná struktura, stíny, grafikon) — <code>synth_*</code> + <code>TemplateStore</code>;</li>
+<li><b>svět grafu/aktivace</b> (kontext, těžiště, brána souborů, light-beam) — <code>dataloader</code> + <code>ActivationField</code>.</li>
+</ul>
+<p><b>VZOR najde kandidáty, aktivace vybere ten osvětlený.</b> Struktura je přesná (mnoho VZORů,
+ne rozostření), kontext je měkký (decay, těžiště) — dohromady stín × světlo.</p>
+
+<h2>Zapadnutí do vrstev a stav</h2>
+<table>
+<tr><th>vrstva</th><th>role v matcheru</th><th>stav</th></tr>
+<tr><td>② dataloader</td><td>brána souborů = aktivace <code>files</code></td><td>hotové</td></tr>
+<tr><td>③ grammar</td><td>query-VZOR + fakt-VZOR (<code>frame_sig</code>)</td><td>hotové</td></tr>
+<tr><td>④ synthesis</td><td><code>synth_queries</code> → shardované <code>QueryTemplate</code> (deterministic transpozice + Ollama)</td><td>✅ hotové + testované</td></tr>
+<tr><td>persist</td><td><code>template_store.py</code> (<code>TemplateStore</code>, <code>QueryTemplate</code>, stats)</td><td>✅ hotové (append/mount/match/stats)</td></tr>
+<tr><td>aktivace</td><td><code>activation_field.py</code> (<code>ActivationField</code>: build_graph/feed/spread/weight/reinforce)</td><td>✅ hotové + testované</td></tr>
+<tr><td>⑤ queryparser</td><td><code>answering.py</code> (<code>Answering.answer</code>): nahraj → VZOR × aktivace → odpověď</td><td>✅ KOSTRA běží end-to-end (přesnost hrubá)</td></tr>
+</table>
+
+<div class="note"><span class="lbl">Poctivě:</span> šablony (④) se staví (Ollama vzorkový batch,
+měří saturaci query-VZORů); <code>TemplateStore</code>/<code>ActivationField</code> jsou navržené,
+implementace navazuje. Aktivační zdroje (② brána, těžiště) už žijí — jde o zapojení, ne stavbu znovu.</div>
+
+<nav class="crumbs" style="margin-top:2.5rem"><a href="index.html">← zpět na rozcestník</a></nav>
+
+</div>
+</body>
+</html>

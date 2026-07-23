@@ -1,0 +1,35 @@
+{
+  "_comment": "Gold set koreference — ručně rozřešené díry (etalon PŘESNOSTI, ne fill rate). Ručně anotováno z textu, ne z resolveru. Klíč [doc, věta_k, token_i] (věta_k = index ve větách dokumentu seřazených dle části). expected = lemma antecedenta (PROPN kapitálkou, NOUN malými); '+' = plurál dvou entit (porovnává se jako množina).",
+  "items": [
+    {"key": ["bible_jan", 1, 0],  "form": "To",     "cat": "dem",     "expected": "slovo"},
+    {"key": ["bible_jan", 2, 3],  "form": "ně",     "cat": "pron3",   "expected": "slovo"},
+    {"key": ["bible_jan", 2, 6],  "form": "něho",   "cat": "pron3",   "expected": "slovo"},
+    {"key": ["bible_jan", 3, 1],  "form": "něm",    "cat": "pron3",   "expected": "slovo"},
+    {"key": ["bible_jan", 4, 7],  "form": "je",     "cat": "pron3",   "expected": "světlo"},
+    {"key": ["bible_jan", 6, 0],  "form": "Ten",    "cat": "dem",     "expected": "člověk"},
+    {"key": ["bible_jan", 6, 17], "form": "něho",   "cat": "pron3",   "expected": "člověk"},
+    {"key": ["bible_jan", 8, 10], "form": "to",     "cat": "dem",     "expected": "světlo"},
+    {"key": ["bible_jan", 9, 6],  "form": "něj",    "cat": "pron3",   "expected": "slovo"},
+    {"key": ["bible_jan", 9, 11], "form": "ho",     "cat": "pron3",   "expected": "slovo"},
+    {"key": ["bible_jan", 10, 0], "form": "Přišel", "cat": "prodrop", "expected": "slovo"},
+    {"key": ["bible_jan", 10, 6], "form": "jeho",   "cat": "poss3",   "expected": "slovo"},
+    {"key": ["bible_jan", 10, 8], "form": "ho",     "cat": "pron3",   "expected": "slovo"},
+    {"key": ["bible_jan", 11, 4], "form": "ho",     "cat": "pron3",   "expected": "slovo"},
+    {"key": ["bible_jan", 11, 9], "form": "jeho",   "cat": "poss3",   "expected": "slovo"},
+    {"key": ["bible_jan", 11, 12],"form": "dal",    "cat": "prodrop", "expected": "slovo"},
+
+    {"key": ["bible_matous", 8, 6],  "form": "Jeho",   "cat": "poss3",   "expected": "Ježíš"},
+    {"key": ["bible_matous", 9, 7],  "form": "ji",     "cat": "pron3",   "expected": "Maria"},
+    {"key": ["bible_matous", 10, 11],"form": "mu",     "cat": "pron3",   "expected": "Josef"},
+    {"key": ["bible_matous", 11, 4], "form": "mu",     "cat": "pron3",   "expected": "syn"},
+    {"key": ["bible_matous", 13, 7], "form": "učinil", "cat": "prodrop", "expected": "Josef"},
+    {"key": ["bible_matous", 14, 1], "form": "nežili", "cat": "prodrop", "expected": "Josef+Maria"},
+
+    {"key": ["bible_lukas", 3, 0],  "form": "Neměli", "cat": "prodrop", "expected": "Zachariáš+Alžběta"},
+    {"key": ["bible_lukas", 4, 8],  "form": "on",     "cat": "pron3",   "expected": "Zachariáš"},
+    {"key": ["bible_lukas", 7, 1],  "form": "ho",     "cat": "pron3",   "expected": "anděl"},
+    {"key": ["bible_lukas", 7, 5],  "form": "zděsil", "cat": "prodrop", "expected": "Zachariáš"},
+    {"key": ["bible_lukas", 7, 10], "form": "něho",   "cat": "pron3",   "expected": "Zachariáš"},
+    {"key": ["bible_lukas", 8, 1],  "form": "mu",     "cat": "pron3",   "expected": "Zachariáš"}
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "_comment": "GOLD otázka→odpověď (K0 fúze). Ručně anotováno, fakty OVĚŘENÉ proti korpusu (data/corpus). answer = seznam přijatelných povrchů/lemmat (alias-aware, lower). role = očekávaná role díry (pro rozpad po roli). kind = predicate|copula|attribution|temporal|spatial|count (pro rozpad po typu — ukazuje, kterou fúzní páku který řádek potřebuje). doc = zdroj (diagnostika extrakce). Baseline se měří harnessem eval_answers.py; každý fúzní krok prokazuje zisk na příslušném řezu.",
+  "items": [
+    {"q": "Kdo napsal drama R.U.R.?", "role": "who", "answer": ["čapek", "karel"], "doc": "wiki_r.u.r.", "kind": "attribution", "note": "genitiv 'Karla Čapka', sloveso napsat v textu není"},
+    {"q": "Kdo navrhl slovo robot?", "role": "who", "answer": ["josef", "čapek", "bratr"], "doc": "wiki_r.u.r.", "kind": "predicate", "note": "'navrhl jeho bratr Josef Čapek'"},
+    {"q": "Kdo napsal Švejka?", "role": "who", "answer": ["hašek", "jaroslav"], "doc": "wiki_jaroslav_hašek", "kind": "predicate", "note": "'začal psát ... Švejka'"},
+    {"q": "Kdo napsal Babičku?", "role": "who", "answer": ["němcová", "božena", "barbora"], "doc": "wiki_božena_němcová", "kind": "predicate", "note": "'napsala povídku Babička'"},
+    {"q": "Co napsal Karel Čapek?", "role": "whom_what", "answer": ["r.u.r.", "mlok", "válka", "bílý", "nemoc", "matka", "hovor", "drama"], "doc": "wiki_karel_čapek", "kind": "predicate", "note": "PŘEDMĚTNÁ role — demo cíl glow-orders-ties (dnes vrací Čapek)"},
+    {"q": "Kdo je pes domácí?", "role": "who", "answer": ["šelma", "savec", "masožravec", "prstochodec", "živočich", "tvor"], "doc": "wiki_pes_domácí", "kind": "copula", "note": "mnoho 'pes je X'"},
+    {"q": "Co je R.U.R.?", "role": "what", "answer": ["drama"], "doc": "wiki_r.u.r.", "kind": "copula", "note": "'R.U.R. ... je ... drama'"},
+    {"q": "Kdo je Josef Čapek?", "role": "who", "answer": ["malíř", "grafik", "ilustrátor", "spisovatel", "bratr"], "doc": "wiki_josef_čapek", "kind": "copula", "note": "'byl český malíř'"},
+    {"q": "Kdo je Karel Čapek?", "role": "who", "answer": ["spisovatel", "dramatik", "novinář", "intelektuál", "překladatel"], "doc": "wiki_karel_čapek", "kind": "copula"},
+    {"q": "Kdo je Božena Němcová?", "role": "who", "answer": ["spisovatelka"], "doc": "wiki_božena_němcová", "kind": "copula", "note": "'byla česká spisovatelka'"},
+    {"q": "Kdy se narodil Karel Čapek?", "role": "when", "answer": ["1890"], "doc": "wiki_karel_čapek", "kind": "temporal", "note": "expert gap — Chronos"},
+    {"q": "Kdy zemřel Karel Čapek?", "role": "when", "answer": ["1938"], "doc": "wiki_karel_čapek", "kind": "temporal", "note": "expert gap — Chronos"},
+    {"q": "Kdy se narodil Josef Čapek?", "role": "when", "answer": ["1887"], "doc": "wiki_josef_čapek", "kind": "temporal", "note": "expert gap — Chronos"},
+    {"q": "Kdy se narodil Jaroslav Hašek?", "role": "when", "answer": ["1883"], "doc": "wiki_jaroslav_hašek", "kind": "temporal", "note": "expert gap — Chronos"},
+    {"q": "Z jakého roku je drama R.U.R.?", "role": "when", "answer": ["1920"], "doc": "wiki_r.u.r.", "kind": "temporal", "note": "expert gap — Chronos"},
+    {"q": "Kdy měla premiéru hra R.U.R.?", "role": "when", "answer": ["1921"], "doc": "wiki_r.u.r.", "kind": "temporal", "note": "expert gap — Chronos"},
+    {"q": "Kde se narodil Karel Čapek?", "role": "where", "answer": ["svatoňovice", "malý"], "doc": "wiki_karel_čapek", "kind": "spatial", "note": "expert gap — Topos"},
+    {"q": "Kde zemřel Karel Čapek?", "role": "where", "answer": ["praha"], "doc": "wiki_karel_čapek", "kind": "spatial", "note": "expert gap — Topos"},
+    {"q": "Kde se narodil Josef Čapek?", "role": "where", "answer": ["hronov"], "doc": "wiki_josef_čapek", "kind": "spatial", "note": "expert gap — Topos"},
+    {"q": "Kde se narodil Jaroslav Hašek?", "role": "where", "answer": ["praha"], "doc": "wiki_jaroslav_hašek", "kind": "spatial", "note": "expert gap — Topos"},
+    {"q": "Kolik měla dětí Božena Němcová?", "role": "how_much", "answer": ["čtyři", "4"], "doc": "wiki_božena_němcová", "kind": "count", "note": "expert gap — Metron; těžké"},
+    {"q": "Co bylo na počátku?", "role": "what_subject", "answer": ["slovo"], "doc": "bible_jan", "kind": "copula", "factual": false, "note": "TEOLOGICKÉ — ne deterministický fakt (user); z etalonu vyňato"},
+    {"q": "Kdo byl Slovo?", "role": "who", "answer": ["bůh", "počátek"], "doc": "bible_jan", "kind": "copula", "factual": false, "note": "TEOLOGICKÉ — vyňato; „počátek\" (Na počátku bylo Slovo) je stejně platný fakt jako „Bůh\" (user)"},
+    {"q": "Čím se stalo Slovo?", "role": "what", "answer": ["tělo"], "doc": "bible_jan", "kind": "copula", "factual": false, "note": "TEOLOGICKÉ — vyňato z etalonu"},
+    {"q": "Co je kočka domácí?", "role": "what", "answer": ["forma", "zástupce", "lovec"], "doc": "wiki_kočka_domácí", "kind": "copula", "note": "kočka popsána jako 'domestikovaná forma' — volnější gold"}
+  ]
+}

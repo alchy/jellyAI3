@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fáze ① Preprocessing — annotate_corpus.py</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+
+<nav class="crumbs"><a href="index.html">Dokumentace</a> › Fáze ① Preprocessing</nav>
+
+<p class="eyebrow">Fáze ① · Preprocessing</p>
+<h1>Z surového textu anotovaný korpus</h1>
+<p class="lead">Jediný vstup je čistý text, výstup je anotovaný korpus <b>rozdělený po
+souborech</b>, na kterém stojí všechny další vrstvy. Anotujeme <b>jednou předem</b>
+nástrojem UDPipe 2 a uložíme; za běhu dotazu se korpus už jen čte.</p>
+
+<p>Soubor: <code>annotate_corpus.py</code> · třída <code>AnnotateCorpus</code> ·
+konfigurace: blok <code>preprocessing</code> v <code>config.json</code> ·
+výstup: <code>data/corpus/&lt;doc&gt;.pkl</code> (jeden shard na zdrojový soubor).</p>
+
+<h2>Příklad: vstup → akce → výstup</h2>
+<p>Vezmeme jednu větu z dokumentu <code>wiki_r.u.r.</code> a projdeme ji celou fází.</p>
+
+<div class="flow">
+  <div class="step in">
+    <span class="tag">vstup — raw text</span>
+    <p style="margin:0">Kus souboru <code>data/raw/wiki_r.u.r..txt</code>:</p>
+    <pre>Autor v příběhu varuje před
+případnými negativními vlivy
+techniky na lidstvo.</pre>
+  </div>
+  <div class="step act">
+    <span class="tag">akce — UDPipe 2</span>
+    <p style="margin:0">Plná pipeline (tokenizace → segmentace vět → morfologie →
+    závislostní rozbor) přes REST, výsledek se rozparsuje na tokeny a odvodí se entity.</p>
+    <pre>AnnotateCorpus() \
+  .annotate_document(
+     "wiki_r.u.r.", raw)</pre>
+  </div>
+  <div class="step out">
+    <span class="tag">výstup — shard data/corpus/wiki_r.u.r..pkl</span>
+    <pre>("wiki_r.u.r.", 1): {
+ "entities": [],
+ "sentences": [[
+  {form:"Autor", lemma:"autor",
+   upos:"NOUN", deprel:"nsubj",
+   head:4, feats:{Case:"Nom"…},
+   start:137, end:142}, …]]}</pre>
+  </div>
+</div>
+
+<p>Klíč záznamu je dvojice <code>(doc_id, index_věty)</code>. Hodnota má dva klíče:
+<code>sentences</code> (seznam vět, každá věta je seznam tokenů) a <code>entities</code>
+(pojmenované entity věty). Token nese tvar, lemma (základní tvar), slovní druh
+<code>upos</code>, morfologické rysy <code>feats</code>, závislostní hranu
+<code>deprel → head</code> a znakové offsety <code>start/end</code>.</p>
+
+<div class="note"><span class="lbl">Názvosloví — surová anotace vs naše klíče:</span> shard
+nese <b>původní názvosloví UDPipe</b> (<code>deprel</code> = nsubj/obl…, <code>upos</code> =
+PROPN…, <code>feats</code> = Case/Tense). Vrstva ① je <b>věrná anotace a nenormalizuje</b> —
+surový <code>deprel</code> je potřeba dál. Převod na <b>naše klíče</b> (<code>who</code> /
+<code>where</code> / …) dělá až vrstva ③ přes <code>role_key(deprel + pád + předložka)</code>
+(tabulka <code>deprel_to_role</code> v <code>lang/cs.json</code>) — viz
+<a href="terminy.html">Termíny → Rolový katalog</a>. Proto shard drží surové názvosloví:
+z <code>deprel + pád</code> se náš klíč odvodí kdykoli, opačně ne.</div>
+
+<div class="note"><span class="lbl">Díry (placeholdery):</span> zájmena a elidovaný podmět
+(„on", „jeho", Ø) jsou DÍRY — ukazují na entitu nepojmenovanou v klauzuli. Detekují se
+<b>ÚFAL rysem</b> (ne seznamem tvarů: <code>ho/mu/jemu…</code> ÚFAL lemmatizuje na
+<code>on</code>) a plní se antecedentem, aby fakt nesl skutečnou entitu — viz
+<a href="diry.html">Díry — čím je zaplníme</a>.</div>
+
+<h2>Proč to tak děláme</h2>
+<ul>
+<li><b>Anotace jednou, offline.</b> Parsovat každou pasáž za běhu by bylo pomalé a hlavně
+by to vneslo neuronové rozhodování do runtime. UDPipe 2 je neuronový, ale používá se
+<i>jen na anotaci předem</i> — v rozhodovací smyčce žádný neuron není.</li>
+<li><b>UDPipe 2 místo UDPipe 1.</b> Nová verze snižuje chyby značkování/rozboru o 40–50 %:
+opravuje např. <code>Kafarnaum</code> (dřív mylně podmět) na <code>nmod</code> a správně
+rozpozná účelové věty (<code>advcl</code>).</li>
+<li><b>Entity z rysu <code>NameType</code>, ne z NameTagu.</b> NameTag lepil jména se
+sousedy („Ježíš Duchem"). Nově bereme jen souvislé tokeny téhož jména a <b>shodného pádu</b>,
+takže pádová neshoda span neslepí.</li>
+</ul>
+
+<div class="note warn"><span class="lbl">Past, kterou jsme zavřeli:</span> data se do REST
+posílají <b>přes soubor</b> (<code>-F data=@file</code>). Inline <code>-F data=…</code>
+tiše ořezával velký víceřádkový vstup na ~485 znaků — bible tak ztrácela 95 % textu
+(55 vět místo 1151). Vždy přes soubor.</div>
+
+<h2>Proč po souborech — fragment (koncept #60)</h2>
+<p>Anotace se neukládá do jednoho velkého picklu, ale do <b>shardu na každý zdrojový
+soubor</b> (<code>data/corpus/&lt;doc&gt;.pkl</code>). Každý soubor je samostatná
+<b>mountovatelná jednotka</b>: za běhu se do grafu nahrají jen ty soubory, které
+odpovídají rozhovoru (frekvenční analýza <b>tf·idf</b> — četnost × unikátnost termínů),
+ne celý korpus naráz. Monolitický pickle by tenhle dynamický mount znemožnil.</p>
+<div class="note"><span class="lbl">Souvislost:</span> jak se soubory nahrávají podle
+matche a jaký index musí každý soubor mít, popisuje
+<a href="dynamicke-nahravani.html">Dynamické nahrávání a formát ukládání</a>; co přesně
+tvoří naši anotační cache popisuje <a href="anotacni-cache.html">Anotační cache</a>.
+Samotný tf·idf index a mount staví vrstva ② (dataloader).</div>
+
+<h2>Třída <code>AnnotateCorpus</code></h2>
+<p>Anotátor korpusu: surové texty ze složky <code>raw_dir</code> → jeden shard na soubor
+do <code>corpus_dir</code>. Instance drží konfiguraci vrstvy (URL a <b>pinnutý</b> model
+UDPipe 2, cesty, velikost dávky); čisté transformace jsou statické metody bez stavu,
+síťové a I/O kroky jsou instanční.</p>
+
+<div class="member">
+  <p class="sig">AnnotateCorpus(config_path="config.json")</p>
+  <p>Konstruktor načte blok <code>preprocessing</code> z JSON konfigurace — nic není
+  natvrdo v kódu (jiný jazyk/nasazení = jiný JSON). Uloží si ho do <code>self.cfg</code>
+  pro všechny další metody.</p>
+  <pre>a = AnnotateCorpus()          # vezme ./config.json</pre>
+  <div class="io"><b>vstup</b><span>cesta ke <code>config.json</code> (volitelná)</span>
+  <b>výstup</b><span>instance s konfigurací vrstvy</span></div>
+</div>
+
+<div class="member">
+  <p class="sig">run() → None</p>
+  <p>Projde všechny <code>*.txt</code> ve <code>raw_dir</code>, zanotuje je a uloží
+  <b>jeden shard na soubor</b> do <code>corpus_dir</code> plus <code>_meta.json</code>
+  s pinnutým i skutečně použitým modelem (reprodukovatelnost). Vstupní data nikdy
+  nepřepisuje.</p>
+  <pre>AnnotateCorpus().run()
+# [i] 2207260632 : hotovo → …/data/corpus/&lt;doc&gt;.pkl (vět 11926, dokumentů 13)</pre>
+  <div class="io"><b>vstup</b><span>složka <code>raw_dir</code> (z configu)</span>
+  <b>výstup</b><span><code>data/corpus/&lt;doc&gt;.pkl</code> (13 shardů) + <code>_meta.json</code></span></div>
+</div>
+
+<div class="member">
+  <p class="sig">annotate_document(doc_id, text) → (dict, str|None)</p>
+  <p>Zanotuje jeden dokument: rozdělí text na dávky po odstavcích, každou pošle do UDPipe 2
+  a věty čísluje průběžně napříč dávkami. Selhaná dávka se zaloguje jako error a přeskočí,
+  aby zbytek doběhl.</p>
+  <pre>recs, model = AnnotateCorpus().annotate_document(
+    "wiki_r.u.r.", open("data/raw/wiki_r.u.r..txt").read())
+
+# výstup: dict o 59 záznamech — jeden záznam:
+recs[("wiki_r.u.r.", 1)]
+# → {"entities": [],
+#    "sentences": [[{"form":"Autor", "lemma":"autor", "upos":"NOUN",
+#                    "deprel":"nsubj", "head":4, "start":137, "end":142}, …]]}
+model   # → "czech-pdtc-ud-2.17-251125"</pre>
+  <div class="io"><b>vstup</b><span><code>doc_id</code> (str), <code>text</code> (str)</span>
+  <b>výstup</b><span><code>{(doc_id, i): {entities, sentences}}</code> + jméno modelu</span></div>
+</div>
+
+<div class="member">
+  <p class="sig">parse_conllu(text) → (list[list[token]], str|None) &nbsp;<span class="pill">static</span></p>
+  <p>Rozparsuje CoNLL-U výstup UDPipe 2 na věty (seznamy tokenů); dělí prázdným řádkem a
+  přeskakuje víceslovné/prázdné uzly. Každému tokenu přidá znakové offsety z <code>TokenRange</code>.</p>
+  <pre>sents, model = AnnotateCorpus.parse_conllu(conllu_str)
+sents[0][0]["lemma"], sents[0][0]["start"]   # → ("být", 0)</pre>
+  <div class="io"><b>vstup</b><span>CoNLL-U (str)</span>
+  <b>výstup</b><span>věty jako seznamy tokenů + jméno modelu</span></div>
+</div>
+
+<div class="member">
+  <p class="sig">entities_from_nametype(tokens) → list[dict] &nbsp;<span class="pill">static</span></p>
+  <p>Z rysu <code>NameType</code> jedné věty odvodí entity: <code>Giv/Sur → "P"</code> (osoba),
+  <code>Geo → "G"</code> (místo). Osobní span drží jen souvislé tokeny <b>shodného pádu</b>,
+  takže se jméno neslepí se sousedem v jiném pádu.</p>
+  <pre>AnnotateCorpus.entities_from_nametype(veta_tokeny)
+# → [{"text":"Karla Čapka","type":"P","start":112,"end":123}]</pre>
+  <div class="io"><b>vstup</b><span>tokeny jedné věty (list[dict])</span>
+  <b>výstup</b><span>entity <code>{text, type, start, end}</code></span></div>
+</div>
+
+<div class="member">
+  <p class="sig">_udpipe2(text, tries=4) → str|None</p>
+  <p>Pošle text do UDPipe 2 (plná pipeline) <b>přes dočasný soubor</b> a vrátí CoNLL-U, nebo
+  <code>None</code> po vyčerpání pokusů. Soubor kvůli tomu, že inline vstup se ořezává;
+  retry s prodlužující se pauzou kvůli občasné nedostupnosti služby.</p>
+  <pre>conllu = AnnotateCorpus()._udpipe2("Vešel do Egypta.")
+# výstup: CoNLL-U (str) — id, tvar, lemma, upos … head, deprel, offsety:
+# 1  Vešel   vejít   VERB   …  0  root   TokenRange=0:5
+# 2  do      do      ADP    …  4  case   TokenRange=6:8
+# 3  Egypta  Egypt   PROPN  …  1  obl    TokenRange=9:15
+# 4  .       .       PUNCT  …  1  punct  TokenRange=15:16</pre>
+  <div class="io"><b>vstup</b><span>raw text jedné dávky (str)</span>
+  <b>výstup</b><span>CoNLL-U (str) nebo <code>None</code></span></div>
+</div>
+
+<div class="member">
+  <p class="sig">_chunks(text, limit) → list[str] &nbsp;<span class="pill">static</span></p>
+  <p>Rozdělí text na dávky do <code>limit</code> znaků na hranicích odstavců (prázdný řádek),
+  aby se věta nikdy nerozťala. Odstavec delší než limit jde v jedné dávce sám.</p>
+  <pre>AnnotateCorpus._chunks(text, 40000)   # → ["odstavec\n\nodstavec…", …]</pre>
+  <div class="io"><b>vstup</b><span><code>text</code> (str), <code>limit</code> (int)</span>
+  <b>výstup</b><span>seznam textových dávek</span></div>
+</div>
+
+<div class="member">
+  <p class="sig">_token_range(misc) → (int|None, int|None) &nbsp;<span class="pill">static</span></p>
+  <p>Ze sloupce MISC v CoNLL-U vytáhne znakové offsety <code>TokenRange=start:end</code>.
+  Když sloupec offset nenese, vrátí <code>(None, None)</code>.</p>
+  <pre>AnnotateCorpus._token_range("TokenRange=137:142|SpaceAfter=No")  # → (137, 142)</pre>
+  <div class="io"><b>vstup</b><span>MISC sloupec (str)</span>
+  <b>výstup</b><span>dvojice offsetů</span></div>
+</div>
+
+<h2>Konfigurace (blok <code>preprocessing</code>)</h2>
+<table>
+<tr><th>klíč</th><th>význam</th></tr>
+<tr><td>raw_dir</td><td>složka se surovými <code>*.txt</code> (vstup)</td></tr>
+<tr><td>corpus_dir</td><td>složka pro shardy <code>&lt;doc&gt;.pkl</code> (výstup — jeden na soubor)</td></tr>
+<tr><td>udpipe2_url</td><td>REST endpoint UDPipe 2 (LINDAT)</td></tr>
+<tr><td>udpipe2_model</td><td>PINNUTÝ model (reprodukovatelnost), např. <code>czech-pdtc-ud-2.17-251125</code></td></tr>
+<tr><td>batch_chars</td><td>max. znaků na jedno REST volání</td></tr>
+</table>
+
+<div class="note"><span class="lbl">Log:</span> modul píše přes sdílený
+<code>logger(severity, message)</code> ve formátu <code>[i] DDMMYYHHMM : zpráva</code>
+(<code>i</code> info, <code>d</code> debug, <code>!</code> error, <code>*</code> ostatní).</div>
+
+<nav class="crumbs" style="margin-top:2.5rem"><a href="index.html">← zpět na rozcestník</a></nav>
+
+</div>
+</body>
+</html>

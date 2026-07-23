@@ -1,0 +1,648 @@
+{
+ "accuracy": 0.64,
+ "hits": 16,
+ "n": 25,
+ "outcomes": {
+  "HIT": 16,
+  "WRONG": 2,
+  "CLARIFY": 6,
+  "NO_QVZOR": 1
+ },
+ "ceiling": {
+  "wrong_only": 6,
+  "retrievable": 17,
+  "no_template": 2
+ },
+ "by_role": {
+  "who": [
+   6,
+   9
+  ],
+  "whom_what": [
+   0,
+   1
+  ],
+  "what": [
+   2,
+   3
+  ],
+  "when": [
+   4,
+   6
+  ],
+  "where": [
+   4,
+   4
+  ],
+  "how_much": [
+   0,
+   1
+  ],
+  "what_subject": [
+   0,
+   1
+  ]
+ },
+ "by_kind": {
+  "attribution": [
+   1,
+   1
+  ],
+  "predicate": [
+   1,
+   4
+  ],
+  "copula": [
+   6,
+   9
+  ],
+  "temporal": [
+   4,
+   6
+  ],
+  "spatial": [
+   4,
+   4
+  ],
+  "count": [
+   0,
+   1
+  ]
+ },
+ "rows": [
+  {
+   "q": "Kdo napsal drama R.U.R.?",
+   "role": "who",
+   "kind": "attribution",
+   "expect": [
+    "čapek",
+    "karel"
+   ],
+   "got": "Čapek",
+   "outcome": "HIT",
+   "ceiling": "wrong_only",
+   "via": "vzor",
+   "offer": [
+    "Čapek",
+    "Vančura",
+    "Kundera",
+    "Hašek"
+   ],
+   "offer_has": true,
+   "extracted": true,
+   "cands": 15,
+   "doc": "wiki_r.u.r."
+  },
+  {
+   "q": "Kdo navrhl slovo robot?",
+   "role": "who",
+   "kind": "predicate",
+   "expect": [
+    "josef",
+    "čapek",
+    "bratr"
+   ],
+   "got": "Ježíš",
+   "outcome": "WRONG",
+   "ceiling": "wrong_only",
+   "via": "vzor",
+   "offer": [
+    "Ježíš",
+    "Alquist",
+    "Erastos",
+    "Krescens"
+   ],
+   "offer_has": false,
+   "extracted": true,
+   "cands": 50,
+   "doc": "wiki_r.u.r."
+  },
+  {
+   "q": "Kdo napsal Švejka?",
+   "role": "who",
+   "kind": "predicate",
+   "expect": [
+    "hašek",
+    "jaroslav"
+   ],
+   "got": "Hašek",
+   "outcome": "HIT",
+   "ceiling": "retrievable",
+   "via": "vzor",
+   "offer": [
+    "Hašek",
+    "Vančura",
+    "Němcová",
+    "Kundera"
+   ],
+   "offer_has": true,
+   "extracted": true,
+   "cands": 28,
+   "doc": "wiki_jaroslav_hašek"
+  },
+  {
+   "q": "Kdo napsal Babičku?",
+   "role": "who",
+   "kind": "predicate",
+   "expect": [
+    "němcová",
+    "božena",
+    "barbora"
+   ],
+   "got": "Němcová",
+   "outcome": "CLARIFY",
+   "ceiling": "retrievable",
+   "via": "vzor",
+   "offer": [
+    "Němcová",
+    "Barbora",
+    "Šalda",
+    "Fučík"
+   ],
+   "offer_has": true,
+   "extracted": true,
+   "cands": 28,
+   "doc": "wiki_božena_němcová"
+  },
+  {
+   "q": "Co napsal Karel Čapek?",
+   "role": "whom_what",
+   "kind": "predicate",
+   "expect": [
+    "r.u.r.",
+    "mlok",
+    "válka",
+    "bílý",
+    "nemoc",
+    "matka",
+    "hovor",
+    "drama"
+   ],
+   "got": "množství",
+   "outcome": "WRONG",
+   "ceiling": "wrong_only",
+   "via": "pred",
+   "offer": [
+    "množství",
+    "známka",
+    "tisk",
+    "hudba"
+   ],
+   "offer_has": false,
+   "extracted": true,
+   "cands": 11,
+   "doc": "wiki_karel_čapek"
+  },
+  {
+   "q": "Kdo je pes domácí?",
+   "role": "who",
+   "kind": "copula",
+   "expect": [
+    "šelma",
+    "savec",
+    "masožravec",
+    "prstochodec",
+    "živočich",
+    "tvor"
+   ],
+   "got": "šelma",
+   "outcome": "HIT",
+   "ceiling": "retrievable",
+   "via": "pred",
+   "offer": [
+    "šelma",
+    "mazlíček",
+    "chovaný",
+    "vzrůst"
+   ],
+   "offer_has": true,
+   "extracted": true,
+   "cands": 52,
+   "doc": "wiki_pes_domácí"
+  },
+  {
+   "q": "Co je R.U.R.?",
+   "role": "what",
+   "kind": "copula",
+   "expect": [
+    "drama"
+   ],
+   "got": "bůh",
+   "outcome": "CLARIFY",
+   "ceiling": "wrong_only",
+   "via": "vzor",
+   "offer": [
+    "bůh",
+    "tělo",
+    "láska",
+    "žena"
+   ],
+   "offer_has": false,
+   "extracted": true,
+   "cands": 14,
+   "doc": "wiki_r.u.r."
+  },
+  {
+   "q": "Kdo je Josef Čapek?",
+   "role": "who",
+   "kind": "copula",
+   "expect": [
+    "malíř",
+    "grafik",
+    "ilustrátor",
+    "spisovatel",
+    "bratr"
+   ],
+   "got": "malíř",
+   "outcome": "HIT",
+   "ceiling": "retrievable",
+   "via": "pred",
+   "offer": [
+    "malíř",
+    "soubor",
+    "odkaz",
+    "dášeňka"
+   ],
+   "offer_has": true,
+   "extracted": true,
+   "cands": 22,
+   "doc": "wiki_josef_čapek"
+  },
+  {
+   "q": "Kdo je Karel Čapek?",
+   "role": "who",
+   "kind": "copula",
+   "expect": [
+    "spisovatel",
+    "dramatik",
+    "novinář",
+    "intelektuál",
+    "překladatel"
+   ],
+   "got": "spisovatel",
+   "outcome": "HIT",
+   "ceiling": "retrievable",
+   "via": "pred",
+   "offer": [
+    "spisovatel",
+    "léta",
+    "odkaz",
+    "aktér"
+   ],
+   "offer_has": true,
+   "extracted": true,
+   "cands": 20,
+   "doc": "wiki_karel_čapek"
+  },
+  {
+   "q": "Kdo je Božena Němcová?",
+   "role": "who",
+   "kind": "copula",
+   "expect": [
+    "spisovatelka"
+   ],
+   "got": "zakladatelka",
+   "outcome": "CLARIFY",
+   "ceiling": "wrong_only",
+   "via": "pred",
+   "offer": [
+    "zakladatelka",
+    "odkaz",
+    "malý",
+    "pozornost"
+   ],
+   "offer_has": false,
+   "extracted": true,
+   "cands": 24,
+   "doc": "wiki_božena_němcová"
+  },
+  {
+   "q": "Kdy se narodil Karel Čapek?",
+   "role": "when",
+   "kind": "temporal",
+   "expect": [
+    "1890"
+   ],
+   "got": "1890",
+   "outcome": "HIT",
+   "ceiling": "retrievable",
+   "via": "pred",
+   "offer": [
+    "1890",
+    "1810",
+    "cestopis",
+    "část"
+   ],
+   "offer_has": true,
+   "extracted": false,
+   "cands": 198,
+   "doc": "wiki_karel_čapek"
+  },
+  {
+   "q": "Kdy zemřel Karel Čapek?",
+   "role": "when",
+   "kind": "temporal",
+   "expect": [
+    "1938"
+   ],
+   "got": "1938",
+   "outcome": "HIT",
+   "ceiling": "retrievable",
+   "via": "pred",
+   "offer": [
+    "1938",
+    "1836",
+    "noviny",
+    "cestopis"
+   ],
+   "offer_has": true,
+   "extracted": false,
+   "cands": 120,
+   "doc": "wiki_karel_čapek"
+  },
+  {
+   "q": "Kdy se narodil Josef Čapek?",
+   "role": "when",
+   "kind": "temporal",
+   "expect": [
+    "1887"
+   ],
+   "got": "1887",
+   "outcome": "HIT",
+   "ceiling": "retrievable",
+   "via": "pred",
+   "offer": [
+    "1887",
+    "kniha",
+    "pobyt",
+    "známost"
+   ],
+   "offer_has": true,
+   "extracted": false,
+   "cands": 366,
+   "doc": "wiki_josef_čapek"
+  },
+  {
+   "q": "Kdy se narodil Jaroslav Hašek?",
+   "role": "when",
+   "kind": "temporal",
+   "expect": [
+    "1883"
+   ],
+   "got": "1883",
+   "outcome": "HIT",
+   "ceiling": "retrievable",
+   "via": "pred",
+   "offer": [
+    "1883",
+    "1901",
+    "povídka",
+    "akademie"
+   ],
+   "offer_has": true,
+   "extracted": false,
+   "cands": 186,
+   "doc": "wiki_jaroslav_hašek"
+  },
+  {
+   "q": "Z jakého roku je drama R.U.R.?",
+   "role": "when",
+   "kind": "temporal",
+   "expect": [
+    "1920"
+   ],
+   "got": "moc",
+   "outcome": "CLARIFY",
+   "ceiling": "no_template",
+   "via": "vzor",
+   "offer": [
+    "moc",
+    "vůle",
+    "duch",
+    "prach"
+   ],
+   "offer_has": false,
+   "extracted": false,
+   "cands": 21,
+   "doc": "wiki_r.u.r."
+  },
+  {
+   "q": "Kdy měla premiéru hra R.U.R.?",
+   "role": "when",
+   "kind": "temporal",
+   "expect": [
+    "1921"
+   ],
+   "got": "1921",
+   "outcome": "CLARIFY",
+   "ceiling": "retrievable",
+   "via": "pred",
+   "offer": [
+    "1921",
+    "1932",
+    "pes",
+    "výzva"
+   ],
+   "offer_has": true,
+   "extracted": false,
+   "cands": 63,
+   "doc": "wiki_r.u.r."
+  },
+  {
+   "q": "Kde se narodil Karel Čapek?",
+   "role": "where",
+   "kind": "spatial",
+   "expect": [
+    "svatoňovice",
+    "malý"
+   ],
+   "got": "Svatoňovice",
+   "outcome": "HIT",
+   "ceiling": "retrievable",
+   "via": "pred",
+   "offer": [
+    "Svatoňovice",
+    "Praha",
+    "rodina",
+    "Páf"
+   ],
+   "offer_has": true,
+   "extracted": true,
+   "cands": 200,
+   "doc": "wiki_karel_čapek"
+  },
+  {
+   "q": "Kde zemřel Karel Čapek?",
+   "role": "where",
+   "kind": "spatial",
+   "expect": [
+    "praha"
+   ],
+   "got": "Praha",
+   "outcome": "HIT",
+   "ceiling": "retrievable",
+   "via": "pred",
+   "offer": [
+    "Praha",
+    "Litoměřice",
+    "Paříž",
+    "Berlín"
+   ],
+   "offer_has": true,
+   "extracted": false,
+   "cands": 120,
+   "doc": "wiki_karel_čapek"
+  },
+  {
+   "q": "Kde se narodil Josef Čapek?",
+   "role": "where",
+   "kind": "spatial",
+   "expect": [
+    "hronov"
+   ],
+   "got": "Hronov",
+   "outcome": "HIT",
+   "ceiling": "retrievable",
+   "via": "pred",
+   "offer": [
+    "Hronov",
+    "země",
+    "známost",
+    "pohřeb"
+   ],
+   "offer_has": true,
+   "extracted": false,
+   "cands": 367,
+   "doc": "wiki_josef_čapek"
+  },
+  {
+   "q": "Kde se narodil Jaroslav Hašek?",
+   "role": "where",
+   "kind": "spatial",
+   "expect": [
+    "praha"
+   ],
+   "got": "Praha",
+   "outcome": "HIT",
+   "ceiling": "retrievable",
+   "via": "pred",
+   "offer": [
+    "Praha",
+    "Žižkov",
+    "Československo",
+    "akademie"
+   ],
+   "offer_has": true,
+   "extracted": true,
+   "cands": 186,
+   "doc": "wiki_jaroslav_hašek"
+  },
+  {
+   "q": "Kolik měla dětí Božena Němcová?",
+   "role": "how_much",
+   "kind": "count",
+   "expect": [
+    "čtyři",
+    "4"
+   ],
+   "got": null,
+   "outcome": "NO_QVZOR",
+   "ceiling": "no_template",
+   "via": "—",
+   "offer": [],
+   "offer_has": false,
+   "extracted": false,
+   "cands": 0,
+   "doc": "wiki_božena_němcová"
+  },
+  {
+   "q": "Co bylo na počátku?",
+   "role": "what_subject",
+   "kind": "copula",
+   "expect": [
+    "slovo"
+   ],
+   "got": "zákon",
+   "outcome": "CLARIFY",
+   "ceiling": "wrong_only",
+   "via": "vzor",
+   "offer": [
+    "zákon",
+    "slib",
+    "svatyně",
+    "hřích"
+   ],
+   "offer_has": false,
+   "extracted": true,
+   "cands": 5,
+   "doc": "bible_jan"
+  },
+  {
+   "q": "Kdo byl Slovo?",
+   "role": "who",
+   "kind": "copula",
+   "expect": [
+    "bůh",
+    "počátek"
+   ],
+   "got": "počátek",
+   "outcome": "HIT",
+   "ceiling": "retrievable",
+   "via": "pred",
+   "offer": [
+    "počátek",
+    "pravda",
+    "zákon",
+    "slib"
+   ],
+   "offer_has": true,
+   "extracted": true,
+   "cands": 9,
+   "doc": "bible_jan"
+  },
+  {
+   "q": "Čím se stalo Slovo?",
+   "role": "what",
+   "kind": "copula",
+   "expect": [
+    "tělo"
+   ],
+   "got": "tělo",
+   "outcome": "HIT",
+   "ceiling": "retrievable",
+   "via": "pred",
+   "offer": [
+    "tělo",
+    "násilí"
+   ],
+   "offer_has": true,
+   "extracted": true,
+   "cands": 2,
+   "doc": "bible_jan"
+  },
+  {
+   "q": "Co je kočka domácí?",
+   "role": "what",
+   "kind": "copula",
+   "expect": [
+    "forma",
+    "zástupce",
+    "lovec"
+   ],
+   "got": "forma",
+   "outcome": "HIT",
+   "ceiling": "retrievable",
+   "via": "pred",
+   "offer": [
+    "forma",
+    "plemeno",
+    "zvíře",
+    "hostitel"
+   ],
+   "offer_has": true,
+   "extracted": true,
+   "cands": 46,
+   "doc": "wiki_kočka_domácí"
+  }
+ ]
+}

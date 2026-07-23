@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fáze ④ Synthesis — synth_registry.py, synth_determination.py</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+
+<nav class="crumbs"><a href="index.html">Dokumentace</a> › Fáze ④ Synthesis</nav>
+
+<p class="eyebrow">Fáze ④ · Synthesis</p>
+<h1>Grafikon FAKT ↔ OTÁZKA a slovník VZOR → role</h1>
+<p class="lead">Z rozkladu na role (③) se staví syntetické vazby: pro každou větu vazba
+FAKT↔OTÁZKA (registr) a přes celý korpus začištěný slovník VZOR→role. To jsou data, nad
+kterými pak běží match a výběr odpovědi (⑤).</p>
+
+<p>Soubory: <code>synth_registry.py</code> (<code>SynthRegistry</code>) ·
+<code>synth_determination.py</code> (<code>SynthDetermination</code>). Vstup: nový korpus přes
+<code>Dataloader.mount</code>. Výstup: <code>registry.jsonl</code>, <code>determination.json</code>.</p>
+
+<h2>Příklad: vstup → akce → výstup</h2>
+<div class="flow">
+  <div class="step in"><span class="tag">vstup — anotovaný korpus</span>
+    <pre>data/corpus/*.pkl
+věty s rozkladem na role (③)</pre></div>
+  <div class="step act"><span class="tag">akce — syntéza</span>
+    <pre>SynthRegistry().run()
+SynthDetermination().run()</pre></div>
+  <div class="step out"><span class="tag">výstup — grafikon + slovník</span>
+    <pre>registry.jsonl
+  9885 vazeb FAKT↔OTÁZKA
+determination.json
+  4804 CONFIRMED VZOR→role</pre></div>
+</div>
+
+<h2>Třída <code>SynthRegistry</code> — vazby FAKT ↔ OTÁZKA</h2>
+<p>Pro každou větu vyrobí vazbu na fakt: predikát, díra (podmět/účastník), odpovědní sloty
+(lemma + náš rolový klíč + rod) a kontext. Odpovědi jsou v základním tvaru; rolový klíč je
+týž jako v ③ (jednotný mapovač).</p>
+
+<div class="member">
+  <p class="sig">run() → dict</p>
+  <p>Projde celý korpus a zapíše <code>registry.jsonl</code> (jedna vazba na řádek). Nejdřív
+  spočte podmíněný fold PROPN, pak z každé věty vytvoří vazbu.</p>
+  <pre>SynthRegistry().run()
+# [i] … : vazeb FAKT↔OTÁZKA: 9885, predikátů: 1863, answer-slotů: 26121 (⌀ 2.6/fakt)
+# → {"bindings": 9885, "predicates": 1863, "answer_slots": 26121}</pre>
+  <div class="io"><b>vstup</b><span>korpus (z <code>Dataloader</code>)</span>
+  <b>výstup</b><span><code>registry.jsonl</code> + souhrn</span></div>
+</div>
+
+<div class="member">
+  <p class="sig">_binding(sent, doc, si, fold) → dict|None</p>
+  <p>Z jedné anotované věty vazba, nebo <code>None</code> (žádný přísudek/odpověď). Predikát je
+  root VERB (jinak spona = identitní fakt); sloty jsou argumentová jména se svým rolovým klíčem.</p>
+  <pre>sr._binding(sent, "bible_lukas", 12, fold)
+# → {"predicate":"odejít", "hole":"subj/person",
+#    "answers":[{"lemma":"Kafarnaum","role":"where","q":"Kde","gender":None,"name":True}],
+#    "context":[…], "doc":"bible_lukas", "sent":12, "text":"Odešel do …"}</pre>
+  <div class="io"><b>vstup</b><span>věta, doc_id, index, fold PROPN</span>
+  <b>výstup</b><span>vazba {predicate, answers, context…} / None</span></div>
+</div>
+
+<div class="member">
+  <p class="sig">_propn_fold(corpus) → dict &nbsp;·&nbsp; _skip(lem, upos) → bool</p>
+  <p>Podmíněný epentetický fold PROPN (Čapk→Čapek, ale jen když „Čapek" je reálně častější —
+  nekorumpuje Egypt→Egypet) a filtr neslov (interpunkce, jednopísmenné iniciály).</p>
+  <pre>sr._propn_fold(corpus)   # → {"Čapk": "Čapek", …}</pre>
+  <div class="io"><b>vstup</b><span>korpus / (lemma, upos)</span>
+  <b>výstup</b><span>fold dvojice / bool</span></div>
+</div>
+
+<h2>Třída <code>SynthDetermination</code> — slovník VZOR → role</h2>
+<p>Agreguje role per VZOR přes celý korpus a povýší jen ZAČIŠTĚNÉ: PURE (jediná role na VZOR)
++ FREQUENT (≥ prahu) + content-role. Revize je konzistence, ne správnost;
+<code>curated.json</code> opravuje známé chyby, impure/vzácné zůstávají kandidáty.</p>
+
+<div class="member">
+  <p class="sig">run() → dict</p>
+  <p>Projde korpus a zapíše <code>determination.json</code>. Vrací souhrn (počet VZORů, CONFIRMED,
+  pokrytí content-tokenů).</p>
+  <pre>SynthDetermination().run()
+# [i] … : VZORů: 69426, CONFIRMED (pure & ≥3): 4804, pokrytí: 24983/103025 (24%)</pre>
+  <div class="io"><b>vstup</b><span>korpus</span><b>výstup</b><span><code>determination.json</code> + souhrn</span></div>
+</div>
+
+<div class="member">
+  <p class="sig">aggregate(sentences) → {VZOR: Counter(role→počet)} &nbsp;·&nbsp; confirmed(vzor_roles) → {VZOR: role}</p>
+  <p>Spočte rozdělení rolí na každý VZOR (jen content-role, r=2 — viz
+  <a href="faze-3-grammar.html">Grammar → poloměr r</a>) a vybere PURE + FREQUENT VZORy.
+  Rozdělení kroků umožňuje ladit práh bez opakované agregace.</p>
+  <pre>vr = sd.aggregate(sents)
+sd.confirmed(vr)   # → {"ADJ:Gen·NOUN:Gen·…": "where", …}</pre>
+  <div class="io"><b>vstup</b><span>věty / agregace</span><b>výstup</b><span>agregace / {VZOR: role}</span></div>
+</div>
+
+<div class="note"><span class="lbl">Parita:</span> <code>SynthRegistry._binding</code> je bitově
+shodné s původním <code>gen_registry</code> (11856 vět, 0 neshod), <code>SynthDetermination</code>
+s <code>build_determination</code> (4068 CONFIRMED identických) — refaktor jen přejmenoval a
+přepojil na nový korpus. Staré buildery byly odstraněny.</div>
+
+<nav class="crumbs" style="margin-top:2.5rem"><a href="index.html">← zpět na rozcestník</a></nav>
+
+</div>
+</body>
+</html>

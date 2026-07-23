@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Koreference — jak plníme díry (mechanismus)</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+
+<nav class="crumbs"><a href="index.html">Dokumentace</a> › Koreference (mechanismus)</nav>
+
+<p class="eyebrow">Mechanismus · rozpracováno</p>
+<h1>Koreference — jak plníme díry</h1>
+<p class="lead">Od placeholderu (detekovaného ÚFAL rysem, viz
+<a href="diry.html">Díry — čím je zaplníme</a>) k jeho antecedentu. Strategie se vyvíjí
+MĚŘENÍM — každý krok se ověřuje na datech, ne odhadem. Soubor: <code>fill_holes.py</code>
+(<code>FillHoles</code>).</p>
+
+<div class="note"><span class="lbl">Stav:</span> rozpracováno. Detekce rysem je hotová;
+resolver antecedenta se ladí. Tato stránka roste s ním — drží aktuální mechanismus i čísla.</div>
+
+<h2>Tři strategie (jak se vyvíjely měřením)</h2>
+<table>
+<tr><th>strategie</th><th>jak vybírá antecedent</th><th>fill rate</th><th>přesnost (gold 28)</th></tr>
+<tr><td>baseline</td><td>nejbližší souhlasný podmět (recency)</td><td>93 %</td><td><b>32 %</b></td></tr>
+<tr><td>activation</td><td>aktivační pole s útlumem — nejaktivnější souhlasná entita</td><td>100 %</td><td>25 %</td></tr>
+<tr><td>zone (VZOR)</td><td>aktivace × transpoziční fit zóny — entita musí FITOVAT do role díry</td><td>100 %</td><td>29 % · 36 %*</td></tr>
+<tr><td><b>identity</b></td><td>zone + KOTVA: entita zavedená copulou „X je/byl Y" drží teplo přes pasáž</td><td>100 %</td><td><b>43 %*</b></td></tr>
+</table>
+<p style="font-size:.85rem;color:var(--muted)">* alias-aware (kněz=Zachariáš, matka=Maria); striktní číslo bez aliasů je nižší.</p>
+<div class="note"><span class="lbl">Kotva identity — první výhra nad baseline:</span>
+„<code>svět ho nepoznal</code>" → <b>ho = slovo ✓</b>, „<code>jeho vlastní</code>" → slovo ✓ —
+prolog u tvrdých míst konečně vrací Slovo (kotva „Slovo byl Bůh" ho drží teplé). Zbývá
+<b>over-anchoring</b> (kotví se každý copula-subjekt → život/Jan kradou cizí případy) — viz
+<a href="k-doreseni.html">K dořešení</a>.</div>
+<div class="note warn"><span class="lbl">Gold set probodl domněnku:</span> na 28 ručně
+rozřešených dírách (<code>gold_coref.json</code>) activation ani zone <b>nepřekonaly baseline</b>
+— <b>fill rate ≠ přesnost</b>. Dva artefakty měření (číslo je podhodnocené): (1) striktní shoda
+lemmatu trestá SPRÁVNOU entitu s jiným lemmatem (<code>on→kněz</code> = Zachariáš,
+<code>ji→matka</code> = Maria) — chce aliasové clustery; (2) gold je zatížený prologem
+(16/28 = studené Slovo, nejtěžší vzorek). Závěr: na tvrdých případech se mechanismy nerozliší;
+prolog potřebuje <b>kotvu identity</b>, ne aktivaci.</div>
+
+<h2>VZOR-zóna + transpozice (jádro)</h2>
+<p>Tvrdé fixy na jednotlivé případy (neosobní, plurál) jsou záplaty na řezu korpusu, ne
+princip. Univerzální cesta je VZOR: <b>každá entita má ZÓNU</b> = rolový profil, v jakých
+rolích běžně žije. Zóna se plní sama z korpusu (akumulace pádů/VZORů).</p>
+
+<h3>Zóna na datech (slovo vs svět)</h3>
+<div style="overflow-x:auto">
+<table>
+<tr><th>entita</th><th>dominantní role</th><th>rozklad pádů</th></tr>
+<tr><td><code>slovo</code> (162×)</td><td><b>Acc 46 %</b> — přirozený PŘEDMĚT/téma</td><td>Acc 75, Nom 32, Ins 25, Gen 13…</td></tr>
+<tr><td><code>svět</code> (97×)</td><td><b>Gen 37 %</b> + Loc/Nom — genitiv/místo</td><td>Gen 36, Nom 21, Acc 19, Loc 11…</td></tr>
+</table>
+</div>
+
+<h3>Transpozice = mezivrstva mezi VZOR ↔ VZOR</h3>
+<p>Placeholder má VZOR, ale v JINÉ roli než antecedent. Transpozice <b>dosadí kandidáta do
+role díry</b> a změří, zda tam podle své zóny patří:</p>
+<pre>„svět ho nepoznal"   →   „ho" VZOR: NOUN:Nom·PRON:Acc·VERB:Past·.   (pivot = PŘEDMĚT, Acc)
+
+fit(slovo, Acc) = 75/162 = 0.46   ← slovo do předmětu SEDÍ
+fit(svět,  Acc) = 19/97  = 0.20   ← svět  do předmětu nesedí (je genitiv/místo)
+
+rank = aktivace × (1 + zone_beta · fit)</pre>
+<p>Aktivace drží recency/topik, zóna drží „sedí do role". Univerzálně to <b>pohltí fixy</b>:
+neosobní „stalo se" → žádná entita nemá ten rámec ve zóně → nikdo nefituje; předmětné zájmeno
+→ vyhraje ten, kdo bývá předmětem — bez jediného <code>if</code>.</p>
+
+<div class="note warn"><span class="lbl">Poctivé měření (teď):</span> zóna míří správně
+(„ho" svět → světlo — posun k role-vhodné entitě), ale prolog sama nezlomí: skutečný referent
+<code>slovo</code> je tam lokálně VYCHLADLÝ (dávno nezmíněný), takže i s fit bonusem ho aktivní
+<code>svět/světlo</code> přebijí. Signál je reálný, ale jako násobič aktivace slabý, když je
+referent studený. Balanc a tvrdé číslo → <b>gold set</b> (další krok).</p></div>
+
+<h2>Metody (<code>FillHoles</code>)</h2>
+<div class="member">
+  <p class="sig">detect(sent) → list[placeholder]</p>
+  <p>Detekuje díry JEN z rysu (PronType/Poss/Person/Tense), ne ze seznamu tvarů. Vrací
+  kategorii a cíl (antecedent / mluvčí / podmět). Neosobní „stalo se" už se sem nedostane.</p>
+</div>
+<div class="member">
+  <p class="sig">build_zone(corpus=None) → dict &nbsp;·&nbsp; _fit(lemma, case) → float</p>
+  <p>Postaví globální zónu (lemma → rolový profil pádů) z celého korpusu a spočte transpoziční
+  fit entity do dané role (0..1). To je ta mezivrstva mezi VZOR a VZOR.</p>
+</div>
+<div class="member">
+  <p class="sig">resolve_document_activation(sents) &nbsp;·&nbsp; resolve_document_zone(sents) → list</p>
+  <p>Projdou dokument v pořadí s aktivačním polem; <code>_zone</code> navíc váží kandidáty
+  transpozičním fitem role. Vracejí resoluce (sent_k, i, kategorie, lemma|None).</p>
+</div>
+
+<h2>Otevřené (na gold set)</h2>
+<ul>
+<li><b>balanc</b> aktivace × zóna (zone_beta) — naladit proti pravdě, ne odhadem;</li>
+<li><b>studený protagonista</b> (Slovo v prologu) — kotva identity („Slovo byl Bůh") nad rámec aktivace;</li>
+<li><b>plurál dvou osob</b> (Zachariáš+Alžběta) vs náhodný plurál (příkaz) — přes zónu, ne fix;</li>
+<li><b>abstraktní „to"</b> (tvrzení/událost, ne uzel).</li>
+</ul>
+
+<nav class="crumbs" style="margin-top:2.5rem"><a href="index.html">← zpět na rozcestník</a></nav>
+
+</div>
+</body>
+</html>

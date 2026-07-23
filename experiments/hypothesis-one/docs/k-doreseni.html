@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>K dořešení — otevřené nedostatky</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+
+<nav class="crumbs"><a href="index.html">Dokumentace</a> › K dořešení</nav>
+
+<p class="eyebrow">Backlog · otevřené nedostatky</p>
+<h1>K dořešení</h1>
+<p class="lead">Poctivý běžící seznam toho, o čem VÍME, že nefunguje nebo je nedotažené —
+i s tím, co ukázalo měření. Roste, jak narážíme; každý bod má směr řešení, ne jen stížnost.</p>
+
+<h2>Koreference / zaplnění děr</h2>
+
+<div class="member">
+  <p class="sig">Kotva identity — over-anchoring <span class="pill">rozpracováno</span></p>
+  <p><b>Hotovo:</b> copula „X je/byl Y" zavádí protagonistu, který drží teplo přes pasáž
+  (<code>anchor_bonus</code>). Vlajkové případy prologu opraveny — „<code>svět ho nepoznal</code>"
+  → ho = <b>slovo ✓</b>. Přesnost 43 % > baseline 39 % (první výhra).</p>
+  <p><b>Zbývá:</b> kotví se KAŽDÝ copula-subjekt → přehřejí se a kradou cizí případy
+  (<code>Ten → život</code>, <code>Přišel → život</code>). Vážení kotvy SÍLOU (kolikrát
+  copula-subjekt) NEPOMOHLO (43 % beze změny) — <code>život</code> je v prologu taky opakovaně
+  „X byl Y", takže dostane silnou kotvu taky.</p>
+  <p><b>Jádro:</b> copula-počet neroszekne GLOBÁLNÍ TÉMA (Slovo) od LOKÁLNÍCH pod-témat
+  (život/světlo). Chce to jemnější model diskurzu — kdo je téma celé pasáže vs. kdo je zmíněn
+  cestou (např. téma = entita s nejvíc zpětných referencí, ne nejvíc copula-vět).</p>
+</div>
+
+<div class="member">
+  <p class="sig">Jistota ≠ správnost (margin nekalibruje)</p>
+  <p>Provenience přes odstup vítěze od druhého NEDÁVÁ práh: na gold setu drží přesnost ~40–50 %
+  při KAŽDÉM prahu, confident-wrong je běžný (<code>je→lidé</code> jistota 1.00 ✗,
+  <code>dal→svět</code> 0.85 ✗). Margin měří „vítěz přebíjí ostatní", ne „vítěz je správně".</p>
+  <p><b>Směr:</b> jiný signál jistoty — shoda VÍCE nezávislých signálů (aktivace × zóna ×
+  identita), nebo konzistence entity-clusteru; ne jen odstup skóre.</p>
+</div>
+
+<div class="member">
+  <p class="sig">Eval není entity-aware (aliasové clustery)</p>
+  <p>Gold porovnává lemma, ale <code>kněz</code>=Zachariáš, <code>matka</code>=Maria jsou TÁŽ
+  entita — striktní shoda je počítá jako chybu a podhodnocuje přesnost.</p>
+  <p><b>Směr:</b> aliasové clustery entit (víc lemmat = jedna entita); eval i resolver by je
+  měly sdílet. Souvisí s identitou/aliasy (<code>jmenovat</code>, apozice „X zvaný Y").</p>
+</div>
+
+<div class="member">
+  <p class="sig">Plurál dvou osob vs náhodný plurál</p>
+  <p>„Neměli" (Zachariáš+Alžběta) vs „mudrci" (jedna plurálová entita): fix bere buď 2 nejteplejší
+  (rozbije mudrce), nebo shodný plurál (vezme náhodné <code>příkaz</code>/<code>den</code>).
+  Rozlišit bez sémantiky nejde.</p>
+  <p><b>Směr:</b> přes zónu (plurálová entita má svůj profil) + osobovost z rysu, ne tvrdý fix.</p>
+</div>
+
+<div class="member">
+  <p class="sig">Předmětné zájmeno a abstraktní „to"</p>
+  <p>Předmětné „ho/mu" míří na druhého účastníka, ne na salientní podmět; „to poznám" =
+  tvrzení/událost, ne uzel. Vlastní koreferenční hloubka.</p>
+  <p><b>Směr:</b> rolová transpozice (VZOR-zóna, rozpracováno) pro předmět; propoziční referent
+  pro „to" (odkaz na klauzuli, ne na jméno).</p>
+</div>
+
+<h2>Syntéza / faktualita</h2>
+<div class="member">
+  <p class="sig">Faktualitní filtr — budoucí nezávaznost <span class="pill">rozpracováno</span></p>
+  <p><b>Hotovo:</b> <code>is_factual</code> odmítá hedging — markery (možná/snad/prý/nějak),
+  kondicionál hlavního přísudku, modální možnost (<code>moci</code> root: „může to být"),
+  mluvčího „nevím" (<code>vědět</code> Neg 1.os), otázku. Nefaktická věta → žádný fakt.</p>
+  <p><b>Zbývá:</b> nezávazná BUDOUCNOST („uvidíme, jak se to vyvine") a disjunktivní hedge
+  („tak nebo tak") projdou jako fakt. Chce to future-noncommittal signál (1. os. plurál
+  budoucího „uvidět/uvidíme") a rozpoznání „X nebo Y" jako neurčitosti, ne výčtu.</p>
+</div>
+
+<h2>VZOR matcher / šablony</h2>
+<div class="member">
+  <p class="sig">Rolová shoda VZORu + aktivace přepíná na salientní entitu <span class="pill">rozpracováno</span></p>
+  <p><b>Kostra běží</b> end-to-end (nahraj dle otázky → VZOR × aktivace → odpověď, cross-doména).
+  Ale přesnost hrubá: „Co napsal Čapek?" (předmět) → <b>Čapek</b> (podmět) — query-VZOR matchnul
+  cizí roli a aktivace vybrala salientní entitu; „Kdo napsal R.U.R.?" → miss (struktura v
+  deterministických šablonách chybí + R.U.R. tokenizace).</p>
+  <p><b>Směr:</b> (1) match ROLE-AWARE — kandidát musí sedět rolí díry (interrogativ→role, máme
+  přes RoleCatalog); (2) aktivaci vážit i FITEM do role (VZOR-zóna jako v koreferenci);
+  (3) Ollama povrchy zvýší strukturní pokrytí (víc query-VZORů); (4) <b>gold set otázka→odpověď</b>
+  na tvrdé číslo přesnosti.</p>
+</div>
+
+<h2>Zaparkováno (vědomě odloženo)</h2>
+<div class="member">
+  <p class="sig">Testování faktu jako ANO/NE odpověď <span class="pill">park</span></p>
+  <p>Zjišťovací otázky („Napsal Čapek R.U.R.?" → Ano / „Je pes savec?" → Ano) — fakt jako
+  pravdivostní odpověď, ne jen díra k vyplnění. Vědomě odloženo (user) až za query šablony.</p>
+</div>
+
+<div class="note"><span class="lbl">Zásada:</span> nedostatek se sem zapisuje s
+<b>měřením</b> (co přesně selhává) a <b>směrem</b> (kudy ven), ne jako holá stížnost. Když se
+bod vyřeší, přesune se do příslušné fázové stránky jako hotová věc.</div>
+
+<nav class="crumbs" style="margin-top:2.5rem"><a href="index.html">← zpět na rozcestník</a></nav>
+
+</div>
+</body>
+</html>

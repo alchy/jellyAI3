@@ -1,28 +1,79 @@
 {
   "_comment": "Jazyková data experimentu (zákon 3: jazyk jako data). Klíče jsou UNIVERZÁLNÍ (UD deprel/pád/animacy), hodnoty jsou české. Nový jazyk = nový soubor (es.json), žádný zásah do kódu.",
   "copula_lemma": "být",
-  "stopwords": ["kdo", "co", "být", "který", "jaký", "kde", "kdy", "jak", "proč"],
+  "stopwords": [
+    "kdo",
+    "co",
+    "být",
+    "který",
+    "jaký",
+    "kde",
+    "kdy",
+    "jak",
+    "proč"
+  ],
   "vowels": "aeiouyáéíóúůýěäö",
-  "possessive_adj_suffixes": ["ův", "ový", "in"],
+  "possessive_adj_suffixes": [
+    "ův",
+    "ový",
+    "in"
+  ],
   "deprel_to_role": {
-    "nsubj":      {"anim": "who", "inanim": "what_subject"},
-    "nsubj:pass": {"anim": "who", "inanim": "what_subject"},
-    "obj":        {"Gen": "whose_of_what", "default": "whom_what"},
-    "iobj":       {"default": "to_whom"},
-    "obl":        {"Dat": "to_whom", "Ins": "with_whom_what", "Loc": "where", "Gen": "whose_of_what", "Acc": "whom_what", "default": "where"},
-    "obl:arg":    {"Dat": "to_whom", "Ins": "with_whom_what", "Loc": "where", "Gen": "whose_of_what", "Acc": "whom_what", "default": "where"}
+    "nsubj": {
+      "anim": "who",
+      "inanim": "what_subject"
+    },
+    "nsubj:pass": {
+      "anim": "who",
+      "inanim": "what_subject"
+    },
+    "obj": {
+      "Gen": "whose_of_what",
+      "default": "whom_what"
+    },
+    "iobj": {
+      "default": "to_whom"
+    },
+    "obl": {
+      "Dat": "to_whom",
+      "Ins": "with_whom_what",
+      "Loc": "where",
+      "Gen": "whose_of_what",
+      "Acc": "whom_what",
+      "default": "where"
+    },
+    "obl:arg": {
+      "Dat": "to_whom",
+      "Ins": "with_whom_what",
+      "Loc": "where",
+      "Gen": "whose_of_what",
+      "Acc": "whom_what",
+      "default": "where"
+    }
   },
   "role_ask": {
-    "who": "Kdo", "what_subject": "Co",
-    "whom_what": "Koho/Co", "whose_of_what": "Koho/Čeho",
-    "to_whom": "Komu/Čemu", "about_whom_what": "O kom/O čem", "with_whom_what": "S kým/Čím",
-    "where": "Kde", "when": "Kdy", "how": "Jak", "how_much": "Kolik",
-    "why": "Proč", "for_what_purpose": "Za jakým účelem",
-    "on_what_condition": "Za jaké podmínky", "in_spite_of": "Navzdory čemu",
-    "state": "Kdo/Co", "which_attribute": "Jaký/Který/Čí", "as_what_state": "Jako jaký",
-    "action": "Co dělá", "past_participle": "Co se stalo", "passive_participle": "Co bylo uděláno"
+    "who": "Kdo",
+    "what_subject": "Co",
+    "whom_what": "Koho/Co",
+    "whose_of_what": "Koho/Čeho",
+    "to_whom": "Komu/Čemu",
+    "about_whom_what": "O kom/O čem",
+    "with_whom_what": "S kým/Čím",
+    "where": "Kde",
+    "when": "Kdy",
+    "how": "Jak",
+    "how_much": "Kolik",
+    "why": "Proč",
+    "for_what_purpose": "Za jakým účelem",
+    "on_what_condition": "Za jaké podmínky",
+    "in_spite_of": "Navzdory čemu",
+    "state": "Kdo/Co",
+    "which_attribute": "Jaký/Který/Čí",
+    "as_what_state": "Jako jaký",
+    "action": "Co dělá",
+    "past_participle": "Co se stalo",
+    "passive_participle": "Co bylo uděláno"
   },
-
   "role_catalog": {
     "who": "Podmět (činitel děje - osoba), odpovídá na otázku: Kdo?",
     "what_subject": "Podmět (neživý činitel, věc, jev), odpovídá na otázku: Co?",
@@ -46,29 +97,112 @@
     "which_attribute": "Přívlastek, odpovídá na otázky: Jaký? Který? Čí? (rozvíjí podstatné jméno)",
     "as_what_state": "Doplněk, vyjadřuje stav podmětu/předmětu během děje, odpovídá na otázku: Jako jaký? V jakém stavu?"
   },
-
   "role_prepositions": {
-    "where": ["v", "ve", "na", "u", "pod", "nad", "před", "za", "mezi", "k", "ke", "z", "ze", "od", "do", "kolem", "podél", "skrz"],
-    "with_whom_what": ["s", "se"],
-    "about_whom_what": ["o"],
-    "for_what_purpose": ["pro", "kvůli"]
+    "where": [
+      "v",
+      "ve",
+      "na",
+      "u",
+      "pod",
+      "nad",
+      "před",
+      "za",
+      "mezi",
+      "k",
+      "ke",
+      "z",
+      "ze",
+      "od",
+      "do",
+      "kolem",
+      "podél",
+      "skrz"
+    ],
+    "with_whom_what": [
+      "s",
+      "se"
+    ],
+    "about_whom_what": [
+      "o"
+    ],
+    "for_what_purpose": [
+      "pro",
+      "kvůli"
+    ]
   },
-  "relative_place_adverbs": ["kde", "kam", "odkud", "kudy"],
-  "relative_time_adverbs": ["kdy", "dokdy", "odkdy"],
-  "participle_active_suffixes": ["l", "la", "lo", "li", "ly"],
-  "participle_passive_suffixes": ["n", "na", "no", "ni", "ny", "t", "ta", "to", "ti", "ty"],
+  "relative_place_adverbs": [
+    "kde",
+    "kam",
+    "odkud",
+    "kudy"
+  ],
+  "relative_time_adverbs": [
+    "kdy",
+    "dokdy",
+    "odkdy"
+  ],
+  "participle_active_suffixes": [
+    "l",
+    "la",
+    "lo",
+    "li",
+    "ly"
+  ],
+  "participle_passive_suffixes": [
+    "n",
+    "na",
+    "no",
+    "ni",
+    "ny",
+    "t",
+    "ta",
+    "to",
+    "ti",
+    "ty"
+  ],
   "clause_markers": {
-    "for_what_purpose": ["aby", "abych", "abys", "abychom", "abyste"],
-    "on_what_condition": ["kdyby", "jestliže", "pokud", "-li"],
-    "in_spite_of": ["ačkoli", "ačkoliv", "přestože", "třebaže", "byť", "navzdory"],
-    "why": ["protože", "poněvadž", "jelikož", "neboť", "ježto"]
+    "for_what_purpose": [
+      "aby",
+      "abych",
+      "abys",
+      "abychom",
+      "abyste"
+    ],
+    "on_what_condition": [
+      "kdyby",
+      "jestliže",
+      "pokud",
+      "-li"
+    ],
+    "in_spite_of": [
+      "ačkoli",
+      "ačkoliv",
+      "přestože",
+      "třebaže",
+      "byť",
+      "navzdory"
+    ],
+    "why": [
+      "protože",
+      "poněvadž",
+      "jelikož",
+      "neboť",
+      "ježto"
+    ]
   },
-
   "deprel_structural": {
-    "case": "preposition", "cc": "conjunction", "mark": "subordinator",
-    "aux": "auxiliary", "aux:pass": "auxiliary", "cop": "copula",
-    "punct": "punctuation", "flat": "name_part", "flat:name": "name_part",
-    "flat:foreign": "name_part", "appos": "name_part", "fixed": "fixed_expr"
+    "case": "preposition",
+    "cc": "conjunction",
+    "mark": "subordinator",
+    "aux": "auxiliary",
+    "aux:pass": "auxiliary",
+    "cop": "copula",
+    "punct": "punctuation",
+    "flat": "name_part",
+    "flat:name": "name_part",
+    "flat:foreign": "name_part",
+    "appos": "name_part",
+    "fixed": "fixed_expr"
   },
   "structural_roles": {
     "preposition": "Předložka — nese pád a směr své jmenné fráze",
@@ -79,5 +213,38 @@
     "punctuation": "Interpunkce — koncová nese modalitu věty (. ? !)",
     "name_part": "Část víceslovného vlastního jména",
     "fixed_expr": "Součást ustáleného víceslovného výrazu"
+  },
+  "uncertainty_markers": [
+    "možná",
+    "snad",
+    "asi",
+    "patrně",
+    "zřejmě",
+    "prý",
+    "údajně",
+    "nejspíš",
+    "nejspíše",
+    "kdoví",
+    "jaksi",
+    "nějak"
+  ],
+  "hedge_root_predicates": [
+    "moci"
+  ],
+  "interrogative_slots": {
+    "who": "PRON:Nom",
+    "what_subject": "PRON:Nom",
+    "state": "PRON:Nom",
+    "whom_what": "PRON:Acc",
+    "whose_of_what": "PRON:Gen",
+    "to_whom": "PRON:Dat",
+    "about_whom_what": "PRON:Loc",
+    "with_whom_what": "PRON:Ins",
+    "where": "ADV",
+    "when": "ADV",
+    "how": "ADV",
+    "how_much": "ADV",
+    "why": "ADV",
+    "which_attribute": "DET:Nom"
   }
 }

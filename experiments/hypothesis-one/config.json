@@ -2,12 +2,90 @@
   "_comment": "Konfigurace fáze 1 — NIC natvrdo v kódu (zákon 3 i pro parametry). Parametry VZORu, služby, cesty. Nový jazyk/nasazení = jiný JSON, žádný zásah do kódu.",
   "lang": "cs",
   "radius": 1,
-  "modality_marks": [".", "?", "!", ":"],
-  "punct_keep": [".", "?", "!", ":", ",", ";", "–", "-"],
+  "modality_marks": [
+    ".",
+    "?",
+    "!",
+    ":"
+  ],
+  "punct_keep": [
+    ".",
+    "?",
+    "!",
+    ":",
+    ",",
+    ";",
+    "–",
+    "-"
+  ],
   "lambda": 0.55,
   "mesh_eps": 0.05,
   "services": {
     "udpipe_url": "http://127.0.0.1:8092/parse"
+  },
+  "preprocessing": {
+    "_comment": "① vrstva PREPROCESSING (annotate_corpus.py): raw text → UDPipe 2 → anotovaný korpus. Výstup je SHARD PER SOUBOR (data/corpus/<doc>.pkl) — koncept #60 fragmentový graf: soubory se do grafu nahrávají dynamicky podle matche, ne všechny naráz. Model se PINUJE kvůli reprodukovatelnosti.",
+    "raw_dir": "../../data/raw",
+    "corpus_dir": "../../data/corpus",
+    "udpipe2_url": "https://lindat.mff.cuni.cz/services/udpipe/api/process",
+    "udpipe2_model": "czech-pdtc-ud-2.17-251125",
+    "batch_chars": 40000
+  },
+  "dataloader": {
+    "_comment": "② vrstva DATALOADER (dataloader.py): ze shardů ① staví per-soubor tf·idf index + globální idf a podle matche vybírá/nahrává soubory do grafu (koncept #60). build_indexes() přepočítá VŠECHNY staty — volat po každém přidání raw dat.",
+    "corpus_dir": "../../data/corpus",
+    "index_dir": "../../data/index",
+    "min_count": 2,
+    "top_files": 8,
+    "subject_min": 3
+  },
+  "fill_holes": {
+    "_comment": "Zaplnění děr (koreference): placeholder se detekuje ÚFAL rysem, antecedent se hledá shodou rysu (překryv rodu = množina kvůli syncretismu + číslo). Dvě strategie: baseline (backward cache, nejbližší podmět/recency) a activation (aktivační pole s útlumem decay, podmět má váhu subject_weight, vyřešená díra referenta posílí o reinforce = téma diskurzu drží přes řetěz).",
+    "window_sentences": 3,
+    "candidate_upos": [
+      "NOUN",
+      "PROPN"
+    ],
+    "decay": 0.7,
+    "subject_weight": 3.0,
+    "reinforce": 2.0,
+    "zone_beta": 2.0,
+    "anchor_bonus": 2.0
+  },
+  "synthesis": {
+    "_comment": "④ vrstva SYNTHESIS: z rozkladu na role (③) staví grafikon FAKT↔OTÁZKA (synth_registry → registry.jsonl) a CONFIRMED slovník VZOR→role (synth_determination → determination.json). vzor_radius = poloměr VZORu, determination_min = práh povýšení role.",
+    "registry": "registry.jsonl",
+    "determination": "determination.json",
+    "queries": "query_templates.jsonl",
+    "vzor_radius": 2,
+    "determination_min": 3
+  },
+  "template_store": {
+    "_comment": "Persistentní šablony FAKT-VZOR × QUERY-VZOR × ODPOVĚĎ (QueryTemplate), SHARDOVANÉ per soubor (jako korpus) → nahrání DLE OTÁZKY (mount, koncept #60). VZOR matcher.",
+    "dir": "../../data/templates",
+    "fuzzy_min_overlap": 0.5
+  },
+  "fact_store": {
+    "_comment": "Fakty (predikát + role-sloty) sharded per soubor → parent-model matching: otázka a fakt se potkají PREDIKÁTEM + rolí díry (nezávisle na slovosledu, na rozdíl od window-VZORu). Fakty = řádky registry (④) agregované per (doc,sent,predikát) + KOREFERENČNÍ obohacení pro-drop podmětu (build_facts_all → who-slot), mount jen horkých (#60). enabled=true: MĚŘENO na goldu ADITIVNÍ (12 %, 0 regrese) po dvou zámcích — (1) koreference vplní podmět (who=[Karel] do narodit faktu), (2) entitní vazba musí být v JINÉ roli než odpověď (guard proti slepenci who=[Švejk,Olbracht]). Predikátová cesta teď najde SPRÁVNÝ fakt; poslední míle = výběr slotu dle TYPU entity (Svatoňovice vs rodina) = expert Topos.",
+    "dir": "../../data/facts",
+    "enabled": true
+  },
+  "topos": {
+    "_comment": "Expert MÍSTO — gazetteer lemmat GEO entit (NER NameType=Geo) z korpusu (build_gazetteer.py). is_place(lemma) rozliší place vs ne-place → výběr správného where-slotu (Svatoňovice > rodina) mezi kandidáty téže role. Mirror parent/Topos; zatím jen typ (is_place), containment (Praha⊂Čechy) je pozdější rozšíření.",
+    "gazetteer": "../../data/gazetteer.json"
+  },
+  "chronos": {
+    "_comment": "Expert/podgraf ČAS (chronos.py) — rozpozná rok (4místné NUM v rozsahu) a přiřadí ho k hlavnímu predikátu věty → fakt dostane when-slot i z běžného textu (ne jen z bio-závorky). Mirror parent/chronos (resolve_temporal); zatím jen rok, plné datum/interval/relativní čas jsou rozšíření.",
+    "year_min": 1000,
+    "year_max": 2100
+  },
+  "activation": {
+    "_comment": "ActivationField — tekoucí světlo nad grafem. VODIVOST hrany = idf(a)×idf(b)×proximity (okenní ko-okurence, ne jen bigram) → funkční slova (nízké idf) světlo nevedou, obsah ano. VÁHA UZLU = idf (distinktivní slova jasná). window = okno ko-okurence (v obsahových tokenech), tau = útlum vzdáleností exp(−d/tau).",
+    "decay": 0.7,
+    "spread_lambda": 0.5,
+    "hops": 2,
+    "window": 5,
+    "tau": 2.0
   },
   "paths": {
     "lang": "lang/cs.json",

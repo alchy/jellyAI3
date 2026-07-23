@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fáze ③ Grammar — grammar_vzor.py, role_catalog.py</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+
+<nav class="crumbs"><a href="index.html">Dokumentace</a> › Fáze ③ Grammar</nav>
+
+<p class="eyebrow">Fáze ③ · Grammar</p>
+<h1>Ze surové anotace naše role a VZOR</h1>
+<p class="lead">Tady se surové názvosloví UDPipe (<code>deprel</code> = nsubj/obl…) NORMALIZUJE
+na <b>naše klíče</b> rolového katalogu (who/where/action/…) a staví se <b>VZOR</b> (frame_sig).
+Pracuje nad už anotovanou větou z korpusu ①.</p>
+
+<p>Soubory: <code>grammar_vzor.py</code> (<code>GrammarVzor</code> — primitiva) ·
+<code>role_catalog.py</code> (<code>RoleCatalog</code> — rozklad na role). Klíče: viz
+<a href="terminy.html">Termíny → Rolový katalog</a>.</p>
+
+<h2>Příklad: vstup → akce → výstup</h2>
+<div class="flow">
+  <div class="step in"><span class="tag">vstup — anotovaná věta ①</span>
+    <pre>tokeny s deprel/upos/feats
+"Odešel do galilejského
+ města Kafarnaum a učil
+ je v sobotu."</pre></div>
+  <div class="step act"><span class="tag">akce — rozklad na role</span>
+    <pre>RoleCatalog()
+  .standardize(sent)
+# deprel + pád + předložka
+# → náš klíč</pre></div>
+  <div class="step out"><span class="tag">výstup — sektory s naším klíčem</span>
+    <pre>[(Odešel,   action),
+ (do,       preposition),
+ (Kafarnaum, where),  ← UDPipe2
+ (učil,     action),
+ (sobotu,   when), …]</pre></div>
+</div>
+<p>Plná tabulka rozkladu (# / sektor / UPOS / lemma / pád / <b>náš klíč</b> / co je špatně) je
+v <a href="terminy.html">Termínech → Klíče v použití</a>. Chybu <code>Kafarnaum → who</code>
+dělal UDPipe 1; nad novým korpusem (UDPipe 2) dává <code>role_catalog</code> správně
+<code>Kafarnaum → where</code>.</p>
+
+<h2>Normalizace deprel → náš klíč</h2>
+<p>Jádro je jediný mapovač <code>GrammarVzor.role_key(deprel, upos, feats, prep)</code> nad
+tabulkou <code>deprel_to_role</code> v <code>lang/cs.json</code>. Předložka může roli přebít
+(s+instrumentál → <code>with_whom_what</code>), pád rozhoduje u předmětů/určení.</p>
+<table>
+<tr><th>deprel + pád</th><th>náš klíč</th></tr>
+<tr><td>nsubj (+ životné)</td><td><code>who</code></td></tr>
+<tr><td>obj (Acc)</td><td><code>whom_what</code></td></tr>
+<tr><td>iobj (Dat)</td><td><code>to_whom</code></td></tr>
+<tr><td>obl (Loc)</td><td><code>where</code></td></tr>
+<tr><td>obl (Ins)</td><td><code>with_whom_what</code></td></tr>
+<tr><td>amod / nmod</td><td><code>which_attribute</code></td></tr>
+</table>
+
+<h2>Třída <code>GrammarVzor</code> — primitiva VZORu</h2>
+<p>Drží parametry VZORu (poloměr okna, interpunkce, modalita) a jazyková data. Metody jsou
+čisté transformace nad tokeny; VZOR je přesný na gramatiku, abstraktní na lexém.</p>
+
+<div class="member">
+  <p class="sig">slot(tok) → str</p>
+  <p>Match-obálka jednoho tokenu: UPOS + nosné rysy (pád, čas). Pád v pivotu JE role, proto
+  se do slotu vždy bere.</p>
+  <pre>g = GrammarVzor()
+g.slot({"upos":"PROPN","feats":{"Case":"Nom"}})   # → "PROPN:Nom"</pre>
+  <div class="io"><b>vstup</b><span>token (dict)</span><b>výstup</b><span>SLOT (str)</span></div>
+</div>
+
+<div class="member">
+  <p class="sig">frame_sig(toks, i, modality, r=None) → str</p>
+  <p>VZOR — skládá se z <b>r SLOTŮ vlevo · pivot · r SLOTŮ vpravo · modalita</b>. Okraje věty
+  doplní <code>^</code> (začátek) / <code>$</code> (konec). Poloměr <code>r</code> řídí, jak
+  široké okolí pivotu se do vzoru vezme.</p>
+  <pre>g.frame_sig(sent, 2, ".", r=2)
+# → "NOUN:Nom·ADP:Loc·NOUN:Loc·VERB:Pres·ADP:Ins·."</pre>
+  <div class="io"><b>vstup</b><span>věta, index pivotu, modalita, poloměr</span><b>výstup</b><span>VZOR (str)</span></div>
+</div>
+
+<h3>Jak se uplatňuje <code>r</code> — a proč r = 2</h3>
+<p>Vezměme větu <i>„Autor v příběhu varuje před …"</i> a pivot <b>„příběhu"</b>
+(<code>NOUN:Loc</code>, role <code>where</code>). Se zvětšujícím se <code>r</code> roste okno
+kolem pivotu:</p>
+<div style="overflow-x:auto">
+<table>
+<tr><th>r</th><th>okno kolem pivotu „příběhu"</th><th>VZOR</th></tr>
+<tr><td>1</td><td>v · <b>příběhu</b> · varuje</td><td><code>ADP:Loc·NOUN:Loc·VERB:Pres·.</code></td></tr>
+<tr><td>2</td><td>Autor · v · <b>příběhu</b> · varuje · před</td><td><code>NOUN:Nom·ADP:Loc·NOUN:Loc·VERB:Pres·ADP:Ins·.</code></td></tr>
+</table>
+</div>
+<ul>
+<li><b>r = 1</b> vidí jen bezprostřední sousedy — předložku <code>v</code> (nese pád Loc) a
+přísudek. To sice zachytí, že jde o předložkovou frázi, ale <b>ne její místo v klauzuli</b>:
+týž vzor <code>ADP:Loc·NOUN:Loc·VERB</code> sdílí spousta nesouvisejících vět → match je
+nejednoznačný.</li>
+<li><b>r = 2</b> přidá VLEVO podmět <code>Autor</code> (<code>NOUN:Nom</code>) a VPRAVO další
+argument <code>před</code> (<code>ADP:Ins</code>) — tedy <b>celý skelet klauzule</b>
+(podmět · pivot · přísudek · další argument). To je přesně to, co roli nese.</li>
+</ul>
+<div class="note"><span class="lbl">Proč zrovna r = 2 (měřeno):</span> shadow harness
+(<code>sim_r_compare</code>) porovnal překryv VZORů mezi otázkou a jejím faktem při r=1 vs r=2.
+<b>Při r=2 přežije víc přesných vzorů → správný fakt se trefí s vyšší jistotou.</b> r=1 je
+příliš úzký (vzor sdílí mnoho kontextů → nejednoznačno); r=3+ naopak <b>přefragmentuje</b> —
+skoro každý vzor je unikát (hapax), mizí generalizace a pokrytí padá. r=2 je rovnováha:
+dost kontextu na roli, a přesto vzor zobecňuje. Proto rolová determinace (<code>synth_determination</code>)
+i kurátorská DB stavějí VZOR na <code>r=2</code>.</div>
+
+<div class="member">
+  <p class="sig">role_key(deprel, upos, feats, prep="", nominal_pred=False) → str|None</p>
+  <p>Tady se surový deprel normalizuje na náš klíč (jediný zdroj mapování, data v cs.json).
+  Předložka může roli přebít; vrací <code>None</code>, když deprel nemapujeme.</p>
+  <pre>g.role_key("obl", "NOUN", {"Case":"Loc"})   # → "where"
+g.role_key("obj", "NOUN", {"Case":"Acc"})   # → "whom_what"</pre>
+  <div class="io"><b>vstup</b><span>deprel, upos, rysy, předložka</span><b>výstup</b><span>náš klíč (str) / None</span></div>
+</div>
+
+<div class="member">
+  <p class="sig">canon_lemma(tok) → str &nbsp;·&nbsp; sentence_modality(toks) → str &nbsp;·&nbsp; prep_of(sent, tid) → str</p>
+  <p>Kanonizace (přivlastňovací ADJ → base jméno: Čapkův→Čapek), koncová modalita věty
+  (. ? ! :) a předložka závislá na tokenu. Pomáhají rozkladu a VZORu.</p>
+  <pre>g.canon_lemma({"upos":"ADJ","lemma":"Čapkův","feats":{"Poss":"Yes"}})   # → "Čapek"</pre>
+  <div class="io"><b>vstup</b><span>token / věta / (věta, id)</span><b>výstup</b><span>lemma / modalita / předložka</span></div>
+</div>
+
+<h2>Třída <code>RoleCatalog</code> — rozklad na role</h2>
+<p>Rozkládá anotovanou větu na sektory s naším klíčem a na klauzule. Používá primitiva
+<code>GrammarVzor</code>, takže stejný význam = stejný klíč napříč systémem.</p>
+
+<div class="member">
+  <p class="sig">standardize(sent) → list[(token, klíč)]</p>
+  <p>Rozklad věty na sektory — každý token dostane náš klíč, deprel se ven nedostane.
+  VERB → action, jmenný přísudek se sponou → state, strukturální deprel → strukturální klíč.</p>
+  <pre>RoleCatalog().standardize(sent)
+# → [(Odešel, "action"), (do, "preposition"), (Kafarnaum, "where"), …]</pre>
+  <div class="io"><b>vstup</b><span>anotovaná věta</span><b>výstup</b><span>[(token, náš klíč)]</span></div>
+</div>
+
+<div class="member">
+  <p class="sig">curated_standardize(sent, r=2) → list[(token, klíč, kurátorováno?)]</p>
+  <p>Jako <code>standardize</code>, ale VZOR okna se hledá v kurátorské DB
+  (<code>curated.json</code>) — je-li tam, bere se OPRAVENÁ role. Tak se řeší systematické
+  chyby anotátoru.</p>
+  <pre>RoleCatalog().curated_standardize(sent)
+# → [(Kafarnaum, "where", True), …]   # True = opraveno kurátorem</pre>
+  <div class="io"><b>vstup</b><span>anotovaná věta, poloměr</span><b>výstup</b><span>[(token, klíč, opraveno?)]</span></div>
+</div>
+
+<div class="member">
+  <p class="sig">decompose(sent) → list[clause]</p>
+  <p>Rozloží větu na KLAUZULE (přísudek + jeho role); relativní klauzule dědí místo z
+  antecedentu (meziklauzulová inference #59). Základ pro syntézu faktů (④).</p>
+  <pre>RoleCatalog().decompose(udpipe_sent_z_korpusu)
+# → [{"predicate":"odejít", "roles":{"action":["odejít"], "where":["Kafarnaum"]}}, …]</pre>
+  <div class="io"><b>vstup</b><span>anotovaná věta</span><b>výstup</b><span>klauzule {predicate, roles…}</span></div>
+</div>
+
+<div class="member">
+  <p class="sig">role_of(t, sent, byid) → str|None &nbsp;·&nbsp; standard_role(t, sent, byid, cop_heads=None) → str</p>
+  <p>Obsahová role jednoho tokenu (souřadný konjunkt dědí roli řídícího) a plný
+  standardizovaný klíč jednoho sektoru. Volají je <code>standardize</code> i <code>decompose</code>.</p>
+  <div class="io"><b>vstup</b><span>token + kontext věty</span><b>výstup</b><span>náš klíč (str) / None</span></div>
+</div>
+
+<div class="note"><span class="lbl">Parita:</span> <code>GrammarVzor</code> je bitově shodné s
+původním <code>run.py</code> (7746 tokenů, 0 neshod), <code>RoleCatalog</code> s <code>roles.py</code>
+(600 vět, 0 neshod) — refaktor jen přejmenoval a přepojil na nový korpus, chování nezměnil.</div>
+
+<nav class="crumbs" style="margin-top:2.5rem"><a href="index.html">← zpět na rozcestník</a></nav>
+
+</div>
+</body>
+</html>

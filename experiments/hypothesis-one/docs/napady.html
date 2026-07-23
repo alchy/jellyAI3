@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nápady a podněty</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+
+<nav class="crumbs"><a href="index.html">Dokumentace</a> › Nápady a podněty</nav>
+
+<p class="eyebrow">Příležitosti · co jsme cestou zahlédli</p>
+<h1>Nápady a podněty</h1>
+<p class="lead">Zajímavé věci, které se vynořily při stavbě a vysvětlování účelu — ne nedostatky
+(ty jsou v <a href="k-doreseni.html">K dořešení</a>), ale <b>příležitosti</b>, které bychom
+mohli využít. Sbírají se průběžně.</p>
+
+<div class="member">
+  <p class="sig">Transpozice = JEDNO primitivum (query-gen ↔ koreference)</p>
+  <p>Deterministická <b>transpozice fakt-VZOR → query-VZOR</b> (pivot = odpovědní slot → tázací
+  slot, modalita → „?") je TÝŽ mechanismus jako <b>transpozice v koreferenci</b> (dosadit
+  kandidáta do role díry, viz <a href="koreference.html">Koreference</a>). Jedno primitivum
+  sjednocuje generování otázky I rozřešení díry.</p>
+  <p><b>Kde využít:</b> stejnou transpozici lze pravděpodobně použít i na generování ODPOVĚDI
+  (dosadit hodnotu do faktu) a parafrázi — vše jako pohyb pivotu po VZORu.</p>
+</div>
+
+<div class="member">
+  <p class="sig">Stín je KONSTRUOVATELNÝ, ne jen učený</p>
+  <p>Query-VZOR (stín otázky) se dá <b>zkonstruovat transpozicí</b> z fakt-VZORu — a přesně
+  se shoduje s tím, co dá parse reálné otázky té struktury. Grafikon má tedy
+  <b>deterministickou kostru</b> (pokrytí zdarma) a Ollama jen dodává povrchovou rozmanitost.</p>
+  <p><b>Kde využít:</b> Ollama NENÍ nutná pro pokrytí — jen pro variabilitu povrchů. Standalone
+  systém funguje i bez ní (deterministické šablony); Ollama je „bonus", ne závislost.</p>
+</div>
+
+<div class="member">
+  <p class="sig">Zóna / selektivní profil entity (z VZORů)</p>
+  <p>Každá entita má <b>rolový profil</b> z korpusu (<code>slovo</code> je Acc-předmět 46 %,
+  <code>svět</code> genitiv/místo). Postavili jsme ho pro koreferenci (transpoziční fit).</p>
+  <p><b>Kde využít:</b> týž profil = <b>typování odpovědi</b> (která entita sedí do role díry),
+  klasifikace entit (osoba/místo/pojem z distribuce pádů), disambiguace — bez slovníku, jen z dat.</p>
+</div>
+
+<div class="member">
+  <p class="sig">Faktualitní filtr i na RUNTIME vstup</p>
+  <p><code>is_factual</code> (hedging/nejistota/modalita → není fakt) dnes filtruje korpus.
+  Stejná brána platí i na <b>vstup uživatele</b>: řekne-li mluvčí „možná přijde", nemá se z toho
+  stát tvrzený fakt v paměti.</p>
+  <p><b>Kde využít:</b> zápisová cesta (Mnemos-styl) — filtrovat nejisté výroky, ať paměť
+  nelže. Napojit na provenienci (OBSERVED vs ASSOCIATED).</p>
+</div>
+
+<div class="member">
+  <p class="sig">Completeness helper jako SELF-REPAIR</p>
+  <p>Kontrola pokrytí rolí (chybějící role v otázkovém setu) nemusí jen HLÁSIT — může
+  <b>doplnit</b>: chybí-li role, vygeneruj ji deterministickou transpozicí. Set se sám zacelí.</p>
+  <p><b>Kde využít:</b> zaručeně kompletní grafikon per fakt bez ohledu na drift Ollamy — brána
+  kvality se stává samoopravnou.</p>
+</div>
+
+<div class="note"><span class="lbl">Zásada:</span> podnět se sem zapisuje s <b>„kde využít"</b>
+— ne jako nápad do vzduchu, ale s konkrétní příležitostí. Když se využije, přesune se do
+příslušné stránky jako hotová věc.</div>
+
+<nav class="crumbs" style="margin-top:2.5rem"><a href="index.html">← zpět na rozcestník</a></nav>
+
+</div>
+</body>
+</html>

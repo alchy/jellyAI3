@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dialogový stavový automat — jádro</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  .flow2 { font-family: var(--mono); font-size: .82rem; background: var(--code-bg);
+    border: 1px solid var(--line); border-radius: 8px; padding: 1rem 1.2rem; line-height: 1.75;
+    overflow-x: auto; }
+  .ok { color: var(--ok); font-weight: 600; }
+  .bad { color: var(--warn); font-weight: 600; }
+  .have td:first-child, .cmp td:first-child { font-family: var(--mono); font-size: .82rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<nav class="crumbs"><a href="index.html">Dokumentace</a> › <a href="fuze.html">Fúze</a> › Dialogový automat</nav>
+
+<p class="eyebrow">Původní koncept · vše na grafu</p>
+<h1>Dialogový stavový automat — jádro</h1>
+<p class="lead">K tomuhle celou dobu všechno mířilo. Co vypadalo jako přípravné díly (VZOR,
+role, fakty, koreference, gazetteer, aktivace) jsou <b>součásti jednoho grafu</b>. Systém není
+statická databáze (<code>SELECT FROM…</code>) — je to <b>dialogový stavový automat</b>: rozhovor
+rozsvěcí graf, VZOR z rozsvíceného kontextu doostří odpověď, a <b>kde je jasno, odpoví; kde není,
+doptá se</b>.</p>
+
+<h2>Původní koncept — vše stojí na grafu</h2>
+<ul>
+<li><b>váhy uzlů</b> — jak jasný je uzel (idf / důležitost);</li>
+<li><b>vodivost hran</b> — jak jimi teče světlo (idf × idf × proximity, okenní ko-okurence);</li>
+<li><b>tekoucí světlo</b> — aktivace se šíří po vodivých hranách, mezi tahy utichá, přetrvává kontext;</li>
+<li><b>podgrafy</b> — doménoví experti jsou pod-struktury grafu (Chronos = čas, Topos = místo).</li>
+</ul>
+
+<h2>Runtime tok — světlo NEJDŘÍV, VZOR AŽ POTOM</h2>
+<div class="flow2">
+STAV<sub>in</sub> (pending klarifikace + přetrvávající světlo z minulých tahů)<br>
+&nbsp;&nbsp;│<br>
+&nbsp;&nbsp;├─ <b>1 ROZSVÍCENÍ</b> — slova rozhovoru nalijí světlo do uzlů (váha=idf), teče po hranách<br>
+&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;→ rozsvítí se KONTEXT (o čem se mluví: „pes domácí" → doména domácích zvířat)<br>
+&nbsp;&nbsp;├─ <b>2 VZOR PADÁ NA KONTEXT</b> — tvar otázky (kdo/co JE ? = komplement; kde ? = místo)<br>
+&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;dopadne na ROZSVÍCENÝ kontext a DOOSTŘÍ na kandidáty správného tvaru/role<br>
+&nbsp;&nbsp;├─ <b>3 ASSURANCE</b> — jasno vs nejasno = odstup vítěze (struktura NEBO světlo)<br>
+&nbsp;&nbsp;└─ <b>4 VĚTVENÍ</b>:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;jasno&nbsp;&nbsp;&nbsp;→ <span class="ok">ODPOVĚZ</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;nejasno&nbsp;→ <span class="bad">DOPTEJ SE</span> „mám data o X a Y — upřesni"<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;prázdno → NEHÁDEJ (upřímný terminál)<br>
+STAV<sub>out</sub> (světlo přetrvá → smyčka konverguje; pending armed při doptání)
+</div>
+<p>Je to obrácení naivního přístupu „VZOR loví globálně → světlo přerovná". Správně: <b>světlo
+najde KDE (kontext), VZOR najde CO (tvar), odpověď = rozsvícené ∩ tvar.</b> Proto se u „Kdo je
+pes?" nemá vůbec rozsvítit bible.</p>
+
+<h2>Parent = přesně tento automat (co jsme prozkoumali)</h2>
+<p>Původní systém (<code>jellyai/</code>) tohle už žije — je to náš cíl:</p>
+<div style="overflow-x:auto">
+<table class="cmp">
+<tr><th>díl</th><th>parent</th></tr>
+<tr><td>stav mezi tahy</td><td><code>FocusState</code> (pending klarifikace + historie) + <code>ActivationField</code> context (světlo, přetrvává)</td></tr>
+<tr><td>turn loop</td><td><code>_turn</code>: resume pick → illuminate → retrieve → assurance → answer/clarify</td></tr>
+<tr><td>retrieval</td><td>glow-orders-ties: <code>sort(−base, −glow)</code> — base rozhoduje, glow řadí JEN remízu</td></tr>
+<tr><td>jasno/nejasno</td><td><code>assurance = quality/(1+rivals) + 0.3·glow</code>; práh 0.55 <b>na kartě, ne v kódu</b></td></tr>
+<tr><td>klarifikace</td><td>karta <code>resolve.ambiguous</code> „Mám možnost se věnovat: {X,Y} — kam zaostřit?" → arm pending → <code>_resume_pick</code> (rekurzivní)</td></tr>
+<tr><td>světlo</td><td><code>warm/step</code>; failed turn NEdecayuje → focus drží; „Co napsal?" navazuje na horký kontext</td></tr>
+</table>
+</div>
+
+<h2>Co už máme postavené (fúze do experimentu)</h2>
+<div style="overflow-x:auto">
+<table class="have">
+<tr><th>vrstva</th><th>stav</th></tr>
+<tr><td><code>activation_field</code></td><td>graf VODIVOSTÍ (idf×idf×proximity, okenní) + váhy uzlů idf <span class="pill">nové</span></td></tr>
+<tr><td><code>fact_store</code> + koref</td><td>fakty predikát+role, pro-drop podměty vyplněné (2467 who-slotů)</td></tr>
+<tr><td><code>topos</code></td><td>expert MÍSTO (is_place, gazetteer 770) — where doostření</td></tr>
+<tr><td><code>_answer_role</code></td><td>kopula „Kdo/Co JE X?" → hole = KOMPLEMENT (state), ne who-podmět <span class="pill">nové</span></td></tr>
+<tr><td><code>_assurance</code></td><td>jasno / nejasno / nehádej — odstup vítěze (base NEBO glow) <span class="pill">nové</span></td></tr>
+<tr><td><code>_rank</code></td><td>glow-orders-ties: (echo, role_fit, known_ov, type_fit, kind_pred, mq, glow)</td></tr>
+</table>
+</div>
+
+<h2>Poctivý stav na goldu (25 otázek)</h2>
+<p><b>15 jistě správně (60 %) · 6 doptání · 3 sebevědomě špatně · 1 bez pivotu.</b> Dialogová
+vrstva běží — jasno odpoví, nejasno se doptá, prázdno nehádá. Měřená křivka:
+K0 8 % → glow-orders-ties 12 % → koref → Topos 16 % → dialog. automat + extrakce závorky 40 %
+→ definiční komplement (kopula) 56 % → <b>entita-jako-podmět (výběr domény) 60 %</b>.</p>
+<div class="note"><span class="lbl">Entita jako podmět (světlo vybírá doménu, hotovo):</span>
+soubor se rozsvítí podle entity JAKO PODMĚTU, ne podle četnosti slova. Podmětový index
+(<code>nsubj</code> počty per soubor) + <b>podmětová unie</b> v <code>select_files</code>: k tf·idf
+top-8 se přidá soubor, kde je entita dotazu nejsilnějším podmětem. „Slovo" → evangelium <b>Jan</b>
+(ne Korintským) → <code>Čím se stalo Slovo → tělo ✓</code>. Merge zkratek (R.U.R.) opakovaně
+regresuje — R.U.R. zůstává tvrdý (tokenizace).</p></div>
+<div class="note"><span class="lbl">Kopula přes definiční komplement (hotovo):</span>
+„Kdo/Co JE X?" → hole = komplement (state) i když tázací slovo nemapuje roli (jmenný přísudek);
++ signál <b>state z ÚVODNÍ věty = definice</b> (jako závorka). Konvertovalo: <code>pes→šelma</code>,
+<code>Josef→malíř</code> (jako parent!), <code>Karel→spisovatel</code>, <code>kočka→forma</code>.</p></div>
+<div class="note"><span class="lbl">Extrakce závorky (hotovo):</span> biografická
+<code>Osoba (datum místo – datum místo)</code> z ÚVODNÍ věty → fakty narodit/zemřít (who+when+where).
+Odemklo VŠECH 8 biografických „kdy"+„kde": <code>1890/1938/1887/1883</code>, <code>Svatoňovice/
+Praha/Hronov/Praha</code>. Klíč: brát závorku jen ze sent 0 (jinde jsou datumy jiných osob →
+falešná remíza).</p></div>
+<div style="overflow-x:auto">
+<table>
+<tr><th>funguje ✓</th><th>nefunguje ✗</th><th>proč</th></tr>
+<tr>
+<td>jasno → odpoví: <code>R.U.R.→Čapek</code>, <code>Švejk→Hašek</code>, <code>Kde narodil Čapek→Svatoňovice</code></td>
+<td>nabídky u doptání jsou často odpad: <code>Kdy narodil→cestopis</code>; <code>Kdo je Josef→verš</code></td>
+<td rowspan="3"><b>Assurance sedí NAD starým retrievalem.</b> Kandidáti vznikají strukturním VZOR/FactStore matchem, ne z ROZSVÍCENÉHO kontextu. Doptání proto nabízí, co strukturně matchlo (odpad), ne co je v grafu jasné.</td>
+</tr>
+<tr>
+<td>„Kdo je pes?" už <b>neříká „bůh"</b> — doptá se <code>mazlíček, chovaný</code> (pes-doména!)</td>
+<td>5 sebevědomě špatně: <code>Josef narodil→země</code>, <code>Hašek→Československo</code></td>
+</tr>
+<tr>
+<td>systém <b>nehádá</b>, když neví (upřímný terminál)</td>
+<td>6× „kdy" = odpad, protože <b>datumy se neextrahují</b> (závorka se zahazuje)</td>
+</tr>
+</table>
+</div>
+<div class="note"><span class="lbl">Klíčový nález:</span> glow-margin v assurance je nutný — bez
+něj se i jistý vítěz (Hašek, glow 20× nad druhým) tvářil jako remíza a zbytečně se doptával.
+Jako parentův <code>+0.3·glow</code>: vítěz s dominantním světlem je jistý i při remíze base.</p></div>
+
+<h2>Klarifikace jako REKURZIVNÍ skórovaný průzkum (cílový tvar)</h2>
+<p>Doptání není pasivní „nabídnu a čekám". Když je nejasno a máme oblasti X, Y, Z:</p>
+<ol>
+<li><b>Aktivně prozkoumej</b> každou nabízenou oblast <b>sadou dotazů na identifikovaný subjekt</b>
+(ne na uživatele) — nech oblast rozsvítit a odpovědět.</li>
+<li><b>Skóruj</b>, která oblast subjektu nejlíp sedí — <b>total</b> nebo <b>odstup</b> (margin).</li>
+<li><b>Rozhodni:</b> jedna dominuje → rozřeš sám (bez ptaní); jinak se zeptej <b>cíleně na content</b>
+a směřuj tam.</li>
+<li><b>Rekurze:</b> celé to může jít víc úrovní hluboko ve stavovém automatu (prozkoumaná oblast
+se stane novým subjektem, znovu se probe/skóruje/doptá).</li>
+</ol>
+<div class="note"><span class="lbl">Splývá se světlo-first:</span> tohle JE světlo-first
+aplikované na klarifikaci — světlo prozkoumá oblasti, <b>odstup = skóre (assurance)</b>, rekurze
+doostřuje. Proto krok 3 (světlo-first) je zároveň nosičem téhle rekurzivní klarifikace.</p></div>
+
+<div class="note warn"><span class="lbl">Dluh — extrakce natvrdo:</span> současný
+<code>extract_bio.bio_facts</code> je NATVRDO (hledá <code>(</code>, en-pomlčku, 4místný NUM,
+NameType=Geo). Funguje (odemklo 8 otázek, 40 %), ale cílový tvar je <b>VZOR</b> (rozpoznat vzor
+biografické závorky přes <code>frame_sig</code>) + <b>rekurze</b> (vnořená místa „Praha - Nové
+Město", datum s částmi). Dočasné lešení, ne konečný stav.</p></div>
+
+<h2>Zbývající cesta (pořadí: dokumentace → extrakce → světlo-first)</h2>
+<ol>
+<li><b>Extrakce závorky</b> — biografické <code>(datum místo – datum místo)</code> → fakty
+narodit/zemřít (when+where). Odemkne 6× „kdy" (odpad → 1890/1938) + zbylé „kde". Měřitelné hned.</li>
+<li><b>Světlo-first retrieval</b> — kandidáti <b>z rozsvíceného kontextu</b> (světlo vybere doménu
+→ VZOR/role doostří), ne globální strukturní match. Tím se pročistí i nabídky u doptání i jisté
+odpovědi. To je poslední díl „původního konceptu".</li>
+</ol>
+
+<div class="note warn"><span class="lbl">Zásada:</span> každý krok se poměřuje na goldu
+(<code>eval_answers.py</code> — módy answer/clarify/unsure) a na koref (<code>eval_coref.py</code>).
+Varianty vah/vodivosti (<code>experiment_graph.py</code>) se srovnávají až na RETRIEVALU, ne na
+mikro-metrice úniku do funkčních slov (ta je zavádějící — funkční slova nikdy nejsou odpověď).</div>
+
+<nav class="crumbs" style="margin-top:2.5rem"><a href="fuze.html">← zpět na fúzi</a></nav>
+
+</div>
+</body>
+</html>

@@ -13,3 +13,10 @@ model/udpipe*
 data/reminders.jsonl
 data/web_inbox.txt
 data/telemetry.jsonl
+
+# hypothesis-one generovaná data (reprodukovatelné: annotate_corpus/build_*)
+data/corpus/
+data/facts/
+data/index/
+data/templates/
+data/gazetteer.json

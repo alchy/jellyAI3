@@ -2,7 +2,5 @@ server.log
 graph.html
 __pycache__/
 registry.jsonl
-bundle.jsonl
 candidates.json
-graphikon_sample.json
 variants.log

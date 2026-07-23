@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Anotační cache a perzistentní data</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+
+<nav class="crumbs"><a href="index.html">Dokumentace</a> › Anotační cache a perzistentní data</nav>
+
+<p class="eyebrow">Perzistentní data</p>
+<h1>Naše anotační cache</h1>
+<p class="lead">Rozbor textu nástrojem UDPipe 2 je pomalý a hlavně neuronový. Uděláme ho
+proto <b>jednou předem, offline</b>, a výsledek uložíme do vlastní statické cache. Za běhu
+dotazu se už jen čte — v rozhodovací smyčce žádný neuron není (teze systému drží).</p>
+
+<h2>Co cache je a k čemu</h2>
+<p>Cache je <b>anotovaný korpus rozdělený po souborech</b>. Každý zdrojový soubor má svůj
+shard; ten je zároveň mountovatelná jednotka pro
+<a href="dynamicke-nahravani.html">dynamické nahrávání</a>.</p>
+<table>
+<tr><th>cesta</th><th>obsah</th><th>formát</th></tr>
+<tr><td>data/corpus/&lt;doc&gt;.pkl</td><td>anotace jednoho souboru</td><td>pickle <code>{(doc,idx): {entities, sentences}}</code></td></tr>
+<tr><td>data/corpus/_meta.json</td><td>metadata běhu (model, počty vět per soubor)</td><td>JSON</td></tr>
+</table>
+
+<h3>Formát shardu (jeden záznam)</h3>
+<pre>("wiki_r.u.r.", 1): {
+  "entities": [ {"text":"Karla Čapka", "type":"P", "start":112, "end":123} ],
+  "sentences": [[
+    {"form":"Autor", "lemma":"autor", "upos":"NOUN", "deprel":"nsubj", "head":4,
+     "feats":{"Case":"Nom", …}, "start":137, "end":142}, …
+  ]]
+}</pre>
+<ul>
+<li>klíč <code>(doc_id, index_věty)</code> — provenience až na úroveň věty;</li>
+<li><code>sentences</code> — seznam vět, věta = seznam tokenů (tvar, lemma, slovní druh,
+morfologie, závislostní hrana <code>deprel→head</code>, znakové offsety);</li>
+<li><code>entities</code> — pojmenované entity (osoba „P" / místo „G"), odvozené z rysu
+<code>NameType</code>; podrobně viz <a href="faze-1-preprocessing.html">Fáze ① Preprocessing</a>.</li>
+</ul>
+
+<h2>Jak se přidává nový obsah</h2>
+<p>Přidání dokumentu je trojkrokové. Vstupní data <b>nikdy nepřepisujeme</b> — přidáváme.</p>
+<div class="flow">
+  <div class="step in"><span class="tag">1 — nový raw soubor</span>
+    <pre>data/raw/muj_text.txt
+(doc_id = "muj_text")</pre></div>
+  <div class="step act"><span class="tag">2 — anotace ①</span>
+    <pre>python annotate_corpus.py
+# → data/corpus/muj_text.pkl
+# + přepíše _meta.json</pre></div>
+  <div class="step out"><span class="tag">3 — přepočet statů ②</span>
+    <pre>Dataloader().build_indexes()
+# idf + všechny indexy
+# aktuální</pre></div>
+</div>
+<p><b>Proč krok 3 přepočítává vše:</b> idf (unikátnost termínu) závisí na počtu souborů,
+takže nový soubor posune váhy i ostatním. <code>build_indexes()</code> je idempotentní nad
+aktuální množinou shardů — je to jediná „aktualizuj všechny staty" funkce. Krok 2 zanotuje
+soubory ze <code>data/raw/</code> a nový soubor si vezme automaticky.</p>
+
+<div class="note"><span class="lbl">Poznámka:</span> anotace i indexy jsou deterministické —
+model UDPipe 2 je v configu <b>pinnutý</b>, skóre se vždy řadí. Stejný vstup → stejná cache.</div>
+
+<h2>Ostatní perzistentní data (formát a účel)</h2>
+<table>
+<tr><th>soubor</th><th>formát</th><th>účel</th></tr>
+<tr><td>config.json</td><td>JSON</td><td>konfigurace všech vrstev (cesty, model, prahy) — nic natvrdo v kódu</td></tr>
+<tr><td>lang/cs.json <span class="pill">grammar_data</span></td><td>JSON</td><td>jazyková data ③: rolový katalog, deprel→role, předložky rolí</td></tr>
+<tr><td>data/index/&lt;doc&gt;.pkl, _idf.pkl</td><td>pickle</td><td>tf·idf indexy pro dynamické nahrávání (staví ② <code>build_indexes</code>)</td></tr>
+<tr><td>curated.json</td><td>JSON</td><td>ruční CURATED záznamy determineru (VZOR→role), nejvyšší priorita</td></tr>
+<tr><td>determination.json</td><td>JSON</td><td>CONFIRMED slovník role-per-VZOR (staví ④ <code>synth_determination</code>)</td></tr>
+<tr><td>registry.jsonl</td><td>JSONL</td><td>syntetické vazby FAKT↔OTÁZKA (staví ④ <code>synth_registry</code>) — živý hub</td></tr>
+</table>
+<p>Souhrn celé architektury a vrstev je na <a href="index.html">rozcestníku dokumentace</a>.</p>
+
+<nav class="crumbs" style="margin-top:2.5rem"><a href="index.html">← zpět na rozcestník</a></nav>
+
+</div>
+</body>
+</html>

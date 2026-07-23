@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dynamické nahrávání a formát ukládání</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+
+<nav class="crumbs"><a href="index.html">Dokumentace</a> › Dynamické nahrávání a formát</nav>
+
+<p class="eyebrow">Koncept · #60 fragmentový graf</p>
+<h1>Dynamické nahrávání souborů podle matche</h1>
+<p class="lead">Korpus se nedrží celý v paměti. Každý soubor je samostatná jednotka;
+za běhu se do grafu nahrají jen ty soubory, které odpovídají rozhovoru — vybrané
+<b>frekvenční analýzou termínů</b> (četnost × unikátnost, tf·idf). Proto se anotace
+ukládá <b>po souborech</b>, ne do jednoho picklu.</p>
+
+<div class="note"><span class="lbl">Proč ne jeden pickle:</span> monolit nutí načíst
+všechno naráz. Při tisících souborů to nejde do paměti a hlavně to bere smysl cílení —
+nemůžeš „rozsvítit" jen relevantní soubory. Shard per soubor + index per soubor to řeší.</div>
+
+<h2>Formát ukládání</h2>
+<table>
+<tr><th>cesta</th><th>co</th><th>formát</th></tr>
+<tr><td>data/corpus/&lt;doc&gt;.pkl</td><td>anotace jednoho souboru (mountovatelná jednotka)</td><td>pickle <code>{(doc,idx): {entities, sentences}}</code></td></tr>
+<tr><td>data/index/&lt;doc&gt;.pkl</td><td><b>předdefinovaný index</b> souboru: slovo → váha vůči ostatním</td><td>pickle <code>{lemma: tf·idf}</code>, L2-normovaný</td></tr>
+<tr><td>data/index/_idf.pkl</td><td>globální tabulka unikátnosti termínů</td><td>pickle <code>{"idf": {lemma: idf}, "n": počet}</code></td></tr>
+</table>
+<p><b>Každý soubor MUSÍ mít svůj index.</b> Bez něj ho brána neumí ohodnotit a nahrát —
+proto je index součást formátu, ne dodatek. Indexy jsou shardovatelné (jeden soubor =
+jeden index), takže mechanismus unese tisíce souborů: studený soubor = jen index na disku,
+horký se namountuje.</p>
+
+<h2>Co je četnost × unikátnost (tf·idf)</h2>
+<ul>
+<li><b>tf</b> (term frequency) = jak často slovo v souboru je — o čem soubor je.</li>
+<li><b>idf</b> (inverse document frequency) = jak <b>vzácné</b> slovo je napříč korpusem —
+<code>log(N/df)+1</code>. Slovo ve všech souborech (df=N) má idf≈1 (nerozlišuje);
+slovo v jednom souboru (df=1) má idf vysoké (silně <b>distinktivní</b>).</li>
+<li><b>tf·idf</b> = váha „tento soubor nese toto slovo silněji než ostatní". Distinktivní
+slova (faraón, drama) nasměrují správný soubor; obecná (být, člověk) skoro nic neváží.</li>
+</ul>
+
+<h2>Loader do grafu — funkce (<code>dataloader.py</code>, třída <code>Dataloader</code>)</h2>
+
+<div class="member">
+  <p class="sig">build_indexes() → dict</p>
+  <p>Přepočítá VŠECHNY staty pro dynamické nahrávání z aktuálních shardů: per-soubor
+  tf·idf indexy + globální idf. Je idempotentní — voláš ji po každém přidání raw dat
+  (viz <a href="anotacni-cache.html">Anotační cache → přidání obsahu</a>).</p>
+  <pre>Dataloader().build_indexes()
+# [i] 2207260654 : indexy: 13 souborů, 12877 termů, práh výskytů 2</pre>
+  <div class="io"><b>vstup</b><span>shardy v <code>corpus_dir</code></span>
+  <b>výstup</b><span>indexy v <code>index_dir</code> + počty</span></div>
+</div>
+
+<div class="member">
+  <p class="sig">select_files(query_lemmas, top_files=None) → list[(doc_id, skóre)]</p>
+  <p>To je ta brána: seřadí soubory podle shody s dotazem <code>Σ teplo(slovo) ×
+  váha_souboru(slovo)</code>. Přijme seznam lemmat, nebo dict lemma→teplo (žhavost
+  z těžiště rozhovoru); vrací nejteplejší soubory sestupně, deterministicky.</p>
+  <pre>Dataloader().select_files(["spisovatel","drama","hra"], top_files=3)
+# → [("wiki_josef_čapek", 0.13), ("wiki_r.u.r.", 0.12), ("wiki_karel_čapek", 0.08)]</pre>
+  <div class="io"><b>vstup</b><span>slova/teplo dotazu, kolik souborů</span>
+  <b>výstup</b><span>žebříček <code>(doc_id, skóre)</code></span></div>
+</div>
+
+<div class="member">
+  <p class="sig">mount(doc_ids) → dict</p>
+  <p>Nahraje shardy vybraných souborů a sloučí je do jednoho korpusu — vstup pro stavbu
+  slovního grafu (jas + hrany). Unmount = tento slovník nedržet (u trvalého grafu zahodit
+  fakty se <code>source=doc</code>).</p>
+  <pre>corpus = Dataloader().mount(["wiki_r.u.r.", "wiki_karel_čapek"])
+len(corpus)   # záznamy obou souborů dohromady</pre>
+  <div class="io"><b>vstup</b><span>seznam doc_id k nahrání</span>
+  <b>výstup</b><span><code>{(doc,idx): rec}</code> přes vybrané soubory</span></div>
+</div>
+
+<div class="member">
+  <p class="sig">load_shard(doc_id) → dict &nbsp;·&nbsp; document_ids() → list &nbsp;·&nbsp; load_idf() → dict</p>
+  <p>Pomocné čtení: jeden shard z disku, seznam dostupných souborů (jen názvy, levné),
+  globální idf tabulka. Slouží mountu i výběru a čtou se líně.</p>
+  <pre>Dataloader().document_ids()   # → ["bible_exodus", …, "wiki_válka_s_mloky"]</pre>
+  <div class="io"><b>vstup</b><span>doc_id / nic</span>
+  <b>výstup</b><span>shard / seznam id / idf tabulka</span></div>
+</div>
+
+<h2>Tok za běhu (zacílení → mount)</h2>
+<div class="flow">
+  <div class="step in"><span class="tag">vstup — slova rozhovoru</span>
+    <pre>"Co napsal Čapek?"
++ žhavá těžiště
+→ lemmata + teplo</pre></div>
+  <div class="step act"><span class="tag">akce — brána tf·idf</span>
+    <pre>select_files(lemmata)
+→ nejteplejší soubory
+mount(top_files)</pre></div>
+  <div class="step out"><span class="tag">výstup — horký subgraf</span>
+    <pre>graf jen z čapkovských
+souborů; ostatní zůstávají
+studené (jen index)</pre></div>
+</div>
+
+<div class="note warn"><span class="lbl">Pasti (dle spec #60):</span> zpětný tok jen
+<b>bonusem</b> při vážení evidence, ne plošným zahříváním slov (runaway/rozmazání domény);
+fragmentový prior je <b>patro, ne veto</b> — přímá evidence dotazu vždy přebíjí, konflikt →
+clarifikace; idf nad malým korpusem je vratké → práh výskytů; skóre vždy řadit (determinismus).</div>
+
+<p>Detailní návrh je ve specifikaci <code>docs/superpowers/specs/2026-07-20-fragmentovy-graf.md</code>.
+Škálování na tisíce souborů (lazy-load s hysterezí) je zaparkované — formát indexu je ale
+shardovatelný už teď, aby to uneslo.</p>
+
+<nav class="crumbs" style="margin-top:2.5rem"><a href="index.html">← zpět na rozcestník</a></nav>
+
+</div>
+</body>
+</html>

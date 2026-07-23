@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Koreference do faktů — vyplnit pro-drop podměty</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  .ok { color: var(--ok); font-weight: 600; }
+  .bad { color: var(--warn); font-weight: 600; }
+  .num td:nth-child(2), .num td:nth-child(3) { font-family: var(--mono); }
+  ol.steps { counter-reset: s; list-style: none; padding: 0; }
+  ol.steps > li { border: 1px solid var(--line); border-radius: 10px; background: var(--surface);
+    padding: 1rem 1.1rem 1rem 3rem; margin: .8rem 0; position: relative; }
+  ol.steps > li::before { counter-increment: s; content: counter(s); position: absolute;
+    left: 1rem; top: 1rem; font-family: var(--mono); font-weight: 700; color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<nav class="crumbs"><a href="index.html">Dokumentace</a> › <a href="fuze.html">Fúze</a> › Koreference do faktů</nav>
+
+<p class="eyebrow">Prerekvizit pivotu · díry napřed</p>
+<h1>Koreference do faktů — vyplnit pro-drop podměty</h1>
+<p class="lead">Měření fúze ukázalo, že predicate+role matching (parent-model) regresuje, protože
+fakty <b>nenesou podmět</b> — v češtině je běžně vypuštěný (pro-drop). „Narodil se v Malých
+Svatoňovicích" nemá slovo „Čapek". Tenhle krok resolvuje vypuštěné podměty a <b>vplní je do
+who-slotu faktů</b>, čímž odemkne predikátovou cestu. Je to empiricky potvrzený prerekvizit —
+princip „<b>díry napřed</b>".</p>
+
+<div class="note"><span class="lbl">Odkud to plyne:</span> viz <a href="fuze.html">fúzní studie</a>,
+sekce „Pivot na predicate+role — MĚŘENO: regresuje bez koreference". Strop tam ukázal, že fakty
+JSOU dosažitelné (retrievable 3 → 6), jen jim chybí resolvovaný podmět, aby se otázka „Kde se
+narodil <b>Čapek</b>" spojila s faktem „<b>Narodil</b> se v Y" přes sdílenou entitu.</p></div>
+
+<h2>1. Přesný problém (měřeno)</h2>
+<p>Fakt v registry (④) pro narození Karla Čapka vypadá takto — všimni si, že podmět je označen
+jako <b>díra</b>, ale nevyplněn:</p>
+<pre>predicate = narodit
+hole      = subj/person          ← podmět JE díra (pro-drop), ale prázdná
+roles     = { where: [Svatoňovice, rodina] }     ← žádný who!
+text      = „Narodil se v Malých Svatoňovicích v rodině venkovského lékaře…"</pre>
+<p>Otázka „Kde se narodil Karel Čapek?" nese predikát <code>narodit</code> + roli díry
+<code>where</code> + známou entitu <code>Čapek</code>. Fakt-matcher (parent-model) hledá fakt
+s predikátem <code>narodit</code>, který <b>nese Čapka</b>, a vezme jeho <code>where</code>. Jenže
+Čapek ve faktu není (pro-drop) → vazba se nespojí, predikátová cesta zaplaví všemi
+<code>narodit</code>-fakty a glow mispickne. <b>To je ta regrese.</b></p>
+
+<h2>2. Co už máme — <code>fill_holes.py</code></h2>
+<p>Koreference NENÍ greenfield. <code>FillHoles</code> už umí:</p>
+<ul>
+<li><b>Detekci děr z ÚFAL rysu</b> (<code>detect</code>) — včetně <b>prodrop</b> (přísudek
+<code>root</code>, minulý čas, bez <code>nsubj</code> = vypuštěný podmět). Neosobní reflexivum
+(„stalo se") je z toho vyňato. Detekce je hotová, univerzální (z rysu, ne ze seznamu tvarů).</li>
+<li><b>Čtyři resolvery</b> antecedenta (měřené na <code>gold_coref.json</code>, 28 děr):
+baseline (nejbližší podmět) 39 %, aktivace 25 %, zóna 36 %, <b>identita 43 %</b> (copula-kotva
+protagonisty). Identita je zatím nejlepší.</li>
+<li><b>Registry už díru značí</b>: <code>hole = subj/person</code> — víme, KTERÉ fakty mají
+prázdný podmět. Nemusíme hádat.</li>
+</ul>
+<p>Podrobně viz <a href="koreference.html">stránka Koreference (mechanismus)</a>.</p>
+
+<h2>3. Nález sondy (měřeno na biografických článcích)</h2>
+<p>Než cokoli měníme, sonda: jak dobře identity-resolver plní pro-drop podměty na životopisech?</p>
+<div style="overflow-x:auto">
+<table class="num">
+<tr><th>dokument</th><th>prodrop vyplněno</th><th>nejčastější podmět →</th><th>hodnocení</th></tr>
+<tr><td>wiki_karel_čapek</td><td>29/29</td><td>Karel 26×</td><td class="ok">čisté (protagonista)</td></tr>
+<tr><td>wiki_josef_čapek</td><td>57/57</td><td>Josef 53×</td><td class="ok">čisté</td></tr>
+<tr><td>wiki_jaroslav_hašek</td><td>52/52</td><td>rod 23×, prapraděd 15×, Hašek 9×</td><td class="bad">šum (rodokmen)</td></tr>
+<tr><td>wiki_božena_němcová</td><td>69/72</td><td>reliéf 16×, MUDr 14×, čp 8×</td><td class="bad">šum (desky/adresy)</td></tr>
+</table>
+</div>
+<p><b>Klíčový spot-check:</b> <code>sent4 „Narodil" → podmět = Karel</code> <span class="ok">✓</span>
+— právě ten fakt, který potřebujeme. Také „přestěhoval → Karel", „absolvoval → Karel".</p>
+<p><b>Závěr sondy:</b> na čistě narativním životopise resolver funguje výborně (Karel 26/29,
+Josef 53/57). Kde má článek <b>rodokmenovou / administrativní vsuvku</b> (Haškovi předci,
+Němcové pamětní desky), lokálně salientní entita přebije protagonistu. To je ten strop 43 % —
+a ukazuje protiváhu: <b>doc-protagonista prior</b> (článek O jedné osobě → vypuštěný podmět
+silně tíhne k ní).</p>
+
+<h2>4. Cíl kroku</h2>
+<p>Resolvovat vypuštěné podměty a <b>vplnit je do who-slotu faktů</b>, aby predikát+role cesta
+(<code>fact_store.enabled</code>) mohla spojit otázku s faktem přes sdílenou entitu.</p>
+
+<h2>5. Mechanismus — worked example</h2>
+<ol class="steps">
+  <li><b>Per-dokument koreference.</b> Pro každý soubor spusť <code>resolve_document_identity</code>
+  → mapa <code>(věta k, token i verba) → resolvovaný podmět</code>. Např.
+  <code>(sent4, „Narodil") → Karel</code>.</li>
+  <li><b>Doc-protagonista jako kotva.</b> Titulní entita souboru (z názvu / první věty:
+  <code>Karel Čapek</code>) se stane trvalou kotvou — brání, aby rodokmen/deska přebily
+  protagonistu (protiváha šumu z bodu 3). Měřený přídavek, ne natvrdo.</li>
+  <li><b>Obohacení faktů.</b> Při stavbě faktů (<code>build_facts_all.py</code>): má-li fakt
+  <code>hole = subj/person</code> a jeho přísudek je pro-drop, dohledej resoluci a přidej
+  <code>who = [resolvovaný podmět]</code>. Fakt narodit tak dostane
+  <code>{ who: [Karel], where: [Svatoňovice, rodina] }</code>.</li>
+  <li><b>Odemknutí pivotu.</b> Zapni <code>fact_store.enabled = true</code>. Otázka „Kde se
+  narodil <b>Karel</b> Čapek?" (predikát narodit, známá entita Karel) teď najde fakt narodit,
+  který <b>nese Karla</b> (known-overlap &gt; 0) → vezme jeho <code>where</code> → Svatoňovice.
+  Predikátová cesta konečně střílí přesně.</li>
+</ol>
+<div class="note"><span class="lbl">Pozn. — zbývající neurčitost slotu:</span> fakt má
+<code>where: [Svatoňovice, rodina]</code>. Který je „místo narození"? Svatoňovice je GEO entita
+(NER typ G v shardu), rodina obecné jméno. Rozřešení přes <b>typ entity</b> je práce experta
+<b>Topos</b> (where) — až po tomto kroku. Koreference odemkne fakt; Topos vybere správný slot.</p></div>
+
+<h2>6. Rozhraní a dopad</h2>
+<p>Krok se dotýká jen build-time obohacení; runtime matcher (<code>answering.py</code>) se nemění —
+jen se rozsvítí už hotová a <b>gated-off</b> predikátová cesta (<code>FactStore</code>). Data
+tečou: <code>corpus → fill_holes (podměty) → build_facts_all (who-sloty) → FactStore →
+answering</code>. Žádné karty, žádná zpětná kompatibilita.</p>
+
+<h2>7. Jak to změříme (měř-first)</h2>
+<ul>
+<li><b>Kvalita koreference</b> — <code>gold_coref.json</code> (28 děr): fill-rate a přesnost
+resolveru + doc-protagonista prior. Musí ≥ dnešních 43 % identity.</li>
+<li><b>End-to-end</b> — <code>gold_answers.json</code> (25 otázek) s <code>fact_store.enabled=true</code>
+proti <code>baseline_answers.json</code> (K1 = 12 %). <b>Přijmout jen když ≥ +N a bez regrese.</b>
+Cílové řezy: where 0/4 a who (pro-drop autoři) — tam pivot ožije.</li>
+</ul>
+
+<h2>8. Kde to žije v kódu</h2>
+<ul>
+<li><code>fill_holes.py</code> — <code>detect</code> (prodrop), <code>resolve_document_identity</code>
+(existuje, 43 %). Sem přijde doc-protagonista prior.</li>
+<li><code>build_facts_all.py</code> — sem přijde obohacení faktů o resolvovaný who-slot.</li>
+<li><code>config.json</code> → <code>fact_store.enabled</code> — přepne se na <code>true</code>,
+až měření ukáže zisk.</li>
+<li><code>eval_answers.py</code> — už měří obě cesty; po zapnutí ukáže dopad přímo.</li>
+</ul>
+
+<h2>HOTOVO — změřeno (aditivní, 12 %, 0 regrese)</h2>
+<p>Implementováno: <code>fill_holes.resolved_subjects()</code> (mapa pro-drop podmětů),
+<code>build_facts_all.py</code> obohacuje fakty o <code>who</code>-slot, <code>fact_store.enabled=true</code>.
+Výsledek buildu: <b>2467 who-slotů doplněno koreferencí</b>; narodit-fakt Čapka nese
+<code>who:[Karel]</code>. Gold end-to-end: <b>3/25 = 12 %</b> — <b>bez regrese</b> (všechny 3 K1
+HITy drží).</p>
+<p><b>Dva zámky, které to zajistily:</b></p>
+<ol>
+<li><b>Koreference vplní podmět</b> → predikátová cesta najde SPRÁVNÝ fakt: „Kde se narodil Karel
+Čapek?" teď matchne narodit-fakt s <code>who:[Karel]</code> (<code>via pred, retrievable</code>).</li>
+<li><b>Entitní vazba v JINÉ roli než odpověď</b> (guard proti slepenci): garbled fakt
+<code>who:[Švejk, Olbracht]</code> se odmítne (Švejk je co-filler odpovědní role, ne vazba) →
+„Kdo napsal Švejka?" zůstává správně Hašek (vzor). Bez tohoto guardu cesta regresovala 12→8 %.</li>
+</ol>
+<div class="note"><span class="lbl">Poslední míle (odkud pokračovat):</span> „Kde se narodil
+Karel Čapek?" vrací <b>rodina</b> místo <b>Svatoňovice</b> — správný fakt, špatný slot. Oba jsou
+<code>where</code>; rozhodne <b>typ entity</b> (Svatoňovice = GEO/místo, rodina = obecné jméno).
+To je práce experta <b>Topos</b> — jediný krok od konverze řezu where (0/4). Predikátová cesta je
+teď LIVE a aditivní, takže Topos se změří okamžitě.</p></div>
+
+<h2>9. Rizika a otevřené otázky</h2>
+<ul>
+<li><b>Šum resolveru</b> (Hašek/Němcová) — protiváha doc-protagonista; měřit, zda prior pomůže
+bez regrese na čistých docech.</li>
+<li><b>Přesnost 43 %</b> vnese chybné podměty → chybné who-sloty. Mitigace: plnit jen s dostatečnou
+jistotou (<code>conf</code> vítěze), jinak nechat díru prázdnou (raději nic než špatně).</li>
+<li><b>Ne-biografické domény</b> (bible, zvířata) — tam není jeden protagonista; prior neplatí,
+spoléhá se na čistý resolver. Měřit doménu po doméně.</li>
+<li><b>Slot-neurčitost</b> (Svatoňovice vs rodina) → další krok Topos (typ entity).</li>
+</ul>
+
+<nav class="crumbs" style="margin-top:2.5rem"><a href="fuze.html">← zpět na fúzi</a></nav>
+
+</div>
+</body>
+</html>

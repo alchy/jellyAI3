@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Díry — čím je zaplníme (placeholdery)</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+
+<nav class="crumbs"><a href="index.html">Dokumentace</a> › Díry — čím je zaplníme</nav>
+
+<p class="eyebrow">Koncept · preprocessing / koreference</p>
+<h1>Díry — čím je zaplníme</h1>
+<p class="lead">DÍRA je placeholder — zájmeno nebo elidovaný podmět, který ukazuje na entitu
+NEpojmenovanou v klauzuli („on", „jeho", Ø). Aby fakt nesl <b>skutečnou entitu</b>, ne „on",
+musíme díru zaplnit jejím antecedentem. Tady je, jak určíme čím.</p>
+
+<div class="note"><span class="lbl">Klíč — detekce RYSEM, ne ručním seznamem tvarů:</span>
+Netváříme si seznam <code>ho/mu/jemu/jej/něj/jí/ji/ní/je/jich/jim/nich/nimi</code>. ÚFAL
+všechny skloněné tvary <b>lemmatizuje na <code>on</code></b> a rozliší je <b>rysem</b>
+(<code>PronType</code>, <code>Poss</code>, <code>Person</code>). Placeholder tedy poznáme
+z rysu, ne z tvaru — a to funguje <b>univerzálně na jakémkoli textu</b>, bez údržby seznamů.</p></div>
+
+<h2>Katalog placeholderů → čím se díra zaplní</h2>
+<div style="overflow-x:auto">
+<table>
+<tr><th>placeholder</th><th>ÚFAL rys</th><th>příklady</th><th>řeší se NA</th></tr>
+<tr><td>elidovaný podmět (Ø)</td><td>(chybí <code>nsubj</code>)</td><td>— (gap, ne slovo)</td><td>nejteplejší shodná entita (<b>těžiště</b>)</td></tr>
+<tr><td>osobní 3. os.</td><td><code>PronType=Prs, Person=3</code>, lemma <code>on</code></td><td>on, ona, oni, ji, jemu, jim</td><td>koreferenční antecedent (<b>těžiště</b>)</td></tr>
+<tr><td>osobní 1./2. os.</td><td><code>PronType=Prs, Person=1/2</code></td><td>já, ty</td><td>mluvčí / adresát (<b>rám přímé řeči</b>)</td></tr>
+<tr><td>přivlastňovací</td><td><code>Poss=Yes</code></td><td>jeho, její, jejich</td><td>vlastník = antecedent</td></tr>
+<tr><td>přivlastňovací zvratné</td><td><code>Poss=Yes</code> + zvratné</td><td>svůj</td><td>podmět klauzule</td></tr>
+<tr><td>přivlastňovací 1./2.</td><td><code>Poss=Yes, Person=1/2</code></td><td>můj, tvůj</td><td>mluvčí / adresát</td></tr>
+<tr><td>ukazovací samostatné</td><td><code>PronType=Dem</code>, jmenné</td><td>to, ten („To bylo na počátku" = Slovo)</td><td>anaforický antecedent</td></tr>
+</table>
+</div>
+
+<h2>Reálné příklady z korpusu</h2>
+<p>Skutečné placeholdery z anotovaného korpusu (UDPipe 2) — detekce jen z rysu, žádný seznam
+tvarů:</p>
+<div style="overflow-x:auto">
+<table>
+<tr><th>placeholder</th><th>reálná věta</th><th>tvar (lemma; rys)</th><th>řeší se na</th></tr>
+<tr><td>ukazovací</td><td>„<b>To</b> bylo na počátku u Boha."</td><td>To (<code>ten</code>; Dem, Neut, Nom)</td><td><b>Slovo</b> (Neut shoda — ne Bůh/Masc!)</td></tr>
+<tr><td>3. os.</td><td>„Všechno povstalo skrze <b>ně</b> …"</td><td>ně (<code>on</code>; Prs, 3, Plur, Acc)</td><td>Slovo / stvořené (antecedent)</td></tr>
+<tr><td>přivl. zvratné</td><td>„Přišel do <b>svého</b> vlastního …"</td><td>svého (<code>svůj</code>; Poss, Reflex, Masc,Neut)</td><td>podmět klauzule (ten, kdo přišel)</td></tr>
+<tr><td>přivlastňovací</td><td>„… <b>jeho</b> vlastní ho nepřijali."</td><td>jeho (Prs, 3, Poss)</td><td>vlastník = antecedent</td></tr>
+<tr><td>1./2. os.</td><td>„… přebývalo mezi <b>námi</b>."</td><td>námi (<code>my</code>; Prs, 1, Plur, Ins)</td><td>mluvčí (my)</td></tr>
+<tr><td>přivl. 1./2.</td><td>„Ještě nepřišla <b>má</b> hodina."</td><td>má (<code>můj</code>; Prs, 1, Poss, Fem)</td><td>mluvčí (Ježíš)</td></tr>
+<tr><td>elidovaný Ø</td><td>„<b>Neměli</b> však děti …"</td><td>Neměli (VERB Past, Masc, Plur; bez nsubj)</td><td>těžiště (Zachariáš + Alžběta)</td></tr>
+</table>
+</div>
+<div class="note"><span class="lbl">Klíčový moment „To → Slovo":</span> antecedent nevybírá
+pořadí („předchozí je Bůh"), ale <b>shoda rysu</b>: <code>To</code> je <code>Neut</code>,
+<code>Slovo</code> je <code>Neut</code>, <code>Bůh</code> je <code>Masc</code> → vyhrává Slovo.
+Týž rys, který díru <b>kategorizoval</b>, ji i <b>rozřeší</b>.</div>
+
+<h2>Jak se určí antecedent (těžiště)</h2>
+<p>U placeholderů, které se řeší na <b>antecedent / těžiště</b>, se hledá v ROZHOVORU/textu
+zpět (backward cache posledních n vět). Kandidát musí <b>souhlasit</b> — a shoda se bere
+z TÉHOŽ rysu, který tvar rozlišil:</p>
+<ul>
+<li><b>rod a číslo</b> z rysu (<code>Gender</code>, <code>Number</code>) — pozor, ÚFAL kóduje
+syncretismus (např. „ho" = <code>Masc,Neut</code>), takže shoda je <b>překryv množin</b>, ne
+rovnost;</li>
+<li><b>recency</b> — bližší zmínka (menší vzdálenost vět) vyhrává;</li>
+<li><b>těžiště</b> = nejteplejší shodná entita v okně (aktivační pole) — vyřešené zájmeno se
+vrací do cache (řetěz), takže navazující díry navazují na stejnou entitu.</li>
+</ul>
+<p>Elidovaný podmět (Ø) je díra <b>bez tvaru</b> — pozná se jako sloveso bez <code>nsubj</code>;
+rod/číslo dodá samo sloveso (shoda přísudku), a plní se stejně z těžiště.</p>
+
+<h2>Co NENÍ díra</h2>
+<p>Rys hlídá i falešné kandidáty — tyhle se NEplní:</p>
+<table>
+<tr><th>tvar</th><th>proč ne</th></tr>
+<tr><td>se, si</td><td>zvratné (<code>Reflex=Yes</code>) — gramatické, ne odkaz na entitu</td></tr>
+<tr><td>kdo, co, který</td><td>tázací/vztažné (<code>PronType=Int,Rel</code>) — to je sama otázka, ne díra</td></tr>
+<tr><td>všechen, nikdo, něco</td><td>kvantifikátor/neurčité — nemá antecedent</td></tr>
+</table>
+
+<div class="note"><span class="lbl">Kam to patří:</span> je to obohacení anotace — z ①
+přijde surové zájmeno se svým rysem, díra se zaplní antecedentem, a teprve pak rozklad na role
+(③) nese <b>skutečnou entitu</b> místo „on". Rovnou se tím připraví i strana ODPOVĚDI (fakt
+bez děr). Detekce rysem je hotová věc; hledání antecedenta je vlastní krok — mechanismus
+(aktivační pole + VZOR-zóna + transpozice) a jeho měření popisuje
+<a href="koreference.html">Koreference (mechanismus)</a>.</div>
+
+<nav class="crumbs" style="margin-top:2.5rem"><a href="index.html">← zpět na rozcestník</a></nav>
+
+</div>
+</body>
+</html>

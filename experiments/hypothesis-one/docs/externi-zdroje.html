@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Externí zdroje — proč a jak</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+
+<nav class="crumbs"><a href="index.html">Dokumentace</a> › Externí zdroje</nav>
+
+<p class="eyebrow">Referenční</p>
+<h1>Externí zdroje — proč a jak</h1>
+<p class="lead">Které cizí nástroje používáme, k čemu a s jakou podmínkou. Vůdčí zásada:
+neuronové modely jen na <b>anotaci předem (offline)</b>; v runtime rozhodovací smyčce
+žádný neuron není — systém je deterministický a symbolický.</p>
+
+<div class="note"><span class="lbl">Teze:</span> „neuron jen offline" znamená, že cizí model
+smí obohatit DATA (anotaci, parafrázi) jednou předem, ale nesmí za běhu rozhodovat o odpovědi.
+Proto lze každý výstup zamknout a reprodukovat.</div>
+
+<h2>UDPipe 2 <span class="pill">používáme</span></h2>
+<p><b>Co:</b> tokenizace, segmentace vět, morfologie a závislostní rozbor (LINDAT REST API).
+<b>Proč:</b> proti UDPipe 1 snižuje chyby o 40–50 % — opravuje např. <code>Kafarnaum</code>
+(dřív mylně podmět) na <code>nmod</code> a správně čte účelové věty. <b>Jak:</b> plná pipeline
+jednou offline (vrstva ①), model se <b>pinuje</b> v configu kvůli reprodukovatelnosti; data se
+posílají přes soubor (<code>-F data=@file</code>, jinak se vstup ořezává na ~485 znaků).
+Licence modelu CC BY-NC-SA (výzkum).</p>
+
+<h2>NameType (rys UDPipe 2) <span class="pill">používáme</span></h2>
+<p><b>Co:</b> značka jména v morfologických rysech (Giv/Sur = osoba, Geo = místo). <b>Proč:</b>
+entity odvozujeme z něj místo z NameTagu, který lepil jména se sousedy („Ježíš Duchem").
+<b>Jak:</b> souvislé tokeny téhož jména a <b>shodného pádu</b> → jedna entita; pádová neshoda
+span neslepí. Bez zvláštní služby, přímo z anotace.</p>
+
+<h2>Ollama (lokální LLM) <span class="pill">používáme</span></h2>
+<p><b>Co:</b> lokální generativní model (qwen / gemma). <b>Proč:</b> jen na <b>parafrázi</b>
+otázek/odpovědí — rozmanitost povrchů pro trénink vazeb. <b>Jak:</b> offline dávkově, mimo
+runtime rozhodování. <b>Pozor:</b> LLM neumí náš parsing/koreferenci a do rozhodovací smyčky
+nepatří (rozbil by determinismus).</p>
+
+<h2>MorfFlex <span class="pill">odloženo</span></h2>
+<p><b>Co:</b> offline morfologický slovník (LINDAT). <b>Proč zvažováno:</b> autoritativní
+kanonizace tvarů. <b>Proč odloženo:</b> měření ukázalo, že UDPipe 2 (staví na týchž datech +
+kontext) je v kanonizaci lepší a MorfFlex sám zaváděl chyby u vzácných jmen (Pitom → „pitomo").
+Kód i data odstraněny; k dohledání v historii.</p>
+
+<h2>RobeCzech <span class="pill">zvažováno</span></h2>
+<p><b>Co:</b> český RoBERTa (ÚFAL). <b>Proč zajímavé:</b> je to model, který pohání kvalitu
+UDPipe 2 (kontextové embeddingy). <b>Proč nepoužíváme přímo:</b> syrový RobeCzech dává jen
+vektory, ne anotaci; a použití embeddingů v runtime by porušilo determinismus. Offline (přes
+UDPipe 2) ho tedy využíváme nepřímo, přímo ne.</p>
+
+<h2>NameTag <span class="pill">nahrazeno</span></h2>
+<p><b>Co:</b> ÚFAL rozpoznávač pojmenovaných entit (starý přístup). <b>Proč nahrazeno:</b>
+přeznačoval a lepil jména se sousedy (person-slepence), což tříštilo identitu. Nahradil ho rys
+<code>NameType</code> z UDPipe 2 — tenčí, ale bez slepenců.</p>
+
+<nav class="crumbs" style="margin-top:2.5rem"><a href="index.html">← zpět na rozcestník</a></nav>
+
+</div>
+</body>
+</html>

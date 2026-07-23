@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aktivace v dialogu — proudění světla</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+
+<nav class="crumbs"><a href="index.html">Dokumentace</a> › Aktivace v dialogu</nav>
+
+<p class="eyebrow">Srdce systému · světlo nad grafem</p>
+<h1>Aktivace v dialogu — proudění světla</h1>
+<p class="lead">Graf je potmě. Rozhovor ho <b>rozsvěcí</b>: slova otázky zažehnou uzly a soubory,
+světlo <b>teče po hranách</b> k příbuzným pojmům, mezi tahy pomalu <b>utichá</b>. Jasná oblast
+grafu je to, o čem se právě mluví — <b>těžiště</b>. Matcher i koreference čtou toto světlo.</p>
+
+<div class="note"><span class="lbl">Proč světlo:</span> struktura (VZOR) říká, CO se do sebe
+trefí; aktivace říká, CO je právě relevantní. VZOR najde všechny stíny, světlo vybere ten
+osvětlený. Tahle stránka je o tom světle — jak vzniká, teče, drží a hasne.</p></div>
+
+<h2>1. Rozsvícení — tah dialogu jako zdroj světla</h2>
+<p>Každý tah (otázka/výrok) je <b>zdroj světla</b>. Rozsvítí dvě věci:</p>
+<ul>
+<li><b>uzly-slova</b> — lemmata tahu dostanou teplo: <code>words[lemma] += 1</code>;</li>
+<li><b>soubory</b> — přes tf·idf bránu (② <code>select_files</code>): distinktivní slova
+rozsvítí soubory, které je nesou silněji: <code>files[doc] += tf·idf_share</code>.</li>
+</ul>
+<pre>feed(otázka):
+  pro lemma v otázce:      words[lemma] += 1
+  pro (doc, s) v select_files(lemmata):   files[doc] += s</pre>
+<p>Obyčejná slova („být", „a") skoro nesvítí (nízké idf), distinktivní („Čapek", „faraón")
+svítí silně — světlo je od začátku zacílené.</p>
+
+<h2>2. Proudění po hranách — hrana jako vodič světla</h2>
+<p>Světlo nezůstává v zažehnutých uzlech — <b>teče po HRANÁCH</b> k sousedům. Hrana je
+<b>spoj</b>, kterým světlo proudí; její <b>váha</b> je vodivost (silná vazba = víc světla).</p>
+<pre>spread():  (opakuj `hops`×)
+  pro každý horký uzel `lem` s teplem `h`:
+    pro souseda `nb` s vahou hrany `w`:
+      nb += h · λ · (w / Σ vah hran lem)          # úměrně SÍLE spoje</pre>
+<ul>
+<li><b>λ (spread_lambda)</b> = kolik světla projde na skok (útlum vzdáleností — mesh λ^d);</li>
+<li><b>w / Σw</b> = normalizace: světlo se rozdělí mezi sousedy podle síly spojů;</li>
+<li><b>hops</b> = kolik skoků daleko světlo dosáhne.</li>
+</ul>
+<p><b>Proč to je klíčové:</b> rozsvítí se i pojmy, které tah NEZMÍNIL, ale jsou spojené —
+„spisovatel" přihřeje „český", „drama"; „Čapek" přihřeje „R.U.R.". Systém tak ví o kontextu
+kolem, ne jen o doslovných slovech.</p>
+
+<h3>Druhy spojů (hran) a jejich váha</h3>
+<div style="overflow-x:auto">
+<table>
+<tr><th>spoj (hrana)</th><th>mezi</th><th>váha = vodivost</th><th>co světlo znamená</th></tr>
+<tr><td>adjacence / mesh</td><td>slovo ↔ slovo</td><td>co-occurrence · λ^d</td><td>slova, co spolu chodí</td></tr>
+<tr><td>doc-links</td><td>soubor ↔ soubor</td><td>sdílené entity</td><td>tematicky blízké soubory</td></tr>
+<tr><td>koreference</td><td>entita ↔ entita</td><td>asociace (těžiště)</td><td>táž / příbuzná entita</td></tr>
+<tr><td>shadow-pár</td><td>fakt ↔ otázka</td><td>VZOR fit</td><td>otázka je stín faktu</td></tr>
+</table>
+</div>
+
+<h2>3. Navazování napříč tahy — světlo drží kontext</h2>
+<p>Aktivace se mezi tahy <b>NERESETUJE</b> — zůstává. Vyřešená odpověď navíc <b>zpětně
+přihřeje</b> (<code>reinforce</code>) svou entitu a soubor. Zbytkové světlo z minulého tahu =
+<b>kontext</b>. Tím se řetězí dialog:</p>
+<pre>reinforce(odpověď):  words[entita] += 1 ;  files[doc] += 1</pre>
+<div style="overflow-x:auto">
+<table>
+<tr><th>tah</th><th>rozsvítí</th><th>zbytkové světlo (kontext)</th><th>výsledek</th></tr>
+<tr><td>„Kdo je Karel Čapek?"</td><td>Karel, Čapek, soubor čapek</td><td>—</td><td>spisovatel · reinforce Čapek</td></tr>
+<tr><td>„Co <b>napsal</b>?" (pro-drop)</td><td>napsat</td><td><b>Čapek stále svítí</b></td><td>R.U.R. (podmět z kontextu, ne z věty)</td></tr>
+<tr><td>„A jeho <b>bratr</b>?"</td><td>bratr</td><td>Čapek + R.U.R. teplé</td><td>Josef Čapek</td></tr>
+</table>
+</div>
+<p>To je stejný mechanismus, kterým se v <a href="koreference.html">koreferenci</a> plní díry:
+„on/jeho/Ø" se rozřeší na <b>nejteplejší</b> souhlasnou entitu = na to, co ještě svítí z minula.
+Řetěz světla = řetěz kontextu.</p>
+
+<h2>4. Utichání — světlo mezi tahy hasne</h2>
+<p>Mezi tahy se VŠECHNO teplo utlumí (<code>× decay</code>). Staré světlo pohasne, recentní
+dominuje — vzniká <b>recency</b> (nedávné téma je jasné, dávné tmavne) a <b>zapomínání</b>.</p>
+<pre>decay():  pro každý uzel/soubor:  teplo *= decay          # 0 &lt; decay &lt; 1</pre>
+<p>Bez útlumu by první téma svítilo navždy a přebíjelo nová. S útlumem světlo „dýchá":
+každý tah přidá, čas ubere. <b>Rovnováha</b> decay × reinforce určuje, jak dlouho téma drží —
+protagonista (opakovaně přihřívaný) svítí dlouho, mimoděčná zmínka rychle zhasne.</p>
+
+<h2>5. Těžiště — nejjasnější oblast je téma</h2>
+<p>Součet světla = <b>těžiště</b> (centroid): nejjasnější region grafu = o čem se mluví.
+Matcher jím váží VZOR-kandidáty (<code>weight(tpl) = files[doc] + words[answer]</code>),
+koreference jím vybírá antecedent. Je to <b>light-beam</b> — paprsek, který mezi překrývajícími
+se stíny osvítí ten pravý.</p>
+
+<h2>6. Plný cyklus tahu</h2>
+<div class="flow">
+  <div class="step in"><span class="tag">1 — rozsviť</span><pre>feed(otázka)
+  slova + soubory (brána)</pre></div>
+  <div class="step act"><span class="tag">2 — rozteč × použij</span><pre>spread()  # po hranách
+match(VZOR) × weight()  # světlo</pre></div>
+  <div class="step out"><span class="tag">3 — přihřej × utiš</span><pre>reinforce(odpověď)
+decay()  # před dalším tahem</pre></div>
+</div>
+<p>A znovu. Světlo se hromadí (kontext drží), teče (kolem-témata), hasne (recency) — dialog
+je proud světla grafem.</p>
+
+<h2>Kde to žije v kódu</h2>
+<p><code>activation_field.py</code> (<code>ActivationField</code>): <code>build_graph</code> (hrany
+z mountovaného korpusu), <code>feed</code> (rozsvícení), <code>spread</code> (proudění po
+hranách), <code>decay</code> (utichání), <code>weight</code> (těžiště šablony),
+<code>reinforce</code> (zpětný tok). Zdroje světla už žijí: ② <code>select_files</code>
+(soubory), koreference (těžiště entit).</p>
+
+<h2>Nedostatky a vylepšení (zahlédnuté při psaní)</h2>
+<div class="note warn"><span class="lbl">Poctivě — na čem světlo ještě není dokonalé:</span></div>
+<ul>
+<li><b>Šum funkčních slov v hranách.</b> Adjacence dnes dělá silné spoje i na „a/v/=" (časté
+sousedy). Světlo teče i tam. <b>Vylepšení:</b> vážit hrany <b>idf</b> — spoj na distinktivní
+slovo je vodivější než na funkční (jako u uzlů).</li>
+<li><b>Uniformní útlum.</b> Všechno hasne stejně, ale PROTAGONISTA by měl hasnout POMALEJI
+(drží téma). <b>Vylepšení:</b> topic-aware decay = kotva identity z koreference (entita zavedená
+copulou „X je Y" tlumí pomaleji). Sjednotit s <a href="koreference.html">kotvou identity</a>.</li>
+<li><b>Neusměrněné proudění.</b> Světlo teče po hranách symetricky; role (podmět/předmět) ho
+neusměrňuje. <b>Vylepšení:</b> vážit tok i rolí (VZOR-zóna) — předmětná díra pustí víc světla
+k entitám, které bývají předmětem.</li>
+<li><b>Runaway.</b> reinforce + spread bez mezí by mohly téma přehřát (jako over-anchoring v
+koreferenci). <b>Vylepšení:</b> strop/normalizace tepla per tah; zpětný tok jen bonusem, ne
+plošně (past #60).</li>
+<li><b>Dialogová smyčka není v ⑤ zapojená.</b> Pole útlum/reinforce/spread UMÍ, ale multi-tah
+loop (feed→spread→answer→reinforce→decay→opakuj) v <code>answering.py</code> zatím není —
+demo dělá jeden tah. <b>To je další krok.</b></li>
+</ul>
+
+<nav class="crumbs" style="margin-top:2.5rem"><a href="index.html">← zpět na rozcestník</a></nav>
+
+</div>
+</body>
+</html>
