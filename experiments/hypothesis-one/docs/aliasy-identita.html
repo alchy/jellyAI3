@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aliasy a identita — vztah mezi více tokeny</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+
+<nav class="crumbs"><a href="index.html">Dokumentace</a> › Aliasy a identita</nav>
+
+<p class="eyebrow">Odpověď · vícetokenový vztah, ne jeden token</p>
+<h1>Aliasy a identita — vztah mezi více tokeny</h1>
+<p class="lead">Schéma odpovědi je <code>q:&lt;TOKEN&gt; a:&lt;token&gt;</code> — <b>jednotokenové</b>.
+Jenže reálná entita je často <b>víc tokenů svázaných VZTAHEM</b>: „Božena Němcová", „Karel Čapek",
+„Barbora Panklová". Když se ten vztah nevidí, <b>jedna osoba se rozpadne na soupeřící kandidáty</b>
+a systém se zbytečně doptává. Tahle stránka je o tom, jak <b>vztah mezi tokeny svázat do jedné
+identity</b> — a proč to funguje líp než slepovat povrch.</p>
+
+<div class="note"><span class="lbl">Jádro:</span> odpověď není <b>uzel</b> (jeden token), ale malý
+<b>vázaný podgraf</b> (tokeny + hrany <code>flat</code>/apozice mezi nimi). „Vztah mezi více tokeny
+najednou" = vzít tu vazbu jako <b>jednu jednotku</b>. V grafovém čtení: entita = kanonický uzel,
+její různá jména jsou aliasy téhož uzlu.</p></div>
+
+<h2>1. Problém — rozpadlé jméno soupeří samo se sebou</h2>
+<p>„Kdo napsal Babičku?" má jasnou odpověď: <b>Božena Němcová</b>. Ale extrakce jede token po tokenu
+a každý answer-token dá <b>samostatné jedno lemma</b> (<code>synth_registry.py</code>). Táž osoba se
+proto v korpusu objeví pod víc jmény — a v assurance stojí <b>proti sobě</b>:</p>
+<div style="overflow-x:auto">
+<table>
+<tr><th>kandidát</th><th>glow</th><th>odkud</th><th>je to…</th></tr>
+<tr><td><b>Němcová</b></td><td>0.280</td><td>wiki_božena_němcová</td><td>ta osoba</td></tr>
+<tr><td><b>Barbora</b></td><td>0.160</td><td>wiki_božena_němcová</td><td><b>TÁŽ osoba</b> (Barbora Panklová)</td></tr>
+<tr><td>Šalda</td><td>0.147</td><td>wiki_božena_němcová</td><td>kritik (jiná osoba)</td></tr>
+</table>
+</div>
+<p>Vítěz Němcová (0.280) NEpřebije Barboru (0.160) o dvojnásobek (0.280 &lt; 0.320) → assurance
+vyhodnotí <b>remízu</b> → <b>doptání</b>. Přitom Barbora <b>není soupeř</b> — je to jen jiné jméno
+téže Němcové. Vztah „Barbora Panklová ≡ Božena Němcová" ten rozpad ruší.</p>
+
+<h2>2. Dvě varianty — a proč zvítězila identita</h2>
+<p>Koncept „vícetokenová odpověď" jde uchopit dvěma způsoby. Obě jsem <b>změřil</b> (měř-first):</p>
+
+<h3>V1 — svázat povrch (span v čase odpovědi) · ZAMÍTNUTO</h3>
+<p>Nápad: po výběru vítěze rozšířit lemma na celý <code>flat</code>/apozici span z původní věty →
+odpověď „Karel Čapek", „Božena Němcová". <b>Naráží na morfologii:</b></p>
+<pre>nominativní podmět:   „Karel"+„Čapek"        → „Karel Čapek"          ✓ (nominativ)
+nepřímý pád (místo):  „narodil se v … Svatoňovicích" → „Svatoňovicích"  ✗ (SKLOŇOVANÝ povrch)</pre>
+<p>„svatoňovice" (gold) <b>není podřetězec</b> „svatoňovicích" → span z povrchu by <b>rozbil
+stávající HIT</b> a zobrazoval skloňované tvary. Víceslovný span má morfologický problém, který
+tahle cesta neřeší. <b>Zahozeno.</b></p>
+
+<h3>V2 — svázat identitu (alias merge) · PŘIJATO</h3>
+<p>Nápad: nepracovat s povrchem, ale s <b>lemmaty a identitou</b>. Variantní jména téže osoby se
+sloučí do <b>kanonického</b> a jejich světlo se <b>sečte</b>. Žádná morfologie — jen se ruší rozpad.</p>
+<div style="overflow-x:auto">
+<table>
+<tr><th></th><th>vítěz glow</th><th>runner glow</th><th>2× margin?</th><th>režim</th></tr>
+<tr><td>dnes (rozpadlé)</td><td>Němcová 0.280</td><td>Barbora <b>0.160</b></td><td>ne (0.28 &lt; 0.32)</td><td>clarify</td></tr>
+<tr><td>po merge Barbora≡Němcová</td><td>Němcová <b>0.440</b></td><td>Šalda 0.147</td><td><b>ano</b></td><td><b>answer</b> ✓</td></tr>
+</table>
+</div>
+
+<h2>3. Jak se alias získá — z grafu, ne natvrdo</h2>
+<p>Alias se odvodí z <b>úvodní (definiční) věty</b> dokumentu: rozsvítí se <b>jmenný cluster</b> —
+podmět a všechny PROPN připojené vztahem <code>flat</code> / <code>flat:name</code> / <code>appos</code>
+(BFS po <code>head</code>). Kanonické jméno = <b>dominantní podmět</b> dokumentu (dle
+<code>_subjects</code>). Data, ne výčet v kódu.</p>
+<pre>úvodní věta: „Božena Němcová, rozená Barbora Panklová (1820–1862) byla česká spisovatelka…"
+cluster (flat/appos PROPN): {němcová, božena, barbora, novotná}
+kanon = argmax podmětů = němcová
+_aliases[„wiki_božena_němcová"] = {božena:němcová, barbora:němcová, novotná:němcová}</pre>
+<p>Uloží se do <code>data/index/_aliases.pkl</code> (<code>build_indexes</code> — jeden reindex,
+vedle <code>_subjects</code>/<code>_doclinks</code>).</p>
+
+<h2>4. Sloučení v assurance — a proč je bezpečné</h2>
+<p>V <code>_assurance</code> se každý kandidát <b>kanonizuje</b> (<code>_canon(lemma, doc)</code>) a
+varianty téže identity se sloučí; glow se sečte, reprezentant = kanonické jméno:</p>
+<pre>merge:  canon = aliases[doc].get(lemma, lemma)     # doc-scoped!
+        glow[canon] += glow[lemma]                 # sečti světlo variant</pre>
+<div class="note"><span class="lbl">DOC-SCOPED = klíč k bezpečnosti:</span> <code>barbora→němcová</code>
+platí <b>jen ve wiki_božena_němcová</b>. Kandidát „Čapek" ze souboru R.U.R. se nekanonizuje na
+„karel" (ten alias žije jen v Karlově dokumentu) → „Kdo napsal R.U.R.?" zůstává <b>Čapek</b>.
+Blast-radius merge = jen kandidáti, kteří mají alias-variantu v <b>témž</b> dokumentu → typicky
+rozpadlé jméno protagonisty. Ostatních entit se to nedotkne.</div>
+
+<h2>5. Měřený výsledek</h2>
+<div style="overflow-x:auto">
+<table>
+<tr><th></th><th>před</th><th>po</th></tr>
+<tr><td>„Kdo napsal Babičku?"</td><td>doptat: Němcová/Barbora/Šalda</td><td><b>→ Němcová [answer]</b> ✓</td></tr>
+<tr><td>HIT</td><td>16</td><td><b>17</b></td></tr>
+<tr><td>WRONG</td><td>1</td><td>1</td></tr>
+<tr><td>etalon</td><td>64 %</td><td><b>68 %</b></td></tr>
+</table>
+</div>
+<p><b>0 regrese</b>: všechna jména (R.U.R.→Čapek, Švejka→Hašek), bio (kdy/kde) i dialog beze změny.</p>
+
+<h2>Kde to žije v kódu</h2>
+<p><code>dataloader.py</code> → <code>build_indexes</code> staví <code>_aliases.pkl</code> (jmenný
+cluster z úvodní věty, kanon = dominantní podmět), <code>_load_aliases</code> ho líně čte.
+<code>answering.py</code> → <code>_canon(lemma, doc)</code> (alias → kanon, doc-scoped) a
+<b>merge v <code>_assurance</code></b> (sloučení variant + součet glow). Souvisí s
+<a href="koreference.html">koreferencí</a> (kotva identity) — koreference plní pro-drop podměty,
+alias váže variantní jména; obojí je „táž entita".</p>
+
+<h2>Nedostatky a vylepšení (poctivě)</h2>
+<div class="note warn"><span class="lbl">Na čem alias ještě není dokonalý:</span></div>
+<ul>
+<li><b>Kanon je někdy křestní jméno.</b> Dominantní podmět Karlova článku je „Karel" → kanon =
+<code>karel</code> (ne příjmení „Čapek"). Zobrazení tím netrpí (gold i běžný úzus berou obojí a
+odpověď často jde z jiného shardu), ale <b>příjmení</b> je přirozenější referent. <b>Vylepšení:</b>
+preferovat člen s <code>NameType=Surname</code> jako kanon.</li>
+<li><b>Alias jen z úvodní věty.</b> Bere se definiční sent 0. Jiné mentiony (přezdívky dál v textu)
+se nezachytí. <b>Vylepšení:</b> rozšířit na apozice v celém dokumentu (opatrně — riziko spojení
+dvou různých osob).</li>
+<li><b>Vícetokenový span (V1) zůstává dluh.</b> Odpověď je pořád jedno lemma; „Malé Svatoňovice",
+„Válka s mloky" se nevrací jako celek kvůli morfologii nepřímých pádů. <b>Cesta:</b> lemmatizovaný
+span se shodou (skloňovat jednotku), nebo rovnou <b>node-based</b> (entita = kanonický uzel, jehož
+povrch známe z nominativu).</li>
+<li><b>Zárodek node-based.</b> Alias-cluster je vlastně <b>uzel s víc jmény</b>. Přirozené
+pokračování: entity jako uzly s fakty-hranami (obejde doc-selection i rozpad jmen naráz).</li>
+</ul>
+
+<nav class="crumbs" style="margin-top:2.5rem"><a href="index.html">← zpět na rozcestník</a></nav>
+
+</div>
+</body>
+</html>
