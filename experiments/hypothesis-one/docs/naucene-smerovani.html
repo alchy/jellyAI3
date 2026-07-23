@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Naučené směrování nad maticí VZORŮ</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+
+<nav class="crumbs"><a href="index.html">Dokumentace</a> › Naučené směrování nad VZORY</nav>
+
+<p class="eyebrow">Směr · malá NN místo ručních if-then</p>
+<h1>Naučené směrování nad maticí VZORŮ</h1>
+<p class="lead">Ruční pravidla <code>if tvar then výjimka</code> nejsou správný systém — <b>množí se</b>
+a vedou zpátky ke <b>kartám</b>, před kterými jsme utekli. Směr: <b>malá naučená vrstva</b> (drobná
+NN) nad <b>maticí VZORŮ</b> + <b>aktivací</b>, která se z dat naučí správné směrování dotaz→odpověď.
+Trénink offline, <b>inference deterministická</b>. Univerzálnost místo bobtnajícího výčtu pravidel.</p>
+
+<div class="note warn"><span class="lbl">Motivace (poctivě z vlastní kůže):</span> guard „u vztahové
+otázky vyřaď identitní kandidáty" byl přesně ten anti-vzor — ruční výjimka, která navíc
+<b>nefungovala</b> (jen prohodila chybu za chybu) a <b>regredovala</b> etalon. Kdybych takhle
+pokračoval, mám za měsíc 40 pravidel a jsem u karet.</div>
+
+<h2>1. Co je špatně na if-then</h2>
+<p>Každá kategorie, co dnes propadá (relation, authorship, attribute…), svádí k dalšímu ručnímu
+pravidlu: „když kopula + genitiv, pak vztahová otázka", „když modalita ? bez tázacího slova, pak
+polární"… Jenže:</p>
+<ul>
+<li><b>Množí se.</b> Jazyk má nekonečno tvarů; výčet pravidel roste bez konce.</li>
+<li><b>Křehnou.</b> Pravidlo opraví jeden tvar a rozbije tři jiné (měřeno).</li>
+<li><b>Je to regrese ke kartám.</b> Přesně ta exploze složitosti, kvůli které vznikl tento
+experiment jako <b>odlehčení</b>.</li>
+</ul>
+
+<h2>2. Vize — matice VZORŮ + malá NN + aktivace</h2>
+<p>VZORY <b>už jsou feature-vektory</b> (<code>frame_sig</code> = pole slotů kolem pivotu do šířky
+<b>r</b>). Množina těch vektorů — fakt-VZOR × query-VZOR × answer-slot — je <b>matice vzorů</b>.
+Malá síť se z <b>tréninku</b> naučí mapování <b>query-VZOR → answer-role/typ</b>; ruční
+<code>_answer_role</code>, <code>_is_relation_query</code>, detekce polární… <b>zmizí do vah</b>.</p>
+<div style="overflow-x:auto">
+<table>
+<tr><th>dnes (ruční)</th><th>směr (naučené)</th></tr>
+<tr><td><code>if has_cop and int and not genitiv: role=state</code></td><td>rys-vektor dotazu → NN → role</td></tr>
+<tr><td>pravidlo pro každý tvar zvlášť</td><td>jedna vrstva vah nad všemi vzory</td></tr>
+<tr><td>psané v kódu</td><td>naučené z etalonu + korpusu</td></tr>
+</table>
+</div>
+<p>Vstup sítě = <b>VZOR dotazu + aktivace</b> (světlo — které uzly jsou rozsvícené, je nejteplejší
+uzel osoba / dílo / místo?). Vzory <b>napříč více větami</b> (šířka r &gt; věta) chytí vztahy a
+koreferenci přes větu. Je to <b>táž vize jako „síť VZORŮ jako metadata"</b> —
+<a href="dialogovy-automat.html">uzavřená smyčka</a> fakt↔query↔answer JE ta matice; NN je ta
+<b>naučená metadata / směrování</b> po ní.</p>
+
+<h2>3. Determinismus zůstává</h2>
+<div class="note"><span class="lbl">Klíč:</span> natrénovaná síť = <b>pevné váhy → deterministická
+inference</b> (stejná otázka = stejná odpověď). Učení je <b>offline</b> (jako „ollama staví vazby
+předem"). Za běhu jen UDPipe (rozbor) + malá matice vah — <b>žádný neuron ani GPU v runtime smyčce</b>.
+Symbolické okolí zůstává; učí se jen směrovací vrstva.</div>
+
+<h2>4. Měřený pilot — myšlenka NESE</h2>
+<p>Drobný softmax (numpy, <b>20 generických strukturních rysů</b> dotazu — kopula? tázací? root
+upos? genitiv u rootu? které tázací lemma? — <b>žádná ruční sémantika</b>), leave-one-out CV nad
+<a href="index.html">velkým etalonem</a> (145 otázek):</p>
+<div style="overflow-x:auto">
+<table>
+<tr><th></th><th>přesnost</th></tr>
+<tr><td><b>naučená vrstva</b></td><td><b>75.9 %</b></td></tr>
+<tr><td>baseline (majorita)</td><td>17.2 %</td></tr>
+</table>
+</div>
+<p><b>Klíč — copula × relation se model naučil sám</b> (to ruční guard pletl a padal na tom):</p>
+<pre>copula   → copula 19×  (jen 1× splet s relation)   ✓
+polar    → 14/14        spatial → 17/17
+count    → 7/7          temporal → 23/25</pre>
+<p>Rozdíl copula vs relation, kvůli kterému mě ruční pravidlo položilo, se <b>naučil z 20 rysů</b>
+bez jediného „if genitiv". Malá vrstva nad vzory <b>nahradí if-then a je přesnější</b>.</p>
+
+<h3>Poctivě — co pilot NEumí (a proč)</h3>
+<ul>
+<li><b>honest-negative 0/7 — a je to správně.</b> Jestli odpověď v korpusu <b>existuje</b>, se
+z tvaru dotazu poznat NEDÁ (to je věc dat, ne vzoru) → patří <b>jinému mechanismu</b> (existence /
+aktivace), ne routeru.</li>
+<li><b>relation × authorship-who se pletou</b> (7/18, 13/20) — obojí je „kdo udělal X", strukturně
+podobné. Rozsekne to <b>aktivace</b> (osoba vs dílo v grafu) + <b>víc dat</b>.</li>
+<li><b>taxonomy 0/2</b> — dva vzorky, statisticky nic.</li>
+</ul>
+
+<h2>5. Workflow — jak dotaz proteče</h2>
+<p>Konkrétně na „Kdo byl bratr Karla Čapka?" (dnes ruční guard padá, router to řeší učením):</p>
+<div class="flow">
+  <div class="step in"><span class="tag">① rozbor</span><pre>_parse(otázka)
+→ toks (UDPipe)</pre></div>
+  <div class="step act"><span class="tag">② VZOR-rysy</span><pre>feats(toks)
+→ vektor [20]</pre></div>
+  <div class="step act"><span class="tag">③ router (NN)</span><pre>route(vektor)
+→ role = relation</pre></div>
+  <div class="step out"><span class="tag">④ výběr × světlo</span><pre>_candidates(role)
++ aktivace → odpověď</pre></div>
+</div>
+<pre>„Kdo byl bratr Karla Čapka?"
+  ① _parse         → [kdo·PRON·Int, být·AUX·cop, bratr·NOUN·root, Karla·PROPN·Gen, …]
+  ② feats(toks)    → has_cop=1  has_int=1  gen=1  root=NOUN  kdo=1  n_propn=2  …   (VZOR dotazu)
+  ③ route(vektor)  → role = "relation"     ← NAUČENÉ (ne „if kopula+genitiv then …")
+  ④ _candidates    → kandidáti role relation (osoby), NE stav „spisovatel"
+     + aktivace     → osvětlený vítěz / doptání / nehádej</pre>
+<p>Krok ③ je jediný nový: matici ručních pravidel nahrazuje jedna naučená vrstva. Kroky ①②④ jsou
+stávající infrastruktura (rozbor, VZOR, fakt-store, aktivace).</p>
+
+<h2>6. Vzory vstupů / výstupů funkcí</h2>
+<div class="member">
+  <p class="sig">feats(toks) → list[float]  (rys-vektor VZORu dotazu)</p>
+  <p>Ze rozebrané otázky vytáhne <b>generické strukturní rysy</b> (kopula, tázací zájmeno, upos rootu,
+  genitiv u rootu, tázací lemma, počet PROPN, sloveso, objekt, modalita). Žádná ruční sémantika —
+  to je „matice vzorů" dotazu do šířky r.</p>
+  <div class="io"><b>vstup</b><span>toks = [{lemma, upos, deprel, head, feats}, …] (UDPipe)</span>
+  <b>výstup</b><span>[1, 1, 1, 2, 0, 0, 1, 1,0,0,0, 1,0,0,0,0,0,0,0,0]  (20 čísel)</span></div>
+</div>
+<div class="member">
+  <p class="sig">train(X, Y, k) → (W, b)   [OFFLINE]</p>
+  <p>Naučí drobný softmax z matice rysů a labelů (role/typ). Běží <b>předem</b> (jako stavba vzorů),
+  výsledkem jsou <b>pevné váhy</b>. Malá vrstva — numpy stačí.</p>
+  <div class="io"><b>vstup</b><span>X = rysy [n×20], Y = role [n], k = počet tříd</span>
+  <b>výstup</b><span>W [20×k], b [k]  — pevné váhy (uloží se)</span></div>
+</div>
+<div class="member">
+  <p class="sig">route(vektor, W, b) → role   [RUNTIME, deterministické]</p>
+  <p>Inference: <code>argmax(softmax(vektor·W + b))</code>. Jediná operace za běhu navíc — malá matice,
+  žádné GPU. Nahrazuje <code>_answer_role</code> a <code>_is_relation_query</code>.</p>
+  <div class="io"><b>vstup</b><span>vektor [20] (z feats), W/b (naučené)</span>
+  <b>výstup</b><span>role ∈ {state, who, where, when, whom_what, how_much, polar, …}</span></div>
+</div>
+<div class="member">
+  <p class="sig">answer(question) → dict   (integrace — beze změny kontraktu)</p>
+  <p>Uvnitř se jen <code>hole_role = _answer_role(toks)</code> vymění za
+  <code>hole_role = route(feats(toks), W, b)</code>. Zbytek tahu (kandidáti, aktivace, assurance)
+  <b>stejný</b> — router jen líp určí, ODKUD odpověď brát.</p>
+  <div class="io"><b>vstup</b><span>„Kdo byl bratr Karla Čapka?"</span>
+  <b>výstup</b><span>{answer, mode, offer, fact_ref, hole_role: „relation", …}</span></div>
+</div>
+
+<h2>7. Co to nahradí a co zůstane</h2>
+<div style="overflow-x:auto">
+<table>
+<tr><th>zůstává (nosná infrastruktura)</th><th>nahrazuje se učením</th></tr>
+<tr><td>extrakce VZORŮ (<code>frame_sig</code>), fakt/šablona shardy</td><td><code>_answer_role</code> (state vs who…)</td></tr>
+<tr><td><a href="aktivace-dialog.html">aktivace</a> (světlo, kontext)</td><td><code>_is_relation_query</code> a spol.</td></tr>
+<tr><td>matice fakt↔query↔answer</td><td>ruční prahy assurance (slabá evidence → unsure)</td></tr>
+</table>
+</div>
+
+<h2>8. Další kroky (měřeně)</h2>
+<ol>
+<li><b>Obohatit rysy o aktivaci</b> — typ nejteplejšího uzlu (osoba/dílo/místo), rozseknout
+relation × authorship-who.</li>
+<li><b>Vzory do šířky r přes věty</b> — dnes je <code>frame_sig</code> jednovětý; vztahy překračují
+větu.</li>
+<li><b>Víc trénovacích dat</b> — auto-generovat z ~16 000 extrahovaných faktů (ne jen 145 ručních).
+<a href="pouziti.html">Zvětšit korpus</a>.</li>
+<li><b>Zapojit naučený router</b> do <code>answer()</code> místo <code>_answer_role</code> →
+<b>změřit pokles confident-wrongů</b> (dnes 35/145) na velkém etalonu.</li>
+<li>Volitelně větší síť (keras 3 je v .venv) — ale i malá numpy verze drží zásadu „malá nadstavba".</li>
+</ol>
+
+<h2>Otevřené otázky / rizika</h2>
+<ul>
+<li><b>Interpretovatelnost.</b> Naučená vrstva je méně čitelná než pravidlo — přijímáme to jako
+cenu za univerzálnost, proto <b>malá</b> a měřená.</li>
+<li><b>Kvalita tréninku.</b> Auto-generovaná data z faktů zdědí chyby extrakce → hlídat.</li>
+<li><b>Kde končí router a začíná existence.</b> Router řeší <b>tvar</b> (jaká role); jestli data
+<b>jsou</b>, řeší aktivace/fakt-store — hranici držet čistou (viz honest-negative).</li>
+</ul>
+
+<h2>Kde to žije</h2>
+<p>Pilot: <code>nn_pilot.py</code> (featurizace + softmax + LOO-CV). Cíl integrace:
+naučený router místo <code>_answer_role</code>/<code>_is_relation_query</code> v
+<a href="faze-5-queryparser.html">⑤ answering</a>; rysy z <code>frame_sig</code> (③ grammar) +
+<a href="aktivace-dialog.html">aktivace</a>. Měřidlo: <code>eval_large.py</code> (145 otázek,
+confident-wrong / kategorie).</p>
+
+<nav class="crumbs" style="margin-top:2.5rem"><a href="index.html">← zpět na rozcestník</a></nav>
+
+</div>
+</body>
+</html>
