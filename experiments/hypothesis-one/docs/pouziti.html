@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Použití — jak se systémem pracovat</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  .term { background: var(--code-bg); border: 1px solid var(--line); border-radius: 8px;
+    padding: .9rem 1.1rem; font-family: var(--mono); font-size: .84rem; line-height: 1.6;
+    overflow-x: auto; margin: .8rem 0; }
+  .term .u { color: var(--accent); }        /* co píše uživatel */
+  .term .s { color: var(--ok); }            /* co odpoví systém */
+  .term .d { color: var(--warn); }          /* doptání / nevím */
+  .step { border-left: 3px solid var(--accent); padding: .3rem 0 .3rem 1rem; margin: 1rem 0; }
+  .step h3 { margin: 0 0 .3rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<nav class="crumbs"><a href="index.html">Dokumentace</a> › Použití</nav>
+
+<p class="eyebrow">Pro uživatele · jak systém používat</p>
+<h1>Použití — ptát se, přidávat data, reindexovat</h1>
+<p class="lead">Praktický návod: jak systém spustit, jak mu poslat dotaz, jak doplnit vlastní
+text a jak po přidání dat přepočítat indexy. Systém je <b>deterministický</b> Q&A nad českým
+textem — na známé otázky odpoví, u nejasných se <b>doptá</b>, a když neví, <b>nehádá</b>.</p>
+
+<div class="note"><span class="lbl">Předpoklad:</span> Python 3 a dostupná služba UDPipe 2
+(rozbor věty). Runtime je jinak offline a deterministický — stejná otázka dá vždy stejnou odpověď.
+Pracovní adresář: <code>experiments/hypothesis-one/</code>.</div>
+
+<h2>1. Zeptat se (nejběžnější)</h2>
+<p>Spusť interaktivní dotaz a piš otázky:</p>
+<div class="term">$ <span class="u">python3 ask.py</span>
+Ptej se (prázdný řádek ukončí). Např.: Kdo napsal Švejka?
+
+? <span class="u">Kdo napsal Švejka?</span>
+  <span class="s">→ Hašek</span>
+? <span class="u">Kde se narodil Karel Čapek?</span>
+  <span class="s">→ Svatoňovice</span>
+? <span class="u">Kdo je pes domácí?</span>
+  <span class="s">→ šelma</span>
+? <span class="u">Kdy měla premiéru hra R.U.R.?</span>
+  <span class="d">nejsem si jist — mám data o: 1921, 1932, pes.  Upřesni prosím?</span>
+</div>
+<p>Prázdný řádek (nebo Ctrl-D) ukončí. Dobré otázky začínají tázacím slovem:
+<b>Kdo, Co, Kde, Kdy, Kolik, Čím…</b> (systém z něj pozná, co hledáš — osobu, věc, místo, čas).</p>
+
+<h3>Tři odpovědní režimy</h3>
+<div style="overflow-x:auto">
+<table>
+<tr><th>režim</th><th>kdy</th><th>vypadá</th></tr>
+<tr><td><b>odpověď</b></td><td>jasný vítěz</td><td class="ok">→ Hašek</td></tr>
+<tr><td><b>doptání</b></td><td>víc rovnocenných možností</td><td class="warn">nejsem si jist — mám data o: X, Y. Upřesni?</td></tr>
+<tr><td><b>nevím</b></td><td>slabá / žádná evidence</td><td>o tom nemám jasná data (nehádám)</td></tr>
+</table>
+</div>
+<p>To je záměr: systém raději řekne „nevím" nebo se doptá, než by si vymyslel odpověď.</p>
+
+<h2>2. Přidat vlastní data</h2>
+<div class="step">
+<h3>a) Vlož text</h3>
+<p>Ulož obyčejný český text jako <code>.txt</code> do složky <code>../../data/raw/</code>. Název
+souboru = název dokumentu (bez diakritiky v cestě není nutný, ale drž se <code>malá_pismena.txt</code>).</p>
+<div class="term">$ <span class="u">cp muj_clanek.txt ../../data/raw/milan_kundera_zivot.txt</span></div>
+</div>
+<div class="step">
+<h3>b) Zanotuj (rozbor vět)</h3>
+<p>Spusť anotaci — projde <code>data/raw/*.txt</code> a z každého udělá jeden anotovaný „shard"
+(<code>data/corpus/&lt;doc&gt;.pkl</code>). Je <b>přírůstková</b>: už zanotované a nezměněné soubory
+přeskočí, zpracuje jen nové/upravené. (Vyžaduje UDPipe 2.)</p>
+<div class="term">$ <span class="u">python3 annotate_corpus.py</span>
+[i] … : anotace: dokumentů 54, model(pin) czech-pdtc-ud-2.17-…
+[i] … : hotovo: … vět, přeskočeno 53 (přírůstkově), nový 1</div>
+<p><span class="lbl">Pozn.:</span> vstupní data se nikdy nepřepisují; anotace je cache. Zkratky
+(„R.U.R.") se automaticky slučují do jednoho tokenu.</p>
+</div>
+
+<h2>3. Reindexovat (po přidání dat)</h2>
+<p>Když přibyl nebo se změnil text, přepočítej odvozené staty. Spusť <b>v tomto pořadí</b>
+(vše lokální, bez sítě):</p>
+<div class="term">$ <span class="u">python3 synth_registry.py</span>       <span class="s"># ④ fakty (kdo/co/kde/kdy z vět)</span>
+$ <span class="u">python3 -c "from dataloader import Dataloader; Dataloader().build_indexes()"</span>
+                                <span class="s"># ② tf·idf + entita-jako-podmět + doc-graf</span>
+$ <span class="u">python3 build_facts_all.py</span>      <span class="s"># fakty + koreference + datumy (Chronos)</span>
+$ <span class="u">python3 build_templates_all.py</span>  <span class="s"># VZOR šablony otázka↔fakt</span></div>
+<p>Po reindexaci se nový obsah rovnou promítne do odpovědí (<code>python3 ask.py</code>). Indexy
+závisí na počtu dokumentů (idf, doc-graf), proto se přepočítávají celé — ne jen nový soubor.</p>
+
+<div class="note"><span class="lbl">Jednou větou:</span> <b>přidat</b> = txt do
+<code>data/raw/</code> → <code>annotate_corpus.py</code>; <b>reindexovat</b> = registry → indexy →
+fakty → šablony; <b>ptát se</b> = <code>ask.py</code>.</div>
+
+<h2>Co systém umí (a neumí)</h2>
+<ul>
+<li><b>Umí:</b> faktické otázky nad textem — kdo něco napsal, kde/kdy se narodil, co něco je,
+kolik něčeho je. Když si není jist, doptá se; když neví, přizná to.</li>
+<li><b>Neumí (zatím):</b> řetězit kontext mezi otázkami („A jeho bratr?"), teologická/nefaktická
+tvrzení, otázky bez tázacího slova. Otevřené body: <a href="otevrene-otazky.html">Otevřené otázky</a>.</li>
+</ul>
+
+<nav class="crumbs" style="margin-top:2.5rem"><a href="index.html">← zpět na rozcestník</a></nav>
+
+</div>
+</body>
+</html>
