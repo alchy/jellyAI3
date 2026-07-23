@@ -1,0 +1,1664 @@
+[
+ {
+  "q": "Kdo byl Karel Čapek?",
+  "expect": [
+   "spisovatel"
+  ],
+  "mode": "answer",
+  "kind": "copula",
+  "entity": "karel_čapek",
+  "src": "wiki_karel_čapek",
+  "factual": true
+ },
+ {
+  "q": "Kdy se narodil Karel Čapek?",
+  "expect": [
+   "1890"
+  ],
+  "mode": "answer",
+  "kind": "temporal",
+  "entity": "karel_čapek",
+  "src": "wiki_karel_čapek",
+  "factual": true,
+  "pgroup": "kc-narozeni"
+ },
+ {
+  "q": "V kterém roce se narodil Karel Čapek?",
+  "expect": [
+   "1890"
+  ],
+  "mode": "answer",
+  "kind": "temporal",
+  "entity": "karel_čapek",
+  "src": "wiki_karel_čapek",
+  "factual": true,
+  "pgroup": "kc-narozeni"
+ },
+ {
+  "q": "Kde se narodil Karel Čapek?",
+  "expect": [
+   "svatoňovice",
+   "malý"
+  ],
+  "mode": "answer",
+  "kind": "spatial",
+  "entity": "karel_čapek",
+  "src": "wiki_karel_čapek",
+  "factual": true
+ },
+ {
+  "q": "Kdo byl bratr Karla Čapka?",
+  "expect": [
+   "josef"
+  ],
+  "mode": "answer",
+  "kind": "relation",
+  "entity": "karel_čapek",
+  "src": "wiki_karel_čapek",
+  "factual": true
+ },
+ {
+  "q": "Kdo napsal drama R.U.R.?",
+  "expect": [
+   "čapek",
+   "karel"
+  ],
+  "mode": "answer",
+  "kind": "authorship-who",
+  "entity": "karel_čapek",
+  "src": "wiki_karel_čapek",
+  "factual": true
+ },
+ {
+  "q": "Byl Karel Čapek malíř?",
+  "expect": [
+   "ne"
+  ],
+  "mode": "answer",
+  "kind": "polar",
+  "entity": "karel_čapek",
+  "src": "wiki_karel_čapek",
+  "factual": true
+ },
+ {
+  "q": "S kým se oženil Karel Čapek?",
+  "expect": [
+   "scheinpflugová",
+   "olga"
+  ],
+  "mode": "answer",
+  "kind": "relation",
+  "entity": "karel_čapek",
+  "src": "wiki_karel_čapek",
+  "factual": true
+ },
+ {
+  "q": "Kdo vymyslel slovo robot?",
+  "expect": [
+   "josef"
+  ],
+  "mode": "answer",
+  "kind": "authorship-who",
+  "entity": "josef_čapek",
+  "src": "wiki_karel_čapek",
+  "factual": true,
+  "pgroup": "robot-autor"
+ },
+ {
+  "q": "Kdo byl Josef Čapek?",
+  "expect": [
+   "malíř"
+  ],
+  "mode": "answer",
+  "kind": "copula",
+  "entity": "josef_čapek",
+  "src": "wiki_josef_čapek",
+  "factual": true
+ },
+ {
+  "q": "Kde se narodil Josef Čapek?",
+  "expect": [
+   "hronov"
+  ],
+  "mode": "answer",
+  "kind": "spatial",
+  "entity": "josef_čapek",
+  "src": "wiki_josef_čapek",
+  "factual": true
+ },
+ {
+  "q": "Kdo byl bratr Josefa Čapka?",
+  "expect": [
+   "karel"
+  ],
+  "mode": "answer",
+  "kind": "relation",
+  "entity": "josef_čapek",
+  "src": "wiki_josef_čapek",
+  "factual": true
+ },
+ {
+  "q": "Kdo napsal knihu Povídání o pejskovi a kočičce?",
+  "expect": [
+   "josef"
+  ],
+  "mode": "answer",
+  "kind": "authorship-who",
+  "entity": "josef_čapek",
+  "src": "wiki_josef_čapek",
+  "factual": true
+ },
+ {
+  "q": "Kdo je autorem slova robot?",
+  "expect": [
+   "josef"
+  ],
+  "mode": "answer",
+  "kind": "authorship-who",
+  "entity": "josef_čapek",
+  "src": "wiki_josef_čapek",
+  "factual": true,
+  "pgroup": "robot-autor"
+ },
+ {
+  "q": "Kde zemřel Josef Čapek?",
+  "expect": [
+   "bergen-belsen",
+   "bergen"
+  ],
+  "mode": "answer",
+  "kind": "spatial",
+  "entity": "josef_čapek",
+  "src": "wiki_josef_čapek",
+  "factual": true
+ },
+ {
+  "q": "Kdo byl Jaroslav Hašek?",
+  "expect": [
+   "spisovatel"
+  ],
+  "mode": "answer",
+  "kind": "copula",
+  "entity": "jaroslav_hašek",
+  "src": "wiki_jaroslav_hašek",
+  "factual": true
+ },
+ {
+  "q": "Kdy se narodil Jaroslav Hašek?",
+  "expect": [
+   "1883"
+  ],
+  "mode": "answer",
+  "kind": "temporal",
+  "entity": "jaroslav_hašek",
+  "src": "wiki_jaroslav_hašek",
+  "factual": true
+ },
+ {
+  "q": "Kdy zemřel Jaroslav Hašek?",
+  "expect": [
+   "1923"
+  ],
+  "mode": "answer",
+  "kind": "temporal",
+  "entity": "jaroslav_hašek",
+  "src": "wiki_jaroslav_hašek",
+  "factual": true
+ },
+ {
+  "q": "Kde se narodil Jaroslav Hašek?",
+  "expect": [
+   "praha"
+  ],
+  "mode": "answer",
+  "kind": "spatial",
+  "entity": "jaroslav_hašek",
+  "src": "wiki_jaroslav_hašek",
+  "factual": true
+ },
+ {
+  "q": "Kde zemřel Jaroslav Hašek?",
+  "expect": [
+   "lipnice"
+  ],
+  "mode": "answer",
+  "kind": "spatial",
+  "entity": "jaroslav_hašek",
+  "src": "wiki_jaroslav_hašek",
+  "factual": true
+ },
+ {
+  "q": "Kdo napsal Osudy dobrého vojáka Švejka?",
+  "expect": [
+   "hašek"
+  ],
+  "mode": "answer",
+  "kind": "authorship-who",
+  "entity": "jaroslav_hašek",
+  "src": "wiki_jaroslav_hašek",
+  "factual": true,
+  "pgroup": "svejk-autor"
+ },
+ {
+  "q": "Kdo je autorem Švejka?",
+  "expect": [
+   "hašek"
+  ],
+  "mode": "answer",
+  "kind": "authorship-who",
+  "entity": "jaroslav_hašek",
+  "src": "wiki_jaroslav_hašek",
+  "factual": true,
+  "pgroup": "svejk-autor"
+ },
+ {
+  "q": "Co napsal Jaroslav Hašek?",
+  "expect": [
+   "švejk"
+  ],
+  "mode": "answer",
+  "kind": "authorship-what",
+  "entity": "jaroslav_hašek",
+  "src": "wiki_jaroslav_hašek",
+  "factual": true
+ },
+ {
+  "q": "Kdo byl bratr Jaroslava Haška?",
+  "expect": [
+   "bohuslav"
+  ],
+  "mode": "answer",
+  "kind": "relation",
+  "entity": "jaroslav_hašek",
+  "src": "wiki_jaroslav_hašek",
+  "factual": true
+ },
+ {
+  "q": "Měl Jaroslav Hašek bratra?",
+  "expect": [
+   "ano"
+  ],
+  "mode": "answer",
+  "kind": "polar",
+  "entity": "jaroslav_hašek",
+  "src": "wiki_jaroslav_hašek",
+  "factual": true
+ },
+ {
+  "q": "Do kolika jazyků byl přeložen Švejk?",
+  "expect": [
+   "58"
+  ],
+  "mode": "answer",
+  "kind": "count",
+  "entity": "jaroslav_hašek",
+  "src": "wiki_jaroslav_hašek",
+  "factual": true
+ },
+ {
+  "q": "Kdo byla Božena Němcová?",
+  "expect": [
+   "spisovatelka"
+  ],
+  "mode": "answer",
+  "kind": "copula",
+  "entity": "božena_němcová",
+  "src": "wiki_božena_němcová",
+  "factual": true
+ },
+ {
+  "q": "Kdy zemřela Božena Němcová?",
+  "expect": [
+   "1862"
+  ],
+  "mode": "answer",
+  "kind": "temporal",
+  "entity": "božena_němcová",
+  "src": "wiki_božena_němcová",
+  "factual": true
+ },
+ {
+  "q": "Kde zemřela Božena Němcová?",
+  "expect": [
+   "praha"
+  ],
+  "mode": "answer",
+  "kind": "spatial",
+  "entity": "božena_němcová",
+  "src": "wiki_božena_němcová",
+  "factual": true
+ },
+ {
+  "q": "Kdo napsal Babičku?",
+  "expect": [
+   "němcová"
+  ],
+  "mode": "answer",
+  "kind": "authorship-who",
+  "entity": "božena_němcová",
+  "src": "wiki_božena_němcová",
+  "factual": true,
+  "pgroup": "babicka-autor"
+ },
+ {
+  "q": "Kdo je autorkou Babičky?",
+  "expect": [
+   "němcová"
+  ],
+  "mode": "answer",
+  "kind": "authorship-who",
+  "entity": "božena_němcová",
+  "src": "wiki_božena_němcová",
+  "factual": true,
+  "pgroup": "babicka-autor"
+ },
+ {
+  "q": "Co napsala Božena Němcová?",
+  "expect": [
+   "babička",
+   "bára"
+  ],
+  "mode": "answer",
+  "kind": "authorship-what",
+  "entity": "božena_němcová",
+  "src": "wiki_božena_němcová",
+  "factual": true
+ },
+ {
+  "q": "Kdo byl manžel Boženy Němcové?",
+  "expect": [
+   "němec",
+   "josef"
+  ],
+  "mode": "answer",
+  "kind": "relation",
+  "entity": "božena_němcová",
+  "src": "wiki_božena_němcová",
+  "factual": true
+ },
+ {
+  "q": "Měla Božena Němcová děti?",
+  "expect": [
+   "ano"
+  ],
+  "mode": "answer",
+  "kind": "polar",
+  "entity": "božena_němcová",
+  "src": "wiki_božena_němcová",
+  "factual": true
+ },
+ {
+  "q": "Jak se Božena Němcová jmenovala rodným jménem?",
+  "expect": [
+   "barbora"
+  ],
+  "mode": "answer",
+  "kind": "attribute",
+  "entity": "božena_němcová",
+  "src": "wiki_božena_němcová",
+  "factual": true
+ },
+ {
+  "q": "Kým byl Milan Kundera?",
+  "expect": [
+   "spisovatel"
+  ],
+  "mode": "answer",
+  "kind": "copula",
+  "entity": "milan_kundera",
+  "src": "wiki_milan_kundera",
+  "factual": true
+ },
+ {
+  "q": "Kdy se narodil Milan Kundera?",
+  "expect": [
+   "1929"
+  ],
+  "mode": "answer",
+  "kind": "temporal",
+  "entity": "milan_kundera",
+  "src": "wiki_milan_kundera",
+  "factual": true
+ },
+ {
+  "q": "Kdy zemřel Milan Kundera?",
+  "expect": [
+   "2023"
+  ],
+  "mode": "answer",
+  "kind": "temporal",
+  "entity": "milan_kundera",
+  "src": "wiki_milan_kundera",
+  "factual": true
+ },
+ {
+  "q": "Kdo byl otcem Milana Kundery?",
+  "expect": [
+   "ludvík",
+   "kundera"
+  ],
+  "mode": "answer",
+  "kind": "relation",
+  "entity": "milan_kundera",
+  "src": "wiki_milan_kundera",
+  "factual": true
+ },
+ {
+  "q": "Kdo napsal Žert?",
+  "expect": [
+   "kundera"
+  ],
+  "mode": "answer",
+  "kind": "authorship-who",
+  "entity": "milan_kundera",
+  "src": "wiki_milan_kundera",
+  "factual": true,
+  "pgroup": "zert-autor"
+ },
+ {
+  "q": "Kdo je autorem románu Žert?",
+  "expect": [
+   "kundera"
+  ],
+  "mode": "answer",
+  "kind": "authorship-who",
+  "entity": "milan_kundera",
+  "src": "wiki_milan_kundera",
+  "factual": true,
+  "pgroup": "zert-autor"
+ },
+ {
+  "q": "Narodil se Milan Kundera v Praze?",
+  "expect": [
+   "ne"
+  ],
+  "mode": "answer",
+  "kind": "polar",
+  "entity": "milan_kundera",
+  "src": "wiki_milan_kundera",
+  "factual": true
+ },
+ {
+  "q": "Kým byl Vítězslav Nezval?",
+  "expect": [
+   "básník"
+  ],
+  "mode": "answer",
+  "kind": "copula",
+  "entity": "vítězslav_nezval",
+  "src": "wiki_vítězslav_nezval",
+  "factual": true
+ },
+ {
+  "q": "Kde se narodil Vítězslav Nezval?",
+  "expect": [
+   "biskoupky"
+  ],
+  "mode": "answer",
+  "kind": "spatial",
+  "entity": "vítězslav_nezval",
+  "src": "wiki_vítězslav_nezval",
+  "factual": true
+ },
+ {
+  "q": "Kdy zemřel Vítězslav Nezval?",
+  "expect": [
+   "1958"
+  ],
+  "mode": "answer",
+  "kind": "temporal",
+  "entity": "vítězslav_nezval",
+  "src": "wiki_vítězslav_nezval",
+  "factual": true,
+  "pgroup": "nezval-umrti"
+ },
+ {
+  "q": "Kterého dne zemřel Vítězslav Nezval?",
+  "expect": [
+   "1958"
+  ],
+  "mode": "answer",
+  "kind": "temporal",
+  "entity": "vítězslav_nezval",
+  "src": "wiki_vítězslav_nezval",
+  "factual": true,
+  "pgroup": "nezval-umrti"
+ },
+ {
+  "q": "Kde je pohřben Vítězslav Nezval?",
+  "expect": [
+   "vyšehrad",
+   "praha"
+  ],
+  "mode": "answer",
+  "kind": "spatial",
+  "entity": "vítězslav_nezval",
+  "src": "wiki_vítězslav_nezval",
+  "factual": true
+ },
+ {
+  "q": "Čeho byl Vítězslav Nezval spoluzakladatelem?",
+  "expect": [
+   "poetismus"
+  ],
+  "mode": "answer",
+  "kind": "attribute",
+  "entity": "vítězslav_nezval",
+  "src": "wiki_vítězslav_nezval",
+  "factual": true
+ },
+ {
+  "q": "Vstoupil Vítězslav Nezval do KSČ?",
+  "expect": [
+   "ano"
+  ],
+  "mode": "answer",
+  "kind": "polar",
+  "entity": "vítězslav_nezval",
+  "src": "wiki_vítězslav_nezval",
+  "factual": true
+ },
+ {
+  "q": "Kolik svazků vyšlo v edici Dílo Vítězslava Nezvala?",
+  "expect": [
+   "38"
+  ],
+  "mode": "answer",
+  "kind": "count",
+  "entity": "vítězslav_nezval",
+  "src": "wiki_vítězslav_nezval",
+  "factual": true
+ },
+ {
+  "q": "Jaké bylo původní povolání Vladislava Vančury?",
+  "expect": [
+   "lékař"
+  ],
+  "mode": "answer",
+  "kind": "attribute",
+  "entity": "vladislav_vančura",
+  "src": "wiki_vladislav_vančura",
+  "factual": true,
+  "pgroup": "vancura-povolani"
+ },
+ {
+  "q": "Čím byl Vladislav Vančura původním povoláním?",
+  "expect": [
+   "lékař"
+  ],
+  "mode": "answer",
+  "kind": "attribute",
+  "entity": "vladislav_vančura",
+  "src": "wiki_vladislav_vančura",
+  "factual": true,
+  "pgroup": "vancura-povolani"
+ },
+ {
+  "q": "Kde se narodil Vladislav Vančura?",
+  "expect": [
+   "háj",
+   "slezsko"
+  ],
+  "mode": "answer",
+  "kind": "spatial",
+  "entity": "vladislav_vančura",
+  "src": "wiki_vladislav_vančura",
+  "factual": true
+ },
+ {
+  "q": "Kdo napsal Pekaře Jana Marhoula?",
+  "expect": [
+   "vančura"
+  ],
+  "mode": "answer",
+  "kind": "authorship-who",
+  "entity": "vladislav_vančura",
+  "src": "wiki_vladislav_vančura",
+  "factual": true
+ },
+ {
+  "q": "Byl Vladislav Vančura popraven?",
+  "expect": [
+   "ano"
+  ],
+  "mode": "answer",
+  "kind": "polar",
+  "entity": "vladislav_vančura",
+  "src": "wiki_vladislav_vančura",
+  "factual": true
+ },
+ {
+  "q": "Kým byl Ivan Olbracht?",
+  "expect": [
+   "spisovatel",
+   "prozaik"
+  ],
+  "mode": "answer",
+  "kind": "copula",
+  "entity": "ivan_olbracht",
+  "src": "wiki_ivan_olbracht",
+  "factual": true
+ },
+ {
+  "q": "Jaké bylo vlastní jméno Ivana Olbrachta?",
+  "expect": [
+   "kamil",
+   "zeman"
+  ],
+  "mode": "answer",
+  "kind": "attribute",
+  "entity": "ivan_olbracht",
+  "src": "wiki_ivan_olbracht",
+  "factual": true
+ },
+ {
+  "q": "Kdo byl otcem Ivana Olbrachta?",
+  "expect": [
+   "stašek",
+   "antonín zeman"
+  ],
+  "mode": "answer",
+  "kind": "relation",
+  "entity": "ivan_olbracht",
+  "src": "wiki_ivan_olbracht",
+  "factual": true
+ },
+ {
+  "q": "Kdo napsal Nikolu Šuhaje loupežníka?",
+  "expect": [
+   "olbracht"
+  ],
+  "mode": "answer",
+  "kind": "authorship-who",
+  "entity": "ivan_olbracht",
+  "src": "wiki_ivan_olbracht",
+  "factual": true
+ },
+ {
+  "q": "Kdo byl Karel Hynek Mácha?",
+  "expect": [
+   "básník",
+   "prozaik"
+  ],
+  "mode": "answer",
+  "kind": "copula",
+  "entity": "karel_hynek_mácha",
+  "src": "wiki_karel_hynek_mácha",
+  "factual": true
+ },
+ {
+  "q": "Kdy se narodil Karel Hynek Mácha?",
+  "expect": [
+   "1810"
+  ],
+  "mode": "answer",
+  "kind": "temporal",
+  "entity": "karel_hynek_mácha",
+  "src": "wiki_karel_hynek_mácha",
+  "factual": true
+ },
+ {
+  "q": "Jaké bylo vlastní jméno Karla Hynka Máchy?",
+  "expect": [
+   "ignác"
+  ],
+  "mode": "answer",
+  "kind": "attribute",
+  "entity": "karel_hynek_mácha",
+  "src": "wiki_karel_hynek_mácha",
+  "factual": true
+ },
+ {
+  "q": "Kde zemřel Karel Hynek Mácha?",
+  "expect": [
+   "litoměřice"
+  ],
+  "mode": "answer",
+  "kind": "spatial",
+  "entity": "karel_hynek_mácha",
+  "src": "wiki_karel_hynek_mácha",
+  "factual": true
+ },
+ {
+  "q": "Kdo napsal Máj?",
+  "expect": [
+   "mácha"
+  ],
+  "mode": "answer",
+  "kind": "authorship-who",
+  "entity": "karel_hynek_mácha",
+  "src": "wiki_karel_hynek_mácha",
+  "factual": true,
+  "pgroup": "mach-maj-autor"
+ },
+ {
+  "q": "Kdo je autorem básně Máj?",
+  "expect": [
+   "mácha"
+  ],
+  "mode": "answer",
+  "kind": "authorship-who",
+  "entity": "karel_hynek_mácha",
+  "src": "wiki_karel_hynek_mácha",
+  "factual": true,
+  "pgroup": "mach-maj-autor"
+ },
+ {
+  "q": "Kolik zpěvů má Máj?",
+  "expect": [
+   "4",
+   "čtyři"
+  ],
+  "mode": "answer",
+  "kind": "count",
+  "entity": "karel_hynek_mácha",
+  "src": "wiki_karel_hynek_mácha",
+  "factual": true
+ },
+ {
+  "q": "Kdy byl vydán Máj?",
+  "expect": [
+   "1836"
+  ],
+  "mode": "answer",
+  "kind": "temporal",
+  "entity": "karel_hynek_mácha",
+  "src": "wiki_karel_hynek_mácha",
+  "factual": true
+ },
+ {
+  "q": "Kdo byl Jan Neruda?",
+  "expect": [
+   "básník",
+   "novinář"
+  ],
+  "mode": "answer",
+  "kind": "copula",
+  "entity": "jan_neruda",
+  "src": "wiki_jan_neruda",
+  "factual": true
+ },
+ {
+  "q": "Kdy zemřel Jan Neruda?",
+  "expect": [
+   "1891"
+  ],
+  "mode": "answer",
+  "kind": "temporal",
+  "entity": "jan_neruda",
+  "src": "wiki_jan_neruda",
+  "factual": true
+ },
+ {
+  "q": "Kde byl pohřben Jan Neruda?",
+  "expect": [
+   "vyšehrad",
+   "vyšehradský"
+  ],
+  "mode": "answer",
+  "kind": "spatial",
+  "entity": "jan_neruda",
+  "src": "wiki_jan_neruda",
+  "factual": true
+ },
+ {
+  "q": "Které dílo je považováno za vrcholnou prózu Jana Nerudy?",
+  "expect": [
+   "povídky malostranské",
+   "malostranský"
+  ],
+  "mode": "answer",
+  "kind": "authorship-what",
+  "entity": "jan_neruda",
+  "src": "wiki_jan_neruda",
+  "factual": true
+ },
+ {
+  "q": "Kdo byla první láska Jana Nerudy?",
+  "expect": [
+   "holinová",
+   "anna"
+  ],
+  "mode": "answer",
+  "kind": "relation",
+  "entity": "jan_neruda",
+  "src": "wiki_jan_neruda",
+  "factual": true
+ },
+ {
+  "q": "Dokončil Jan Neruda vysokoškolská studia?",
+  "expect": [
+   "ne"
+  ],
+  "mode": "answer",
+  "kind": "polar",
+  "entity": "jan_neruda",
+  "src": "wiki_jan_neruda",
+  "factual": true
+ },
+ {
+  "q": "Kdo byl Jaroslav Seifert?",
+  "expect": [
+   "básník",
+   "spisovatel"
+  ],
+  "mode": "answer",
+  "kind": "copula",
+  "entity": "jaroslav_seifert",
+  "src": "wiki_jaroslav_seifert",
+  "factual": true
+ },
+ {
+  "q": "Kdy získal Jaroslav Seifert Nobelovu cenu?",
+  "expect": [
+   "1984"
+  ],
+  "mode": "answer",
+  "kind": "temporal",
+  "entity": "jaroslav_seifert",
+  "src": "wiki_jaroslav_seifert",
+  "factual": true,
+  "pgroup": "seifert-nobel-rok"
+ },
+ {
+  "q": "V kterém roce dostal Seifert Nobelovu cenu za literaturu?",
+  "expect": [
+   "1984"
+  ],
+  "mode": "answer",
+  "kind": "temporal",
+  "entity": "jaroslav_seifert",
+  "src": "wiki_jaroslav_seifert",
+  "factual": true,
+  "pgroup": "seifert-nobel-rok"
+ },
+ {
+  "q": "Získal Jaroslav Seifert Nobelovu cenu?",
+  "expect": [
+   "ano"
+  ],
+  "mode": "answer",
+  "kind": "polar",
+  "entity": "jaroslav_seifert",
+  "src": "wiki_jaroslav_seifert",
+  "factual": true
+ },
+ {
+  "q": "Kde se narodil Jaroslav Seifert?",
+  "expect": [
+   "žižkov"
+  ],
+  "mode": "answer",
+  "kind": "spatial",
+  "entity": "jaroslav_seifert",
+  "src": "wiki_jaroslav_seifert",
+  "factual": true
+ },
+ {
+  "q": "Kolik dětí měl Jaroslav Seifert?",
+  "expect": [
+   "dvě",
+   "2"
+  ],
+  "mode": "answer",
+  "kind": "count",
+  "entity": "jaroslav_seifert",
+  "src": "wiki_jaroslav_seifert",
+  "factual": true
+ },
+ {
+  "q": "Kdo byla manželka Jaroslava Seiferta?",
+  "expect": [
+   "ulrichová",
+   "marie"
+  ],
+  "mode": "answer",
+  "kind": "relation",
+  "entity": "jaroslav_seifert",
+  "src": "wiki_jaroslav_seifert",
+  "factual": true
+ },
+ {
+  "q": "Kdo byl Bohumil Hrabal?",
+  "expect": [
+   "prozaik",
+   "spisovatel"
+  ],
+  "mode": "answer",
+  "kind": "copula",
+  "entity": "bohumil_hrabal",
+  "src": "wiki_bohumil_hrabal",
+  "factual": true
+ },
+ {
+  "q": "Kdy se narodil Bohumil Hrabal?",
+  "expect": [
+   "1914"
+  ],
+  "mode": "answer",
+  "kind": "temporal",
+  "entity": "bohumil_hrabal",
+  "src": "wiki_bohumil_hrabal",
+  "factual": true,
+  "pgroup": "hrabal-narozeni-rok"
+ },
+ {
+  "q": "V kterém roce se narodil Bohumil Hrabal?",
+  "expect": [
+   "1914"
+  ],
+  "mode": "answer",
+  "kind": "temporal",
+  "entity": "bohumil_hrabal",
+  "src": "wiki_bohumil_hrabal",
+  "factual": true,
+  "pgroup": "hrabal-narozeni-rok"
+ },
+ {
+  "q": "Kde se narodil Bohumil Hrabal?",
+  "expect": [
+   "židenice"
+  ],
+  "mode": "answer",
+  "kind": "spatial",
+  "entity": "bohumil_hrabal",
+  "src": "wiki_bohumil_hrabal",
+  "factual": true
+ },
+ {
+  "q": "Kdo napsal Ostře sledované vlaky?",
+  "expect": [
+   "hrabal"
+  ],
+  "mode": "answer",
+  "kind": "authorship-who",
+  "entity": "bohumil_hrabal",
+  "src": "wiki_bohumil_hrabal",
+  "factual": true
+ },
+ {
+  "q": "Co je pes domácí?",
+  "expect": [
+   "šelma"
+  ],
+  "mode": "answer",
+  "kind": "copula",
+  "entity": "pes_domácí",
+  "src": "wiki_pes_domácí",
+  "factual": true
+ },
+ {
+  "q": "Kolik zubů má dospělý pes?",
+  "expect": [
+   "42"
+  ],
+  "mode": "answer",
+  "kind": "count",
+  "entity": "pes_domácí",
+  "src": "wiki_pes_domácí",
+  "factual": true
+ },
+ {
+  "q": "Jak dlouho trvá březost u psa?",
+  "expect": [
+   "63"
+  ],
+  "mode": "answer",
+  "kind": "temporal",
+  "entity": "pes_domácí",
+  "src": "wiki_pes_domácí",
+  "factual": true,
+  "pgroup": "brezost-pes"
+ },
+ {
+  "q": "Kolik dní je březí fena?",
+  "expect": [
+   "63"
+  ],
+  "mode": "answer",
+  "kind": "temporal",
+  "entity": "pes_domácí",
+  "src": "wiki_pes_domácí",
+  "factual": true,
+  "pgroup": "brezost-pes"
+ },
+ {
+  "q": "Je pes šelma?",
+  "expect": [
+   "ano"
+  ],
+  "mode": "answer",
+  "kind": "polar",
+  "entity": "pes_domácí",
+  "src": "wiki_pes_domácí",
+  "factual": true
+ },
+ {
+  "q": "Z čeho vznikla kočka domácí?",
+  "expect": [
+   "kočka plavá",
+   "divoký"
+  ],
+  "mode": "answer",
+  "kind": "copula",
+  "entity": "kočka_domácí",
+  "src": "wiki_kočka_domácí",
+  "factual": true
+ },
+ {
+  "q": "Do jaké podčeledi patří kočka domácí?",
+  "expect": [
+   "malé kočky",
+   "kočka"
+  ],
+  "mode": "answer",
+  "kind": "taxonomy",
+  "entity": "kočka_domácí",
+  "src": "wiki_kočka_domácí",
+  "factual": true
+ },
+ {
+  "q": "Kolik zubů má dospělá kočka?",
+  "expect": [
+   "30"
+  ],
+  "mode": "answer",
+  "kind": "count",
+  "entity": "kočka_domácí",
+  "src": "wiki_kočka_domácí",
+  "factual": true
+ },
+ {
+  "q": "Jak dlouho je březí kočka?",
+  "expect": [
+   "65",
+   "9 týdnů"
+  ],
+  "mode": "answer",
+  "kind": "temporal",
+  "entity": "kočka_domácí",
+  "src": "wiki_kočka_domácí",
+  "factual": true
+ },
+ {
+  "q": "Co je kůň domácí?",
+  "expect": [
+   "lichokopytník",
+   "býložravec"
+  ],
+  "mode": "answer",
+  "kind": "copula",
+  "entity": "kůň_domácí",
+  "src": "wiki_kůň_domácí",
+  "factual": true
+ },
+ {
+  "q": "Je kůň šelma?",
+  "expect": [
+   "ne"
+  ],
+  "mode": "answer",
+  "kind": "polar",
+  "entity": "kůň_domácí",
+  "src": "wiki_kůň_domácí",
+  "factual": true
+ },
+ {
+  "q": "Jak se nazývá mládě koně?",
+  "expect": [
+   "hříbě"
+  ],
+  "mode": "answer",
+  "kind": "attribute",
+  "entity": "kůň_domácí",
+  "src": "wiki_kůň_domácí",
+  "factual": true
+ },
+ {
+  "q": "Kolik párů chromozomů má kůň?",
+  "expect": [
+   "32"
+  ],
+  "mode": "answer",
+  "kind": "count",
+  "entity": "kůň_domácí",
+  "src": "wiki_kůň_domácí",
+  "factual": true
+ },
+ {
+  "q": "Co je koza domácí?",
+  "expect": [
+   "přežvýkavec"
+  ],
+  "mode": "answer",
+  "kind": "copula",
+  "entity": "koza_domácí",
+  "src": "wiki_koza_domácí",
+  "factual": true
+ },
+ {
+  "q": "Jak se nazývá samec kozy?",
+  "expect": [
+   "kozel"
+  ],
+  "mode": "answer",
+  "kind": "attribute",
+  "entity": "koza_domácí",
+  "src": "wiki_koza_domácí",
+  "factual": true,
+  "pgroup": "samec-koza"
+ },
+ {
+  "q": "Jak se říká samci kozy domácí?",
+  "expect": [
+   "kozel"
+  ],
+  "mode": "answer",
+  "kind": "attribute",
+  "entity": "koza_domácí",
+  "src": "wiki_koza_domácí",
+  "factual": true,
+  "pgroup": "samec-koza"
+ },
+ {
+  "q": "Jak dlouho trvá březost u kozy?",
+  "expect": [
+   "150"
+  ],
+  "mode": "answer",
+  "kind": "temporal",
+  "entity": "koza_domácí",
+  "src": "wiki_koza_domácí",
+  "factual": true
+ },
+ {
+  "q": "Co je prase domácí?",
+  "expect": [
+   "sudokopytník"
+  ],
+  "mode": "answer",
+  "kind": "copula",
+  "entity": "prase_domácí",
+  "src": "wiki_prase_domácí",
+  "factual": true
+ },
+ {
+  "q": "Je prase přežvýkavec?",
+  "expect": [
+   "ne"
+  ],
+  "mode": "answer",
+  "kind": "polar",
+  "entity": "prase_domácí",
+  "src": "wiki_prase_domácí",
+  "factual": true
+ },
+ {
+  "q": "Jak dlouho trvá březost u prasete?",
+  "expect": [
+   "115"
+  ],
+  "mode": "answer",
+  "kind": "temporal",
+  "entity": "prase_domácí",
+  "src": "wiki_prase_domácí",
+  "factual": true,
+  "pgroup": "brezost-prase"
+ },
+ {
+  "q": "Kolik dní je březí prasnice?",
+  "expect": [
+   "115"
+  ],
+  "mode": "answer",
+  "kind": "temporal",
+  "entity": "prase_domácí",
+  "src": "wiki_prase_domácí",
+  "factual": true,
+  "pgroup": "brezost-prase"
+ },
+ {
+  "q": "Co je ovce domácí?",
+  "expect": [
+   "přežvýkavec"
+  ],
+  "mode": "answer",
+  "kind": "copula",
+  "entity": "ovce_domácí",
+  "src": "wiki_ovce_domácí",
+  "factual": true
+ },
+ {
+  "q": "Jak se nazývá samec ovce?",
+  "expect": [
+   "beran"
+  ],
+  "mode": "answer",
+  "kind": "attribute",
+  "entity": "ovce_domácí",
+  "src": "wiki_ovce_domácí",
+  "factual": true
+ },
+ {
+  "q": "Je ovce přežvýkavec?",
+  "expect": [
+   "ano"
+  ],
+  "mode": "answer",
+  "kind": "polar",
+  "entity": "ovce_domácí",
+  "src": "wiki_ovce_domácí",
+  "factual": true
+ },
+ {
+  "q": "Z čeho vznikl králík domácí?",
+  "expect": [
+   "králík divoký",
+   "divoký"
+  ],
+  "mode": "answer",
+  "kind": "taxonomy",
+  "entity": "králík_domácí",
+  "src": "wiki_králík_domácí",
+  "factual": true
+ },
+ {
+  "q": "Je králík býložravec?",
+  "expect": [
+   "ano"
+  ],
+  "mode": "answer",
+  "kind": "polar",
+  "entity": "králík_domácí",
+  "src": "wiki_králík_domácí",
+  "factual": true
+ },
+ {
+  "q": "Jak se nazývá samice králíka?",
+  "expect": [
+   "ramlice",
+   "králice"
+  ],
+  "mode": "answer",
+  "kind": "attribute",
+  "entity": "králík_domácí",
+  "src": "wiki_králík_domácí",
+  "factual": true
+ },
+ {
+  "q": "Kdo napsal R.U.R.?",
+  "expect": [
+   "čapek",
+   "karel"
+  ],
+  "mode": "answer",
+  "kind": "authorship-who",
+  "entity": "r.u.r.",
+  "src": "wiki_r.u.r.",
+  "factual": true,
+  "pgroup": "rur-autor"
+ },
+ {
+  "q": "Kdo je autorem R.U.R.?",
+  "expect": [
+   "čapek",
+   "karel"
+  ],
+  "mode": "answer",
+  "kind": "authorship-who",
+  "entity": "r.u.r.",
+  "src": "wiki_r.u.r.",
+  "factual": true,
+  "pgroup": "rur-autor"
+ },
+ {
+  "q": "Z jakého roku je R.U.R.?",
+  "expect": [
+   "1920"
+  ],
+  "mode": "answer",
+  "kind": "temporal",
+  "entity": "r.u.r.",
+  "src": "wiki_r.u.r.",
+  "factual": true
+ },
+ {
+  "q": "Kdy měla premiéru R.U.R.?",
+  "expect": [
+   "1921"
+  ],
+  "mode": "answer",
+  "kind": "temporal",
+  "entity": "r.u.r.",
+  "src": "wiki_r.u.r.",
+  "factual": true
+ },
+ {
+  "q": "Co je R.U.R.?",
+  "expect": [
+   "drama",
+   "hra"
+  ],
+  "mode": "answer",
+  "kind": "copula",
+  "entity": "r.u.r.",
+  "src": "wiki_r.u.r.",
+  "factual": true
+ },
+ {
+  "q": "Napsal Karel Čapek R.U.R.?",
+  "expect": [
+   "ano"
+  ],
+  "mode": "answer",
+  "kind": "polar",
+  "entity": "r.u.r.",
+  "src": "wiki_r.u.r.",
+  "factual": true
+ },
+ {
+  "q": "Kdo navrhl slovo robot?",
+  "expect": [
+   "josef",
+   "čapek"
+  ],
+  "mode": "answer",
+  "kind": "authorship-who",
+  "entity": "robot",
+  "src": "wiki_r.u.r.",
+  "factual": true
+ },
+ {
+  "q": "Kdo napsal Válku s Mloky?",
+  "expect": [
+   "čapek",
+   "karel"
+  ],
+  "mode": "answer",
+  "kind": "authorship-who",
+  "entity": "válka_s_mloky",
+  "src": "wiki_válka_s_mloky",
+  "factual": true
+ },
+ {
+  "q": "Co je Válka s Mloky?",
+  "expect": [
+   "román"
+  ],
+  "mode": "answer",
+  "kind": "copula",
+  "entity": "válka_s_mloky",
+  "src": "wiki_válka_s_mloky",
+  "factual": true
+ },
+ {
+  "q": "Kdo objevil mloky?",
+  "expect": [
+   "van toch",
+   "toch"
+  ],
+  "mode": "answer",
+  "kind": "relation",
+  "entity": "van_toch",
+  "src": "wiki_válka_s_mloky",
+  "factual": true
+ },
+ {
+  "q": "Kde objevil kapitán Van Toch mloky?",
+  "expect": [
+   "tana masa",
+   "masa"
+  ],
+  "mode": "answer",
+  "kind": "spatial",
+  "entity": "van_toch",
+  "src": "wiki_válka_s_mloky",
+  "factual": true
+ },
+ {
+  "q": "Kdo napsal Bílou nemoc?",
+  "expect": [
+   "čapek",
+   "karel"
+  ],
+  "mode": "answer",
+  "kind": "authorship-who",
+  "entity": "bílá_nemoc",
+  "src": "wiki_bílá_nemoc",
+  "factual": true
+ },
+ {
+  "q": "Z jakého roku je Bílá nemoc?",
+  "expect": [
+   "1937"
+  ],
+  "mode": "answer",
+  "kind": "temporal",
+  "entity": "bílá_nemoc",
+  "src": "wiki_bílá_nemoc",
+  "factual": true
+ },
+ {
+  "q": "Co je Bílá nemoc?",
+  "expect": [
+   "drama",
+   "hra"
+  ],
+  "mode": "answer",
+  "kind": "copula",
+  "entity": "bílá_nemoc",
+  "src": "wiki_bílá_nemoc",
+  "factual": true
+ },
+ {
+  "q": "Kdo vynalezl lék proti bílé nemoci?",
+  "expect": [
+   "galén"
+  ],
+  "mode": "answer",
+  "kind": "relation",
+  "entity": "galén",
+  "src": "wiki_bílá_nemoc",
+  "factual": true
+ },
+ {
+  "q": "Koho zabil Kain?",
+  "expect": [
+   "ábel"
+  ],
+  "mode": "answer",
+  "kind": "relation",
+  "entity": "kain",
+  "src": "bible_genesis",
+  "factual": true
+ },
+ {
+  "q": "Kdo postavil archu?",
+  "expect": [
+   "noe"
+  ],
+  "mode": "answer",
+  "kind": "relation",
+  "entity": "noe",
+  "src": "bible_genesis",
+  "factual": true
+ },
+ {
+  "q": "Jak Adam pojmenoval svou ženu?",
+  "expect": [
+   "eva"
+  ],
+  "mode": "answer",
+  "kind": "relation",
+  "entity": "adam",
+  "src": "bible_genesis",
+  "factual": true
+ },
+ {
+  "q": "Kde Bůh vysadil zahradu?",
+  "expect": [
+   "eden"
+  ],
+  "mode": "answer",
+  "kind": "spatial",
+  "entity": "eden",
+  "src": "bible_genesis",
+  "factual": true
+ },
+ {
+  "q": "Kde se narodil Ježíš?",
+  "expect": [
+   "betlém"
+  ],
+  "mode": "answer",
+  "kind": "spatial",
+  "entity": "ježíš",
+  "src": "bible_lukas",
+  "factual": true
+ },
+ {
+  "q": "Kdo byla matka Ježíše?",
+  "expect": [
+   "maria",
+   "marie"
+  ],
+  "mode": "answer",
+  "kind": "relation",
+  "entity": "ježíš",
+  "src": "bible_lukas",
+  "factual": true
+ },
+ {
+  "q": "Který anděl byl poslán k Marii?",
+  "expect": [
+   "gabriel"
+  ],
+  "mode": "answer",
+  "kind": "relation",
+  "entity": "maria",
+  "src": "bible_lukas",
+  "factual": true
+ },
+ {
+  "q": "Kdo pokřtil Ježíše?",
+  "expect": [
+   "jan"
+  ],
+  "mode": "answer",
+  "kind": "relation",
+  "entity": "ježíš",
+  "src": "bible_jan",
+  "factual": true
+ },
+ {
+  "q": "Kde Ježíš proměnil vodu ve víno?",
+  "expect": [
+   "kána",
+   "kán"
+  ],
+  "mode": "answer",
+  "kind": "spatial",
+  "entity": "ježíš",
+  "src": "bible_jan",
+  "factual": true
+ },
+ {
+  "q": "Kdo nařídil soupis lidu?",
+  "expect": [
+   "august"
+  ],
+  "mode": "answer",
+  "kind": "relation",
+  "entity": "august",
+  "src": "bible_lukas",
+  "factual": true
+ },
+ {
+  "q": "Kým bylo Slovo na počátku?",
+  "expect": [
+   "bůh"
+  ],
+  "mode": "answer",
+  "kind": "copula",
+  "entity": "slovo",
+  "src": "bible_jan",
+  "factual": false
+ },
+ {
+  "q": "Kdy se narodil Ježíš?",
+  "expect": [
+   "nevím"
+  ],
+  "mode": "unsure",
+  "kind": "honest-negative",
+  "entity": "ježíš",
+  "src": "bible_lukas",
+  "factual": true
+ },
+ {
+  "q": "Kolik měl Ježíš sourozenců?",
+  "expect": [
+   "nevím"
+  ],
+  "mode": "unsure",
+  "kind": "honest-negative",
+  "entity": "ježíš",
+  "src": "bible_jan",
+  "factual": true
+ },
+ {
+  "q": "Jakou barvu měl Máchův kabát?",
+  "expect": [
+   "nevím"
+  ],
+  "mode": "unsure",
+  "kind": "honest-negative",
+  "entity": "mácha",
+  "src": "wiki_karel_hynek_mácha",
+  "factual": true
+ },
+ {
+  "q": "Kdy zemřel kapitán Van Toch?",
+  "expect": [
+   "nevím"
+  ],
+  "mode": "unsure",
+  "kind": "honest-negative",
+  "entity": "van_toch",
+  "src": "wiki_válka_s_mloky",
+  "factual": true
+ },
+ {
+  "q": "Jak se jmenovala loď kapitána Van Tocha?",
+  "expect": [
+   "nevím"
+  ],
+  "mode": "unsure",
+  "kind": "honest-negative",
+  "entity": "van_toch",
+  "src": "wiki_válka_s_mloky",
+  "factual": true
+ },
+ {
+  "q": "Kolik dětí měl Karel Čapek?",
+  "expect": [
+   "nevím"
+  ],
+  "mode": "unsure",
+  "kind": "honest-negative",
+  "entity": "karel_čapek",
+  "src": "wiki_karel_čapek",
+  "factual": true
+ },
+ {
+  "q": "Jaké bylo složení léku dr. Galéna?",
+  "expect": [
+   "nevím"
+  ],
+  "mode": "unsure",
+  "kind": "honest-negative",
+  "entity": "galén",
+  "src": "wiki_bílá_nemoc",
+  "factual": true
+ }
+]

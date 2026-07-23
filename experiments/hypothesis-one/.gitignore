@@ -5,3 +5,5 @@ registry.jsonl
 candidates.json
 variants.log
 .viz.pid
+
+baseline_large.json
