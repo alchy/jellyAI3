@@ -60,6 +60,31 @@ do faktů, glow-orders-ties, extrakce bio-závorky, entita-jako-podmět (výběr
   <code>answering._assurance</code>.</p>
 </div>
 <div class="member">
+  <p class="sig"><span class="pri p2">P2</span> Řetězení / předání kontextu mezi otázkami (interaktivní session)</p>
+  <p>Dnes je každý tah samostatný — světlo/mount se mezi otázkami mažou (<code>ask.py</code>).
+  Parent ale <b>světlo mezi tahy nereseuje</b> (decay jen po úspěchu) → „Co napsal?" navazuje na
+  horký kontext z minula, „a jeho bratr?" na entitu z minula. Přidat: <b>přetrvávající aktivační
+  pole</b> mezi tahy v session (feed → spread → answer → reinforce → decay → další tah), pro-drop
+  a zájmena („on/jeho") se pak rozřeší na nejteplejší entitu z minula. Místo: session-loop nad
+  <code>Answering.answer</code> + <code>fill_holes</code> (koreference přes tahy). Viz
+  <a href="aktivace-dialog.html">Aktivace v dialogu</a> (mechanismus už popsán).</p>
+</div>
+<div class="member">
+  <p class="sig"><span class="pri p2">P2</span> Mnemos — ukládání faktů v dialogu (write-path)</p>
+  <p>Dnes je systém <b>READ-ONLY</b> nad statickým korpusem — nejde mu v dialogu říct nový fakt
+  („Karel Čapek napsal i Matku", „můj e-mail je…") a mít ho zapamatovaný. Chybí <b>write-path</b>:
+  uživatelské <b>VÝROKY</b> (ne otázky) → fakty v grafu (s časovým razítkem) → později zodpovězené
+  obyčejnou read cestou. Mechanismus (parent Mnemos): brána <b>is_factual</b> („?"/tázací slovo →
+  otázka; jinak výrok → Mnemos) · <code>parse_statement</code> → fakt + čas · ulož do <b>user shardu</b> ·
+  <code>persist</code> do JSONL deníku + <code>replay</code> při startu · <code>forget</code> přesnou
+  shodou. <b>Mapuje se skoro mechanicky</b> na naši infra: <code>FactStore</code>/<code>TemplateStore</code>
+  UŽ JSOU append-only event-log (per-doc shardy + mount) → uživatelský výrok = další „horký soubor";
+  <code>memory.jsonl ↔ user shard</code>; <code>replay ↔ mount</code>; <code>forget ↔ remove + reindex</code>.
+  Plán fúze je už v <a href="fuze.html">fúzní studii</a> (Mnemos v tabulce expertů — „největší mezera
+  experimentu"). Místo: nová větev v turn-loopu (is_factual → Mnemos) + <code>user.jsonl</code> shard;
+  provázat s řetězením kontextu (výše) — write i read v jedné session.</p>
+</div>
+<div class="member">
   <p class="sig"><span class="pri p2">P2</span> Node-based retrieval (cíl konceptu)</p>
   <p>Sjednotit fakt-store + aktivaci do <b>entitně-centrického grafu</b>: entita = uzel, fakty =
   typované hrany. Retrieval = od rozsvíceného uzlu traverz po relaci VZORu. Obejde tf·idf výběr

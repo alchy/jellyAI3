@@ -24,9 +24,14 @@
 
 <p class="eyebrow">Experiment · hypothesis-one</p>
 <h1>Dokumentace</h1>
-<p class="lead">Český symbolický systém: ze surového textu se staví katalog syntetických
-vazeb FAKT ↔ OTÁZKA ↔ ODPOVĚĎ. Neuron (UDPipe 2) jen na anotaci předem; runtime je
-deterministický. Dokumentace je stavěná na příkladech — projdeš shora dolů a víš, jak to funguje.</p>
+<p class="lead"><b>Co stavíme:</b> dialogový <b>stavový automat</b>, který ze surového českého
+textu postaví <b>mapu faktů</b> — a pak nad ní, pomocí <b>grafu</b> (tekoucí světlo / aktivace) a
+<b>lingvistických vzorů</b> (VZOR), <b>dohledá fakt</b> a odpoví uživateli na jeho dotaz. Kde je
+jasno, odpoví; kde není, doptá se; když neví, <b>nehádá</b>.</p>
+<p class="lead" style="font-size: 1rem;">Tok: surový text → mapa faktů (predikát + role) → živá
+otázka rozsvítí graf → VZOR doostří odpověď. Neuron (UDPipe 2) jen na anotaci předem; runtime je
+deterministický (stejná otázka = stejná odpověď). Dokumentace je stavěná na příkladech — projdeš
+shora dolů a víš, jak to funguje.</p>
 
 <div class="note"><span class="lbl">Vztah k parentu:</span> hypothesis-one je <b>odlehčení</b>
 od systému KARET předchozího projektu (<code>jellyai/</code> v hlavním adresáři) — ten je bohatá
