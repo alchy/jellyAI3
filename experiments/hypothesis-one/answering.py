@@ -223,11 +223,32 @@ class Answering:
             return "clarify", win_c, offer         # evidence, ale rovnocenní → doptej se
         return "unsure", win_c, offer              # jen echo → nehádej
 
-    def answer(self, question):
+    def _hot_entities(self, top=6, floor=0.4, idf_min=1.5):
+        """Nejteplejší DISTINKTIVNÍ slova pole = TÉMA z minulých tahů (kontext dialogu).
+
+        Navazující otázka („Kdy se narodil?") nemá explicitní entitu — vezme ji z toho, co
+        ještě SVÍTÍ z minula (Karel Čapek). Jen distinktivní (idf ≥ 1.5 — funkční slova mají
+        idf ≤ 1.0), ne funkční slova. Vstup: prahy. Výstup: množina horkých entit-lemmat.
+        """
+        out = set()
+        for w, h in sorted(self.field.words.items(), key=lambda x: -x[1]):
+            if h < floor:
+                break
+            if self.field.idf.get(w, 0.0) >= idf_min:
+                out.add(w)
+                if len(out) >= top:
+                    break
+        return out
+
+    def answer(self, question, carry_context=False):
         """Živá otázka → odpověď / klarifikace / upřímný terminál (dialogový stavový automat).
 
-        Vstup: otázka (str). Výstup: dict {answer, mode, offer, fact_ref, hole_role, candidates, via}.
-        mode: answer (jasno) | clarify (nejasno → doptat) | unsure (nehádám). None bez záchytu.
+        `carry_context=True` = interaktivní session: světlo i mount PŘETRVAJÍ mezi tahy (jen
+        `decay` je utlumí), navazující otázka bez entity si vezme TÉMA z horkých entit minula
+        („Kdy se narodil?" po „Kdo je Karel Čapek?" → Karel je horký → narodit-fakt Karla).
+        Default False = samostatný tah (volající si pole/mount čistí sám, např. etalon).
+
+        Výstup: dict {answer, mode, offer, fact_ref, hole_role, candidates, via} nebo None.
         """
         toks = self._parse(question)
         q_vzor, lemmas, hole_role = self._question(toks)
@@ -235,16 +256,41 @@ class Answering:
         predicate = self._predicate(toks)
         if not (q_vzor or (predicate and hole_role)):
             return None
-        hot = [d for d, _s in self.dl.select_files(lemmas)]     # DLE OTÁZKY vybere soubory
-        if not hot:
+        known = {l.lower() for l in lemmas}
+        follow_up = False
+        if carry_context:
+            # NAVAZUJÍCÍ otázka BEZ vlastní entity si vezme TÉMA z minula, otázka s VLASTNÍ
+            # entitou téma přepíná. Predikát z testu VYNECHÁN — „narodit/zemřít" mají vysoké
+            # idf, ale jsou to slovesa, ne téma; rozhoduje distinktivní NEslovesné slovo.
+            pred_l = (predicate or "").lower()
+            follow_up = not any(self.field.idf.get(l.lower(), 0.0) >= 1.5
+                                for l in lemmas if l.lower() != pred_l)
+            if follow_up:
+                self.field.decay()                               # minulé téma jen POHASNE (drží kontext)
+                known |= self._hot_entities()                    # + horké entity z minula (téma)
+            else:
+                # NOVÉ téma (otázka nese vlastní entitu): zbytkový žár minulého protagonisty
+                # zhasne, jinak by v glow-remíze („napsal"+who nese ko=0 u všech autorů) přebil
+                # čerstvou entitu — „Kdo napsal Švejka?" po Čapkovi nesmí dát Čapka místo Haška.
+                # A ZAHOĎ i mount minulého tématu — nakupené dokumenty by přinášely rivaly a
+                # kazily assurance (answer→clarify), i když identitu vítěze nemění.
+                self.field.words.clear()
+                self.field.files.clear()
+                self.store.mounted.clear()
+                if self.facts_enabled:
+                    self.facts.mounted.clear()
+        hot = [d for d, _s in self.dl.select_files(lemmas)]      # DLE OTÁZKY vybere soubory
+        if not hot and not (carry_context and self.store.mounted):
             return None
         self.store.mount(hot)                                    # NAHRAJ šablony horkých (#60)
         if self.facts_enabled:
             self.facts.mount(hot)                                # NAHRAJ fakty horkých (#60)
-        self.field.build_graph(self.dl.mount(hot), self.g)       # graf hran horkých souborů
+        self.field.adj.clear()                                   # graf hran = VŠECHNY mountnuté
+        self.field.build_graph(self.dl.mount(list(self.store.mounted)), self.g)
         self.field.feed(lemmas, self.dl)                         # rozsvícení
         self.field.spread()                                      # teplo po hranách
-        known = {l.lower() for l in lemmas}
+        if follow_up:
+            known |= self._hot_entities()                        # po spreadu přibydou horké
         cands = self._candidates(q_vzor, predicate, hole_role, known)   # predikát+role ∪ window-VZOR
         if not cands:
             return None
@@ -253,6 +299,9 @@ class Answering:
             return None
         if mode == "answer":
             self.field.reinforce(best["answer"], best["doc"])    # zpětný tok jen u jasné odpovědi
+            if carry_context:                                    # udrž téma i entity otázky horké
+                for e in known:
+                    self.field.words[e] = self.field.words.get(e, 0.0) + 1.0
         return {"answer": best["answer"], "mode": mode,
                 "offer": [c["answer"] for c in offer], "fact_ref": best.get("fact_ref"),
                 "hole_role": hole_role, "candidates": len(cands), "via": best["kind"]}

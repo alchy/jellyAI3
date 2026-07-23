@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>⑤ Queryparser — živá otázka → odpověď</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+
+<nav class="crumbs"><a href="index.html">Dokumentace</a> › ⑤ Queryparser</nav>
+
+<p class="eyebrow">Fáze ⑤ · runtime matcher (answering.py)</p>
+<h1>⑤ Queryparser — živá otázka → odpověď</h1>
+<p class="lead">Srdce běhu: živá otázka projde jedním tahem dialogového automatu — rozsvítí graf,
+sesbírá kandidáty (fakty + šablony), assurance rozhodne <b>jasno / nejasno / nehádej</b>, a systém
+odpoví, doptá se, nebo přizná „nevím". Jediná živá anotace je UDPipe 2 (rozbor otázky); rozhodování
+je symbolické a deterministické.</p>
+
+<div class="note"><span class="lbl">Celý tah v kostce:</span> <code>_parse</code> (otázka →
+tokeny) → <code>_question</code> (query-VZOR + lemmata + role díry) → <code>_answer_role</code>
+(kopula → komplement) → <code>_predicate</code> (predikát) → <code>select_files</code>+mount (② brána)
+→ <code>feed</code>/<code>spread</code> (světlo) → <code>_candidates</code> (predikát+role ∪ VZOR) →
+<code>_assurance</code> (jasno/nejasno) → odpověz / doptej / nehádej → <code>reinforce</code>.</p></div>
+
+<h2>Rozbor otázky</h2>
+<div class="member">
+  <p class="sig">_parse(question) → tokeny</p>
+  <p>Pošle otázku na UDPipe 2 (jediná živá anotace), rozparsuje CoNLL-U a <b>sloučí zkratky</b>
+  stejně jako korpus (chokepoint — jinak by „R.U.R." bylo „R/U/R" a nesedělo na fakty).</p>
+  <div class="io"><b>vstup</b><span>„Kdo napsal Švejka?"</span>
+  <b>výstup</b><span>[Kdo(PRON,Int), napsat(VERB,root), Švejk(PROPN,obj), ?]</span></div>
+</div>
+<div class="member">
+  <p class="sig">_question(toks) → (query-VZOR, lemmata, role díry)</p>
+  <p>Najde tázací slovo (rys <code>PronType=Int</code>), z jeho okna udělá <b>query-VZOR</b> (stín
+  otázky) a hlavně určí <b>roli díry</b> — přes TÝŽ mapovač <code>RoleCatalog.role_of</code> jako
+  fakty (DRY): „Kdo" = who, „Co napsal" = whom_what, „Kde" = where, „Kdy" = when. Lemmata =
+  obsahová slova bez tázacího.</p>
+  <div class="io"><b>„Kdo napsal Švejka?"</b><span>role díry = <b>who</b>, lemmata = [napsat, Švejk]</span></div>
+</div>
+<div class="member">
+  <p class="sig">_answer_role(toks, hole_role) → efektivní role odpovědi</p>
+  <p>Kopulová identita „Kdo/Co <b>JE</b> X?" se neptá na who-podmět (X je známý), ale na to, <b>co
+  X JE</b> — komplement (role <code>state</code>). Platí i když <code>role_of</code> vrátí None
+  (tázací slovo je jmenný přísudek). Bez tohoto by „Kdo je pes?" vrátilo nejteplejší who-podmět
+  z jakékoli věty „X je Y" (v korpusu s biblí → „bůh").</p>
+  <div class="io"><b>„Kdo je pes domácí?"</b><span>role who → <b>state</b> (hledá komplement: šelma)</span></div>
+</div>
+<div class="member">
+  <p class="sig">_predicate(toks) → lemma predikátu</p>
+  <p>Predikát otázky = lemma hlavního slovesa (root, jinak první VERB), jinak spona. Je to
+  <b>JOIN klíč</b> parent-modelu: „Kde se <b>narodil</b> X" a fakt „<b>Narodil</b> se v Y" se
+  potkají přes <code>narodit</code>, nezávisle na slovosledu.</p>
+  <div class="io"><b>„Kde se narodil Karel Čapek?"</b><span>predikát = <b>narodit</b></span></div>
+</div>
+
+<h2>Kandidáti (dvě cesty)</h2>
+<div class="member">
+  <p class="sig">_candidates(q_vzor, predicate, hole_role, known) → [kandidát]</p>
+  <p>Sesbírá kandidáty DVĚMA cestami do jednotného tvaru <code>{answer, role, doc, mq, kind, fact_ref}</code>:
+  <b>pred</b> (parent-model: <code>FactStore.match(predikát, role)</code>) a <b>vzor</b> (window-VZOR:
+  <code>TemplateStore.match_scored</code>). Predikátová cesta je PŘESNÁ: přijme jen fakt, který sám
+  nese ZNÁMOU entitu otázky <b>v JINÉ roli než odpověď</b> — jinak by predikát „napsal"+who zaplavil
+  všemi autory (a glow by mispicknul). Ta entitní vazba v jiné roli je zámek proti slepenci
+  (<code>who=[Švejk, Olbracht]</code> není vazba; <code>who=[Karel] + where=?</code> je).</p>
+  <div class="io"><b>„Kde se narodil Karel Čapek?"</b><span>pred: narodit-fakt s who=[Karel] → where=[Svatoňovice, rodina]</span></div>
+</div>
+<div class="member">
+  <p class="sig">_known_overlap(fact_ref, role, known) → počet</p>
+  <p>Kolik ZNÁMÝCH entit otázky nese fakt kandidáta v <b>jiné roli než odpovědní</b>. Sdíleno oběma
+  cestami (fakt dohledán přes <code>FactStore.by_ref</code>). Co-filler odpovědní role se nepočítá
+  (proti slepenci). Signál base v <code>_rank</code>.</p>
+  <div class="io"><b>fakt narodit {who:[Karel], where:[Svatoňovice]}, díra where, known={karel,čapek}</b><span>→ 1 (Karel ve where≠roli)</span></div>
+</div>
+
+<h2>Rozhodnutí — glow-orders-ties + assurance</h2>
+<div class="member">
+  <p class="sig">_rank(cands, known, hole_role) → nejlepší kandidát</p>
+  <p><b>Glow-orders-ties</b> jako parent: STRUKTURA rozhoduje první, aktivace (glow) řadí jen remízu
+  — leaked světlo tak NEMŮŽE přebít strukturní shodu. Vybírá <code>max</code> podle base tuple
+  (sestupně):</p>
+  <div style="overflow-x:auto"><table>
+  <tr><th>#</th><th>složka</th><th>co znamená</th></tr>
+  <tr><td>1</td><td><code>echo_ok</code></td><td>odpověď NENÍ slovo z otázky (self-answer „Kdo je pes?"→pes je nesmysl)</td></tr>
+  <tr><td>2</td><td><code>role_fit</code></td><td>role kandidáta = role díry (Hašek/who &gt; román/what_subject)</td></tr>
+  <tr><td>3</td><td><code>known_ov</code></td><td>fakt nese známou entitu otázky (Švejk → Hašek, ne libovolný autor)</td></tr>
+  <tr><td>4</td><td><code>def_fit</code></td><td>DEFINIČNÍ komplement — <code>state</code> ze sent 0 (úvodní věta = definice: „Josef Čapek byl <b>malíř</b>")</td></tr>
+  <tr><td>5</td><td><code>type_fit</code></td><td>TYP entity sedí na díru (Topos: where → MÍSTO; Svatoňovice &gt; rodina)</td></tr>
+  <tr><td>6</td><td><code>kind_pred</code></td><td>parent-model (predikát+role) bije window-VZOR</td></tr>
+  <tr><td>7</td><td><code>mq</code></td><td>exaktní shoda VZORu &gt; fuzzy</td></tr>
+  <tr><td>8</td><td><code>glow</code></td><td>teplo aktivace (POSLEDNÍ — jen remíza)</td></tr>
+  </table></div>
+  <p>Klíč <code>def_fit</code> (dřív chyběl v dokumentaci): mezi mnoha <code>state</code>-komplementy
+  entity vybere ten z ÚVODNÍ věty = definici (jako biografická závorka bere jen sent 0).</p>
+</div>
+<div class="member">
+  <p class="sig">_assurance(cands, known, hole_role) → (mode, winner, offer)</p>
+  <p>Jasno vs nejasno (parentovo <code>assurance</code>). Deduplikuje kandidáty dle odpovědi, seřadí
+  dle (base, glow), a rozhodne podle <b>ODSTUPU</b> vítěze od druhého — STRUKTUROU (base_sep) NEBO
+  SVĚTLEM (glow_sep: vítěz má &gt; 2× glow druhého). Klíč: vítěz s dominantním světlem je jistý i
+  při remíze base (jinak by „Kdo napsal Švejka" zbytečně doptával — Hašek má 20× glow nad Vančurou).</p>
+  <div style="overflow-x:auto"><table>
+  <tr><th>mode</th><th>kdy</th><th>výstup</th></tr>
+  <tr><td><b>answer</b></td><td>strukturní síla ≥ 1 A odstup (base NEBO glow)</td><td>odpověz</td></tr>
+  <tr><td><b>clarify</b></td><td>evidence, ale rovnocenní rivalové</td><td>„mám data o X, Y — upřesni?"</td></tr>
+  <tr><td><b>unsure</b></td><td>jen echo, žádná struktura</td><td>„nemám jasná data" (nehádej)</td></tr>
+  </table></div>
+</div>
+
+<h2>Celý tah</h2>
+<div class="member">
+  <p class="sig">answer(question, carry_context=False) → dict | None</p>
+  <p>Celý runtime tah: rozbor → <code>select_files</code> (② brána dle otázky) → mount horkých
+  (šablony i fakty, #60) → <code>build_graph</code>/<code>feed</code>/<code>spread</code> (světlo) →
+  <code>_candidates</code> → <code>_assurance</code> → jen u <b>answer</b> zpětně přihřeje
+  (<code>reinforce</code>, řetěz). Bez horkých souborů nebo bez záchytu vrací None.</p>
+  <p><code>carry_context=True</code> (interaktivní dialog, <code>ask.py</code>/<code>viz.py</code>):
+  světlo i mount PŘETRVAJÍ mezi tahy. Navazující otázka bez vlastní entity zdědí téma z horkých
+  entit minula a jen pohasne (<code>decay</code>); otázka s vlastní entitou téma přepne (žár i mount
+  zhasnou). Mechanismus a proč: <a href="aktivace-dialog.html#s4b">aktivace v dialogu §4b</a>.
+  Etalon volá s <code>False</code> (samostatný tah, deterministicky srovnatelný).</p>
+  <div class="io"><b>vstup</b><span>„Kde se narodil Karel Čapek?"</span>
+  <b>výstup</b><span>{answer: „Svatoňovice", mode: „answer", offer: […], fact_ref: [„wiki_karel_čapek", 4], hole_role: „where", candidates: N, via: „pred"}</span></div>
+</div>
+
+<h2>Podklad: fakt-store (predikát+role)</h2>
+<div class="member">
+  <p class="sig">FactStore.match(predicate, hole_role) → [(lemma, Fact)]</p>
+  <p>Parent-model JOIN: fakt a otázka se potkají PREDIKÁTEM + rolí díry, nezávisle na slovosledu
+  (window-VZOR to nesouměří — vidí jen lokální okno). <code>Fact</code> = predikát + role-sloty +
+  provenience; shardy per soubor, mount jen horkých (#60), index <code>by_predicate</code> +
+  <code>by_ref</code> (ten krmí <code>_known_overlap</code>). Doc-kontext supluje pro-drop podmět.</p>
+</div>
+
+<h2>Podklad: experti (podgrafy)</h2>
+<div class="member">
+  <p class="sig">Topos.is_place(lemma) — expert MÍSTO</p>
+  <p>Rozliší, zda lemma je MÍSTO (gazetteer GEO entit z NER) → signál <code>type_fit</code> pro výběr
+  správného where-slotu (Svatoňovice ✓ / rodina ✗). Detail: <a href="fuze.html">fúzní studie</a>.</p>
+</div>
+<div class="member">
+  <p class="sig">Chronos.temporal_facts(sent, grammar) → [(predikát, rok)] — expert ČAS</p>
+  <p>Rozpozná ROK (4místné NUM v rozsahu) a přiřadí ho k HLAVNÍMU predikátu věty (root verb) → fakt
+  dostane <code>when</code>-slot i z BĚŽNÉHO textu (ne jen z biografické závorky). „Premiéra … měla
+  proběhnout … došlo k odložení termínu na 25. ledna <b>1921</b>" → rok visí přes conj pod root
+  <code>měla</code> → mít-fakt dostane when=1921 → „Kdy měla premiéru?" se trefí. (Zatím jen rok;
+  plné datum/interval/relativní čas jsou rozšíření — parent je má.)</p>
+</div>
+
+<h2>Kde to žije</h2>
+<p><code>answering.py</code> (Answering — třída sdružuje ③ grammar, ② dataloader, fakt/šablona store,
+aktivační pole, experty, UDPipe parser). Podklad: <code>fact_store.py</code>, <code>topos.py</code>,
+<code>chronos.py</code>. Vizualizace tahu: <a href="dialogovy-automat.html">dialogový automat</a>
+(jádro) a živý <code>viz.py</code>.</p>
+
+<nav class="crumbs" style="margin-top:2.5rem"><a href="index.html">← zpět na rozcestník</a></nav>
+
+</div>
+</body>
+</html>

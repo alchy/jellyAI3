@@ -29,7 +29,7 @@ osvětlený. Tahle stránka je o tom světle — jak vzniká, teče, drží a ha
 rozsvítí soubory, které je nesou silněji: <code>files[doc] += tf·idf_share</code>.</li>
 </ul>
 <pre>feed(otázka):
-  pro lemma v otázce:      words[lemma] += 1
+  pro lemma v otázce:      words[lemma] += idf(lemma)   # VÁHA UZLU = idf (ne holá 1)
   pro (doc, s) v select_files(lemmata):   files[doc] += s</pre>
 <p>Obyčejná slova („být", „a") skoro nesvítí (nízké idf), distinktivní („Čapek", „faraón")
 svítí silně — světlo je od začátku zacílené.</p>
@@ -62,7 +62,8 @@ kolem, ne jen o doslovných slovech.</p>
 </div>
 
 <h2>3. Navazování napříč tahy — světlo drží kontext</h2>
-<p>Aktivace se mezi tahy <b>NERESETUJE</b> — zůstává. Vyřešená odpověď navíc <b>zpětně
+<p>U <b>navazující</b> otázky se aktivace mezi tahy <b>NERESETUJE</b> — zůstává (jen pohasne;
+přepínací tah je výjimka, viz <a href="#s4b">§4b</a>). Vyřešená odpověď navíc <b>zpětně
 přihřeje</b> (<code>reinforce</code>) svou entitu a soubor. Zbytkové světlo z minulého tahu =
 <b>kontext</b>. Tím se řetězí dialog:</p>
 <pre>reinforce(odpověď):  words[entita] += 1 ;  files[doc] += 1</pre>
@@ -79,12 +80,33 @@ přihřeje</b> (<code>reinforce</code>) svou entitu a soubor. Zbytkové světlo 
 Řetěz světla = řetěz kontextu.</p>
 
 <h2>4. Utichání — světlo mezi tahy hasne</h2>
-<p>Mezi tahy se VŠECHNO teplo utlumí (<code>× decay</code>). Staré světlo pohasne, recentní
+<p>Mezi tahy se teplo utlumí (<code>× decay</code>). Staré světlo pohasne, recentní
 dominuje — vzniká <b>recency</b> (nedávné téma je jasné, dávné tmavne) a <b>zapomínání</b>.</p>
 <pre>decay():  pro každý uzel/soubor:  teplo *= decay          # 0 &lt; decay &lt; 1</pre>
 <p>Bez útlumu by první téma svítilo navždy a přebíjelo nová. S útlumem světlo „dýchá":
 každý tah přidá, čas ubere. <b>Rovnováha</b> decay × reinforce určuje, jak dlouho téma drží —
 protagonista (opakovaně přihřívaný) svítí dlouho, mimoděčná zmínka rychle zhasne.</p>
+
+<h2 id="s4b">4b. Opřít se o kontext, nebo ho přepnout? — rozhoduje sama otázka</h2>
+<p>Kontext je mocný, ale nesmí přebít otázku, která si <b>nese vlastní téma</b>. Proto
+<code>answer(carry_context=True)</code> každý tah rozhodne, jestli je <b>navazující</b>, nebo
+<b>přepínací</b> — podle toho, zda otázka obsahuje distinktivní <b>neslovesné</b> slovo (jméno /
+entita, idf ≥ 1.5; predikát se z testu vynechá, protože „narodit/zemřít" mají vysoké idf, ale
+téma nenesou):</p>
+<div style="overflow-x:auto">
+<table>
+<tr><th>tah</th><th>vlastní entita?</th><th>co se stane se světlem</th><th>proč</th></tr>
+<tr><td>„Kdy se narodil?"</td><td>ne (jen predikát)</td><td><b>decay</b> + zdědí horké entity
+minula (téma)</td><td>navazuje → opře se o to, co ještě svítí (Karel)</td></tr>
+<tr><td>„Kdo napsal <b>Švejka</b>?"</td><td>ano (Švejk)</td><td>zbytkový žár i mount minulého
+tématu <b>zhasnou</b></td><td>přepíná → nový podmět nesmí prohrát s horkým protagonistou</td></tr>
+</table>
+</div>
+<p><b>Proč to musí být takhle:</b> fakt „napsal"+kdo nese u <em>všech</em> autorů stejnou
+strukturní shodu (nikdo nemá známou entitu v jiné roli) — <b>base je remíza</b> a rozhoduje
+jedině glow. Kdyby po Čapkově hovoru zůstal Čapek horký, „Kdo napsal Švejka?" by v té remíze
+dalo <b>Čapka místo Haška</b>. Přepnutí tématu (zhasnutí žáru i mountu) je tedy oprava přelivu,
+ne kosmetika. Ověřeno: navazování Karel → 1890 / Svatoňovice / 1938; přepnutí → Hašek.</p>
 
 <h2>5. Těžiště — nejjasnější oblast je téma</h2>
 <p>Součet světla = <b>těžiště</b> (centroid): nejjasnější region grafu = o čem se mluví.
@@ -110,6 +132,13 @@ z mountovaného korpusu), <code>feed</code> (rozsvícení), <code>spread</code> 
 hranách), <code>decay</code> (utichání), <code>weight</code> (těžiště šablony),
 <code>reinforce</code> (zpětný tok). Zdroje světla už žijí: ② <code>select_files</code>
 (soubory), koreference (těžiště entit).</p>
+<p><b>Dialogová smyčka</b> žije v <code>answering.py</code> → <code>answer(question,
+carry_context=True)</code>: rozhodne navazující/přepínací tah (<code>_hot_entities</code> = horké
+distinktivní entity minula), pak feed → spread → assurance → <code>reinforce</code>, a mezi tahy
+<code>decay</code> (navazování) nebo zhasnutí žáru+mountu (přepnutí). Interaktivní volající
+<code>ask.py</code> (REPL) i <code>viz.py</code> (živý graf + panel dokumentů) ji volají s
+<code>carry_context=True</code>; etalon <code>eval_answers.py</code> s <code>False</code>
+(samostatný tah).</p>
 
 <h2>Nedostatky a vylepšení (zahlédnuté při psaní)</h2>
 <div class="note warn"><span class="lbl">Poctivě — na čem světlo ještě není dokonalé:</span></div>
@@ -117,18 +146,29 @@ hranách), <code>decay</code> (utichání), <code>weight</code> (těžiště ša
 <li><b>Šum funkčních slov v hranách.</b> Adjacence dnes dělá silné spoje i na „a/v/=" (časté
 sousedy). Světlo teče i tam. <b>Vylepšení:</b> vážit hrany <b>idf</b> — spoj na distinktivní
 slovo je vodivější než na funkční (jako u uzlů).</li>
-<li><b>Uniformní útlum.</b> Všechno hasne stejně, ale PROTAGONISTA by měl hasnout POMALEJI
-(drží téma). <b>Vylepšení:</b> topic-aware decay = kotva identity z koreference (entita zavedená
-copulou „X je Y" tlumí pomaleji). Sjednotit s <a href="koreference.html">kotvou identity</a>.</li>
+<li><b>Uniformní útlum (a otázka na dynamický práh).</b> Dnes hasne všechno stejným
+<code>decay</code>; navazování vs. přepnutí řeší <b>větev</b> podle tahu (§4b), ne plynulý práh.
+Intuice říká, že by práh <b>důvěry v kontext</b> mohl být adaptivní — protagonista potvrzený víc
+tahy hasne pomaleji než mimoděčná zmínka (topic-aware decay, kotva identity z
+<a href="koreference.html">koreference</a>). <b>Pozor — měř-first:</b> emergentně už jeden
+dynamický práh existuje (<code>decay × reinforce</code>: laťka pro přebití zavedeného tématu sama
+roste, čím déle na tématu jsme), takže explicitní laditelný skalár se nesmí přidat na tušení.
+Prerekvizit = <b>vícetahový gold dialog</b>, proti kterému se změří, jestli adaptivní decay porazí
+tu větev. <em>Lexikální</em> práh idf ≥ 1.5 (má otázka vlastní entitu) dynamický být NEMÁ — je to
+vlastnost korpusu, ne rozhovoru.</li>
 <li><b>Neusměrněné proudění.</b> Světlo teče po hranách symetricky; role (podmět/předmět) ho
 neusměrňuje. <b>Vylepšení:</b> vážit tok i rolí (VZOR-zóna) — předmětná díra pustí víc světla
 k entitám, které bývají předmětem.</li>
 <li><b>Runaway.</b> reinforce + spread bez mezí by mohly téma přehřát (jako over-anchoring v
 koreferenci). <b>Vylepšení:</b> strop/normalizace tepla per tah; zpětný tok jen bonusem, ne
 plošně (past #60).</li>
-<li><b>Dialogová smyčka není v ⑤ zapojená.</b> Pole útlum/reinforce/spread UMÍ, ale multi-tah
-loop (feed→spread→answer→reinforce→decay→opakuj) v <code>answering.py</code> zatím není —
-demo dělá jeden tah. <b>To je další krok.</b></li>
+<li><b>Přepnutí na dílo → navazující „Kdy se narodil?" skončí na doptání.</b> Po „Kdo napsal
+Švejka?" je nejteplejší entita <b>Švejk</b> (postava/dílo, nejpropojenější uzel v Haškově
+souboru), ne Hašek (odpověď). Navazující „Kdy se narodil?" se pak opře o Švejka — a protože ten
+narození nemá, systém <b>poctivě doptá</b> (nehádá). Není to špatná odpověď, jen ne ideální:
+kotvou navazování by měla být <b>odpověď</b> minulého tahu (Hašek), ne nejteplejší zmíněný objekt.
+<b>Vylepšení:</b> vážit horké entity preferencí posledního <em>focusu</em> (vyřešené odpovědi) —
+opět až s vícetahovým goldem, ať se změří.</li>
 </ul>
 
 <nav class="crumbs" style="margin-top:2.5rem"><a href="index.html">← zpět na rozcestník</a></nav>

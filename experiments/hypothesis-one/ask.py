@@ -3,10 +3,11 @@
 
 Spuštění:  python3 ask.py      (piš otázky; prázdný řádek nebo Ctrl-D ukončí)
 
-Každý tah je samostatný (bez řetězení kontextu mezi otázkami — to je budoucí rozšíření,
-viz docs/otevrene-otazky.html). Runtime je deterministický; jediná živá služba je UDPipe 2
-(rozbor otázky). Odpovědní režim zrcadlí dialogový automat: jasno → odpověz, nejasno → doptej se,
-prázdno → nehádej.
+Kontext SE ŘETĚZÍ mezi tahy (`carry_context=True`): navazující otázka bez vlastní entity
+(„Kdy se narodil?") si vezme téma z minula („Karel Čapek" ještě svítí), otázka s vlastní
+entitou téma přepne. Světlo mezi tahy pohasíná (decay). Runtime je deterministický; jediná
+živá služba je UDPipe 2 (rozbor otázky). Odpovědní režim zrcadlí dialogový automat: jasno →
+odpověz, nejasno → doptej se, prázdno → nehádej.
 """
 from answering import Answering
 
@@ -21,13 +22,7 @@ def main():
             break
         if not q:
             break
-        r = a.answer(q)
-        # čistý per-tah (jinak by mount/světlo z minula přeteklo)
-        a.store.mounted.clear()
-        a.facts.mounted.clear()
-        a.field.words.clear()
-        a.field.files.clear()
-        a.field.adj.clear()
+        r = a.answer(q, carry_context=True)          # světlo i mount PŘETRVAJÍ mezi tahy
         if not r:
             print("  — nerozumím otázce (chybí tázací slovo, nebo o tom nejsou data)")
         elif r["mode"] == "answer":

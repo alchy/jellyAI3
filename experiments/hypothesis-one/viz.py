@@ -13,6 +13,9 @@ Spuštění (NUTNÝ .venv kvůli viewBase):
 """
 import os
 import sys
+import time
+import atexit
+import signal
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)                                # answering & spol.
@@ -21,6 +24,51 @@ sys.path.insert(0, os.path.join(HERE, "..", ".."))     # jellyai (viewBase adapt
 from answering import Answering                          # noqa: E402
 from jellyai.viz.viewbase_view import ViewBaseView       # noqa: E402
 
+PIDFILE = os.path.join(HERE, ".viz.pid")                 # jeden běžící viewer (self-restart)
+
+
+def _alive(pid):
+    """Běží proces s tímto PID?"""
+    try:
+        os.kill(pid, 0)
+        return True
+    except (ProcessLookupError, PermissionError):
+        return False
+
+
+def _claim_singleton():
+    """Zabij PŘEDCHOZÍ instanci viz.py (z PID souboru) a zaber port.
+
+    Idempotentní spuštění: re-run viz.py sám zabije starou instanci → uvolní se 8080
+    (žádné „address already in use"). Počká, až starý proces port skutečně pustí.
+    """
+    try:
+        old = int(open(PIDFILE, encoding="utf-8").read().strip())
+    except (FileNotFoundError, ValueError):
+        old = None
+    if old and old != os.getpid() and _alive(old):
+        try:
+            os.kill(old, signal.SIGTERM)                 # zdvořile ukonči
+            for _ in range(50):                          # počkej max ~5 s na uvolnění portu
+                if not _alive(old):
+                    break
+                time.sleep(0.1)
+        except ProcessLookupError:
+            pass                                         # už neběžel
+        print(f"→ zabita předchozí instance (PID {old})")
+    with open(PIDFILE, "w", encoding="utf-8") as f:
+        f.write(str(os.getpid()))
+    atexit.register(_release)
+
+
+def _release():
+    """Při ukončení smaž PID soubor (jen když je náš)."""
+    try:
+        if int(open(PIDFILE, encoding="utf-8").read().strip()) == os.getpid():
+            os.remove(PIDFILE)
+    except (FileNotFoundError, ValueError, OSError):
+        pass
+
 TOP_CTX = 18
 SEED_COL = "#5aa0ff"
 CTX_COL = "#cfe0ff"
@@ -28,32 +76,20 @@ ANSWER_COL = {"answer": "#5aff9a", "clarify": "#ffb15a", "unsure": "#8a94a3"}
 
 
 def process(answering, q):
-    """Spustí jeden tah a vrátí stav pole + odpověď (čistý tah, bez řetězení)."""
+    """Spustí jeden tah S ŘETĚZENÍM kontextu; vrátí stav pole + odpověď.
+
+    NEMAŽE pole ani mount — světlo i dokumenty PŘETRVÁVAJÍ mezi tahy a pohasínají
+    (decay uvnitř `answer(carry_context=True)`). To je přesně, co vizualizace ukazuje:
+    aktivace se přenáší a uhasíná; dokumenty se po pohasnutí odeberou z panelu.
+    """
     a = answering
-    toks = a._parse(q)
-    q_vzor, lemmas, hole = a._question(toks)
-    hole = a._answer_role(toks, hole)
-    pred = a._predicate(toks)
-    known = {l.lower() for l in lemmas}
-    a.store.mounted.clear()
-    a.facts.mounted.clear()
-    a.field.words.clear()
-    a.field.files.clear()
-    a.field.adj.clear()
-    seed = [l.lower() for l in lemmas]
-    hot = [d for d, _s in a.dl.select_files(lemmas)]
-    if not hot:
-        return {"hot": [], "seed": seed, "words": {}, "best": None, "mode": "unsure", "offer": []}
-    a.store.mount(hot)
-    if a.facts_enabled:
-        a.facts.mount(hot)
-    a.field.build_graph(a.dl.mount(hot), a.g)
-    a.field.feed(lemmas, a.dl)
-    a.field.spread()
-    cands = a._candidates(q_vzor, pred, hole, known)
-    mode, best, offer = a._assurance(cands, lemmas, hole) if cands else ("unsure", None, [])
-    return {"hot": hot, "seed": seed, "words": dict(a.field.words),
-            "best": best, "mode": mode, "offer": offer}
+    seed = [l.lower() for l in a._question(a._parse(q))[1]]   # slova otázky (pro flow/barvu)
+    r = a.answer(q, carry_context=True)                       # plný tah: mount+světlo přetrvá
+    return {"mounted": sorted(a.store.mounted), "seed": seed,
+            "words": dict(a.field.words), "files": dict(a.field.files),
+            "best": ({"answer": r["answer"]} if r else None),
+            "mode": (r["mode"] if r else "unsure"),
+            "offer": (r["offer"] if r else [])}
 
 
 def build_view(answering):
@@ -61,8 +97,9 @@ def build_view(answering):
     a = answering
     view = ViewBaseView("hypothesis-one · živý dialog")
     try:
-        view.open_nodes_panel()
-    except Exception:                                    # panel je nice-to-have
+        view.open_nodes_panel()                          # ⚡ uzly dle jasu
+        view.open_docs_panel()                           # 📄 aktivní dokumenty (nahraj → pohasni → odeber)
+    except Exception:                                    # panely jsou nice-to-have
         pass
     shown = set()
 
@@ -101,6 +138,10 @@ def build_view(answering):
             view.focus(ans_id)
         try:
             view.write_nodes(sorted(words.items(), key=lambda x: -x[1])[:12])
+            # 📄 dokumenty dle AKTIVACE (ne mountu): pohaslé pod prahem se z panelu odeberou
+            docs = [(d, s) for d, s in sorted(st["files"].items(), key=lambda x: -x[1])
+                    if s > 0.05][:12]
+            view.write_docs(docs)
         except Exception:
             pass
 
@@ -110,9 +151,10 @@ def build_view(answering):
             return
         st = process(a, q)
         render(st)
+        lit = [d for d, _s in sorted(st["files"].items(), key=lambda x: -x[1])[:4]]
         if st["mode"] == "answer" and st["best"]:
             view.write(f"❓ {q}\n  → {st['best']['answer']}   "
-                       f"(rozsvíceno: {', '.join(st['hot'][:4])})\n")
+                       f"(rozsvíceno: {', '.join(lit)})\n")
         elif st["mode"] == "clarify":
             view.write(f"❓ {q}\n  nejsem si jist — mám: "
                        f"{', '.join(str(o) for o in st['offer'][:4] if o)}. Upřesni?\n")
