@@ -118,8 +118,36 @@ class Dataloader:
                                 sc[lem] += 1
             subj[d] = dict(sc)                    # RAW počty (idf entity je konstantní → stačí count)
         pickle.dump(subj, open(os.path.join(self.index_dir, "_subjects.pkl"), "wb"))
+        # DOC-GRAF (#60 doc_links): hrany MEZI dokumenty = sdílené distinktivní entity (PROPN×idf).
+        # Uplatní se při mountu jako BONUS co-mount (drží ekosystém entity: seed Čapek → i R.U.R.).
+        ent = {}
+        for d in docs:
+            es = set()
+            for rec in self.load_shard(d).values():
+                for sent in rec["sentences"]:
+                    for t in sent:
+                        if t["upos"] == "PROPN" and len(t["lemma"]) >= 2:
+                            es.add(t["lemma"].lower())
+            ent[d] = es
+        doclinks = {}
+        for d in docs:
+            sc = Counter()
+            for d2 in docs:
+                if d2 != d:
+                    w = sum(idf.get(e, 1.0) for e in (ent[d] & ent[d2]))
+                    if w > 0:
+                        sc[d2] = w
+            doclinks[d] = sc.most_common(5)
+        pickle.dump(doclinks, open(os.path.join(self.index_dir, "_doclinks.pkl"), "wb"))
         logger("i", f"indexy: {n} souborů, {len(idf)} termů, práh výskytů {min_tf}")
         return {"documents": n, "terms": len(idf)}
+
+    def _load_doclinks(self):
+        """Načte doc-graf `{doc: [(soused, váha_sdílených_entit)]}` (líně, cache)."""
+        if not hasattr(self, "_doclinks"):
+            path = os.path.join(self.index_dir, "_doclinks.pkl")
+            self._doclinks = pickle.load(open(path, "rb")) if os.path.exists(path) else {}
+        return self._doclinks
 
     def _load_subjects(self):
         """Načte podmětový index `{doc: {lemma: váha}}` (líně, cache)."""
@@ -169,6 +197,14 @@ class Dataloader:
             if best_cnt >= subj_min and best_d not in picked:
                 result.append((best_d, 0.0))
                 picked.add(best_d)
+        # DOC-GRAF: rozsvítit ekosystém #1 seed dokumentu — přibrat jeho nejpropojenější sousedy
+        # (bonus co-mount, ne plošně). Drží entity pohromadě (seed Čapek → co-mount R.U.R.).
+        top = self.cfg.get("doclink_top", 0)
+        if top and result:
+            for nb, _w in self._load_doclinks().get(result[0][0], [])[:top]:
+                if nb not in picked:
+                    result.append((nb, 0.0))
+                    picked.add(nb)
         return result
 
     def mount(self, doc_ids):

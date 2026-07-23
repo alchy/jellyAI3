@@ -37,7 +37,8 @@
     "index_dir": "../../data/index",
     "min_count": 2,
     "top_files": 8,
-    "subject_min": 3
+    "subject_min": 3,
+    "doclink_top": 2
   },
   "fill_holes": {
     "_comment": "Zaplnění děr (koreference): placeholder se detekuje ÚFAL rysem, antecedent se hledá shodou rysu (překryv rodu = množina kvůli syncretismu + číslo). Dvě strategie: baseline (backward cache, nejbližší podmět/recency) a activation (aktivační pole s útlumem decay, podmět má váhu subject_weight, vyřešená díra referenta posílí o reinforce = téma diskurzu drží přes řetěz).",

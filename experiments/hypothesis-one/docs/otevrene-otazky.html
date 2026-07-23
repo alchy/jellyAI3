@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Otevřené otázky — předání</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  .pri { display: inline-block; font-family: var(--mono); font-size: .72rem; padding: .1em .5em;
+    border-radius: 4px; font-weight: 700; color: #fff; }
+  .p1 { background: var(--warn); }  .p2 { background: var(--accent); }  .p3 { background: var(--muted); }
+  .done { color: var(--ok); font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<nav class="crumbs"><a href="index.html">Dokumentace</a> › <a href="dialogovy-automat.html">Dialogový automat</a> › Otevřené otázky</nav>
+
+<p class="eyebrow">Předání · stav a kudy dál</p>
+<h1>Otevřené otázky — předání další instanci</h1>
+<p class="lead">Kde jsme, co zbývá, a jaká pravidla platí. Vstupní bod pro pokračování:
+tenhle soubor + <a href="dialogovy-automat.html">dialogový automat (jádro)</a> +
+<a href="fuze.html">fúzní studie</a>. Vše měřeno na goldu, nic na víru.</p>
+
+<h2>Stav (měřeno)</h2>
+<p><b>Faktický etalon 14/22 = 64 %</b> (teologie vyňata), total 16/25, sebevědomě špatně jen 2,
+doptá se 6. Křivka: <code>K0 8 → glow-orders-ties 12 → koref → Topos 16 → dialog.automat+závorka 40
+→ definiční komplement 56 → entita-jako-podmět 60 → Chronos+doc-graf+očištěný etalon 64</code>.</p>
+<p><b>Postaveno:</b> dialogový stavový automat (assurance: jasno→odpověz / nejasno→doptej /
+prázdno→nehádej), 3 experti (Topos místo, Chronos čas, definiční komplement kopula), koreference
+do faktů, glow-orders-ties, extrakce bio-závorky, entita-jako-podmět (výběr domény), doc-graf
+(#60 co-mount), korpus mergnutý (R.U.R.), etalon očištěný od teologie.</p>
+
+<h2>Zbývající tvrdý ocas (po příčinách)</h2>
+<div style="overflow-x:auto">
+<table>
+<tr><th>příčina</th><th>otázky</th><th>co je potřeba</th></tr>
+<tr><td><b>EXTRAKCE</b> (odpověď není fakt)</td>
+<td><code>Kdo navrhl slovo robot→Ježíš</code> (Josef nevytěžen jako navrhnout-podmět),
+<code>Co napsal Čapek→množství</code> (objekt-fakt), <code>Božena→zakladatelka</code> (úvodní kopula spisovatelka)</td>
+<td>vytěžit chybějící hrany (podmět/objekt/profese); genitivní autorství („drama Karla Čapka" → hrana autor)</td></tr>
+<tr><td><b>DOMÉNA/salience</b> (odpověď existuje, ale doc-salience ji přebije)</td>
+<td><code>napsal R.U.R.</code> (postavy Alquist zaplaví článek), <code>Co je R.U.R.</code></td>
+<td><b>node-based retrieval</b> — entita = uzel s fakty, traverz po relaci (ne doc-mount)</td></tr>
+<tr><td><b>PARSE</b></td>
+<td><code>Kolik měla dětí</code> (no-pivot)</td>
+<td>„Kolik" jako tázací pivot (rys / lang data)</td></tr>
+<tr><td><b>reziduum</b></td>
+<td>role-mismatch kandidáti (viz „pes")</td>
+<td>vítěz bez role_fit → <b>unsure</b> místo clarify</td></tr>
+</table>
+</div>
+
+<h2>Kudy dál (priorita)</h2>
+<div class="member">
+  <p class="sig"><span class="pri p1">P1</span> role-mismatch → unsure</p>
+  <p>Když vítěz nesedí rolí díry (when-otázka, ale kandidát je who), řekni <b>„nemám"</b>, ne
+  doptání odpadem. Rychlé, principiální, zpřesní „nehádej", nulové riziko regrese. Místo:
+  <code>answering._assurance</code>.</p>
+</div>
+<div class="member">
+  <p class="sig"><span class="pri p2">P2</span> Node-based retrieval (cíl konceptu)</p>
+  <p>Sjednotit fakt-store + aktivaci do <b>entitně-centrického grafu</b>: entita = uzel, fakty =
+  typované hrany. Retrieval = od rozsvíceného uzlu traverz po relaci VZORu. Obejde tf·idf výběr
+  domény i zamoření salience (Alquist, počátek). To je destinace, ke které je fakt-store + doc-graf
+  lešení. Viz <a href="dialogovy-automat.html">jádro</a> a diskuzi doc-graf vs node-based.</p>
+</div>
+<div class="member">
+  <p class="sig"><span class="pri p2">P2</span> Extrakce chybějících hran</p>
+  <p>Genitivní autorství („X od Y" / „dílo Y-a"), objekt-fakty, úvodní kopula profese. Node-based
+  umí projít jen hranu, která existuje — polovina ocasu je o tom, že hrana chybí.</p>
+</div>
+<div class="member">
+  <p class="sig"><span class="pri p3">P3</span> VZOR-ifikace extrakce (dluh)</p>
+  <p><code>extract_bio</code> je NATVRDO (hledá závorku/pomlčku/NUM/Geo). Cíl = <b>VZOR</b>
+  (rozpoznat vzor přes <code>frame_sig</code>) + <b>rekurze</b> (vnořená místa „Praha - Nové Město").</p>
+</div>
+<div class="member">
+  <p class="sig"><span class="pri p3">P3</span> Rekurzivní skórovaná klarifikace</p>
+  <p>Nejasno → aktivně probni každou oblast dotazy NA SUBJEKT → skóruj (odstup) → rozřeš sám nebo se
+  zeptej cíleně → rekurze víc úrovní. = světlo-first na klarifikaci. Detail v jádru.</p>
+</div>
+
+<h2>Zásady (platí, nepřekračovat)</h2>
+<ul>
+<li><b>Měřením, ne vírou</b> — každý krok proti <code>gold_answers.json</code> (<code>eval_answers.py</code>);
+přijmout jen parita + zisk, jinak zahodit/gate.</li>
+<li><b>Refaktor konceptu před použitím</b> — z parentu brát mechanismus, ne nabalený kód.</li>
+<li><b>Teologie není etalon</b> — nefaktická/„kdo co řekl" tvrzení <code>"factual": false</code>.</li>
+<li><b>Doc-protagonista = cheat</b> (zamítnuto). <b>Merge R.U.R. na dotaz</b> regresuje (postavy) — zamítnuto.</li>
+<li><b>Světlo vybírá doménu → VZOR doostří</b> (světlo-first). Entita se rozsvěcí <b>jako podmět</b>, ne četností.</li>
+<li><b>Není to SELECT FROM</b> — živý dialogový automat nad grafem.</li>
+</ul>
+
+<h2>Jak to spustit</h2>
+<pre>python3 eval_answers.py        # gold otázka→odpověď (faktický etalon + módy)
+python3 eval_coref.py          # koreference (gold_coref, 36 %)
+python3 experiment_graph.py    # sweep vah/vodivosti grafu
+
+# přestavba dat (po změně korpusu):
+python3 remerge_corpus.py      # merge zkratek v korpusu (lokálně)
+python3 synth_registry.py      # registry (④ fakt↔otázka)
+python3 -c "from dataloader import Dataloader; Dataloader().build_indexes()"   # tf·idf + subject + doc-graf
+python3 build_facts_all.py     # fakty (koref who + bio závorka + Chronos when)
+python3 build_templates_all.py # window-VZOR šablony</pre>
+
+<h2>Klíčové soubory</h2>
+<ul>
+<li><code>answering.py</code> — ⑤ matcher: <code>_question/_answer_role/_predicate/_candidates/_rank/_assurance/answer</code></li>
+<li><code>fact_store.py</code> · <code>topos.py</code> · <code>chronos.py</code> — fakt-store + experti</li>
+<li><code>dataloader.py</code> — výběr domény (tf·idf + entita-jako-podmět + doc-graf)</li>
+<li><code>activation_field.py</code> — světlo (vodivost idf×proximity)</li>
+<li><code>fill_holes.py</code> + <code>extract_bio.py</code> — koreference + extrakce závorky</li>
+<li><code>gold_answers.json</code> · <code>eval_answers.py</code> — etalon + harness</li>
+</ul>
+
+<nav class="crumbs" style="margin-top:2.5rem"><a href="dialogovy-automat.html">← zpět na jádro</a></nav>
+
+</div>
+</body>
+</html>

@@ -85,12 +85,12 @@
    "offer": [
     "Čapek",
     "Vančura",
-    "Kundera",
-    "Hašek"
+    "Němcová",
+    "Kundera"
    ],
    "offer_has": true,
    "extracted": true,
-   "cands": 15,
+   "cands": 28,
    "doc": "wiki_r.u.r."
   },
   {
@@ -109,12 +109,12 @@
    "offer": [
     "Ježíš",
     "Alquist",
-    "Erastos",
-    "Krescens"
+    "Krescens",
+    "Erastos"
    ],
    "offer_has": false,
    "extracted": true,
-   "cands": 50,
+   "cands": 51,
    "doc": "wiki_r.u.r."
   },
   {
@@ -137,7 +137,7 @@
    ],
    "offer_has": true,
    "extracted": true,
-   "cands": 28,
+   "cands": 29,
    "doc": "wiki_jaroslav_hašek"
   },
   {
@@ -161,7 +161,7 @@
    ],
    "offer_has": true,
    "extracted": true,
-   "cands": 28,
+   "cands": 32,
    "doc": "wiki_božena_němcová"
   },
   {
@@ -190,7 +190,7 @@
    ],
    "offer_has": false,
    "extracted": true,
-   "cands": 11,
+   "cands": 13,
    "doc": "wiki_karel_čapek"
   },
   {
@@ -213,11 +213,11 @@
     "šelma",
     "mazlíček",
     "chovaný",
-    "vzrůst"
+    "černý"
    ],
    "offer_has": true,
    "extracted": true,
-   "cands": 52,
+   "cands": 84,
    "doc": "wiki_pes_domácí"
   },
   {
@@ -234,12 +234,12 @@
    "offer": [
     "bůh",
     "tělo",
-    "láska",
-    "žena"
+    "žena",
+    "láska"
    ],
    "offer_has": false,
    "extracted": true,
-   "cands": 14,
+   "cands": 15,
    "doc": "wiki_r.u.r."
   },
   {
@@ -265,7 +265,7 @@
    ],
    "offer_has": true,
    "extracted": true,
-   "cands": 22,
+   "cands": 29,
    "doc": "wiki_josef_čapek"
   },
   {
@@ -291,7 +291,7 @@
    ],
    "offer_has": true,
    "extracted": true,
-   "cands": 20,
+   "cands": 27,
    "doc": "wiki_karel_čapek"
   },
   {
@@ -309,11 +309,11 @@
     "zakladatelka",
     "odkaz",
     "malý",
-    "pozornost"
+    "kontroverzní"
    ],
    "offer_has": false,
    "extracted": true,
-   "cands": 24,
+   "cands": 28,
    "doc": "wiki_božena_němcová"
   },
   {
@@ -335,7 +335,7 @@
    ],
    "offer_has": true,
    "extracted": false,
-   "cands": 198,
+   "cands": 274,
    "doc": "wiki_karel_čapek"
   },
   {
@@ -357,7 +357,7 @@
    ],
    "offer_has": true,
    "extracted": false,
-   "cands": 120,
+   "cands": 181,
    "doc": "wiki_karel_čapek"
   },
   {
@@ -379,7 +379,7 @@
    ],
    "offer_has": true,
    "extracted": false,
-   "cands": 366,
+   "cands": 442,
    "doc": "wiki_josef_čapek"
   },
   {
@@ -401,7 +401,7 @@
    ],
    "offer_has": true,
    "extracted": false,
-   "cands": 186,
+   "cands": 274,
    "doc": "wiki_jaroslav_hašek"
   },
   {
@@ -411,19 +411,19 @@
    "expect": [
     "1920"
    ],
-   "got": "moc",
+   "got": "prach",
    "outcome": "CLARIFY",
    "ceiling": "no_template",
    "via": "vzor",
    "offer": [
-    "moc",
-    "vůle",
+    "prach",
     "duch",
-    "prach"
+    "moc",
+    "vůle"
    ],
    "offer_has": false,
    "extracted": false,
-   "cands": 21,
+   "cands": 31,
    "doc": "wiki_r.u.r."
   },
   {
@@ -441,11 +441,11 @@
     "1921",
     "1932",
     "pes",
-    "výzva"
+    "robot"
    ],
    "offer_has": true,
    "extracted": false,
-   "cands": 63,
+   "cands": 89,
    "doc": "wiki_r.u.r."
   },
   {
@@ -468,7 +468,7 @@
    ],
    "offer_has": true,
    "extracted": true,
-   "cands": 200,
+   "cands": 276,
    "doc": "wiki_karel_čapek"
   },
   {
@@ -490,7 +490,7 @@
    ],
    "offer_has": true,
    "extracted": false,
-   "cands": 120,
+   "cands": 181,
    "doc": "wiki_karel_čapek"
   },
   {
@@ -506,13 +506,13 @@
    "via": "pred",
    "offer": [
     "Hronov",
+    "Josefov",
     "země",
-    "známost",
-    "pohřeb"
+    "známost"
    ],
    "offer_has": true,
    "extracted": false,
-   "cands": 367,
+   "cands": 444,
    "doc": "wiki_josef_čapek"
   },
   {
@@ -534,7 +534,7 @@
    ],
    "offer_has": true,
    "extracted": true,
-   "cands": 186,
+   "cands": 274,
    "doc": "wiki_jaroslav_hašek"
   },
   {
@@ -574,7 +574,7 @@
    ],
    "offer_has": false,
    "extracted": true,
-   "cands": 5,
+   "cands": 7,
    "doc": "bible_jan"
   },
   {
@@ -592,12 +592,12 @@
    "offer": [
     "počátek",
     "pravda",
-    "zákon",
-    "slib"
+    "vychovaný",
+    "zákon"
    ],
    "offer_has": true,
    "extracted": true,
-   "cands": 9,
+   "cands": 12,
    "doc": "bible_jan"
   },
   {
@@ -641,7 +641,7 @@
    ],
    "offer_has": true,
    "extracted": true,
-   "cands": 46,
+   "cands": 79,
    "doc": "wiki_kočka_domácí"
   }
  ]
