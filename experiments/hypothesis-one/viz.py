@@ -165,6 +165,7 @@ def build_view(answering):
 
 
 def main():
+    _claim_singleton()                                   # re-run sám zabije starou instanci (self-restart)
     view, on_ask = build_view(Answering())
     view.open_terminal(on_ask)
     view.write("Ptej se — graf se rozsvítí. Např.: Kdo napsal Švejka?\n")
