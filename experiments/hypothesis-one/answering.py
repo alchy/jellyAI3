@@ -44,9 +44,12 @@ class Answering:
         self.topos = Topos(config_path)
         self.field = ActivationField(config_path)
         self.parser = AnnotateCorpus(config_path)
+        cfg = json.load(open(config_path, encoding="utf-8"))
         # parent-model predikát+role cesta: MĚŘENO regresní bez koreference → default OFF (viz config)
-        self.facts_enabled = json.load(open(config_path, encoding="utf-8")) \
-            .get("fact_store", {}).get("enabled", False)
+        self.facts_enabled = cfg.get("fact_store", {}).get("enabled", False)
+        # KVANTIFIKÁTORY („množství povídek") nejsou nikdy faktická odpověď — data v configu,
+        # filtrují se z kandidátů jako echo (viz _candidates). Jazyk = JSON, ne kód.
+        self.nonanswer = set(cfg.get("answering", {}).get("nonanswer_lemmas", []))
 
     def _parse(self, question):
         res = self.parser._udpipe2(question)
@@ -131,7 +134,8 @@ class Answering:
                               "doc": tpl.fact_ref[0] if tpl.fact_ref else None,
                               "fact_ref": list(tpl.fact_ref) if tpl.fact_ref else None,
                               "mq": mq, "kind": "vzor"})
-        return cands
+        # KVANTIFIKÁTORY nejsou faktická odpověď („napsal množství" → ne „množství")
+        return [c for c in cands if (c["answer"] or "").lower() not in self.nonanswer]
 
     def _known_overlap(self, fact_ref, role, known):
         """Kolik ZNÁMÝCH entit otázky nese fakt kandidáta v JINÉ roli než odpovědní (vazba).

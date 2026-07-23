@@ -88,6 +88,17 @@
     "window": 5,
     "tau": 2.0
   },
+  "answering": {
+    "_comment": "⑤ queryparser (answering.py). nonanswer_lemmas = KVANTIFIKÁTORY a měrová slova, která NIKDY nejsou faktická odpověď: napsal množství povídek nesmí dát odpověď množství. Filtrují se z kandidátů jako echo (odpověď=slovo otázky). Jazyk = data (nový jazyk = jiný JSON, žádný zásah do kódu).",
+    "nonanswer_lemmas": [
+      "množství",
+      "řada",
+      "spousta",
+      "mnoho",
+      "hromada",
+      "počet"
+    ]
+  },
   "paths": {
     "lang": "lang/cs.json",
     "curated": "curated.json",
