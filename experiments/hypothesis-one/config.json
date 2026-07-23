@@ -113,7 +113,9 @@
       "čí",
       "proč",
       "jak"
-    ]
+    ],
+    "gate_enabled": true,
+    "gate_threshold": 0.3
   },
   "paths": {
     "lang": "lang/cs.json",

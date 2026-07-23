@@ -13,6 +13,7 @@ Deterministické parsování otázky (UDPipe 2) = jediná živá anotace; rozhod
 """
 import os
 import json
+import math
 
 from grammar_vzor import GrammarVzor
 from role_catalog import RoleCatalog
@@ -56,6 +57,23 @@ class Answering:
         # POLÁRNÍ (ano/ne) otázky: tázací lemmata (i „kolik" bez PronType=Int); jejich
         # NEPŘÍTOMNOST + modalita ? = polární tvar (viz _polar).
         self.interrog = set(cfg.get("answering", {}).get("interrog_lemmas", []))
+        # NAUČENÁ ASSURANCE BRÁNA (gate.json = malé pevné váhy): p(odpověď správná)<práh →
+        # nehádej (viz docs/naucene-smerovani.html). Offline trénink, RUNTIME deterministický.
+        acfg = cfg.get("answering", {})
+        self.gate = None
+        self.gate_threshold = acfg.get("gate_threshold", 0.3)
+        gpath = os.path.join(HERE, "gate.json")
+        if acfg.get("gate_enabled", False) and os.path.exists(gpath):
+            self.gate = json.load(open(gpath, encoding="utf-8"))
+
+    def _gate_p(self, feat):
+        """Pravděpodobnost SPRÁVNOSTI odpovědi dle naučené brány (čistá python inference —
+        sigmoid((rys−mu)/sd · w + b)). Bez brány vrací 1.0 (nebrání). Runtime deterministický."""
+        g = self.gate
+        if not g or len(feat) != g["dim"]:
+            return 1.0
+        z = g["b"] + sum(((feat[i] - g["mu"][i]) / g["sd"][i]) * g["w"][i] for i in range(g["dim"]))
+        return 1.0 / (1.0 + math.exp(-max(-60.0, min(60.0, z))))
 
     def _parse(self, question):
         res = self.parser._udpipe2(question)
@@ -361,7 +379,21 @@ class Answering:
         n_ans = len({(c["answer"] or "").lower() for c in cands})
         fmax = max(self.field.files.values(), default=1.0) or 1.0
         doc_act = self.field.files.get(best["doc"], 0.0) / fmax      # je vítězův soubor horký?
-        return [echo, rf, ko, df, tf, kp, round(gb, 4), round(margin, 4), n_ans, round(doc_act, 4)]
+        # RICHER: je odpověď JMÉNO (PROPN-like)? její idf (distinktivita)? je vítězův soubor
+        # DOMOVSKÝ soubor entity otázky (Hašek z vlastního článku vs Eliáš z cizí bible)?
+        is_name = int(bool(best["answer"]) and best["answer"][:1].isupper())
+        ans_idf = self.field.idf.get(ans, 0.0)
+        subs = self.dl._load_subjects()
+        ents = [l for l in known if self.field.idf.get(l, 0.0) >= 1.5]
+        home = None
+        if ents:
+            ent = max(ents, key=lambda l: self.field.idf.get(l, 0.0))
+            home = max(subs, key=lambda d: subs.get(d, {}).get(ent, 0), default=None)
+            if home is not None and subs.get(home, {}).get(ent, 0) == 0:
+                home = None
+        home_match = int(home is not None and best["doc"] == home)
+        return [echo, rf, ko, df, tf, kp, round(gb, 4), round(margin, 4), n_ans,
+                round(doc_act, 4), is_name, round(ans_idf, 3), home_match]
 
     def answer(self, question, carry_context=False, hole_override=None, return_features=False):
         """Živá otázka → odpověď / klarifikace / upřímný terminál (dialogový stavový automat).
@@ -428,6 +460,11 @@ class Answering:
         mode, best, offer = self._assurance(cands, lemmas, hole_role)   # jasno vs nejasno
         if best is None:
             return None
+        gate_p = None
+        if mode == "answer" and self.gate is not None:                  # NAUČENÁ brána: nehádej,
+            gate_p = self._gate_p(self._gate_feats(best, cands, lemmas, hole_role))
+            if gate_p < self.gate_threshold:                            # nejspíš špatně → unsure
+                mode = "unsure"
         if mode == "answer":
             self.field.reinforce(best["answer"], best["doc"])    # zpětný tok jen u jasné odpovědi
             if carry_context:                                    # udrž téma i entity otázky horké
