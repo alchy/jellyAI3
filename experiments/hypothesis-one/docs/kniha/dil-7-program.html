@@ -82,6 +82,31 @@ r = a.answer(q, carry_context=True)           # plný tah: mount+světlo přetrv
       Čapek" ještě nepohaslo. Grep obou souborů to potvrzuje — <code>answer(q, carry_context=True)</code>
       je jediné místo, kde se v obou během ptá jádra.</p>
 
+      <h2 id="mapa">Kde hledat co — orientační mapa pro vývojáře <span class="mark mark-overeno">Ověřeno</span></h2>
+      <p>Než se ponoříš do detailů, tady je rozcestník. Klíčové je, že celá vazba na baseView je ve
+      <b>dvou souborech</b> — <code>viz.py</code> (integrace) a <code>jellyai/viz/viewbase_view.py</code>
+      (adaptér) — a samotná knihovna <code>viewbase</code> (canvas + WebSocket) je <b>externí</b>, žije
+      v <code>.venv</code> (z nadřazeného projektu), v tomhle repu není.</p>
+      <div class="tablewrap">
+      <table>
+        <tr><th>Chci…</th><th>Kde hledat</th></tr>
+        <tr><td>Změnit, <b>co se kreslí</b> (uzly, barvy, jas, tok)</td><td><code>viz.py</code> → <code>render(st)</code> (uvnitř <code>build_view</code>); barvy <code>SEED_COL</code>/<code>CTX_COL</code>/<code>ANSWER_COL</code> · výklad <a href="#p3">§ Životní cyklus</a></td></tr>
+        <tr><td>Změnit, <b>co terminál vypíše</b> (odpověď/doptání)</td><td><code>viz.py</code> → <code>build_view</code> → handler <code>on_ask</code></td></tr>
+        <tr><td>Jak se získá <b>stav pole</b> pro kreslení</td><td><code>viz.py</code> → <code>process(answering, q)</code> → dict <code>{words, files, mode, best, offer}</code></td></tr>
+        <tr><td><b>Co umí adaptér</b> (add_node, flow, panely, serve…)</td><td><code>jellyai/viz/viewbase_view.py</code> → třída <code>ViewBaseView</code> · tabulka metod v <a href="#p4">§ Adaptér</a></td></tr>
+        <tr><td><b>Spuštění, port, self-restart</b></td><td><code>viz.py</code> → <code>main</code>, <code>_claim_singleton</code>, <code>.viz.pid</code>, port 8080 · <a href="#p5">§ Self-restart</a></td></tr>
+        <tr><td><b>Pole, které viz jen zrcadlí</b> (uzly/hrany/teplo)</td><td><code>activation_field.py</code> · <a href="dil-4-program.html#pole">Díl IV, § Datový model pole</a></td></tr>
+        <tr><td>Když <b>viewBase chybí / spadne</b></td><td><code>ViewBaseView.__init__</code> (ImportError → JellyError) · <a href="#p6">§ Co nefunguje</a></td></tr>
+        <tr><td>Diagnostika <b>bez</b> viz (stopa rozhodnutí)</td><td>návratový dict <code>answer()</code> · <a href="#log">§ Logování</a></td></tr>
+        <tr><td><b>Uživatelské</b> užití (spustit, co uvidím)</td><td><a href="dil-7.html#7-2">Díl VII, VII.2 Živá vizualizace</a></td></tr>
+        <tr><td>Knihovna <code>viewbase</code> sama (canvas, WebSocket)</td><td>Externí, v <code>.venv</code> (nadřazený projekt) — <b>není v tomhle repu</b></td></tr>
+      </table>
+      </div>
+      <p>Zlaté pravidlo orientace: <b>logika odpovědi ve <code>viz.py</code> není</b> — ta žije
+      v <code>Answering</code>. <code>viz.py</code> jen bere hotový stav pole a maluje ho. Když hledáš,
+      <i>proč</i> systém odpověděl, jdeš do <a href="dil-4-program.html">Dílu IV</a>, ne sem; sem jdeš,
+      když chceš změnit, <i>jak se to zobrazuje</i>.</p>
+
       <h2 id="p2">Jediné místo integrace — líný adaptér <span class="mark mark-overeno">Ověřeno</span></h2>
       <p>viewBase je knihovna z nadřazeného projektu (<code>jellyai</code>). Aby na ní jádro
       hypothesis-one nebylo závislé, je <b>celá</b> integrace stažená do jednoho importu na jednom
