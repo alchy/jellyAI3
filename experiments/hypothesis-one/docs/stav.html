@@ -28,8 +28,8 @@ poctivých „nevím") je hlavní měřidlo — malý 25položkový míjel to ne
 <div style="overflow-x:auto">
 <table>
 <tr><th></th><th>PASS</th><th>confident-wrong (sebevědomě špatně)</th></tr>
-<tr><td>retrieval (brána OFF)</td><td>59/145 (40 %)</td><td>35</td></tr>
-<tr><td><b>+ naučená brána (ON)</b></td><td>55/145</td><td><b>20</b> (LOO odhad −13)</td></tr>
+<tr><td><b>retrieval + relation-hrany</b></td><td><b>63/145 (43 %)</b></td><td>30</td></tr>
+<tr><td>naučená brána</td><td colspan="2"><b>VYPNUTA</b> — po přidání vztahů přeučuje (76 vzorků; LOO −2 vs běh −19 potlačených). Čeká na víc dat.</td></tr>
 <tr><td>malý etalon (25, nezávislý)</td><td>18/25 (72 %)</td><td>2 (bez regrese)</td></tr>
 </table>
 </div>
@@ -44,7 +44,7 @@ poctivých „nevím") je hlavní měřidlo — malý 25položkový míjel to ne
 <tr><td>polar (ano/ne)</td><td>9/14</td><td>◑ 64 %</td></tr>
 <tr><td>temporal (kdy / rok)</td><td>9/25</td><td>◔ 36 %</td></tr>
 <tr><td>authorship-who (Kdo napsal Y?)</td><td>6/20</td><td>◔ 30 %</td></tr>
-<tr><td><b>relation</b> (bratr/manžel/matka)</td><td>0/18</td><td>❌ 0 %</td></tr>
+<tr><td>relation (bratr/manžel/otec)</td><td>4/18</td><td>◔ 22 % (vztah=hrana)</td></tr>
 <tr><td><b>attribute</b> (jméno/povolání)</td><td>0/11</td><td>❌ 0 %</td></tr>
 <tr><td><b>count</b> (kolik)</td><td>0/7</td><td>❌ 0 %</td></tr>
 <tr><td>authorship-what / taxonomy</td><td>0/3, 0/2</td><td>❌ 0 %</td></tr>
@@ -63,8 +63,11 @@ otázka zdědí téma, otázka s vlastní entitou přepne. „Kdy se narodil?" p
 <li><b>Kvantifikátor guard</b> — „množství/řada" není faktická odpověď.</li>
 <li><b>Polární smyčka VZORŮ</b> (ano/ne) — existence fakt-tvaru → ano/ne. „Je pes šelma? → ano".</li>
 <li><b>Kopula hlavní klauzule</b> má přednost před slovesem vedlejší věty (extrakce).</li>
+<li><b>Stejnovětná relation-extrakce</b> — vztah (bratr/manžel/otec) jako <b>hrana</b>: „byl
+bratrem Josefa Čapka" → bratr(Karel, Josef); symetrické obousměrně. relation 0→4/18. Grafový substrát.</li>
 <li><b>Naučená assurance brána</b> (<a href="naucene-smerovani.html">směr</a>) — malá NN nad
-rysy+aktivací: p(správně)&lt;práh → nehádej. −13 confident-wrong, deterministická inference.</li>
+rysy+aktivací: p(správně)&lt;práh → nehádej. Validovaný směr, ale <b>dnes VYPNUTÁ</b> (přeučuje na
+76 vzorcích — čeká na víc dat).</li>
 </ul>
 
 <h2>3. Architektonický směr</h2>
