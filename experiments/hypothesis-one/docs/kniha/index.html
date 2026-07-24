@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>hypothesis-one — knižní dokumentace</title>
+<link rel="stylesheet" href="assets/style.css">
+<script defer src="assets/mermaid.min.js"></script>
+<script defer src="assets/script.js"></script>
+</head>
+<body>
+<div class="layout">
+
+  <aside class="sidebar">
+    <p class="brand"><a href="index.html">hypothesis-one</a></p>
+    <p class="tag">knižní dokumentace · v0 kostra</p>
+    <nav aria-label="Obsah knihy">
+      <a href="index.html">Úvod</a>
+      <p class="part">Díl I — Než začneme</p>
+      <span class="soon">I.1 Co projekt řeší</span>
+      <span class="soon">I.2 Slovníček pojmů</span>
+      <span class="soon">I.3 Mapa repozitáře</span>
+      <p class="part">Díl II — První kroky</p>
+      <span class="soon">II.1 Instalace</span>
+      <span class="soon">II.2 První běh</span>
+      <span class="soon">II.3 Přestavba dat</span>
+      <p class="part">Díl III — Cesta dat</p>
+      <span class="soon">III.1–III.8 fáze pipeline</span>
+      <p class="part">Díl IV — Jak to funguje</p>
+      <a href="dil-4-1-dialogovy-automat.html">IV.1 Dialogový automat</a>
+      <span class="soon">IV.2 Aktivace / světlo</span>
+      <span class="soon">IV.3 VZOR matcher</span>
+      <span class="soon">IV.4 Fakt-store a role</span>
+      <span class="soon">IV.5 Assurance a brána</span>
+      <span class="soon">IV.6 Koreference, aliasy, kontext</span>
+      <p class="part">Díl V — Testování</p>
+      <span class="soon">V.1–V.6 testy a měření</span>
+      <p class="part">Díl VI–VIII</p>
+      <span class="soon">Rozšiřování · Provoz · Otevřené body</span>
+      <p class="part">Přílohy</p>
+      <span class="soon">Rejstřík · Konfigurace · Příkazy</span>
+    </nav>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <button class="iconbtn" id="theme-toggle" type="button" aria-label="Přepnout světlý/tmavý režim">◐ režim</button>
+    </div>
+    <div class="content">
+      <p class="eyebrow">Naučná kniha · ne referenční příručka</p>
+      <h1>hypothesis-one od nuly</h1>
+      <p class="lead">Tahle kniha tě provede projektem <b>hypothesis-one</b> — deterministickým
+      systémem, který ze surového českého textu postaví mapu faktů a pak na ni odpovídá na otázky.
+      Nepředpokládá, že o projektu, o zpracování jazyka nebo o téhle doméně něco víš. Každý pojem
+      vysvětlíme, až na něj poprvé narazíme.</p>
+
+      <p>Většina technické dokumentace je psaná jako referenční příručka: seznam funkcí, každá s
+      jednou větou. Kdo projekt zná, dohledá si v ní detail. Kdo ho nezná, se z ní nedozví, <b>proč</b>
+      věci fungují tak, jak fungují — a proto neumí rozhodnout v situaci, kterou příručka nepopisuje.
+      Tahle kniha je psaná opačně: staví jeden koncept na druhém, ukazuje na konkrétním příkladu, co
+      se stane, a než ukáže kód, vysvětlí, proč ho ukazuje.</p>
+
+      <h2>Jak je kniha uspořádaná</h2>
+      <p>Knihu čteš shora dolů. Každý díl předpokládá, že máš přečtený ten předchozí, a posouvá tě
+      o úroveň dál — od orientace přes první spuštění až po rozšiřování a provoz.</p>
+
+      <div class="tablewrap">
+      <table>
+        <tr><th>Díl</th><th>Co na konci umíš</th></tr>
+        <tr><td><b>I — Než začneme</b></td><td>Víš, k čemu projekt je, z čeho se skládá a co znamenají jeho pojmy.</td></tr>
+        <tr><td><b>II — První kroky</b></td><td>Rozjedeš projekt na svém stroji a položíš mu první otázku.</td></tr>
+        <tr><td><b>III — Cesta dat</b></td><td>Sleduješ, jak se ze surového textu krok po kroku stane odpověď.</td></tr>
+        <tr><td><b>IV — Jak to funguje</b></td><td>Chápeš mechanismus a umíš předpovědět, kdy selže.</td></tr>
+        <tr><td><b>V — Testování</b></td><td>Rozumíš, proč se jazykový model netestuje na přesnou rovnost, a čteš jeho čísla.</td></tr>
+        <tr><td><b>VI — Rozšiřování</b></td><td>Přidáš vlastní data, vztah nebo testovací případ.</td></tr>
+        <tr><td><b>VII — Provoz</b></td><td>Vyřešíš problém, který návod nepokrývá.</td></tr>
+        <tr><td><b>VIII — Otevřené body</b></td><td>Víš, co v projektu není hotové, a nešaháš na to naslepo.</td></tr>
+      </table>
+      </div>
+
+      <h2>Značky důvěry</h2>
+      <p>U každého postupu, příkladu a příkazu najdeš značku, která ti bez přemýšlení řekne, jak
+      moc mu věřit:</p>
+      <p>
+        <span class="mark mark-overeno">Ověřeno</span> někdo to spustil a výstup souhlasí, nebo to hlídá test — drž se toho.<br>
+        <span class="mark mark-prevzato">Převzato</span> odpovídá kódu, ale nikdo to v této podobě nespustil — při potížích podezírej dokumentaci.<br>
+        <span class="mark mark-navrh">Návrh</span> nápad, možná cesta, neověřeno — neber jako pokyn.
+      </p>
+
+      <h2>Kudy začít</h2>
+      <p>Zatím je hotová <b>kostra knihy</b> a jedna vzorová kapitola v plné kvalitě jako ukázka
+      stylu: <a href="dil-4-1-dialogovy-automat.html">IV.1 Dialogový stavový automat</a> — srdce
+      celého projektu. Ostatní kapitoly (v menu zeleně ztlumené) se teprve píší; jejich rozvržení
+      najdeš v plánu osnovy.</p>
+
+      <div class="pager">
+        <span></span>
+        <a href="dil-4-1-dialogovy-automat.html"><span class="dir">další →</span>IV.1 Dialogový automat</a>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

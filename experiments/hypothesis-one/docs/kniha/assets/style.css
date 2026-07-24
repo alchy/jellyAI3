@@ -1,0 +1,161 @@
+/* Knižní dokumentace hypothesis-one — statické HTML, funkční z file:// bez sítě.
+   Typografie čtená jako kniha: serif pro text, mono pro kód, řádek ~68 znaků. */
+
+:root {
+  --bg: #fbfaf7; --surface: #ffffff; --ink: #22201c; --muted: #6b655c;
+  --line: #e7e2d8; --accent: #7a5a2e; --accent-soft: #f0e8da;
+  --code-bg: #f5f2eb; --code-ink: #3a3630;
+  --overeno: #2e6b45; --prevzato: #8a6d2f; --navrh: #7d5aa0;
+  --rat-bg: #f3efe6; --rat-line: #cbb98f; --open-bg: #efeaf4; --open-line: #b9a6d4;
+  --todo-bg: #fbe4c4; --todo-ink: #7a4a10;
+  --serif: Charter, Georgia, "Iowan Old Style", "Times New Roman", serif;
+  --mono: "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  --measure: 68ch;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1b1a17; --surface: #232120; --ink: #e6e1d6; --muted: #9d968a;
+    --line: #35322c; --accent: #cfa46a; --accent-soft: #322a1d;
+    --code-bg: #26241f; --code-ink: #d8d2c4;
+    --rat-bg: #2a271f; --rat-line: #6b5a34; --open-bg: #262032; --open-line: #574670;
+    --todo-bg: #4a3410; --todo-ink: #f0c98a;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #1b1a17; --surface: #232120; --ink: #e6e1d6; --muted: #9d968a;
+  --line: #35322c; --accent: #cfa46a; --accent-soft: #322a1d;
+  --code-bg: #26241f; --code-ink: #d8d2c4;
+  --rat-bg: #2a271f; --rat-line: #6b5a34; --open-bg: #262032; --open-line: #574670;
+  --todo-bg: #4a3410; --todo-ink: #f0c98a;
+}
+:root[data-theme="light"] {
+  --bg: #fbfaf7; --surface: #ffffff; --ink: #22201c; --muted: #6b655c;
+  --line: #e7e2d8; --accent: #7a5a2e; --accent-soft: #f0e8da;
+  --code-bg: #f5f2eb; --code-ink: #3a3630;
+  --rat-bg: #f3efe6; --rat-line: #cbb98f; --open-bg: #efeaf4; --open-line: #b9a6d4;
+  --todo-bg: #fbe4c4; --todo-ink: #7a4a10;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font-family: var(--serif); font-size: 18px; line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---- rozvržení: postranní menu | text | obsah kapitoly ---- */
+.layout { display: grid; grid-template-columns: 17rem 1fr; min-height: 100vh; }
+.sidebar {
+  border-right: 1px solid var(--line); background: var(--surface);
+  padding: 1.2rem 1rem; position: sticky; top: 0; height: 100vh; overflow-y: auto;
+}
+.sidebar .brand { font-weight: 700; font-size: 1.05rem; margin: 0 0 .2rem; }
+.sidebar .brand a { color: var(--ink); text-decoration: none; }
+.sidebar .tag { color: var(--muted); font-size: .78rem; font-family: var(--mono); }
+.sidebar nav { margin-top: 1rem; }
+.sidebar .part { font-size: .72rem; text-transform: uppercase; letter-spacing: .06em;
+  color: var(--accent); margin: 1rem 0 .3rem; font-family: var(--mono); }
+.sidebar a { display: block; color: var(--muted); text-decoration: none;
+  padding: .18rem .4rem; border-radius: 6px; font-size: .92rem; }
+.sidebar a:hover { color: var(--ink); background: var(--accent-soft); }
+.sidebar a.active { color: var(--ink); background: var(--accent-soft); font-weight: 600; }
+
+.main { min-width: 0; }
+.content { max-width: 52rem; margin: 0 auto; padding: 2rem 2.2rem 5rem; }
+.content > * { max-width: var(--measure); }
+.content > .full, .content > figure, .content > .mermaid, .content > table,
+.content > .tablewrap { max-width: 100%; }
+
+/* ---- typografie ---- */
+h1 { font-size: 2rem; line-height: 1.2; margin: .3rem 0 1rem; text-wrap: balance; }
+h2 { font-size: 1.45rem; margin: 2.4rem 0 .8rem; text-wrap: balance;
+  border-bottom: 1px solid var(--line); padding-bottom: .3rem; }
+h3 { font-size: 1.15rem; margin: 1.8rem 0 .5rem; }
+p { margin: 0 0 1rem; }
+a { color: var(--accent); }
+.eyebrow { font-family: var(--mono); font-size: .78rem; text-transform: uppercase;
+  letter-spacing: .08em; color: var(--muted); margin: 0 0 .4rem; }
+.crumbs { font-family: var(--mono); font-size: .8rem; color: var(--muted); margin: 0 0 1.2rem; }
+.crumbs a { color: var(--muted); }
+.lead { font-size: 1.15rem; color: var(--ink); }
+
+code { font-family: var(--mono); font-size: .86em; background: var(--code-bg);
+  color: var(--code-ink); padding: .1em .35em; border-radius: 5px; }
+.codeblock { position: relative; max-width: 100%; }
+pre { background: var(--code-bg); color: var(--code-ink); font-family: var(--mono);
+  font-size: .82rem; line-height: 1.55; padding: 1rem 1.1rem; border-radius: 10px;
+  border: 1px solid var(--line); overflow-x: auto; margin: 0 0 1rem; }
+pre code { background: none; padding: 0; font-size: 1em; }
+.copybtn { position: absolute; top: .5rem; right: .5rem; font-family: var(--mono);
+  font-size: .7rem; background: var(--surface); color: var(--muted);
+  border: 1px solid var(--line); border-radius: 6px; padding: .2rem .5rem; cursor: pointer; }
+.copybtn:hover { color: var(--ink); border-color: var(--accent); }
+
+/* ---- tabulky ---- */
+.tablewrap { overflow-x: auto; margin: 0 0 1.2rem; }
+table { border-collapse: collapse; width: 100%; font-size: .92rem; font-family: var(--serif); }
+th, td { border: 1px solid var(--line); padding: .45rem .6rem; text-align: left; vertical-align: top; }
+th { background: var(--accent-soft); font-weight: 600; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* ---- zdůvodňovací blok / otevřená otázka / TODO ---- */
+aside.rationale, aside.open-question { border-radius: 10px; padding: 1rem 1.2rem;
+  margin: 1.4rem 0; font-size: .95rem; }
+aside.rationale { background: var(--rat-bg); border-left: 4px solid var(--rat-line); }
+aside.open-question { background: var(--open-bg); border-left: 4px solid var(--open-line); }
+aside .lbl { font-family: var(--mono); font-size: .72rem; text-transform: uppercase;
+  letter-spacing: .06em; color: var(--accent); display: block; margin-bottom: .3rem; }
+aside p:last-child { margin-bottom: 0; }
+aside dl { margin: 0; }
+aside dt { font-weight: 700; margin-top: .5rem; }
+aside dd { margin: 0 0 .2rem; }
+.todo { background: var(--todo-bg); color: var(--todo-ink); font-family: var(--mono);
+  font-size: .82em; padding: .05em .4em; border-radius: 5px; }
+
+/* ---- značky důvěry ---- */
+.mark { font-family: var(--mono); font-size: .68rem; text-transform: uppercase;
+  letter-spacing: .05em; padding: .12em .5em; border-radius: 999px;
+  vertical-align: middle; margin-left: .5rem; border: 1px solid; }
+.mark-overeno { color: var(--overeno); border-color: var(--overeno); }
+.mark-prevzato { color: var(--prevzato); border-color: var(--prevzato); }
+.mark-navrh { color: var(--navrh); border-color: var(--navrh); }
+
+/* ---- Mermaid ---- */
+.mermaid { background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+  padding: 1rem; margin: 1rem 0; overflow-x: auto; text-align: center; }
+.mermaid-src { display: none; }
+.mermaid-fail pre { border-color: #b04a4a; }
+
+/* ---- navigace dole + horní lišta ---- */
+.topbar { display: flex; justify-content: flex-end; gap: .6rem; padding: .6rem 2.2rem 0;
+  max-width: 52rem; margin: 0 auto; }
+.iconbtn { font-family: var(--mono); font-size: .78rem; background: var(--surface);
+  border: 1px solid var(--line); color: var(--muted); border-radius: 7px;
+  padding: .3rem .6rem; cursor: pointer; }
+.iconbtn:hover { color: var(--ink); border-color: var(--accent); }
+.pager { display: flex; justify-content: space-between; gap: 1rem; margin-top: 3rem;
+  padding-top: 1.2rem; border-top: 1px solid var(--line); }
+.pager a { text-decoration: none; color: var(--ink); font-size: .95rem; }
+.pager .dir { display: block; font-family: var(--mono); font-size: .72rem; color: var(--muted); }
+
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+
+/* ---- responzivní ---- */
+@media (max-width: 900px) {
+  .layout { grid-template-columns: 1fr; }
+  .sidebar { position: static; height: auto; border-right: none; border-bottom: 1px solid var(--line); }
+}
+
+/* ---- tisk / PDF ---- */
+@media print {
+  .sidebar, .topbar, .copybtn, .pager { display: none; }
+  body { background: #fff; color: #000; font-size: 11pt; }
+  .content { max-width: 100%; }
+  .mermaid, pre, table, aside { break-inside: avoid; }
+  a { color: #000; text-decoration: underline; }
+}
+
+/* kapitola v menu, která se teprve píše (kostra) */
+.sidebar .soon { display: block; padding: .18rem .4rem; color: var(--muted);
+  opacity: .5; font-size: .92rem; cursor: default; }

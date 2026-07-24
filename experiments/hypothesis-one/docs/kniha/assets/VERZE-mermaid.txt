@@ -1,0 +1,3 @@
+mermaid.min.js — verze 10 (staženo z cdn.jsdelivr.net/npm/mermaid@10 při stavbě kostry).
+Uloženo lokálně kvůli funkčnosti z file:// bez sítě (zadání 5). Aktualizace: stáhnout novou
+verzi a ověřit, že se ukázkový diagram v dil-4-1 stále vykreslí.
