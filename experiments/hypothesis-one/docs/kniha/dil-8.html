@@ -357,6 +357,97 @@ flowchart TD
         </dl>
       </aside>
 
+      <h2 id="8-mosty">Naučené mosty nad VZORy — a proč to nesmí být karta <span class="mark mark-navrh">Návrh</span></h2>
+
+      <p>Tahle sekce popisuje <b>směr, který se právě zkoumá</b>, ne hotovou věc — proto značka
+      <span class="mark mark-navrh">Návrh</span>. Navazuje na <i>retrieval po uzlech</i> (výše) a řeší
+      jeho poslední míli: sémantiku, kterou samotná struktura nedá.</p>
+
+      <h3>Co struktura sama nedokáže</h3>
+      <p>Současná reprezentace a matching dnes spolehlivě <b>ne</b>umí čtyři věci (a je to měřeno —
+      relation <b>4/18</b>, authorship-what <b>0/3</b>, sebevědomě špatných <b>30</b>):</p>
+      <ul>
+        <li>držet celou <b>entitu a její identitu</b>, ne jen jednotlivá lemmata;</li>
+        <li>spojit <b>argument dotazu</b> s <b>argumentem faktu</b>;</li>
+        <li>zachovat strukturu argumentů při <b>pro-dropu, koordinaci, pasivu, elipse a koreferenci</b>;</li>
+        <li>odlišit <b>správný fakt</b> od jiné věty se <b>stejným predikátem</b>.</li>
+      </ul>
+      <p>První tři řeší strukturní páteř (entita jako uzel + argumentové hrany s rolí). Čtvrtou a hlavně
+      <b>lexikálně-sémantickou mezeru</b> ne: ze syntaxe se nedá samočinně poznat, že „autorem Babičky
+      byla Němcová" a „Němcová napsala Babičku" vyjadřují <b>tutéž relaci</b>. UDPipe ví, jak jsou slova
+      gramaticky poskládaná; neví, že <code>autor</code> a <code>napsat</code> jsou v té konstrukci
+      významově ekvivalentní. Tahle znalost do systému musí vejít <b>odněkud</b>.</p>
+
+      <h3>Ideál: univerzální reprodukovatelná síť, NN jen kde zobecní</h3>
+      <p>Cílový tvar je <b>univerzální reprodukovatelný korpus lingvistické sítě</b> nad VZORy a
+      aktivací, deterministický za běhu (viz <a href="dil-5.html">Díl V</a>). Do něj mohou pro <b>dílčí
+      kroky</b> vstupovat jednoduché trénované NN modely — ale <b>jen když něco zobecní</b>. Lexikální
+      most (<code>autor≈napsat</code>) se přitom nedělá ručním pravidlem, ale tak, že model (Ollama) při
+      <b>buildu vygeneruje VZORy</b> (parafrázní query-VZORy přiložené k témuž faktu); runtime zůstává
+      čisté VZOR-matchování. Ollama <b>navrhne</b>, měření a struktura <b>rozhodnou</b>.</p>
+
+      <aside class="rationale">
+        <span class="lbl">Zásada — od karet jsme odešli; zavádět jejich obdobu jinou technikou je špatně</span>
+        <p><b>hypothesis-one vznikl jako odchod od karet</b> — od per-relace <code>if-then</code>
+        definic parentu (viz <a href="dil-1.html">Díl I</a>). To není detail, to je <b>smysl projektu</b>:
+        univerzální struktura (VZOR + role + aktivace) místo tisíce ručních definic. Proto zavádět
+        jejich <b>obdobu jinou technikou</b> není „riziko k ohlídání" — je to <b>krok zpět, který
+        projekt popírá</b>, a je jedno, jak elegantně je zabalený.</p>
+        <p>A karta se pozná podle <b>chování, ne podle převleku</b>. Karta = mapování/chování specifické
+        pro jednu relaci nebo téma. Zůstává kartou, ať je napsaná rukou (<code>napsat→authored_by</code>),
+        oblečená do strojově vygenerovaného VZORu, nebo <b>zapečená do vah NN</b>. Test je jednoduchý:
+        runtime musí zacházet se všemi VZORy/fakty <b>stejně, bez jediné větve per relaci</b>. Jakmile
+        artefakt vyžaduje bespoke zacházení pro konkrétní relaci, je to karta — i kdyby ji psala Ollama.
+        (Srov. <a href="dil-6-program.html#curated">curated.json</a>: malá výjimková DB nad univerzálním
+        rozkladem je únosná; per-relace normalizace predikátů by nebyla.)</p>
+      </aside>
+
+      <h3>Co naopak je v pořádku: jednoduchý NN z textu pro dílčí úlohu</h3>
+      <p>Zákaz karet <b>není</b> zákaz neuronových sítí. Jednoduchý NN <b>je v pořádku</b>, když splní
+      tři podmínky zároveň:</p>
+      <ul>
+        <li>řeší <b>jednu dílčí úlohu</b> (krok pipeline), ne celý běh;</li>
+        <li><b>trénuje se na existujících textových datech</b> — znalost bere z jazyka, ne z ručních
+        per-relace definic; <b>právě to ho odlišuje od karty</b> (karta z ruky, tenhle NN z textu);</li>
+        <li><b>nenahrazuje princip</b> — VZORy, role a aktivace zůstávají páteří, NN jim jen slouží
+        (přeřadí remízu, doplní dílčí krok), deterministicky a volitelně.</li>
+      </ul>
+      <p>Rozhodující je tedy <b>odkud bere znalost</b> a <b>čí je pán</b>: znalost z textu, ne z ruky;
+      a NN slouží struktuře, ne naopak. A i tak platí tvrdý filtr: <b>nezobecní-li, vypadne</b> (viz
+      detektor níže).</p>
+
+      <h3>Detektor karty = cross-dataset transfer</h3>
+      <p>Jak poznat kartu v přestrojení od skutečného jazykového vzoru? <b>Jedním testem:
+      přenositelností přes datasety.</b> Věta „autorem X byl Y ≡ Y napsal X" je fakt o <b>češtině</b>,
+      ne o Babičce — takže když platí, <b>musí</b> fungovat i na textu, ze kterého nevznikla.
+      Topic-specific bridge = karta scoped na jeden korpus. Cross-dataset bridge = prokázaný univerzální
+      vzor. <b>Ten jeden test měří zároveň „zobecňuje" i „není karta".</b></p>
+      <p>Proto se buduje <b>druhá, žánrově jiná validační sada</b> (mimo wiki-biografie): <b>literatura</b>
+      (Wikisource, čistý plaintext) a <b>zprávy</b> — text, který nese faktické konstrukce, ale úplně
+      jiný kontext. Bridge se přijme jako univerzální <b>jen když zvedne tenhle held-out žánr a nezvýší
+      tam sebevědomě špatné odpovědi</b>. Bez druhého datasetu se univerzální od topic-specific nedá
+      odlišit — jen se v to doufá.</p>
+
+      <div class="open-question">
+        <span class="lbl">Co nefunguje a proč</span>
+        <p>Cross-lexikální generace je jediná, která umí <b>tiše přehodit relaci</b>:
+        <code>napsat≈autor</code> sedí, ale <code>vydal</code>, <code>ilustroval</code>,
+        <code>přeložil</code> ne — a Ollama je vygeneruje taky. Bez brány je to nejrychlejší cesta, jak
+        do deterministického jádra napumpovat sebevědomé nesmysly. Pojistka: <b>confident-wrong jako
+        tvrdé veto</b> (relace-měnící parafráze vyrobí špatnou odpověď → automaticky zamítnuta) a jen
+        entitu-nesoucí, konkrétní query-VZORy.</p>
+      </div>
+
+      <aside class="correct-way">
+        <span class="lbl">Correct way — cílový stav</span>
+        <p>Systém odpoví „kdo napsal Babičku" i z věty „autorem Babičky byla Němcová", protože zná
+        <b>univerzální</b> parafrázní vzor (ne kartu pro autorství). Ten vzor byl navržen modelem při
+        buildu, ale <b>prokázal se přenosem na jiný žánr</b> a spotřebovává se za běhu stejným
+        deterministickým VZOR-matchováním jako všechno ostatní — žádná větev per relaci, žádné zapečené
+        téma. Naučené vrstvy vstupují jen do dílčích kroků a jen tam, kde měřitelně zobecňují nad
+        reprodukovatelnou enumeraci.</p>
+      </aside>
+
       <h2 id="8-6-registr">Mini-registr otevřených bodů</h2>
       <p>Souhrn na jedné obrazovce. Sloupec <b>dopad</b> říká, kolik by vyřešení bodu vyneslo;
       <b>blokuje</b> ukazuje, co na bodu visí (nebo že bod sám čeká na jiný). Všimni si, že čtyři
