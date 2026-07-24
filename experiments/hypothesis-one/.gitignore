@@ -1,13 +1,26 @@
 server.log
 graph.html
 __pycache__/
-registry.jsonl
-candidates.json
-variants.log
 .viz.pid
-
-baseline_large.json
+variants.log
 pilot_parses.json
-gate_data.json
-neural_pairs.jsonl
+
+# --- data/ : generovaná/reprodukovatelná data + zkopírovaný zdroj ---
+# Self-contained je přes KOPII adresáře (cp -r), ne přes git. Reprodukovatelné
+# (annotate_corpus / build_* / synth_*) se necommitují. Kurátorovaný ground truth
+# (data/gold/) se commituje.
+data/raw/
+data/corpus/
+data/facts/
+data/index/
+data/templates/
+data/gazetteer.json
+data/annotations.pkl
+data/registry.jsonl
+data/candidates.json
+data/gate_data.json
+data/neural_pairs.jsonl
+data/results/
+
+# generovaný snímek posledního testu (přepisuje eval_domain.py)
 docs/last-test.html

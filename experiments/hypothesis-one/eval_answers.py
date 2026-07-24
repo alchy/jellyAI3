@@ -20,9 +20,9 @@ from answering import Answering
 from logger import logger
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-GOLD = os.path.join(HERE, "gold_answers.json")
-REG = os.path.join(HERE, "registry.jsonl")
-OUT = os.path.join(HERE, "baseline_answers.json")
+GOLD = os.path.join(HERE, "data/gold/gold_answers.json")
+REG = os.path.join(HERE, "data/registry.jsonl")
+OUT = os.path.join(HERE, "data/results/baseline_answers.json")
 
 
 def norm(s):

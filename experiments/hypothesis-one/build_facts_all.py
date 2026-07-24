@@ -21,8 +21,8 @@ from chronos import Chronos
 from logger import logger
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-REG = os.path.join(HERE, "registry.jsonl")
-CORP = os.path.join(HERE, "../../data/corpus")
+REG = os.path.join(HERE, "data/registry.jsonl")
+CORP = os.path.join(HERE, "data/corpus")
 
 
 def _load_sentences(doc):

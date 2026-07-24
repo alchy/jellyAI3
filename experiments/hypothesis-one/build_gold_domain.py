@@ -11,7 +11,7 @@ import os
 import json
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-OUT = os.path.join(HERE, "gold_domain.json")
+OUT = os.path.join(HERE, "data/gold/gold_domain.json")
 
 # lemma-tvary míst + aliasy (jak je answering vrací: holé lemma), pro alias-aware accept
 PLACE = {

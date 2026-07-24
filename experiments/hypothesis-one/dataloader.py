@@ -24,7 +24,7 @@ from collections import Counter
 from logger import logger
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-CONFIG_PATH = os.path.join(HERE, "config.json")
+CONFIG_PATH = os.path.join(HERE, "config", "config.json")
 
 
 class Dataloader:

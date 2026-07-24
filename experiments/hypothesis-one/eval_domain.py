@@ -26,7 +26,7 @@ from answering import Answering                      # noqa: E402
 from eval_large import accept, _clear                # noqa: E402
 import test_report                                   # noqa: E402
 
-GOLD = os.path.join(HERE, "gold_domain.json")
+GOLD = os.path.join(HERE, "data/gold/gold_domain.json")
 DOCS = os.path.join(HERE, "docs", "last-test.html")
 
 # módy kompozice mountu (answering._compose_mount) pro --sweep

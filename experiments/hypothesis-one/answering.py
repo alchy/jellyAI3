@@ -25,7 +25,7 @@ from activation_field import ActivationField
 from annotate_corpus import AnnotateCorpus
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-CONFIG_PATH = os.path.join(HERE, "config.json")
+CONFIG_PATH = os.path.join(HERE, "config", "config.json")
 
 
 class Answering:
@@ -65,7 +65,7 @@ class Answering:
         acfg = cfg.get("answering", {})
         self.gate = None
         self.gate_threshold = acfg.get("gate_threshold", 0.3)
-        gpath = os.path.join(HERE, "gate.json")
+        gpath = os.path.join(HERE, "data/gate.json")
         if acfg.get("gate_enabled", False) and os.path.exists(gpath):
             self.gate = json.load(open(gpath, encoding="utf-8"))
 

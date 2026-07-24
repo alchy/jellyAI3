@@ -41,7 +41,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 # („R.U.R." → 1 PROPN, ne R/./U/./R/.). Parent = studnice nápadů; tohle přesahuje k nám.
 sys.path.insert(0, os.path.join(HERE, "..", ".."))
 from jellyai.normalize import merge_abbreviations
-CONFIG_PATH = os.path.join(HERE, "config.json")
+CONFIG_PATH = os.path.join(HERE, "config", "config.json")
 
 PERSON_NAMETYPE = {"Giv", "Sur"}          # UDPipe 2 NameType → osoba ("P")
 GEO_NAMETYPE = {"Geo"}                     # UDPipe 2 NameType → místo ("G")

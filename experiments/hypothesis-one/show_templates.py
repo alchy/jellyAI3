@@ -9,7 +9,7 @@ import sys
 import json
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-PATH = os.path.join(HERE, "query_templates.jsonl")
+PATH = os.path.join(HERE, "data/query_templates.jsonl")
 
 
 def main(last=24):

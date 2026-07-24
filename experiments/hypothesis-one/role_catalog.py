@@ -19,7 +19,7 @@ import json
 from grammar_vzor import GrammarVzor
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-CONFIG_PATH = os.path.join(HERE, "config.json")
+CONFIG_PATH = os.path.join(HERE, "config", "config.json")
 
 
 class RoleCatalog:
@@ -197,7 +197,7 @@ class RoleCatalog:
 if __name__ == "__main__":
     import pickle
     rc = RoleCatalog()
-    shard = pickle.load(open(os.path.join(HERE, "../../data/corpus/bible_lukas.pkl"), "rb"))
+    shard = pickle.load(open(os.path.join(HERE, "data/corpus/bible_lukas.pkl"), "rb"))
     # najdi větu s Kafarnaum pro sektorový rozklad
     for rec in shard.values():
         for sent in rec["sentences"]:

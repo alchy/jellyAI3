@@ -18,7 +18,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 from answering import Answering                                   # noqa: E402
 
-GOLD = os.path.join(HERE, "gold_large.json")
+GOLD = os.path.join(HERE, "data/gold/gold_large.json")
 
 
 def norm(s):
@@ -99,7 +99,7 @@ def main():
     # formulační variace: shodné výsledky napříč parafrázemi téhož faktu?
     consistent = sum(1 for v in pgroups.values() if len(set(v)) == 1)
     print(f"-- FORMULAČNÍ ROBUSTNOST -- {consistent}/{len(pgroups)} skupin parafrází konzistentních")
-    out = os.path.join(HERE, "baseline_large.json")
+    out = os.path.join(HERE, "data/results/baseline_large.json")
     json.dump([{"q": it["q"], "ok": ok, "got": got, "mode": gm, "kind": it.get("kind")}
                for it, ok, got, gm in rows], open(out, "w", encoding="utf-8"),
               ensure_ascii=False, indent=1)

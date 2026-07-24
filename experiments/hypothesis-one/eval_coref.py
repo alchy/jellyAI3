@@ -13,8 +13,8 @@ from collections import Counter
 from fill_holes import FillHoles
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-CORP = os.path.join(HERE, "../../data/corpus")
-GOLD = os.path.join(HERE, "gold_coref.json")
+CORP = os.path.join(HERE, "data/corpus")
+GOLD = os.path.join(HERE, "data/gold/gold_coref.json")
 
 
 def _load(doc):

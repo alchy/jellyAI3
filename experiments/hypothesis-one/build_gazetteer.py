@@ -15,8 +15,8 @@ import pickle
 from grammar_vzor import GrammarVzor
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-CORP = os.path.join(HERE, "../../data/corpus")
-OUT = os.path.join(HERE, "../../data/gazetteer.json")
+CORP = os.path.join(HERE, "data/corpus")
+OUT = os.path.join(HERE, "data/gazetteer.json")
 
 
 def _overlaps(a0, a1, b0, b1):

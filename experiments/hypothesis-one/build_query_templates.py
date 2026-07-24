@@ -25,7 +25,7 @@ def main():
     sq = SynthQueries()
     # dedup dle predikátu — reprezentant s nejvíc různými rolemi
     reps = {}
-    for line in open(os.path.join(HERE, "registry.jsonl"), encoding="utf-8"):
+    for line in open(os.path.join(HERE, "data/registry.jsonl"), encoding="utf-8"):
         e = json.loads(line)
         nr = len({a["role"] for a in e["answers"] if a["role"]})
         if e["predicate"] not in reps or nr > reps[e["predicate"]][0]:
@@ -37,7 +37,7 @@ def main():
                 f"≤{MAX_ROLES} rolí/fakt")
 
     vzors, complete, total_q = set(), 0, 0
-    out = open(os.path.join(HERE, "query_templates.jsonl"), "w", encoding="utf-8")
+    out = open(os.path.join(HERE, "data/query_templates.jsonl"), "w", encoding="utf-8")
     for i, fact in enumerate(sample, 1):
         # ořízni na ≤ MAX_ROLES různých rolí (jeden slot na roli)
         seen, trimmed = set(), []

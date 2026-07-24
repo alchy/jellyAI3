@@ -15,7 +15,7 @@ import json
 from collections import defaultdict
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-CONFIG_PATH = os.path.join(HERE, "config.json")
+CONFIG_PATH = os.path.join(HERE, "config", "config.json")
 
 
 class Fact:
@@ -52,7 +52,7 @@ class FactStore:
         """Načte cestu shardů z configu; prázdný mount."""
         with open(config_path, encoding="utf-8") as config_file:
             cfg = json.load(config_file)
-        self.dir = os.path.join(HERE, cfg.get("fact_store", {}).get("dir", "../../data/facts"))
+        self.dir = os.path.join(HERE, cfg.get("fact_store", {}).get("dir", "data/facts"))
         self.mounted = {}                       # doc -> [Fact]
         self.by_predicate = defaultdict(list)
         self.by_ref = {}                        # (doc, sent) -> Fact

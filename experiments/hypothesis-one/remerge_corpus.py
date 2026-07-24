@@ -15,7 +15,7 @@ sys.path.insert(0, os.path.join(HERE, "..", ".."))
 from jellyai.normalize import merge_abbreviations     # noqa: E402
 from logger import logger                             # noqa: E402
 
-CORP = os.path.join(HERE, "../../data/corpus")
+CORP = os.path.join(HERE, "data/corpus")
 
 
 def main():

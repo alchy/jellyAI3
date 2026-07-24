@@ -19,7 +19,7 @@ from template_store import QueryTemplate
 from logger import logger
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-REG = os.path.join(HERE, "registry.jsonl")
+REG = os.path.join(HERE, "data/registry.jsonl")
 
 
 def main():

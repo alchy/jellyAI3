@@ -10,8 +10,8 @@ import os, sys, json
 import numpy as np
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-DATA = os.path.join(HERE, "gate_data.json")
-OUT = os.path.join(HERE, "gate.json")
+DATA = os.path.join(HERE, "data/gate_data.json")
+OUT = os.path.join(HERE, "data/gate.json")
 
 
 def sigmoid(z): return 1 / (1 + np.exp(-z))
@@ -30,7 +30,7 @@ def collect():
     Reprodukovatelnost: když gate_data.json chybí, vyrobí ho (pomalé, UDPipe)."""
     from answering import Answering
     a = Answering()
-    gold = json.load(open(os.path.join(HERE, "gold_large.json"), encoding="utf-8"))
+    gold = json.load(open(os.path.join(HERE, "data/gold/gold_large.json"), encoding="utf-8"))
 
     def acc(got, ans):
         g = (got or "").strip().lower()

@@ -23,7 +23,7 @@ from logger import logger
 import ollama_iface as O
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-CONFIG_PATH = os.path.join(HERE, "config.json")
+CONFIG_PATH = os.path.join(HERE, "config", "config.json")
 
 
 class SynthQueries:
@@ -151,7 +151,7 @@ class SynthQueries:
 if __name__ == "__main__":
     sq = SynthQueries()
     facts = []
-    for line in open(os.path.join(HERE, "registry.jsonl"), encoding="utf-8"):
+    for line in open(os.path.join(HERE, "data/registry.jsonl"), encoding="utf-8"):
         e = json.loads(line)
         if e["doc"] in ("wiki_karel_čapek", "wiki_pes_domácí", "bible_jan") and len(e["answers"]) >= 2:
             facts.append(e)

@@ -17,7 +17,7 @@ import json
 from grammar_vzor import GrammarVzor
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-CONFIG_PATH = os.path.join(HERE, "config.json")
+CONFIG_PATH = os.path.join(HERE, "config", "config.json")
 
 
 class FillHoles:
@@ -369,7 +369,7 @@ def _measure():
                   ("activation", fh.resolve_document_activation))
 
     def load(doc):
-        shard = pickle.load(open(os.path.join(HERE, f"../../data/corpus/{doc}.pkl"), "rb"))
+        shard = pickle.load(open(os.path.join(HERE, f"data/corpus/{doc}.pkl"), "rb"))
         return [s for (_d, _i), rec in sorted(shard.items(), key=lambda x: x[0][1])
                 for s in rec["sentences"]]
 

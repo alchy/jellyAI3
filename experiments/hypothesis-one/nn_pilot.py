@@ -15,7 +15,7 @@ import numpy as np
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-GOLD = os.path.join(HERE, "gold_large.json")
+GOLD = os.path.join(HERE, "data/gold/gold_large.json")
 CACHE = os.path.join(HERE, "pilot_parses.json")          # cache rozborů (gitignored)
 
 INTERROG = ["kdo", "co", "kde", "kdy", "kolik", "jaký", "který", "čí", "jak"]

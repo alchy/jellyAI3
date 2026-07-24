@@ -83,7 +83,7 @@ def main():
                         help="omezí počet factů; vhodné pro první ověření modelu")
     args = parser.parse_args()
 
-    with open(os.path.join(HERE, "config.json"), encoding="utf-8") as config_file:
+    with open(os.path.join(HERE, "config", "config.json"), encoding="utf-8") as config_file:
         cfg = json.load(config_file)
     ncfg = cfg["neural_training"]
     registry = os.path.join(HERE, cfg["synthesis"]["registry"])

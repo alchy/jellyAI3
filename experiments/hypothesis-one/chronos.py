@@ -14,7 +14,7 @@ import os
 import json
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-CONFIG_PATH = os.path.join(HERE, "config.json")
+CONFIG_PATH = os.path.join(HERE, "config", "config.json")
 
 
 class Chronos:
@@ -50,7 +50,7 @@ if __name__ == "__main__":
     from grammar_vzor import GrammarVzor
     g = GrammarVzor()
     ch = Chronos()
-    shard = pickle.load(open(os.path.join(HERE, "../../data/corpus/wiki_r.u.r..pkl"), "rb"))
+    shard = pickle.load(open(os.path.join(HERE, "data/corpus/wiki_r.u.r..pkl"), "rb"))
     for rec in shard.values():
         for s in rec["sentences"]:
             tf = ch.temporal_facts(s, g)

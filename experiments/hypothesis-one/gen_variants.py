@@ -112,11 +112,11 @@ def main():
     NV = 2
     C = build_corpus()
     reg = defaultdict(list)
-    for line in open(f"{ROOT}/experiments/hypothesis-one/registry.jsonl"):
+    for line in open(f"{ROOT}/experiments/hypothesis-one/data/registry.jsonl"):
         e = json.loads(line); reg[e["doc"]].append(e)
     picks = select(reg, C["docs"], K)
 
-    out = open(f"{ROOT}/experiments/hypothesis-one/variants.jsonl", "w")
+    out = open(f"{ROOT}/experiments/hypothesis-one/data/variants.jsonl", "w")
     n_q = self_ok = ver_ok = 0
     pos_tot = Counter(); pos_ok = Counter()      # self-consistency dle pozice varianty
     for i, (e, ans) in enumerate(picks, 1):

@@ -13,7 +13,7 @@ import os
 import json
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-CONFIG_PATH = os.path.join(HERE, "config.json")
+CONFIG_PATH = os.path.join(HERE, "config", "config.json")
 
 
 class Topos:
@@ -26,7 +26,7 @@ class Topos:
     def __init__(self, config_path=CONFIG_PATH):
         """Načte gazetteer (lemmata míst) z cesty v configu; prázdný, když chybí."""
         cfg = json.load(open(config_path, encoding="utf-8")).get("topos", {})
-        path = os.path.join(HERE, cfg.get("gazetteer", "../../data/gazetteer.json"))
+        path = os.path.join(HERE, cfg.get("gazetteer", "data/gazetteer.json"))
         self.places = set(json.load(open(path, encoding="utf-8"))) if os.path.exists(path) else set()
 
     def is_place(self, lemma):

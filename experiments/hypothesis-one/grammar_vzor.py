@@ -17,7 +17,7 @@ import os
 import json
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-CONFIG_PATH = os.path.join(HERE, "config.json")
+CONFIG_PATH = os.path.join(HERE, "config", "config.json")
 
 
 class GrammarVzor:
@@ -172,7 +172,7 @@ class GrammarVzor:
 if __name__ == "__main__":
     import pickle
     g = GrammarVzor()
-    shard = pickle.load(open(os.path.join(HERE, "../../data/corpus/wiki_r.u.r..pkl"), "rb"))
+    shard = pickle.load(open(os.path.join(HERE, "data/corpus/wiki_r.u.r..pkl"), "rb"))
     sent = next(iter(shard.values()))["sentences"][0]
     mod = g.sentence_modality(sent)
     print("věta:", " ".join(t["form"] for t in sent)[:70])
