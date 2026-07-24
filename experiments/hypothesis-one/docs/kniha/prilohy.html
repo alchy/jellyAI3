@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Přílohy — rejstřík, konfigurace, registry — hypothesis-one</title>
+<link rel="stylesheet" href="assets/style.css">
+<script defer src="assets/mermaid.min.js"></script>
+<script defer src="assets/script.js"></script>
+</head>
+<body>
+<div class="layout">
+
+  <aside class="sidebar">
+    <p class="brand"><a href="index.html">hypothesis-one</a></p>
+    <p class="tag">knižní dokumentace</p>
+    <nav aria-label="Obsah knihy">
+      <a href="index.html">Úvod</a>
+      <p class="part">Díl I — Než začneme</p><a href="dil-1.html">I · Co řeší, slovník, mapa</a>
+      <p class="part">Díl II — První kroky</p><a href="dil-2.html">II · Instalace, běh, data</a>
+      <p class="part">Díl III — Cesta dat</p><a href="dil-3.html">III · Fáze pipeline</a>
+      <p class="part">Díl IV — Jak to funguje</p><a href="dil-4.html">IV · Automat, aktivace, fakty</a>
+      <p class="part">Díl V — Testování</p><a href="dil-5.html">V · Testy, tvary, měření</a>
+      <p class="part">Díl VI — Rozšiřování</p><a href="dil-6.html">VI · Data, vztahy, testy</a>
+      <p class="part">Díl VII — Provoz</p><a href="dil-7.html">VII · UDPipe, viz, pasti</a>
+      <p class="part">Díl VIII — Otevřené body</p><a href="dil-8.html">VIII · Nedodělky a cesty</a>
+      <p class="part">Přílohy</p><a href="prilohy.html" class="active">Rejstřík, konfigurace, registry</a>
+    </nav>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <button class="iconbtn" id="theme-toggle" type="button" aria-label="Přepnout světlý/tmavý režim">◐ režim</button>
+    </div>
+    <div class="content">
+      <nav class="crumbs"><a href="index.html">Úvod</a> › Přílohy</nav>
+      <p class="eyebrow">Přílohy — referenční část</p>
+      <h1>Přílohy — rejstřík, konfigurace, registry</h1>
+
+      <p class="lead">Knihu jsi dočetl. Tahle část se nečte odshora dolů jako díly — je to
+      <b>vyhledávací aparát</b>: osm tabulek, do kterých se vracíš, když potřebuješ dohledat pojem,
+      zjistit výchozí hodnotu parametru, ověřit, jaké číslo je čím podložené, nebo najít, kam se
+      přesunul obsah staré dokumentace. Každá tabulka má vlastní kotvu, takže na ni jde odkázat
+      přímo z výkladu v jednotlivých dílech.</p>
+
+      <p>Přeskoč rovnou na to, co hledáš:
+        <a href="#rejstrik">Rejstřík pojmů</a> ·
+        <a href="#konfigurace">Přehled konfigurace</a> ·
+        <a href="#prikazy">Seznam příkazů</a> ·
+        <a href="#rozhodnuti">Registr návrhových rozhodnutí</a> ·
+        <a href="#registr-otevrenych">Registr otevřených bodů</a> ·
+        <a href="#overeni">Tabulka ověření</a> ·
+        <a href="#matice-tvaru">Matice tvarů dat</a> ·
+        <a href="#pokryti">Pokrytí staré dokumentace</a>.</p>
+
+      <!-- ============================================================ -->
+      <h2 id="rejstrik">Rejstřík pojmů</h2>
+      <p>Abecední soupis pojmů, které kniha zavádí. Sloupec <b>kde</b> ukazuje, ve kterém modulu
+      nebo dílu pojem žije; sloupec <b>související</b> vede k pojmům, které se s ním pletou nebo
+      s ním tvoří dvojici. Pojmy psané <code>strojově</code> jsou přímo klíče v kódu nebo configu.</p>
+      <div class="tablewrap">
+      <table>
+        <tr><th>Pojem</th><th>Definice</th><th>Kde</th><th>Související</th></tr>
+        <tr><td><b>aktivace / světlo / glow</b></td><td>Teplo, které slova otázky rozlijí po grafu; váha uzlu = idf slova, vodivost hrany = idf×idf×proximity. Distinktivní slova svítí, funkční skoro ne.</td><td><code>activation_field.py</code>, Díl IV.2</td><td>vodivost hrany, glow-orders-ties, mount</td></tr>
+        <tr><td><b>alias / identita</b></td><td>Různé zápisy téže entity (Barbora Panklová ≡ Božena Němcová) sloučené na jeden kanon = dominantní podmět dokumentu. Rozpouští rozpadlé jméno v remíze.</td><td><code>dataloader._aliases</code>, <code>answering._canon</code></td><td>subject index, VZOR</td></tr>
+        <tr><td><b>assurance (míra jistoty)</b></td><td>Poslední stav tahu: podle náskoku vítěze zvolí jeden ze tří konců — odpověď (jasno), doptání (nejasno), mlčení (prázdno).</td><td><code>answering._assurance</code>, Díl IV.5</td><td>dialogový automat, confident-wrong, brána</td></tr>
+        <tr><td><b>brána (naučená / gate)</b></td><td>Malý naučený klasifikátor, který měl potlačit sebevědomě špatné odpovědi. Přeučuje na 76 vzorcích × 13 rysů → <code>gate_enabled=false</code>, dnes vypnutá.</td><td><code>gate.json</code>, <code>answering._gate_p</code></td><td>assurance, confident-wrong</td></tr>
+        <tr><td><b>carry_context (řetězení kontextu)</b></td><td>Světlo i mount přetrvávají mezi tahy: navazující otázka bez entity zdědí téma, otázka s entitou téma přepne (žár i mount zhasnou).</td><td><code>answering.answer</code>, Díl IV.6</td><td>aktivace, mount, díra</td></tr>
+        <tr><td><b>confident-wrong (sebevědomě špatně)</b></td><td>Nejškodlivější třída chyb: systém místo mlčení vrátí špatnou odpověď jako jistou. Metrika, kterou se sleduje kvalita (dnes 30 na velkém etalonu).</td><td>Díl V.5, <code>eval_large.py</code></td><td>assurance, honest-negative</td></tr>
+        <tr><td><b>CoNLL-U</b></td><td>Řádkový formát závislostního rozboru z UDPipe 2: jeden token na řádek se sloupci form/lemma/upos/feats/head/deprel. Vstup pro anotaci.</td><td><code>annotate_corpus.py</code>, Díl III.2</td><td>UDPipe 2, deprel, upos</td></tr>
+        <tr><td><b>deprel</b></td><td>Závislostní vztah tokenu k jeho řídicímu slovu (nsubj = podmět, obj = předmět, cop = spona…). Univerzální klíč, ze kterého se odvozuje rolový klíč.</td><td><code>lang/cs.json</code> deprel_to_role</td><td>role, upos, VZOR</td></tr>
+        <tr><td><b>determinismus / deterministický runtime</b></td><td>Runtime nemá v rozhodovací smyčce žádný neuron; stejná otázka nad stejnými daty vrací vždy stejnou odpověď. UDPipe 2 běží jen na rozbor otázky.</td><td>Díl I, Díl IV</td><td>UDPipe 2, brána</td></tr>
+        <tr><td><b>dialogový stavový automat</b></td><td>Jádro: odpověď nevzniká dotazem SELECT, ale průchodem stavů rozsvícení → doostření → jistota. Světlo napřed, tvar potom.</td><td>Díl IV.1, <code>answering.answer</code></td><td>aktivace, VZOR, assurance</td></tr>
+        <tr><td><b>díra / koreference (pro-drop podmět)</b></td><td>Placeholder na místě vypuštěného či zájmenného účastníka; antecedent se hledá shodou ÚFAL rysu (rod+číslo). Vyplněná díra doplní podmět do who-slotu faktu.</td><td><code>fill_holes.py</code>, Díl III.5</td><td>role, alias, carry_context</td></tr>
+        <tr><td><b>doclink / doc-graf (#60)</b></td><td>Hrany mezi dokumenty = sdílené distinktivní entity (PROPN×idf). Při mountu přiberou k vítězi jeho ekosystém (seed „Čapek" → i „R.U.R.").</td><td><code>dataloader._doclinks</code></td><td>mount, fragmentový graf</td></tr>
+        <tr><td><b>echo-guard</b></td><td>Filtr, který z kandidátů vyhodí slova, jež nikdy nejsou faktická odpověď (kvantifikátory „množství", „řada") — jinak by „napsal množství povídek" dalo odpověď „množství".</td><td><code>answering._candidates</code>, nonanswer_lemmas</td><td>kandidáti, role</td></tr>
+        <tr><td><b>etalon / gold</b></td><td>Ruční sada otázek s očekávanou odpovědí a režimem, proti které se měří. Velký (145) měří pokrytí po kategoriích, malý (25) end-to-end.</td><td><code>gold_large.json</code>, <code>gold_answers.json</code>, Díl V.4</td><td>confident-wrong, honest-negative</td></tr>
+        <tr><td><b>fakt (Fact)</b></td><td>Predikát + role-sloty (who/where/when…) + provenience (doc, sent). Řádky registru agregované per (doc, sent, predikát), obohacené o koreferovaný podmět.</td><td><code>fact_store.py</code>, Díl IV.4</td><td>role, registry, predikát</td></tr>
+        <tr><td><b>fragmentový graf (#60)</b></td><td>Korpus není jeden balík: každý soubor je samostatný shard, který se do grafu nahrává (mountuje) dynamicky podle matche, ne všechny naráz.</td><td>Díl III, <code>dataloader</code>, <code>template_store</code></td><td>mount, shard, doclink</td></tr>
+        <tr><td><b>glow-orders-ties</b></td><td>Pravidlo výběru: o odpovědi rozhoduje strukturní base skóre, aktivace (glow) jen řadí remízu mezi rovnocennými kandidáty. Světlo neurčuje pravdu, jen pořadí.</td><td>Díl IV.2, <code>answering</code></td><td>aktivace, kandidáti, VZOR</td></tr>
+        <tr><td><b>honest-negative</b></td><td>Otázka, na kterou v korpusu odpověď není a poctivé je mlčet/doptat se. Vlastnost, ne chyba — 7/7 na velkém etalonu.</td><td>Díl IV, Díl V, <code>eval_large</code></td><td>assurance, confident-wrong</td></tr>
+        <tr><td><b>idf</b></td><td>Míra unikátnosti slova napříč soubory (log(N/df)+1). Určuje váhu uzlu i vodivost hrany — vzácná slova svítí a vedou světlo, běžná ne.</td><td><code>dataloader.build_indexes</code></td><td>tf·idf, aktivace, vodivost hrany</td></tr>
+        <tr><td><b>kandidáti</b></td><td>Uzly, které jsou zároveň osvětlené a mají tvar, jaký VZOR hledá. Mezi nimi se pak vybírá vítěz a rozhoduje jistota.</td><td><code>answering._candidates</code>, Díl IV.3</td><td>VZOR, glow-orders-ties, assurance</td></tr>
+        <tr><td><b>lemma</b></td><td>Základní slovníkový tvar slova (Čapkovi → Čapek, narodil → narodit). Match i sloty pracují nad lemmaty, ne nad povrchem.</td><td>UDPipe 2, <code>grammar_vzor.canon_lemma</code></td><td>upos, VZOR, alias</td></tr>
+        <tr><td><b>mount / namountování</b></td><td>Nahrání horkých souborů (shardů) do grafu na začátku tahu podle slov otázky; studené soubory zůstávají jen indexem na disku. Unmount = zahození.</td><td><code>dataloader.select_files</code>, Díl III</td><td>fragmentový graf, doclink, top_files</td></tr>
+        <tr><td><b>NameType</b></td><td>Rys UDPipe 2 na tokenu (Giv/Sur = osoba, Geo = místo). Z něj se odvozují entity — pádová neshoda span neslepí (řez proti slepencům).</td><td><code>annotate_corpus.py</code></td><td>entita, gazetteer, upos</td></tr>
+        <tr><td><b>polární smyčka (ano/ne)</b></td><td>Otázka bez tázacího slova + koncové „?" je polární: odpověď je ano/ne podle toho, zda fakt v datech je. „Je pes šelma? → ano".</td><td><code>answering</code>, interrog_lemmas</td><td>assurance, role</td></tr>
+        <tr><td><b>predikát</b></td><td>Sloveso nebo jmenný přísudek, kolem kterého se fakt organizuje. Otázka a fakt se potkají predikátem + rolí díry, nezávisle na slovosledu.</td><td><code>fact_store</code>, <code>synth_registry</code></td><td>fakt, role, VZOR</td></tr>
+        <tr><td><b>proximity / vodivost hrany</b></td><td>Blízkost dvou slov v okně ko-okurence; násobí idf obou konců → vodivost hrany. Vzdálenost tlumí exp(−d/tau).</td><td><code>activation_field.py</code>, activation.window/tau</td><td>aktivace, idf</td></tr>
+        <tr><td><b>registry</b></td><td>Grafikon syntetických vazeb FAKT↔OTÁZKA: řádek per větný přísudek s dírou, odpovědními sloty a kontextem. Zdroj faktů i šablon.</td><td><code>registry.jsonl</code>, <code>synth_registry.py</code></td><td>fakt, šablona, role</td></tr>
+        <tr><td><b>role / rolový klíč</b></td><td>Náš univerzální klíč větného členu (who, where, when, whom_what, state, how_much…), odvozený z deprel + pádu. Jazykově nezávislá vrstva nad UD.</td><td><code>role_catalog.py</code>, <code>lang/cs.json</code></td><td>deprel, díra, fakt</td></tr>
+        <tr><td><b>shard</b></td><td>Jeden soubor korpusu/indexu/šablon uložený zvlášť (per doc). Umožňuje líné nahrávání — mechanismus unese tisíce souborů.</td><td>Díl III, <code>data/corpus/&lt;doc&gt;.pkl</code></td><td>fragmentový graf, mount</td></tr>
+        <tr><td><b>šablona (QueryTemplate)</b></td><td>Trojice FAKT-VZOR × QUERY-VZOR × ODPOVĚĎ, sharded per soubor. Transpozicí faktu na otázku dělá VZOR matcher použitelný napříč doménami.</td><td><code>template_store.py</code>, Díl IV.3</td><td>VZOR, registry, mount</td></tr>
+        <tr><td><b>subject index (entita jako podmět)</b></td><td>Kolikrát je entita v souboru podmětem (× idf). Soubor se rozsvítí podle entity jako podmětu, ne podle četnosti („Slovo" → Jan, ne bible).</td><td><code>dataloader._subjects</code>, subject_min</td><td>alias, mount, aktivace</td></tr>
+        <tr><td><b>tf·idf</b></td><td>Váha slova v souboru = četnost v souboru × unikátnost napříč soubory. Základ per-soubor indexu, podle kterého se vybírají horké soubory.</td><td><code>dataloader.build_indexes</code></td><td>idf, mount, fragmentový graf</td></tr>
+        <tr><td><b>ÚFAL</b></td><td>Ústav formální a aplikované lingvistiky MFF UK — tvůrce UDPipe 2 a modelu Universal Dependencies pro češtinu, které projekt používá.</td><td>Díl I slovník, Díl VII</td><td>UDPipe 2, CoNLL-U, NameType</td></tr>
+        <tr><td><b>UDPipe 2</b></td><td>Jediný neuronový nástroj v projektu: rozbor věty (tokenizace, morfologie, závislosti). Korpus se anotuje offline; runtime jím jen rozebírá otázku.</td><td>services.udpipe_url :8092, Díl III.2</td><td>determinismus, CoNLL-U, ÚFAL</td></tr>
+        <tr><td><b>upos</b></td><td>Univerzální slovní druh tokenu (NOUN, PROPN, VERB, ADJ, NUM, ADV…). Obsahové druhy nesou světlo, funkční ne.</td><td>UDPipe 2, <code>lang/cs.json</code></td><td>deprel, lemma, aktivace</td></tr>
+        <tr><td><b>VZOR (frame_sig)</b></td><td>Strukturní šablona = pole slotů kolem pivotu do šířky r. Ví, jaký tvar má odpověď mít (osoba? místo? rok?), a doostří jím rozsvícenou oblast.</td><td><code>grammar_vzor.py</code>, radius/vzor_radius, Díl IV.3</td><td>šablona, role, kandidáti</td></tr>
+        <tr><td><b>WORD / SLOT / DÍRA</b></td><td>Základní stavební klíče VZORu: WORD = konkrétní slovo, SLOT = pozice s rolí, DÍRA = neobsazený slot (to, na co se ptáme, nebo elidovaný člen).</td><td>Díl I slovník, <code>grammar_vzor</code></td><td>VZOR, role, díra</td></tr>
+      </table>
+      </div>
+
+      <!-- ============================================================ -->
+      <h2 id="konfigurace">Přehled konfigurace</h2>
+      <p>Všechny parametry žijí v datech, ne v kódu (zákon „nic natvrdo"): číselné a cestové v
+      <code>config.json</code> (bloky po vrstvách), jazykové v <code>lang/cs.json</code>. Nový jazyk
+      nebo nasazení = jiný JSON, žádný zásah do zdrojáku. Níže výchozí hodnoty ke commitu
+      <code>d20a5ec</code>; sloupec <b>vliv</b> říká, co se stane, když hodnotu změníš.
+      <span class="mark mark-prevzato">Převzato</span></p>
+      <div class="tablewrap">
+      <table>
+        <tr><th>Klíč</th><th>Typ</th><th>Výchozí</th><th>Vliv</th><th>Příklad</th></tr>
+        <tr><td colspan="5"><b>config.json → dataloader</b> (② nahrávání souborů do grafu)</td></tr>
+        <tr><td><code>top_files</code></td><td>int</td><td>8</td><td>Kolik nejbližších souborů se při dotazu namountuje do grafu. Víc = širší kontext, ale i víc šumu z cizích domén.</td><td><code>8</code></td></tr>
+        <tr><td><code>subject_min</code></td><td>int</td><td>3</td><td>Práh výskytů entity jako podmětu, aby jí soubor mohl rozsvítit přes podmětový index (entita jako podmět, ne četnost).</td><td><code>3</code></td></tr>
+        <tr><td><code>doclink_top</code></td><td>int</td><td>2</td><td>Kolik co-mount sousedů z doc-grafu se přibere k vítěznému souboru (drží ekosystém entity).</td><td><code>2</code></td></tr>
+        <tr><td><code>min_count</code></td><td>int</td><td>2</td><td>Minimální výskyt lemmatu v souboru, aby vešlo do tf·idf indexu (ořez šumu hapaxů).</td><td><code>2</code></td></tr>
+        <tr><td colspan="5"><b>config.json → fact_store</b> (predikátová cesta k faktu)</td></tr>
+        <tr><td><code>enabled</code></td><td>bool</td><td>true</td><td>Zapíná predikátovou cestu (fakt = predikát + role). Měřeno aditivní +12 % na goldu, 0 regrese po dvou zámcích (koreference + entita v jiné roli než odpověď).</td><td><code>true</code></td></tr>
+        <tr><td colspan="5"><b>config.json → chronos</b> (expert ČAS — rok z běžného textu)</td></tr>
+        <tr><td><code>year_min</code></td><td>int</td><td>1000</td><td>Dolní hranice čtyřmístného NUM, který se uzná za rok a přiřadí k predikátu věty (when-slot).</td><td><code>1000</code></td></tr>
+        <tr><td><code>year_max</code></td><td>int</td><td>2100</td><td>Horní hranice roku. Mimo interval [year_min, year_max] se číslo za rok nepovažuje.</td><td><code>2100</code></td></tr>
+        <tr><td colspan="5"><b>config.json → activation</b> (tekoucí světlo nad grafem)</td></tr>
+        <tr><td><code>decay</code></td><td>float</td><td>0.7</td><td>Jak rychle světlo mezi tahy pohasíná (řetězení kontextu). Nižší = rychlejší zapomínání tématu.</td><td><code>0.7</code></td></tr>
+        <tr><td><code>spread_lambda</code></td><td>float</td><td>0.5</td><td>Podíl tepla, který uzel předá dál po hranách při šíření. Vyšší = širší, plošší rozsvícení.</td><td><code>0.5</code></td></tr>
+        <tr><td><code>hops</code></td><td>int</td><td>2</td><td>Kolik kroků po hranách se světlo šíří od zdrojových slov. Víc skoků = vzdálenější asociace.</td><td><code>2</code></td></tr>
+        <tr><td><code>window</code></td><td>int</td><td>5</td><td>Okno ko-okurence v obsahových tokenech, ze kterého se počítá proximita hrany (ne jen bigram).</td><td><code>5</code></td></tr>
+        <tr><td><code>tau</code></td><td>float</td><td>2.0</td><td>Měřítko útlumu vzdáleností exp(−d/tau) uvnitř okna. Nižší tau = prudší pokles s odstupem slov.</td><td><code>2.0</code></td></tr>
+        <tr><td colspan="5"><b>config.json → answering</b> (⑤ queryparser)</td></tr>
+        <tr><td><code>gate_enabled</code></td><td>bool</td><td>false</td><td>Zapíná naučenou assurance bránu. Dnes vypnutá — na 76 vzorcích přeučuje (reálný běh −19 potlačených).</td><td><code>false</code></td></tr>
+        <tr><td><code>gate_threshold</code></td><td>float</td><td>0.3</td><td>Práh pravděpodobnosti správnosti, pod kterým by brána odpověď zamlčela. Účinný jen při gate_enabled=true.</td><td><code>0.3</code></td></tr>
+        <tr><td><code>nonanswer_lemmas</code></td><td>seznam</td><td>množství, řada, spousta, mnoho, hromada, počet</td><td>Kvantifikátory, které nikdy nejsou faktická odpověď — echo-guard je vyhodí z kandidátů.</td><td><code>["množství", "řada", …]</code></td></tr>
+        <tr><td><code>interrog_lemmas</code></td><td>seznam</td><td>kdo, co, kde, kam, odkud, kudy, kdy, kolik, kolikátý, jaký, který, čí, proč, jak</td><td>Tázací slova. Jejich NEPŘÍTOMNOST + koncové „?" značí polární (ano/ne) otázku.</td><td><code>["kdo", "co", "kde", …]</code></td></tr>
+        <tr><td colspan="5"><b>lang/cs.json</b> (jazyková data — klíče univerzální, hodnoty české)</td></tr>
+        <tr><td><code>copula_lemma</code></td><td>string</td><td>být</td><td>Lemma spony. Kopulový vzor („X je Y") staví jmenný přísudek do state-slotu a nese vztah jako hranu.</td><td><code>"být"</code></td></tr>
+        <tr><td><code>relation_nouns</code></td><td>seznam</td><td>bratr, sestra, sourozenec, manžel, manželka, žena, muž, otec, matka, syn, dcera, rodič, láska, přítel, přítelkyně</td><td>Příbuzenská/vztahová slova, ze kterých se v kopulovém vzoru stává hrana mezi entitami (vztah = hrana).</td><td><code>["bratr", "otec", …]</code></td></tr>
+        <tr><td><code>symmetric_relations</code></td><td>seznam</td><td>bratr, sestra, sourozenec, manžel, manželka, přítel, přítelkyně</td><td>Podmnožina vztahů, kde hrana platí oběma směry (bratr(A,B) ⇒ bratr(B,A)); ostatní (otec, syn) jsou orientované.</td><td><code>["bratr", "sestra", …]</code></td></tr>
+      </table>
+      </div>
+
+      <!-- ============================================================ -->
+      <h2 id="prikazy">Seznam příkazů</h2>
+      <p>Skripty spustitelné z kořene experimentu (<code>experiments/hypothesis-one/</code>). Většina
+      nemá přepínače na příkazové řádce — chování řídí <code>config.json</code>. Pořadí přestavby dat
+      je závazné (idf závisí na počtu souborů, fakty na registru): <b>annotate → dataloader →
+      synth_registry → synth_determination → build_facts_all → build_templates_all → build_gazetteer</b>.
+      <span class="mark mark-prevzato">Převzato</span></p>
+      <div class="tablewrap">
+      <table>
+        <tr><th>Příkaz</th><th>Co dělá</th><th>Důležité vstupy / přepínače</th></tr>
+        <tr><td colspan="3"><b>Dotaz a vyhodnocení</b></td></tr>
+        <tr><td><code>python3 ask.py</code></td><td>Interaktivní dotaz. Píšeš otázky, dostáváš odpověď / doptání / poctivé „nevím". Kontext se řetězí mezi tahy.</td><td>Bez argumentů. Prázdný řádek nebo Ctrl-D ukončí. Vyžaduje UDPipe 2 na :8092.</td></tr>
+        <tr><td><code>python3 eval_large.py</code></td><td>Velký etalon (145 otázek), mode-aware skóre + rozpad po kategoriích. Tiskne PASS/FAIL, confident-wrong, výtěžnost tříd.</td><td>Vstup <code>gold_large.json</code>. Výstup <code>baseline_large.json</code>. Bez přepínačů.</td></tr>
+        <tr><td><code>python3 eval_answers.py</code></td><td>Malý etalon (25 otázek) end-to-end + fázová diagnostika (kde tah spadl: no_qvzor / no_hot / no_cand / WRONG / HIT) a STROP.</td><td>Vstup <code>gold_answers.json</code>, <code>registry.jsonl</code>. Výstup <code>baseline_answers.json</code>.</td></tr>
+        <tr><td><code>python3 eval_coref.py</code></td><td>Etalon zaplnění děr (koreference) proti <code>gold_coref.json</code>.</td><td>Vstup <code>gold_coref.json</code>. Bez přepínačů.</td></tr>
+        <tr><td colspan="3"><b>Přestavba dat (v tomto pořadí)</b></td></tr>
+        <tr><td><code>python3 annotate_corpus.py</code></td><td>① Anotuje surové texty přes UDPipe 2 → shard per soubor <code>data/corpus/&lt;doc&gt;.pkl</code>. Přírůstkově: přeskočí aktuální shardy.</td><td>Čte blok <code>preprocessing</code> (raw_dir, udpipe2_url LINDAT, pinnutý model, batch_chars). Vstup se nikdy nepřepisuje.</td></tr>
+        <tr><td><code>python3 dataloader.py</code></td><td>② <code>build_indexes()</code> přepočte VŠECHNY staty (tf·idf, idf, subjects, aliases, doclinks) + sanity výběr souborů. Volat po každém přidání dat.</td><td>Čte blok <code>dataloader</code>. Přepisuje celé <code>data/index/</code> (idf závisí na počtu souborů).</td></tr>
+        <tr><td><code>python3 synth_registry.py</code></td><td>④ Z korpusu staví grafikon FAKT↔OTÁZKA → <code>registry.jsonl</code> (predikát, díra, odpovědní sloty, kontext).</td><td>Čte korpus přes Dataloader. Bez přepínačů.</td></tr>
+        <tr><td><code>python3 synth_determination.py</code></td><td>④ Staví CONFIRMED slovník VZOR→role → <code>determination.json</code> (práh povýšení role = determination_min).</td><td>Blok <code>synthesis</code>. Bez přepínačů.</td></tr>
+        <tr><td><code>python3 build_facts_all.py</code></td><td>Agreguje registry per (doc, sent, predikát) → fakty <code>data/facts/&lt;doc&gt;.jsonl</code>. Obohatí pro-drop podmět koreferencí + bio-závorka + vztahy + Chronos (rok).</td><td>Vstup <code>registry.jsonl</code> + korpus. Bez sítě, deterministické.</td></tr>
+        <tr><td><code>python3 build_templates_all.py</code></td><td>Transponuje registry na šablony (QueryTemplate) per soubor <code>data/templates/&lt;doc&gt;.jsonl</code> → VZOR matcher použitelný napříč doménami.</td><td>Vstup <code>registry.jsonl</code>. Idempotentní: reset() smaže staré shardy, dedup dle id.</td></tr>
+        <tr><td><code>python3 build_gazetteer.py</code></td><td>Sesbírá lemmata uvnitř GEO entit → <code>data/gazetteer.json</code> (expert MÍSTO: is_place rozliší Svatoňovice vs rodina).</td><td>Vstup korpus. Bez přepínačů.</td></tr>
+        <tr><td colspan="3"><b>Naučené komponenty a nástroje (offline)</b></td></tr>
+        <tr><td><code>python3 train_gate.py</code></td><td>Natrénuje assurance bránu → <code>gate.json</code> (malé pevné váhy, inference pak deterministická). Chybí-li <code>gate_data.json</code>, vyrobí ho přes etalon.</td><td>Vstup <code>gate_data.json</code>. Pozn.: brána je v runtime vypnutá (přeučuje).</td></tr>
+        <tr><td><code>python3 nn_pilot.py</code></td><td>Pilot malé NN nad strukturními VZOR-rysy místo ručních pravidel; leave-one-out CV (75.9 % vs 17.2 % majorita). Trénink offline.</td><td>Vstup <code>gold_large.json</code>, cache <code>pilot_parses.json</code>. Bez přepínačů.</td></tr>
+        <tr><td><code>python3 viz.py</code></td><td>Živá vizualizace dialogu (graf se rozsvěcí, jak se ptáš) na <code>http://127.0.0.1:8080</code>. Self-restart: zabije předchozí instanci.</td><td>Vyžaduje <code>.venv</code> kvůli viewBase: <code>.venv/bin/python viz.py</code>. Napojeno na živý Answering.</td></tr>
+      </table>
+      </div>
+
+      <!-- ============================================================ -->
+      <h2 id="rozhodnuti">Registr návrhových rozhodnutí</h2>
+      <p>Proč projekt vypadá, jak vypadá. Každý řádek je rozhodnutí, které se opakovaně vrací do
+      výkladu; sloupec <b>důsledek pro rozšiřovatele</b> je to, co si z něj musíš odnést, než začneš
+      měnit kód. Podrobná zdůvodnění (mechanismus, kdy přestane platit, cena) jsou ve zdůvodňovacích
+      blocích Dílů III–VI.</p>
+      <div class="tablewrap">
+      <table>
+        <tr><th>Rozhodnutí</th><th>Důvod</th><th>Odmítnutá alternativa</th><th>Důsledek pro toho, kdo rozšiřuje</th></tr>
+        <tr><td><b>Deterministický runtime</b> — žádný neuron v rozhodovací smyčce</td><td>Reprodukovatelnost a poctivost: stejná otázka dá vždy stejnou odpověď, systém při neznalosti mlčí místo halucinace.</td><td>Velký jazykový model v runtime — odpoví vždy plynule, ale při neznalosti si vymýšlí a není deterministický.</td><td>Nová funkce nesmí do rozhodovací smyčky vložit neuron ani náhodu. UDPipe 2 běží jen na rozbor, offline.</td></tr>
+        <tr><td><b>glow-orders-ties</b> — base rozhoduje, glow řadí remízu</td><td>Aktivace je asociativní a plošná; kdyby určovala pravdu, vyhrálo by nejteplejší, ne nejsprávnější slovo.</td><td>Řadit kandidáty čistě podle aktivace (světla) — bible s vysokým žárem přebíjí správnou, ale slabší odpověď.</td><td>Když přidáváš skórování, drž světlo jako rozhodčí remíz, ne jako hlavní kritérium. Base skóre musí zůstat primární.</td></tr>
+        <tr><td><b>VZOR místo karet</b> — strukturní šablona kolem pivotu</td><td>Jeden VZOR pokryje mnoho povrchových tvarů; ruční karty se neškálují a duplikují se s každou dimenzí.</td><td>Ručně psané karty per jev (systém parentu jellyai/) — kombinatorická exploze, těžká údržba.</td><td>Nový jazykový jev řeš rozšířením VZORu / rolového mapování, ne přidáním speciální karty.</td></tr>
+        <tr><td><b>Jazyk jako data</b> — <code>lang/cs.json</code>, nic natvrdo</td><td>Klíče jsou univerzální (UD deprel/pád), hodnoty české; nový jazyk = nový soubor bez zásahu do kódu.</td><td>České lemma / seznam napsané přímo v Pythonu — každý nový jazyk by znamenal fork zdrojáku.</td><td>Přidáváš-li slovo (vztahové, tázací, kvantifikátor), patří do <code>cs.json</code>, ne do <code>.py</code>.</td></tr>
+        <tr><td><b>Vztah jako hrana</b> — relation-extrakce jen pro kopulový vzor</td><td>„X je bratr Y" je hrana mezi entitami; kopulový vzor ji vytěží spolehlivě a s nulovou regresí.</td><td>Oblique / pronoun-genitiv a verbální vztahy — měřeno net-neutral (swap + šum) → vráceno; narážejí na entitní identitu.</td><td>Nové vztahové slovo přidej do <code>relation_nouns</code>/<code>symmetric_relations</code>; mimo kopulový vzor zatím čeká na node-based retrieval.</td></tr>
+        <tr><td><b>Brána vypnutá</b> — <code>gate_enabled=false</code></td><td>Naučená brána přeučuje na 76 vzorcích × 13 rysů (LOO −2 vs reálný běh −19 potlačených), víc škodí než pomáhá.</td><td>Nechat bránu zapnutou pro potlačení confident-wrong — v reálném běhu potlačí i správné odpovědi.</td><td>Assurance řeš prahy a strukturou (base/glow), ne doučováním brány, dokud nebude dost dat.</td></tr>
+        <tr><td><b>Entity z rysu NameType</b>, ne z NameTagu</td><td>NameTag lepil slepence („Ježíš Duchem"); NameType (Giv/Sur/Geo) + pádová shoda span drží čistě.</td><td>Brát entity z NameTagu — víceslovné slepence napříč pády kazí who-slot i otisk.</td><td>Osobní span drží jen souvislé tokeny shodného pádu; když ladíš entity, hlídej pádovou neshodu jako řez.</td></tr>
+        <tr><td><b>Shard per soubor</b> (#60 fragmentový graf)</td><td>Soubory se do grafu nahrávají dynamicky podle matche; jeden monolitický pickle by lazy-mount znemožnil.</td><td>Jeden velký pickle celého korpusu — nejde mountovat jen horké soubory, mechanismus se neškáluje na tisíce.</td><td>Nové úložiště (fakty, šablony, indexy) drž shardovatelné per doc, aby uneslo tisíce souborů.</td></tr>
+      </table>
+      </div>
+
+      <!-- ============================================================ -->
+      <h2 id="registr-otevrenych">Registr otevřených bodů</h2>
+      <p>Co v projektu není hotové, seřazeno podle <b>dopadu</b> (kolik chyb nebo kolik dalších bodů
+      to drží). Kategorie: <i>nedodělek</i> (má se dodělat), <i>známé omezení</i> (víme o něm, zatím
+      žije), <i>vědomé provizorium</i> (dočasné řešení), <i>směr</i> (nerozhodnutá cesta). Rozbor
+      každého bodu — proč nevyřešeno a jaké cesty vedou ven — je v Dílu VIII.</p>
+      <div class="tablewrap">
+      <table>
+        <tr><th>Bod</th><th>Kategorie</th><th>Dopad</th><th>Blokuje</th><th>Kde</th></tr>
+        <tr><td><b>Node-based retrieval</b> — entita = uzel s fakt-hranami</td><td>nedodělek / směr</td><td>vysoký</td><td>R.U.R./doména, rozpad jmen, relation zbytek</td><td>Díl VIII, FÁZE-1 odd. F</td></tr>
+        <tr><td><b>Temporal 36 %</b> — datumy v běžném textu mimo bio-závorku</td><td>nedodělek</td><td>vysoký</td><td>—</td><td>Díl VIII, <code>chronos.py</code></td></tr>
+        <tr><td><b>Relation zbytek</b> — verb-vztahy, oblique, pronoun-genitiv</td><td>nedodělek</td><td>střední</td><td>čeká na node-based (entitní identita)</td><td>Díl VIII, <code>extract_relations.py</code></td></tr>
+        <tr><td><b>R.U.R. / doména</b> — tokenizace R/U/R → mount bible</td><td>známé omezení</td><td>střední</td><td>čeká na node-based</td><td>Díl VIII, 4.5, <code>annotate_corpus</code></td></tr>
+        <tr><td><b>Bible plošně znečišťuje mount</b> — co-mount i pro cizí dotaz</td><td>známé omezení</td><td>střední</td><td>—</td><td>Díl VIII, <code>dataloader.select_files</code></td></tr>
+        <tr><td><b>Naučená brána přeučuje</b> na 76 vzorcích</td><td>vědomé provizorium</td><td>nízký (vypnutá)</td><td>—</td><td>Díl V, Díl VIII, <code>gate.json</code></td></tr>
+        <tr><td><b>VZOR-síť do šířky r přes věty</b> — uzavřená smyčka fact↔query↔answer</td><td>směr / nerozhodnuto</td><td>nízký</td><td>—</td><td>Díl VIII</td></tr>
+        <tr><td><b>Mnemos — zápis</b> (uživatel učí systém fakty)</td><td>nedodělek</td><td>nízký</td><td>—</td><td>Díl VIII</td></tr>
+      </table>
+      </div>
+
+      <!-- ============================================================ -->
+      <h2 id="overeni">Tabulka ověření</h2>
+      <p>Každé tvrzení v knize nese značku důvěry. Tady je jejich soupis s důkazem: <b>Ověřeno</b> =
+      někdo to spustil a výstup souhlasí (nebo to hlídá test); <b>Převzato</b> = odpovídá kódu/měření,
+      ale v této podobě nespuštěno teď; <b>Návrh</b> = nápad, neověřeno. Datum a prostředí říkají, za
+      jakých podmínek důkaz vznikl — čísla platí ke commitu <code>d20a5ec</code>.</p>
+      <div class="tablewrap">
+      <table>
+        <tr><th>Postup / tvrzení</th><th>Značka</th><th>Jak ověřeno</th><th>Prostředí</th><th>Datum</th><th>Odkaz</th></tr>
+        <tr><td>Velký etalon 63/145 = 43 %, confident-wrong 30</td><td><span class="mark mark-overeno">Ověřeno</span></td><td><code>python3 eval_large.py</code>, mode-aware skóre po kategoriích</td><td>lokálně, UDPipe 2 :8092</td><td>2026-07-24</td><td><code>gold_large.json</code>, <code>baseline_large.json</code></td></tr>
+        <tr><td>Malý etalon 18/25 = 72 % (HIT 18, WRONG 2, CLARIFY 4, NO_QVZOR 1)</td><td><span class="mark mark-overeno">Ověřeno</span></td><td><code>python3 eval_answers.py</code>, fázová diagnostika</td><td>lokálně, UDPipe 2 :8092</td><td>2026-07-24</td><td><code>gold_answers.json</code>, <code>baseline_answers.json</code></td></tr>
+        <tr><td>„Kdo je Karel Čapek? → spisovatel"</td><td><span class="mark mark-overeno">Ověřeno</span></td><td>běh <code>ask.py</code>, jeden tah (session)</td><td>lokálně, UDPipe 2 :8092</td><td>2026-07-24</td><td><code>ask.py</code>, Díl IV.1</td></tr>
+        <tr><td>„Kdy se narodil? → 1890" (řetězení kontextu na předchozí tah)</td><td><span class="mark mark-overeno">Ověřeno</span></td><td>navazující tah v <code>ask.py</code> (carry_context)</td><td>lokálně, UDPipe 2 :8092</td><td>2026-07-24</td><td><code>ask.py</code></td></tr>
+        <tr><td>„Kdo napsal Švejka? → Hašek", „Kdo napsal Babičku? → Němcová"</td><td><span class="mark mark-overeno">Ověřeno</span></td><td>běh <code>ask.py</code></td><td>lokálně, UDPipe 2 :8092</td><td>2026-07-24</td><td><code>ask.py</code></td></tr>
+        <tr><td>„Je pes šelma? → ano", „Je kůň šelma? → ne" (polární smyčka)</td><td><span class="mark mark-overeno">Ověřeno</span></td><td>běh <code>ask.py</code>, polární režim</td><td>lokálně, UDPipe 2 :8092</td><td>2026-07-24</td><td><code>ask.py</code></td></tr>
+        <tr><td>„Kdo byl bratr Karla Čapka? → Josef" (vztah = hrana)</td><td><span class="mark mark-overeno">Ověřeno</span></td><td>běh <code>ask.py</code>, kopulový relation vzor</td><td>lokálně, UDPipe 2 :8092</td><td>2026-07-24</td><td><code>extract_relations.py</code></td></tr>
+        <tr><td>Kostra knihy + Mermaid diagram se vykreslí z <code>file://</code> bez sítě</td><td><span class="mark mark-overeno">Ověřeno</span></td><td>otevření <code>dil-4-1-dialogovy-automat.html</code> v prohlížeči (potvrdil uživatel)</td><td>prohlížeč, <code>file://</code>, offline</td><td>2026-07-23</td><td>FÁZE-2 odd. 7</td></tr>
+        <tr><td>Naučená brána: LOO-CV přesnost 68.8 %, práh 0.30 → −13 confident-wrong / −3 správné</td><td><span class="mark mark-prevzato">Převzato</span></td><td>LOO sweep nad 77 answer-mode případy</td><td>lokálně, offline trénink</td><td>—</td><td><code>train_gate.py</code>, <code>gate.json</code></td></tr>
+        <tr><td>NN router pilot: 75.9 % vs 17.2 % (majorita), 20 strukturních rysů</td><td><span class="mark mark-prevzato">Převzato</span></td><td><code>python3 nn_pilot.py</code>, leave-one-out CV</td><td>lokálně, offline trénink</td><td>—</td><td><code>nn_pilot.py</code></td></tr>
+        <tr><td>Oracle routing-strop: +4 PASS / −6 confident-wrong (routing je minor páka)</td><td><span class="mark mark-prevzato">Převzato</span></td><td>oracle horní odhad nad velkým etalonem</td><td>lokálně, UDPipe 2 :8092</td><td>—</td><td>Díl V.5</td></tr>
+        <tr><td>SELHÁNÍ: „Kdo objevil mloky? → kapitán" (má být Van Toch)</td><td><span class="mark mark-overeno">Ověřeno</span></td><td>běh <code>ask.py</code>; třída relation 4/18</td><td>lokálně, UDPipe 2 :8092</td><td>2026-07-24</td><td><code>eval_large.py</code> (relation)</td></tr>
+        <tr><td>SELHÁNÍ: „Co je R.U.R.? → doptání/bůh" (tokenizace R/U/R → mount bible)</td><td><span class="mark mark-overeno">Ověřeno</span></td><td>běh <code>ask.py</code>; doménová záměna</td><td>lokálně, UDPipe 2 :8092</td><td>2026-07-24</td><td>N2, Díl VIII</td></tr>
+        <tr><td>SELHÁNÍ: „Kdo postavil archu? → bůh" (honest-negative selhalo hádáním)</td><td><span class="mark mark-overeno">Ověřeno</span></td><td>běh <code>ask.py</code></td><td>lokálně, UDPipe 2 :8092</td><td>2026-07-24</td><td>Díl IV.1 „Co nefunguje"</td></tr>
+      </table>
+      </div>
+
+      <!-- ============================================================ -->
+      <h2 id="matice-tvaru">Matice tvarů dat</h2>
+      <p>Jazyk přichází v mnoha tvarech — táž věc napsaná jinak. Tabulka rozděluje tvary do tříd a
+      u každé říká, co má systém dělat a jestli to <b>pokrývá</b> (ano / částečně / ne). Nepokryté
+      třídy jsou ponechány záměrně: ukazují, kde jsou testy tenké a kde hrozí tichá chyba. Podklad
+      pro Díl V.3.</p>
+      <div class="tablewrap">
+      <table>
+        <tr><th>Třída tvaru</th><th>Příklad</th><th>Očekávané chování</th><th>Pokryto</th></tr>
+        <tr><td><b>Tvarosloví</b> — skloňování, časování</td><td>Čapek / Čapka / Čapkovi; narodil / narození</td><td>Kanonizace na lemma (canon_lemma), epentetický fold PROPN, alias merge — match nezávisí na tvaru.</td><td>ano <span class="mark mark-prevzato">Převzato</span> (copula 16/21)</td></tr>
+        <tr><td><b>Formulační variace</b> — parafráze otázky</td><td>„Kdy se narodil…" vs „V kterém roce se narodil…" vs „Narození Karla Čapka?"</td><td>Táž odpověď napříč parafrázemi (VZOR nad povrchem).</td><td>částečně (8/14 skupin konzistentních)</td></tr>
+        <tr><td><b>Pravopis / diakritika</b> — chybějící háčky, překlepy</td><td>„Capek" bez háčků, drobný překlep v dotazu</td><td>Robustní rozbor by měl dojít k témuž lemmatu.</td><td>ne (neměřeno — samostatný test chybí)</td></tr>
+        <tr><td><b>Znaky / zkratky</b> — tečkované zkratky, uvozovky, závorky</td><td>„R.U.R.", „T. G. Masaryk", biografická závorka, uvozený citát</td><td>Merge tečkovaných zkratek na korpus, filtr iniciál, vytěžení bio-závorky.</td><td>částečně (merge na korpus ano; na živý dotaz revertnuto — N2; iniciály filtrovány)</td></tr>
+        <tr><td><b>Členění / segmentace</b> — hranice vět, víceřádkový vstup</td><td>Dlouhý dokument, věty přes odstavce</td><td>UDPipe 2 segmentuje; data se posílají přes soubor (ne inline), batch_chars 40000.</td><td>ano <span class="mark mark-prevzato">Převzato</span> (past inline -F ořezu na ~485 znaků ošetřena)</td></tr>
+        <tr><td><b>Slovní zásoba</b> — synonyma, slova mimo korpus</td><td>bratr / sourozenec; kvantifikátor „množství"; entita mimo data</td><td>Vztahová slova a kvantifikátory z <code>cs.json</code>; slovo mimo korpus → honest-negative (mlčení).</td><td>částečně (honest-negative 7/7; synonymie omezená)</td></tr>
+        <tr><td><b>Rozsah / škála</b> — letopočty, počty, velikost sady</td><td>rok 1890; „Kolik měla dětí?"; 145 otázek, 52 souborů</td><td>Chronos uzná rok v [1000, 2100]; počty jako vlastnost situace.</td><td>ne / částečně (temporal 9/25, count 0/7)</td></tr>
+      </table>
+      </div>
+
+      <!-- ============================================================ -->
+      <h2 id="pokryti">Pokrytí staré dokumentace</h2>
+      <p>Kniha nahrazuje 24 HTML souborů v původním <code>docs/</code>. Přebírá se <b>obsah</b>, ne
+      forma — pořadí ani formulace se nepřenášejí. Tabulka říká, kam se věcné jádro každého starého
+      souboru přesunulo, a upozorňuje na stálost (co je aktuální a co bylo v rozporu s kódem).
+      Převzato z FÁZE-1 odd. B.</p>
+      <div class="tablewrap">
+      <table>
+        <tr><th>Starý soubor</th><th>Kam v nové knize</th><th>Poznámka (stálost)</th></tr>
+        <tr><td><code>index.html</code></td><td>Díl I (přepis)</td><td>aktuální</td></tr>
+        <tr><td><code>stav.html</code></td><td>Díl I + Díl V (čísla) + Díl VIII</td><td>aktuální (nejnovější metriky)</td></tr>
+        <tr><td><code>dialogovy-automat.html</code></td><td>Díl IV</td><td>aktuální, jádro konceptu (flagship)</td></tr>
+        <tr><td><code>aktivace-dialog.html</code></td><td>Díl IV + 4.5</td><td>aktuální</td></tr>
+        <tr><td><code>vzor-matcher.html</code></td><td>Díl IV + Díl III (VZOR fáze)</td><td>aktuální</td></tr>
+        <tr><td><code>faze-1-preprocessing.html</code></td><td>Díl III fáze 1–2</td><td>aktuální</td></tr>
+        <tr><td><code>faze-2-dataloader.html</code></td><td>Díl III fáze indexace</td><td>ověřit doplnění subject/doclink/alias</td></tr>
+        <tr><td><code>faze-3-grammar.html</code></td><td>Díl III fáze gramatika</td><td>aktuální</td></tr>
+        <tr><td><code>faze-4-synthesis.html</code></td><td>Díl III fáze syntéza</td><td>ověřit doplnění bio/relations/chronos</td></tr>
+        <tr><td><code>faze-5-queryparser.html</code></td><td>Díl III fáze inference + Díl IV</td><td>doplněno carry_context, polar, gate, relations</td></tr>
+        <tr><td><code>naucene-smerovani.html</code></td><td>Díl IV + Díl VIII</td><td>aktuální</td></tr>
+        <tr><td><code>aliasy-identita.html</code></td><td>Díl IV</td><td>aktuální</td></tr>
+        <tr><td><code>koreference.html</code></td><td>Díl III / IV</td><td>ověřit proti <code>fill_holes</code></td></tr>
+        <tr><td><code>koreference-do-faktu.html</code></td><td>Díl III fáze syntéza</td><td>aktuální</td></tr>
+        <tr><td><code>diry.html</code></td><td>Díl IV slovník / koncept</td><td>ověřit</td></tr>
+        <tr><td><code>dynamicke-nahravani.html</code></td><td>Díl III + Díl IV</td><td>aktuální koncept (#60)</td></tr>
+        <tr><td><code>anotacni-cache.html</code></td><td>Díl III fáze 1–2</td><td>aktuální</td></tr>
+        <tr><td><code>externi-zdroje.html</code></td><td>Díl I slovník + Díl II</td><td>ověřit Ollama (živé?)</td></tr>
+        <tr><td><code>terminy.html</code></td><td>Díl I slovník (rozšířit)</td><td>základ slovníku</td></tr>
+        <tr><td><code>pouziti.html</code></td><td>Díl II + Díl VI</td><td>aktuální</td></tr>
+        <tr><td><code>fuze.html</code></td><td>Díl IV zdůvodnění + Díl VIII</td><td>historický kontext</td></tr>
+        <tr><td><code>otevrene-otazky.html</code></td><td>Díl VIII (přepsat)</td><td>ZASTARALÉ (tvrdí 64 %, staré priority) → rozpor s kódem</td></tr>
+        <tr><td><code>k-doreseni.html</code></td><td>Díl VIII registr</td><td>ověřit aktuálnost</td></tr>
+        <tr><td><code>napady.html</code></td><td>Díl VIII možné cesty</td><td>ověřit aktuálnost</td></tr>
+      </table>
+      </div>
+      <p>Rozpor kód × dokumentace: <code>otevrene-otazky.html</code> tvrdí 64 %, kód dnes dává velký
+      etalon 43 % a malý 72 %; <code>k-doreseni.html</code> a <code>napady.html</code> mohou obsahovat
+      už vyřešené body. Vše patří do Dílu VIII jako rozpor, ne do výkladu jako fakt.</p>
+
+      <div class="pager">
+        <a href="dil-8.html"><span class="dir">← předchozí</span>Díl VIII — Otevřené body</a>
+        <span></span>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

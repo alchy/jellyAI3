@@ -1,0 +1,504 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Díl V — Testování jazykového modelu — hypothesis-one</title>
+<link rel="stylesheet" href="assets/style.css">
+<script defer src="assets/mermaid.min.js"></script>
+<script defer src="assets/script.js"></script>
+<style>
+  /* vodorovné pruhy pro rozpad po kategoriích (V.6) — self-contained */
+  .bars { list-style: none; margin: 0 0 1.2rem; padding: 0; max-width: 100%; }
+  .bars li { display: grid; grid-template-columns: 9.5rem 1fr 3.4rem;
+    align-items: center; gap: .6rem; margin: .3rem 0; }
+  .bars .lab { font-family: var(--mono); font-size: .76rem; color: var(--muted); text-align: right; }
+  .bars .track { background: var(--code-bg); border: 1px solid var(--line);
+    border-radius: 6px; height: 1.15rem; overflow: hidden; }
+  .bars .fill { height: 100%; background: var(--accent); border-radius: 6px 0 0 6px; }
+  .bars .fill.zero { background: transparent; }
+  .bars .val { font-family: var(--mono); font-size: .76rem; text-align: right;
+    font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+<div class="layout">
+
+  <aside class="sidebar">
+    <p class="brand"><a href="index.html">hypothesis-one</a></p>
+    <p class="tag">knižní dokumentace</p>
+    <nav aria-label="Obsah knihy">
+      <a href="index.html">Úvod</a>
+      <p class="part">Díl I — Než začneme</p><a href="dil-1.html">I · Co řeší, slovník, mapa</a>
+      <p class="part">Díl II — První kroky</p><a href="dil-2.html">II · Instalace, běh, data</a>
+      <p class="part">Díl III — Cesta dat</p><a href="dil-3.html">III · Fáze pipeline</a>
+      <p class="part">Díl IV — Jak to funguje</p><a href="dil-4.html">IV · Automat, aktivace, fakty</a>
+      <p class="part">Díl V — Testování</p><a href="dil-5.html" class="active">V · Testy, tvary, měření</a>
+      <p class="part">Díl VI — Rozšiřování</p><a href="dil-6.html">VI · Data, vztahy, testy</a>
+      <p class="part">Díl VII — Provoz</p><a href="dil-7.html">VII · UDPipe, viz, pasti</a>
+      <p class="part">Díl VIII — Otevřené body</p><a href="dil-8.html">VIII · Nedodělky a cesty</a>
+      <p class="part">Přílohy</p><a href="prilohy.html">Rejstřík, konfigurace, registry</a>
+    </nav>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <button class="iconbtn" id="theme-toggle" type="button" aria-label="Přepnout světlý/tmavý režim">◐ režim</button>
+    </div>
+    <div class="content">
+      <nav class="crumbs"><a href="index.html">Úvod</a> › Díl V</nav>
+      <p class="eyebrow">Díl V — Testování jazykového modelu</p>
+      <h1>Díl V — Testování jazykového modelu</h1>
+
+      <p class="lead">Kde jsme a kam jdeme: v Dílu IV jsi viděl, jak systém odpovídá — světlo
+      rozsvítí kontext, vzor ho doostří na kandidáty a míra jistoty rozhodne mezi odpovědí,
+      doptáním a poctivým mlčením. Teď přijde otázka, kterou si klade každý inženýr: <b>jak vůbec
+      poznáme, že to funguje?</b> Ukáže se, že obvyklý reflex — napsat <code>assert vysledek == "spisovatel"</code>
+      — u jazyka selhává, a že místo jedné rovnosti musíme měřit <b>rozdělení výsledků přes celou
+      sadu otázek</b> a hlídat, kudy se to rozdělení posouvá v čase.</p>
+
+      <h2 id="5-1">V.1 Proč nelze testovat rovností</h2>
+      <p>U běžné funkce je test snadný: <code>secti(2, 3)</code> se má rovnat <code>5</code>, a když
+      se nerovná, test spadne. Tenhle vzorec „přesný vstup → přesná hodnota → porovnej
+      rovností" je páteří většiny testů, na které jsi zvyklý. Jazykový systém ho ale <b>nesplňuje</b>,
+      a to ze tří nezávislých důvodů. Projdeme si je a u každého uvidíš, čím se testuje místo rovnosti.</p>
+
+      <p><b>1 — Odpověď je rozdělení, ne jedna hodnota.</b> Táž skutečnost je v textu i ve výstupu
+      zapsaná pokaždé jinak. Na otázku „Kde se narodil Karel Čapek?" je stejně správně „Svatoňovice",
+      „Malé Svatoňovice" i „v Malých Svatoňovicích". Kdybys porovnával rovností, jediný přijatelný
+      tvar by prošel a všechny ostatní by test označil za chybu — přestože jsou správné. Proto etalon
+      (soubor <code>gold_answers.json</code>) neuvádí u otázky <i>jednu</i> odpověď, ale <b>seznam
+      přijatelných povrchů</b>, a porovnávací funkce <code>accept()</code> hlásí shodu, když se
+      vrácené slovo některému z nich rovná <i>nebo je jeho podřetězcem</i> (v obou směrech). „Čapek"
+      tak sedí na očekávané „Karel Čapek" a naopak.</p>
+
+      <p><b>2 — Vstup není plně deterministický.</b> Vnitřek systému sice deterministický je —
+      symbolická část dá na stejná data vždy stejný výsledek — ale rozbor otázky prochází přes
+      <b>UDPipe 2</b>, živou neuronovou službu na síti (viz <a href="dil-1.html#slovnik">slovníček</a>).
+      Její verze i dostupnost se mohou změnit, a s nimi i to, jak přesně se otázka rozloží na slovní
+      druhy a závislosti. Test proto nesmí fixovat vnitřní mezikrok na konkrétní řetězec; drží se
+      až <b>konečného chování na celé sadě</b>, kde občasný posun jednoho rozboru zapadne do čísla
+      za mnoha otázkami.</p>
+
+      <p><b>3 — Změny se projeví postupnou degradací, ne jedním pádem.</b> Když upravíš pravidlo
+      v symbolickém jádru, nezmění se jeden výsledek, ale <b>rozložení desítek</b>. Typicky jeden
+      případ opravíš a tři jiné rozbiješ — a někdy naopak. Jediný <code>assert</code> takový posun
+      neuvidí: buď zůstane zelený, i když se celkově zhoršilo, nebo zčervená na věci, která je ve
+      skutečnosti v pořádku. Proto se sleduje <b>míra úspěšnosti přes celou sadu</b> a její
+      <b>křivka v čase</b> (v tomto projektu 33 → 40 → 43 %, viz <a href="#5-6">V.6</a>).</p>
+
+      <p>K tomu se přidává čtvrtá věc, kterou rovnost úplně přehlíží: <b>ne každá chyba je stejně
+      zlá</b>. Odpověď, kterou systém vydá sebevědomě jako fakt a je špatná, je horší než poctivé
+      „to nevím" — protože zní jako odpověď a uvěříš jí. Testy proto neměří jen „sedí hodnota?",
+      ale i <b>režim</b>, ve kterém systém odpověděl (odpověď / doptání / mlčení). Tomuhle se říká
+      <i>mode-aware</i> skórování a vrátíme se k němu v <a href="#5-5">V.5</a>.</p>
+
+      <div class="tablewrap">
+      <table>
+        <tr><th>Překážka</th><th>Jak se projeví</th><th>Čím se testuje místo rovnosti</th></tr>
+        <tr>
+          <td>Rozdělení místo jedné hodnoty</td>
+          <td>táž odpověď má víc správných zápisů („Čapek" / „Karel Čapek" / „v Malých Svatoňovicích")</td>
+          <td>seznam přijatelných povrchů + shoda přes <code>accept()</code> (rovnost <i>nebo</i> podřetězec v obou směrech)</td>
+        </tr>
+        <tr>
+          <td>Nedeterminismus vstupu</td>
+          <td>rozbor otázky jde přes UDPipe 2 (živá síťová služba); verze a dostupnost kolísají</td>
+          <td>měří se konečné chování na celé sadě, ne fixace vnitřního mezikroku; každý tah běží nad čistým polem</td>
+        </tr>
+        <tr>
+          <td>Postupná degradace</td>
+          <td>jedna změna posune desítky případů (jeden opraví, tři rozbije)</td>
+          <td>míra úspěšnosti přes sadu + křivka v čase (33 → 40 → 43 %) jako regresní kotva</td>
+        </tr>
+        <tr>
+          <td>Ne každá chyba je stejná</td>
+          <td>sebevědomě špatná odpověď je horší než mlčení</td>
+          <td>mode-aware skórování: hodnotí se i <b>režim</b> odpovědi, ne jen její obsah</td>
+        </tr>
+      </table>
+      </div>
+
+      <h3>Co nefunguje a proč</h3>
+      <p>První nápad nováčka je napsat přímý test rovnosti: <code>assert answer("Kdo je Karel Čapek?") == "spisovatel"</code>.
+      Selže to tiše a zákeřně. Za prvé projde jen u jedné formulace a jednoho tvaru odpovědi — jakmile
+      systém vrátí „spisovatel." s tečkou, „český spisovatel" nebo lemma podmětu, test zčervená na
+      správné odpovědi. Za horší je ale druhá past: takový test <b>nevidí regrese jinde</b>. Zůstane
+      zelený, i když se dvacet jiných otázek mezitím pokazilo — protože měří jeden bod, ne rozdělení.
+      Falešný pocit jistoty z jednoho zeleného assertu je nebezpečnější než žádný test.</p>
+
+      <h2 id="5-2">V.2 Patra testů</h2>
+      <p>Testy se dají rozvrstvit podle toho, jakou otázku kladou — od „dělá jedna funkce, co má?"
+      až po „vydrží to velký a škaredý vstup?". Následující tabulka projde šest obvyklých pater a
+      u každého <b>poctivě</b> uvádí, jak na tom hypothesis-one dnes je. Rovnou upozorňuji: obraz
+      není růžový. Projekt má jen tenká jednotková patra a silná patra metrická a regresní přes
+      etalony; tři patra <b>chybí úplně</b> a jsou vedena jako otevřený bod (viz <a href="dil-8.html">Díl VIII</a>).</p>
+
+      <div class="tablewrap">
+      <table>
+        <tr><th>Patro</th><th>Otázka, na kterou odpovídá</th><th>Stav v hypothesis-one</th></tr>
+        <tr>
+          <td><b>Jednotkové</b></td>
+          <td>Dělá jedna třída či funkce na jasném vstupu přesně to, co má?</td>
+          <td><span class="mark mark-prevzato">Převzato</span> tenké: <code>test_phase1.py</code> (6 testů — Standardizer, VzorBuilder, Curator, konfig z JSON) a <code>test_determiner.py</code> (5 testů — provenience, miss→candidate, kuratela přebíjí, žádný zápis na disk, persistence). Celkem 11 testů nad reálnou větou z cache.</td>
+        </tr>
+        <tr>
+          <td><b>Smluvní</b></td>
+          <td>Drží se rozhraní mezi moduly dohodnutého tvaru (co jeden vrací, druhý čeká)?</td>
+          <td><span class="todo">CHYBÍ</span> — např. že <code>answer()</code> vrací vždy trojici <code>{answer, mode, offer}</code> a že fakt nese provenienci <code>(doc, sent)</code>, se dnes nehlídá vlastním testem.</td>
+        </tr>
+        <tr>
+          <td><b>Vlastnostní</b></td>
+          <td>Platí invariant pro <i>náhodně</i> generované vstupy (ne jen pro ručně vybrané)?</td>
+          <td><span class="todo">CHYBÍ</span> — invarianty typu „stejný vstup → stejný výstup" nebo „prázdný vstup nikdy neshodí program" nejsou pokryté generovaným testem.</td>
+        </tr>
+        <tr>
+          <td><b>Metrické</b></td>
+          <td>Jaká je úspěšnost přes celou sadu — a <i>která</i> třída otázek propadá?</td>
+          <td><span class="mark mark-prevzato">Převzato</span> nese hlavní tíhu: <code>eval_large.py</code> (145 otázek, rozpad po kategoriích), <code>eval_answers.py</code> (25 otázek, rozpad po fázích) a <code>eval_coref.py</code> (koreference).</td>
+        </tr>
+        <tr>
+          <td><b>Regresní</b></td>
+          <td>Zlepšila, nebo zhoršila poslední změna číslo oproti minule?</td>
+          <td><span class="mark mark-prevzato">Převzato</span> přes commitnuté výstupy <code>baseline_large.json</code> a <code>baseline_answers.json</code>; posun se čte jako křivka (33 → 40 → 43 %, confident-wrong 35 → 30).</td>
+        </tr>
+        <tr>
+          <td><b>Zátěžové</b></td>
+          <td>Vydrží to velmi velký nebo záměrně škaredý vstup — a jak je to rychlé?</td>
+          <td><span class="todo">CHYBÍ</span> — hraniční a objemné vstupy (prázdno, samá interpunkce, dlouhý odstavec) nemají vlastní test ani měření času.</td>
+        </tr>
+      </table>
+      </div>
+
+      <p class="full">Na diagramu hledej dvě skupiny: co v projektu <b>dnes žije</b> (levý sloupec —
+      jednotkové, metrické, regresní) a co <b>chybí</b> (pravý sloupec). Šipky vedou od jednotkových
+      přes metrické k regresním, protože v tomto pořadí se v projektu i skutečně používají.</p>
+
+<pre class="mermaid">
+flowchart TD
+  accTitle: Patra testů hypothesis-one
+  accDescr: Šest pater testů. V projektu dnes žijí jednotková (tenká), metrická a regresní přes etalony; smluvní, vlastnostní a zátěžové patro chybí a jsou vedeny jako otevřený bod.
+  subgraph ZIVE["Dnes v projektu"]
+    U["Jednotkové · test_phase1 + test_determiner (11 testů)"]
+    M["Metrické · eval_large 145 / eval_answers 25 / eval_coref"]
+    R["Regresní · baseline_*.json (křivka 33 az 43 %)"]
+  end
+  subgraph CHYBI["Chybí — otevřený bod (Díl VIII)"]
+    S["Smluvní · tvar rozhraní mezi moduly"]
+    P["Vlastnostní · invarianty nad náhodným vstupem"]
+    Z["Zátěžové · velký a škaredý vstup, rychlost"]
+  end
+  U --> M --> R
+</pre>
+
+      <p>Slovně: jednotkové testy chytnou <b>hrubou chybu</b> v jedné třídě hned (rozbil jsi
+      <code>VzorBuilder</code>, spadne <code>test_phase1.py</code>). Metrická patra pak měří, jak si
+      celý řetězec vede na reálných otázkách, a regresní patra to číslo zafixují, aby ho příští
+      změna nezhoršila potajmu. Zbylá tři patra by chytila jinou třídu problémů — rozpadlé rozhraní,
+      porušený invariant, pád na velkém vstupu — ale ta dnes nikdo nehlídá.</p>
+
+      <aside class="rationale">
+        <span class="lbl">Zdůvodňovací blok</span>
+        <dl>
+          <dt>Rozhodnutí</dt><dd>Hlavní testovací tíhu nesou <b>etalony</b> (metrické + regresní patro), ne pyramida jednotkových testů.</dd>
+          <dt>Problém</dt><dd>Chování systému je emergentní: vzniká souhrou rozsvícení, vzoru a míry jistoty nad reálnými daty. Jednotkový test jedné funkce o kvalitě odpovědí neřekne skoro nic, protože chyba bývá v <i>souhře</i>, ne v jednom kroku.</dd>
+          <dt>Mechanismus</dt><dd>Etalon položí systému desítky reálných otázek, oskóruje je mode-aware a vydá jedno číslo plus rozpad po kategoriích. Commitnutý <code>baseline_*.json</code> pak slouží jako kotva: příští změna se poměří proti němu a hned je vidět, co se pohnulo a kterým směrem.</dd>
+          <dt>Zvažované alternativy</dt><dd><b>Hustá síť jednotkových testů na každou funkci:</b> byla by zelená, i když kvalita odpovědí klesá, protože neměří souhru — falešná jistota. <b>Ruční překlikání pár otázek po každé změně:</b> nereprodukovatelné, nezachytí tichou degradaci ve třídě otázek, které sis zrovna nevšiml.</dd>
+          <dt>Kdy to přestane platit</dt><dd>Až sada naroste a jednotlivé fáze se ustálí, vyplatí se doplnit chybějící patra (smluvní pro rozhraní, zátěžové pro hraniční vstupy). Signál: regrese, kterou etalon <i>chytí</i>, ale <i>neumí lokalizovat</i> do modulu.</dd>
+          <dt>Cena</dt><dd>Etalon vyžaduje běžící UDPipe 2 a je pomalejší než jednotkový test; a protože měří souhru, řekne <i>že</i> se něco zhoršilo, ale ne vždy <i>kde</i> — hledání příčiny pak padá na člověka.</dd>
+        </dl>
+      </aside>
+
+      <h2 id="5-3">V.3 Matice tvarů dat</h2>
+      <p>Tady je jádro testovací rozvahy. U běžného programu je vstup pár typů (číslo, řetězec,
+      seznam). U jazyka je vstupem <b>věta</b>, a táž věta — dokonce týž význam — se dá napsat
+      nepřebernou spoustou tvarů: v jiném pádě, bez diakritiky, kapitálkami, s jinou pomlčkou, se
+      zkratkou. <b>Matice tvarů dat</b> vypisuje osy, po kterých se vstup mění, a u každé říká, co
+      by se <i>mělo</i> stát a jestli to dnes něco hlídá. Je to současně mapa toho, co systém umí,
+      i seznam děr, kam ještě žádný test nesvítí.</p>
+
+      <p>Rovnou upozornění: sloupec „pokryto" je většinou <b>NEPOKRYTO</b>. Cílené testy tvarů dat
+      v projektu zatím nejsou — některé tvary systém zvládá <i>nepřímo</i> (třeba pády díky
+      lemmatizaci v UDPipe), ale nikdo to neověřuje záměrným testem. Ty řádky, kde tvar systém
+      dokonce <b>rozbíjí</b>, jsou označené zvlášť.</p>
+
+      <div class="tablewrap">
+      <table>
+        <tr><th>Třída tvaru</th><th>Co obnáší</th><th>Příklad</th><th>Očekávané chování</th><th>Pokryto</th></tr>
+        <tr>
+          <td><b>Tvarosloví</b><br>(pády, vid, zápor)</td>
+          <td>totéž slovo v jiném pádě, sloveso v jiném vidu, tvrzení proti popření</td>
+          <td>„Karla Čapka" vs „Karel Čapek"; „napsal" vs „psát"; „je" vs „není"</td>
+          <td>tvary se srovnají na lemma; porovnává se lemma, ne povrch; zápor se nesmí splést s tvrzením</td>
+          <td>nepřímo (lemmatizace UDPipe + <code>accept()</code>); <span class="todo">bez cíleného testu</span></td>
+        </tr>
+        <tr>
+          <td><b>Pravopis</b><br>(bez diakritiky, KAPITÁLKY)</td>
+          <td>vstup bez háčků a čárek nebo celý velkými písmeny</td>
+          <td>„kdo je karel capek"; „KAREL ČAPEK"</td>
+          <td>malá/velká písmena sjednotit; text bez diakritiky rozpoznat jako totéž slovo</td>
+          <td><span class="todo">NEPOKRYTO</span> — reálné riziko</td>
+        </tr>
+        <tr>
+          <td><b>Znaky</b><br>(unicode, mezery)</td>
+          <td>neviditelné rozdíly ve znacích: nezlomitelná mezera, různé pomlčky a uvozovky, dvojité mezery</td>
+          <td>„9.&nbsp;ledna"; pomlčka <code>–</code> vs <code>-</code>; „1890&nbsp;–&nbsp;1938"</td>
+          <td>sjednotit na kanonický znak, aby tokenizace nezávisela na tom, kterou pomlčku pisatel použil</td>
+          <td><span class="todo">NEPOKRYTO</span></td>
+        </tr>
+        <tr>
+          <td><b>Členění</b><br>(zkratky s tečkou, číslovky)</td>
+          <td>tečka, která <i>není</i> koncem věty; řadové číslovky s tečkou</td>
+          <td><b>„R.U.R."</b>; „9. ledna"; „č. 1"</td>
+          <td>tečka ve zkratce nesmí ukončit větu ani rozdělit „R.U.R." na tři tokeny</td>
+          <td><span class="todo">SELHÁVÁ</span> — sloučení zkratek opraveno na korpus, ale na <i>živý dotaz</i> revertnuto (regrese); „R.U.R." se láme na R/U/R a mountuje bibli</td>
+        </tr>
+        <tr>
+          <td><b>Slovní zásoba</b></td>
+          <td>slova mimo korpus; synonyma tázacích slov; překlepy</td>
+          <td>„Kdo napsal Hamleta?" (není v datech); „autor" vs „napsal"</td>
+          <td>na fakt mimo korpus poctivě mlčet (nehádat); parafráze téhož faktu dát tentýž výsledek</td>
+          <td>měřeno: honest-negative 7/7, formulační robustnost 8/14 skupin</td>
+        </tr>
+        <tr>
+          <td><b>Rozsah</b><br>(prázdný, dlouhý)</td>
+          <td>hraniční délky: prázdno, samá interpunkce, velmi dlouhý vstup, jedno slovo bez otázky</td>
+          <td>„"; „???"; celý odstavec; „Čapek"</td>
+          <td>prázdno → mlčení / NO_QVZOR, nikdy pád; dlouhý vstup zpracovat bez zamrznutí</td>
+          <td><span class="todo">NEPOKRYTO</span> — režim NO_QVZOR existuje, ale hraniční tvary nemají test</td>
+        </tr>
+      </table>
+      </div>
+
+      <p>Proč na každé ose záleží, konkrétně:</p>
+      <p><b>Tvarosloví.</b> Čeština ohýbá jméno v každém pádě. Kdyby se porovnávaly povrchy, „Karla
+      Čapka" (genitiv v otázce) by se nikdy netrefilo do „Karel Čapek" (nominativ v textu) a systém
+      by neodpověděl vůbec nic. Proto se všechno srovnává na <b>lemma</b> (základní tvar) a etalon
+      pracuje s lemmaty. Zvláštní pozor si žádá <b>zápor</b>: „Je kůň šelma? → ne" musí umět odlišit
+      tvrzení od jeho popření, jinak by polární otázky odpovídaly naslepo „ano".</p>
+      <p><b>Pravopis.</b> Tohle je nejpodceňovanější past. Když uživatel napíše „Capek" bez háčku,
+      <b>rozejde se tokenizér a lemmatizér se slovníkem</b>: „Capek" není lexém, který UDPipe zná
+      jako „Čapek", takže se nenajde správné lemma, soubor se nerozsvítí a odpověď nepřijde. Totéž
+      hrozí u KAPITÁLEK, kde kolísá rozpoznání vlastního jména. Pro reálný chat od reálných lidí je
+      tohle běžný vstup — a dnes na něj není žádný test.</p>
+      <p><b>Znaky.</b> Neviditelné rozdíly kazí tiše. Datum „9. ledna 1890" psané s nezlomitelnou
+      mezerou nebo rozsah „1890–1938" s typografickou pomlčkou se tokenizuje jinak než s obyčejnou
+      mezerou a spojovníkem — a jiná tokenizace znamená jiný rozbor a jinou (nebo žádnou) odpověď.</p>
+      <p><b>Členění.</b> Právě špatné členění stojí za nejnápadnější reálnou chybou celého systému.
+      Zkratka „R.U.R." se rozpadne na tři tokeny R / U / R, ty se chovají jako běžná krátká slova a
+      přetáhnou k sobě biblický korpus — a otázka o Čapkově hře pak dostane odpověď z bible. Uvidíš
+      to černé na bílém v ukázce v <a href="#5-6">V.6</a>: „Kdo navrhl slovo robot? → Ježíš". Sloučení
+      zkratek se povedlo opravit při stavbě korpusu, ale na živém dotazu způsobovalo regrese, tak
+      se vrátilo zpět (podrobně v <a href="dil-8.html">Dílu VIII</a>).</p>
+      <p><b>Slovní zásoba.</b> Dvě věci najednou. Za prvé, na fakt, který v datech není, systém
+      <b>nesmí hádat</b> — a tady je vysvěceně dobrý: kategorie honest-negative dává 7/7 (mlčí,
+      místo aby si vymýšlel). Za druhé, dvě formulace téhož faktu („Kdo napsal Švejka?" vs „Kdo je
+      autorem Švejka?") by měly dát tentýž výsledek; tuhle formulační robustnost etalon měří a dnes
+      drží 8 z 14 skupin parafrází.</p>
+      <p><b>Rozsah.</b> Hraniční vstupy jsou přesně místo, kde symbolické pipeline padají tiše —
+      prázdný seznam kandidátů, index mimo rozsah, dělení nulou. Systém sice má režim NO_QVZOR
+      (nedokázal otázku vůbec uchopit → poctivě nic), ale že na prázdný nebo obludně dlouhý vstup
+      <i>nespadne</i>, dnes nikdo neověřuje.</p>
+
+      <h2 id="5-4">V.4 Zlaté sady</h2>
+      <p>Etalonu se lidově říká <b>zlatá sada</b> (gold set): ručně sestavený seznam otázek se
+      správnými odpověďmi, proti kterému se systém měří. Projekt má tři.</p>
+      <p><b><code>gold_large.json</code> — 145 otázek.</b> Široké pokrytí: polární (ano/ne),
+      autorství děl, vztahy, taxonomie, časy, místa a poctivé „nevím". Každá položka nese očekávaný
+      <b>režim</b>, takže poctivé mlčení u faktu mimo korpus se počítá jako úspěch, ne propad. Tohle
+      je sada, ze které vzniká <a href="#5-6">rozpad po kategoriích</a>.</p>
+      <p><b><code>gold_answers.json</code> — 25 otázek.</b> Menší ruční řez okolo hlavního vlákna
+      (Karel Čapek, R.U.R., pes/kočka, bible). Slouží k rychlé diagnostice <i>kde</i> tah spadl:
+      vybral se špatný soubor, chybí šablona, nebo jen dopadli špatní kandidáti.</p>
+      <p><b><code>gold_coref.json</code> — 28 rozřešených děr.</b> Etalon <i>přesnosti</i>
+      koreference: u každého zájmena či vypuštěného podmětu je ručně určeno, ke které entitě patří
+      (např. „ho" → slovo, vypuštěný podmět „Přišel" → slovo).</p>
+
+      <p>Jedna položka velké sady vypadá takhle — všimni si, že <code>expect</code> je <b>seznam</b>
+      a že položka nese <code>kind</code> (kategorie pro rozpad) i <code>mode</code> (očekávaný
+      režim):</p>
+<pre><code>{"q": "Kde se narodil Karel Čapek?",
+ "role": "where", "kind": "spatial",
+ "answer": ["svatoňovice", "malý"],
+ "doc": "wiki_karel_čapek",
+ "note": "expert gap — Topos"}</code></pre>
+      <p>Pole po jednom: <code>q</code> je přesná otázka; <code>answer</code> (ve velké sadě
+      <code>expect</code>) je seznam přijatelných povrchů psaných malými písmeny — sem patří všechny
+      správné tvary a aliasy; <code>role</code> je očekávaná role díry (kdo/kde/kdy…) pro rozpad po
+      roli; <code>kind</code> je kategorie otázky pro rozpad po typu; <code>doc</code> je zdrojový
+      soubor (slouží diagnostice extrakce); <code>mode</code> (u velké sady) je očekávaný režim
+      (answer / clarify / unsure) a <code>factual: false</code> označuje nefaktické položky
+      (teologie), které se z faktického skóre vyjímají. Nepovinné <code>pgroup</code> spojí několik
+      parafrází téhož faktu do skupiny — tak se měří formulační robustnost.</p>
+
+      <h3>Jak přidat nový případ</h3>
+      <p>Tohle je nejdůležitější návod celého dílu, protože rozšiřování sady je jediný způsob, jak
+      měření zůstane poctivé, když přibude data nebo schopnost. Postupuj takhle:</p>
+      <p><b>1 — Vyber sadu.</b> Rychlý ruční řez okolo hlavního vlákna → <code>gold_answers.json</code>
+      (25). Nová <i>kategorie</i> otázek nebo široké pokrytí → <code>gold_large.json</code> (145).</p>
+      <p><b>2 — Ověř fakt v korpusu.</b> Odpověď <b>musí</b> být doložená v datech (<code>data/corpus</code>).
+      Když v korpusu <i>není</i>, otázka nepatří mezi faktické — zapíšeš ji jako honest-negative
+      s <code>mode: "unsure"</code>, protože správné chování je mlčet, ne hádat.</p>
+      <p><b>3 — Napiš položku.</b> Doplň <code>q</code>, <code>answer</code>/<code>expect</code> jako
+      <b>seznam všech správných povrchů</b> (nikdy jeden!), <code>role</code>, <code>kind</code>,
+      <code>doc</code> a u velké sady <code>mode</code>. U nefaktických přidej <code>factual: false</code>.</p>
+      <p><b>4 — Volitelně skupina parafrází.</b> Chceš-li měřit robustnost, dej stejné
+      <code>pgroup</code> několika formulacím téhož faktu.</p>
+      <p><b>5 — Spusť etalon a zafixuj.</b> <code>python3 eval_large.py</code> (nebo
+      <code>eval_answers.py</code>) přepíše <code>baseline_*.json</code>. Ten commitni jako regresní
+      kotvu — od téhle chvíle příští změna hlídá i tvůj nový případ.</p>
+
+      <h3>Co nefunguje a proč</h3>
+      <p>Dvě klasické chyby při přidávání případu. První: zapsat <code>answer</code> jako <b>jeden
+      povrch</b>, třeba <code>"Karel Čapek"</code>. Systém ale běžně vrací lemma podmětu „Čapek" —
+      a i když <code>accept()</code> zvládne podřetězec, u volnějších odpovědí (kraj místo města,
+      alias jména) jednopoložkový seznam zbytečně propadne. Vždycky vypiš <i>všechny</i> správné
+      tvary. Druhá, zákeřnější: přidat otázku, jejíž odpověď v korpusu <b>není</b>, a čekat konkrétní
+      odpověď. Systém poctivě mlčí (což je správně), ale tvůj test to označí za selhání — vyrobil
+      sis falešně červený řádek a budeš „opravovat" chování, které je ve skutečnosti v pořádku.
+      Fakt mimo korpus patří jako honest-negative, ne jako otázka s odpovědí.</p>
+
+      <h2 id="5-5">V.5 Metriky a prahy</h2>
+      <p>Dvě čísla nesou celé měření. První je <b>úspěšnost etalonu</b> — prostě podíl otázek, které
+      prošly, ku všem otázkám v sadě (63 ze 145 = 43 %). „Prošly" se ale posuzuje mode-aware:
+      u faktické otázky musí sedět odpověď <i>a</i> režim být „odpověď"; u honest-negative naopak
+      stačí, že systém <b>neodpověděl sebevědomě</b> (doptal se nebo mlčel) — a to se počítá jako
+      úspěch.</p>
+      <p>Druhé číslo je <b>confident-wrong</b>, sebevědomě špatné odpovědi. Řečeno vlastními slovy:
+      je to počet otázek, u kterých systém odpověděl v režimu „odpověď" (tvářil se jistě), ale
+      obsah byl špatný. Tahle třída chyb je nejškodlivější ze všech — právě proto, že vypadá jako
+      odpověď a čtenář jí uvěří. Poctivé „to nevím" je z tohohle pohledu <i>lepší</i> výsledek než
+      sebevědomý omyl. Proto se confident-wrong sleduje jako <b>samostatné číslo</b> vedle
+      úspěšnosti a systém se ladí tak, aby ho tlačil dolů (v tomto projektu 35 → 30).</p>
+      <p>O tom, jestli tah skončí odpovědí, doptáním, nebo mlčením, rozhoduje <b>míra jistoty</b>
+      (assurance) — náskok nejlepšího kandidáta a to, jak dobře sedí do očekávaného tvaru. Existuje
+      i pokus tenhle práh <i>naučit</i> malou neuronovou bránou nad 13 rysy, ale na 76 vzorcích se
+      přeučuje (v reálném běhu potlačila 19 odpovědí), takže je <b>vypnutá</b>; podrobně v
+      <a href="dil-4.html">Dílu IV</a> a <a href="dil-8.html">Dílu VIII</a>.</p>
+
+      <h3>Jak měření zopakovat</h3>
+      <p>Obě metrická patra se spouštějí jedním příkazem. Velký etalon: <span class="mark mark-prevzato">Převzato</span></p>
+<pre><code>$ python3 eval_large.py
+======================================================================
+VELKÝ ETALON — 145 otázek
+...
+-- CELKEM -- 63/145 = 43 %
+-- dle KATEGORIE (pass/total) --
+   temporal          9/25   36%  ████
+   copula           16/21   76%  ████████
+   ...
+→ .../baseline_large.json</code></pre>
+      <p>Skript vypíše jen propady (kvůli čitelnosti), pak celkové číslo a rozpad po kategoriích
+      s textovými pruhy, a nakonec přepíše <code>baseline_large.json</code>. Malý etalon se spouští
+      analogicky: <code>python3 eval_answers.py</code> → <code>baseline_answers.json</code>. Obojí
+      <b>vyžaduje běžící UDPipe 2</b> na portu 8092 (živý rozbor otázky přes síť, viz
+      <a href="dil-7.html">Díl VII</a>) — bez něj se rozbor otázky neprovede.</p>
+
+      <h2 id="5-6">V.6 Naměřené výsledky <span class="mark mark-prevzato">Převzato</span></h2>
+      <p>Následují <b>skutečná</b> čísla z projektu, ke commitu <code>b8b2d5c…d20a5ec</code> na větvi
+      <code>hypothesis-two</code>. Nic zde není odhad.</p>
+
+      <h3>Křivka v čase</h3>
+      <p>Velký etalon se za poslední práce zvedl ve třech krocích. Čísla čti tak, že úspěšnost roste
+      a confident-wrong klesá — obojí je žádoucí směr:</p>
+      <div class="tablewrap">
+      <table>
+        <tr><th>Krok</th><th>Co přibylo</th><th class="num">Úspěšnost</th><th class="num">Confident-wrong</th></tr>
+        <tr><td>výchozí stav</td><td>—</td><td class="num">33 %</td><td class="num">35</td></tr>
+        <tr><td>+ polární smyčka a lepší extrakce</td><td>ano/ne, čištění</td><td class="num">40 %</td><td class="num">—</td></tr>
+        <tr><td>+ vztahy jako hrany</td><td>relation-extrakce</td><td class="num">43 %</td><td class="num">30</td></tr>
+      </table>
+      </div>
+
+      <h3>Rozpad po kategoriích (velký etalon, 63/145 = 43 %)</h3>
+      <p>Rozpad je nejcennější číslo celého měření, protože ukazuje <b>kde</b> systém propadá.
+      Pruhy jsou seřazené od nejsilnější kategorie po nejslabší:</p>
+      <ul class="bars" aria-hidden="true">
+        <li><span class="lab">honest-negative</span><span class="track"><span class="fill" style="width:100%"></span></span><span class="val">7/7</span></li>
+        <li><span class="lab">copula</span><span class="track"><span class="fill" style="width:76%"></span></span><span class="val">16/21</span></li>
+        <li><span class="lab">spatial</span><span class="track"><span class="fill" style="width:71%"></span></span><span class="val">12/17</span></li>
+        <li><span class="lab">polar</span><span class="track"><span class="fill" style="width:64%"></span></span><span class="val">9/14</span></li>
+        <li><span class="lab">temporal</span><span class="track"><span class="fill" style="width:36%"></span></span><span class="val">9/25</span></li>
+        <li><span class="lab">authorship-who</span><span class="track"><span class="fill" style="width:30%"></span></span><span class="val">6/20</span></li>
+        <li><span class="lab">relation</span><span class="track"><span class="fill" style="width:22%"></span></span><span class="val">4/18</span></li>
+        <li><span class="lab">attribute</span><span class="track"><span class="fill zero" style="width:0%"></span></span><span class="val">0/11</span></li>
+        <li><span class="lab">count</span><span class="track"><span class="fill zero" style="width:0%"></span></span><span class="val">0/7</span></li>
+        <li><span class="lab">authorship-what</span><span class="track"><span class="fill zero" style="width:0%"></span></span><span class="val">0/3</span></li>
+        <li><span class="lab">taxonomy</span><span class="track"><span class="fill zero" style="width:0%"></span></span><span class="val">0/2</span></li>
+      </ul>
+      <div class="tablewrap">
+      <table>
+        <tr><th>Kategorie</th><th class="num">Prošlo</th><th class="num">Úspěšnost</th></tr>
+        <tr><td>honest-negative (poctivé mlčení)</td><td class="num">7/7</td><td class="num">100 %</td></tr>
+        <tr><td>copula (kdo/co je X)</td><td class="num">16/21</td><td class="num">76 %</td></tr>
+        <tr><td>spatial (kde)</td><td class="num">12/17</td><td class="num">71 %</td></tr>
+        <tr><td>polar (ano/ne)</td><td class="num">9/14</td><td class="num">64 %</td></tr>
+        <tr><td>temporal (kdy)</td><td class="num">9/25</td><td class="num">36 %</td></tr>
+        <tr><td>authorship-who (kdo napsal)</td><td class="num">6/20</td><td class="num">30 %</td></tr>
+        <tr><td>relation (vztahy: bratr, otec…)</td><td class="num">4/18</td><td class="num">22 %</td></tr>
+        <tr><td>attribute (vlastnost)</td><td class="num">0/11</td><td class="num">0 %</td></tr>
+        <tr><td>count (kolik)</td><td class="num">0/7</td><td class="num">0 %</td></tr>
+        <tr><td>authorship-what (co napsal)</td><td class="num">0/3</td><td class="num">0 %</td></tr>
+        <tr><td>taxonomy (je X druhem Y)</td><td class="num">0/2</td><td class="num">0 %</td></tr>
+      </table>
+      </div>
+      <p>Co z toho čteme: nahoře jsou úlohy, kde stačí kopulový vzor a jasná díra (kdo je X, kde,
+      poctivé mlčení). Dole leží kategorie, které potřebují <b>počítání, agregaci vlastností nebo
+      spolehlivou vztahovou hranu</b> — a tam je systém dnes slabý (attribute, count, authorship-what
+      a taxonomy jsou na nule). Malý etalon (25 otázek) dopadá 18/25 = 72 % (18 zásahů, 2 sebevědomé
+      omyly, 4 doptání, 1 neuchopená otázka).</p>
+
+      <h3>Ukázka vyhodnocení</h3>
+      <p>Konkrétní řádky přímo z <code>baseline_answers.json</code> a <code>baseline_large.json</code>
+      — pět zásahů a čtyři propady, u propadů s vysvětlením <i>proč</i>:</p>
+      <div class="tablewrap">
+      <table>
+        <tr><th>Vstup</th><th>Očekáváno</th><th>Model vrátil</th><th>Shoda</th></tr>
+        <tr><td>Kdo je Karel Čapek?</td><td>spisovatel / dramatik / …</td><td>spisovatel</td><td>✓ shoda</td></tr>
+        <tr><td>Kdy se narodil Karel Čapek?</td><td>1890</td><td>1890</td><td>✓ shoda</td></tr>
+        <tr><td>Kde se narodil Karel Čapek?</td><td>Svatoňovice / Malé</td><td>Svatoňovice</td><td>✓ shoda</td></tr>
+        <tr><td>Kdo napsal Babičku?</td><td>Němcová / Božena</td><td>Němcová</td><td>✓ shoda</td></tr>
+        <tr><td>Kdo je pes domácí?</td><td>šelma / savec / …</td><td>šelma</td><td>✓ shoda</td></tr>
+        <tr><td>Kdo navrhl slovo robot?</td><td>Josef (Čapek)</td><td>Ježíš</td><td>✗ sebevědomě špatně</td></tr>
+        <tr><td>Kolik měla dětí Božena Němcová?</td><td>čtyři / 4</td><td>— (nic)</td><td>✗ neuchopeno</td></tr>
+        <tr><td>Co je R.U.R.?</td><td>drama</td><td>doptání: jiný / bůh / tělo</td><td>⁇ doptání</td></tr>
+        <tr><td>Kdo byl otcem Milana Kundery?</td><td>Ludvík</td><td>Jan</td><td>✗ sebevědomě špatně</td></tr>
+      </table>
+      </div>
+      <p>Proč selhaly ty čtyři:</p>
+      <p><b>„Kdo navrhl slovo robot? → Ježíš"</b> je učebnicová ukázka chyby <b>členění</b>. Otázka
+      patří k dramatu R.U.R., ale „R.U.R." se rozpadne na R / U / R, ty přitáhnou biblický korpus,
+      a mezi rozsvícenými osobami je „Ježíš" nejsvětlejší — systém tedy sebevědomě odpoví jménem
+      z úplně jiné domény. Správně je Čapkův bratr Josef.</p>
+      <p><b>„Kolik měla dětí Božena Němcová? → nic"</b> je čistá díra ve <b>schopnosti</b>: pro počet
+      chybí jak dotazovací vzor, tak faktová role. Systém nemá otázku čím uchopit (režim NO_QVZOR),
+      tak — správně — mlčí. Odpovídá to kategorii count 0/7 z rozpadu výše.</p>
+      <p><b>„Co je R.U.R.? → doptání"</b> je táž příčina jako první propad (rozpad zkratky na R/U/R
+      a biblický mount), jen s lepším koncem: správná odpověď „drama" se vůbec nedostala mezi
+      kandidáty, tak se systém aspoň nezostudil a <i>doptal se</i>, místo aby hádal.</p>
+      <p><b>„Kdo byl otcem Milana Kundery? → Jan"</b> ukazuje slabost kategorie <b>relation</b>
+      (4/18): vztah „otec" se nepodařilo vytěžit jako spolehlivou hranu, tak systém vrátil jiné
+      jméno z okolí. Je to confident-wrong — přesně ta třída chyb, kterou má míra jistoty tlačit
+      dolů. Správně je Ludvík.</p>
+
+      <h2>Co už umíš</h2>
+      <p>Teď víš, proč se jazykový systém netestuje rovností: odpověď je <b>rozdělení</b> přijatelných
+      tvarů, vstup není plně deterministický a změny se projeví <b>postupnou degradací</b> — takže
+      se měří úspěšnost přes celou sadu, mode-aware, a hlídá se křivka i confident-wrong. Znáš šest
+      pater testů a poctivý stav projektu (tenká jednotková patra, silná metrická a regresní přes
+      etalony, tři patra chybí). Umíš přečíst matici tvarů dat jako mapu děr, přidat nový případ do
+      zlaté sady bez klasických pastí a víš, kde systém propadá — počítání, vlastnosti, vztahy a
+      špatně členěné zkratky jako „R.U.R.".</p>
+      <p>V dalším dílu z těchhle znalostí uděláš praxi: <a href="dil-6.html">Díl VI — Rozšiřování</a>
+      ukáže, jak přidat dokument nebo doménu, jak naučit systém nové vztahové a tázací slovo a jak
+      k novému jazykovému jevu rovnou dopsat testovací případ, aby ho příště hlídal etalon.</p>
+
+      <div class="pager">
+        <a href="dil-4.html"><span class="dir">← předchozí</span>IV · Automat, aktivace, fakty</a>
+        <a href="dil-6.html"><span class="dir">další →</span>VI · Data, vztahy, testy</a>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

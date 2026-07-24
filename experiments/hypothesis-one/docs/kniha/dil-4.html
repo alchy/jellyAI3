@@ -1,0 +1,657 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Díl IV — Jak to uvnitř funguje — hypothesis-one</title>
+<link rel="stylesheet" href="assets/style.css">
+<script defer src="assets/mermaid.min.js"></script>
+<script defer src="assets/script.js"></script>
+</head>
+<body>
+<div class="layout">
+
+  <aside class="sidebar">
+    <p class="brand"><a href="index.html">hypothesis-one</a></p>
+    <p class="tag">knižní dokumentace</p>
+    <nav aria-label="Obsah knihy">
+      <a href="index.html">Úvod</a>
+      <p class="part">Díl I — Než začneme</p><a href="dil-1.html">I · Co řeší, slovník, mapa</a>
+      <p class="part">Díl II — První kroky</p><a href="dil-2.html">II · Instalace, běh, data</a>
+      <p class="part">Díl III — Cesta dat</p><a href="dil-3.html">III · Fáze pipeline</a>
+      <p class="part">Díl IV — Jak to funguje</p><a href="dil-4.html" class="active">IV · Automat, aktivace, fakty</a>
+      <p class="part">Díl V — Testování</p><a href="dil-5.html">V · Testy, tvary, měření</a>
+      <p class="part">Díl VI — Rozšiřování</p><a href="dil-6.html">VI · Data, vztahy, testy</a>
+      <p class="part">Díl VII — Provoz</p><a href="dil-7.html">VII · UDPipe, viz, pasti</a>
+      <p class="part">Díl VIII — Otevřené body</p><a href="dil-8.html">VIII · Nedodělky a cesty</a>
+      <p class="part">Přílohy</p><a href="prilohy.html">Rejstřík, konfigurace, registry</a>
+    </nav>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <button class="iconbtn" id="theme-toggle" type="button" aria-label="Přepnout světlý/tmavý režim">◐ režim</button>
+    </div>
+    <div class="content">
+      <nav class="crumbs"><a href="index.html">Úvod</a> › Díl IV</nav>
+      <p class="eyebrow">Díl IV — Jak to uvnitř funguje</p>
+      <h1>Jak to uvnitř funguje</h1>
+
+      <p class="lead">Kde jsme a kam jdeme: v Dílu III jsme sledovali, jak se ze surového textu
+      stane mapa faktů uložená na disku. Teď otevřeme motor. Uvidíš, co se přesně stane, když
+      téhle mapě položíš otázku — a hlavně proč to nevypadá jako vyhledávání v databázi. Nejdřív
+      celek (<a href="#iv-1">IV.1 dialogový automat</a>), pak jeho čtyři součástky: světlo, které
+      rozsvítí kontext (<a href="#iv-2">IV.2</a>), vzor, který ho doostří (<a href="#iv-3">IV.3</a>),
+      fakty s rolemi, mezi nimiž se hledá (<a href="#iv-4">IV.4</a>), míra jistoty a naučená brána
+      (<a href="#iv-5">IV.5</a>) a nakonec díry, aliasy a kontext, které to všechno drží pohromadě
+      (<a href="#iv-6">IV.6</a>). Po tomhle dílu budeš umět mechanismus nejen popsat, ale i
+      předpovědět, kdy selže.</p>
+
+      <!-- ============================================================ -->
+      <!-- IV.1 (převzato z dil-4-1-dialogovy-automat.html, referenční styl) -->
+      <!-- ============================================================ -->
+      <h2 id="iv-1">IV.1 Dialogový stavový automat <span class="mark mark-prevzato">Převzato</span></h2>
+
+      <p>Odpověď v hypothesis-one nevzniká vyhledáním v databázi, ale <b>průchodem stavovým
+      automatem</b> — a pochopení tohohle rozdílu je klíč ke všemu ostatnímu v Dílu IV.</p>
+
+      <h3>Problém: proč ne obyčejné vyhledávání</h3>
+      <p>Nejpřirozenější nápad, jak stavět systém otázka–odpověď, je databáze: fakty jako řádky,
+      otázka jako dotaz <code>SELECT</code>. Napíšeš „Kdy se narodil Karel Čapek?" a systém najde
+      řádek, kde se jméno rovná „Karel Čapek", a vrátí sloupec s rokem.</p>
+      <p>U jazyka to ale nefunguje. Táž otázka se dá položit desítkami způsobů („V kterém roce se
+      narodil…", „Narození Karla Čapka?"), táž odpověď je v textu zapsaná pokaždé jinak, a hlavně:
+      často není jasné, na co se ptáš. „Kdo je pes?" — myslíš zvíře, nebo nadávku? Databáze na
+      nejednoznačnou otázku vrátí buď špatný řádek, nebo prázdno. Nezeptá se tě zpět.</p>
+
+      <h3>Intuice: nejdřív rozsvítit, pak zaostřit</h3>
+      <p>Představ si mapu faktů jako <b>temnou místnost</b>. Otázka je baterka. Když posvítíš, část
+      místnosti se rozjasní — ne jeden bod, ale celá oblast kolem toho, na co ses zeptal. Slovo
+      „Čapek" rozsvítí Karla, jeho bratra Josefa, jeho hry. Teprve na tuhle <b>rozsvícenou oblast</b>
+      pak přiložíš šablonu, která hledá konkrétní tvar odpovědi — a odpověď je to, co leží zároveň
+      <i>ve světle</i> i <i>v tom tvaru</i>.</p>
+      <p>Tenhle dvoutakt — <b>světlo napřed, tvar potom</b> — je celý trik. Světlo říká, o čem je
+      řeč (kontext, doména); šablona říká, co přesně chceš (roli odpovědi). Ani jedno samo nestačí:
+      samotné světlo neví, který z rozsvícených uzlů je odpověď; samotná šablona by našla tvar
+      i v úplně cizí části textu.</p>
+
+      <h3>Přesná definice: tři stavy jednoho tahu</h3>
+      <p>V kódu (soubor <code>answering.py</code>, metoda <code>answer</code>) je každý dotaz jeden
+      <b>tah</b> stavového automatu. Tah projde třemi stavy a skončí jedním ze tří konců. Nejdřív
+      se podívej na diagram, pak si každý přechod projdeme slovy.</p>
+
+      <p class="full">Na diagramu sleduj, že z posledního stavu <b>Assurance</b> („míra jistoty")
+      vedou <b>tři</b> různé konce — to je jádro celého automatu.</p>
+
+<pre class="mermaid">
+stateDiagram-v2
+  accTitle: Jeden tah dialogového automatu
+  accDescr: Otázka projde rozsvícením kontextu a doostřením vzorem do stavu jistoty, odkud vedou tři konce: odpověď, doptání, nebo poctivé mlčení.
+  state "Rozsvícení kontextu" as S1
+  state "Doostření vzorem" as S2
+  state "Míra jistoty (assurance)" as S3
+  [*] --> S1 : otázka
+  S1 --> S2 : světlo teče po hranách
+  S2 --> S3 : kandidáti odpovědi
+  S3 --> Odpoved : jasno
+  S3 --> Doptani : nejasno
+  S3 --> Nehadej : prázdno
+  Odpoved --> [*]
+  Doptani --> [*]
+  Nehadej --> [*]
+</pre>
+
+      <p>Slovy, po jednotlivých přechodech:</p>
+      <p><b>1 — Rozsvícení kontextu.</b> Slova otázky dostanou „teplo" a to se rozlije po hranách
+      grafu k příbuzným pojmům. Distinktivní slova (jméno, letopočet) svítí silně, funkční slova
+      („a", „být") skoro vůbec — světlo je od začátku zacílené. Podrobně v kapitole
+      <a href="#iv-2">IV.2 Aktivace</a>.</p>
+      <p><b>2 — Doostření vzorem.</b> Na rozsvícenou oblast padne <b>VZOR</b> — strukturní šablona,
+      která ví, jaký tvar má odpověď mít (osoba? místo? rok?). Vzniknou <b>kandidáti</b>: uzly, které
+      jsou zároveň osvětlené a mají správný tvar.</p>
+      <p><b>3 — Míra jistoty.</b> Automat se zeptá sám sebe, jak jistý je vítěz mezi kandidáty. A
+      podle toho zvolí jeden ze tří konců:</p>
+      <div class="tablewrap">
+      <table>
+        <tr><th>Konec</th><th>Kdy nastane</th><th>Co systém udělá</th></tr>
+        <tr><td><b>Odpověď</b></td><td>silná evidence, jeden jasný vítěz</td><td>odpoví („1890")</td></tr>
+        <tr><td><b>Doptání</b></td><td>víc rovnocenných kandidátů</td><td>„mám data o X a Y — upřesni?"</td></tr>
+        <tr><td><b>Nehádej</b></td><td>žádná struktura, jen náhodné teplo</td><td>přizná „o tom nemám jasná data"</td></tr>
+      </table>
+      </div>
+
+      <h3>Příklad: jeden tah naživo <span class="mark mark-overeno">Ověřeno</span></h3>
+      <p>Položme automatu otázku. Spustíme interaktivní režim a napíšeme jednu větu:</p>
+<pre><code>$ python ask.py
+? Kdo je Karel Čapek?
+  → spisovatel</code></pre>
+      <p>Co se právě stalo: slovo „Čapek" rozsvítilo soubor o Karlu Čapkovi (krok 1). Protože jde
+      o otázku „Kdo je X?", VZOR hledal <b>jmenný přísudek</b> — to, co Karel <i>je</i>, ne kdo je
+      jeho podmětem (krok 2). Mezi kandidáty (spisovatel, dramatik, novinář) měl „spisovatel"
+      nejsilnější strukturní i světelnou oporu, a to s velkým náskokem, takže automat skončil ve
+      stavu <b>Odpověď</b> (krok 3). Kdyby náskok nebyl, zeptal by se zpět.</p>
+
+      <aside class="rationale">
+        <span class="lbl">Zdůvodňovací blok</span>
+        <dl>
+          <dt>Rozhodnutí</dt><dd>Odpověď vzniká průchodem stavového automatu, ne dotazem do databáze.</dd>
+          <dt>Problém</dt><dd>Jazyk je nejednoznačný. Táž otázka má mnoho tvarů, táž odpověď mnoho zápisů a část otázek nemá jednu správnou odpověď — buď je nejasná, nebo v datech není.</dd>
+          <dt>Mechanismus</dt><dd>Světlo vybere <i>kde</i> hledat (rozsvícená doména), vzor vybere <i>co</i> (tvar odpovědi). Stav jistoty pak nerozhoduje jen „ano/ne", ale rozlišuje tři situace, z nichž databáze umí jen dvě. Právě třetí konec — poctivé přiznání „nevím" — dělá ze systému partnera do dialogu, ne věštce.</dd>
+          <dt>Zvažované alternativy</dt><dd><b>Přímé vyhledávání (SELECT):</b> na nejednoznačnou otázku vrátí špatný řádek nebo prázdno; neumí se doptat. <b>Velký jazykový model:</b> odpoví vždy a plynule, ale při neznalosti si odpověď <i>vymyslí</i> — což je u faktického systému horší než mlčení, a navíc není deterministický.</dd>
+          <dt>Kdy to přestane platit</dt><dd>Když je doména tak malá, že se všechno vejde do jedné věty, je stavový automat zbytečně složitý. Signál: rozsvícení i doostření vždy vyberou totéž — pak stačí přímé vyhledání.</dd>
+          <dt>Cena</dt><dd>Automat je složitější na pochopení i ladění než SELECT a jeho tři konce se musí kalibrovat (kdy je náskok „dost velký"). Špatná kalibrace vede buď k hádání, nebo k přehnanému doptávání.</dd>
+        </dl>
+      </aside>
+
+      <h3>Co nefunguje a proč</h3>
+      <p>Nejčastější první nápad nováčka je „vylepšit" automat tím, že <b>vypustí stav jistoty</b>
+      a bude vždycky vracet nejteplejšího kandidáta — vždyť odpověď skoro vždycky je. Selže to
+      tiše a ošklivě: u otázek, na které v datech odpověď <b>není</b>, automat místo mlčení vrátí
+      nejbližší náhodně osvětlené slovo. Zeptáš se „Kdo postavil archu?" nad korpusem, kde ta
+      informace chybí, a dostaneš sebevědomě „bůh" nebo „loď" — a protože to zní jako odpověď,
+      uvěříš jí. Měřením se ukazuje, že právě tyhle <b>sebevědomě špatné</b> odpovědi jsou
+      nejškodlivější třída chyb; celý třetí konec automatu existuje proto, aby jim zabránil.</p>
+
+      <h3>Co už umíš (IV.1)</h3>
+      <p>Teď víš, že hypothesis-one neodpovídá vyhledáním, ale <b>tahem stavového automatu</b>:
+      světlo rozsvítí kontext, vzor ho doostří na kandidáty, a míra jistoty rozhodne mezi třemi
+      konci — odpovědět, doptat se, nebo poctivě mlčet. Umíš vysvětlit, proč ten třetí konec není
+      slabost, ale hlavní přednost systému.</p>
+      <p>V další kapitole rozebereme první stav podrobně: <a href="#iv-2">IV.2 Aktivace</a> —
+      jak přesně vzniká to „světlo", proč funkční slova skoro nesvítí a jak se teplo drží mezi
+      otázkami, takže „Kdy se narodil?" po „Kdo je Karel Čapek?" pořád ví, o kom je řeč.</p>
+
+      <!-- ============================================================ -->
+      <!-- IV.2 -->
+      <!-- ============================================================ -->
+      <h2 id="iv-2">IV.2 Aktivace / světlo nad grafem</h2>
+
+      <p>V IV.1 jsme řekli, že tah začne „rozsvícením kontextu". Teď se podíváme, co to světlo
+      doopravdy je — čísla, hrany, útlum — v souboru <code>activation_field.py</code>. Drž se
+      obrazu z minula: mapa faktů je <b>potmě</b> a otázka je jediný zdroj světla.</p>
+
+      <h3>Problém: rozsvícená oblast je pořád moc velká</h3>
+      <p>Otázka „Kde se narodil Karel Čapek?" nahraje (mount, viz Díl III a #60) všechny soubory,
+      které nesou její slova — o Čapkovi, ale klidně i o psech nebo o bibli, když se v nich některé
+      slovo vyskytne. V takhle rozsvícené oblasti je <b>stovky</b> uzlů. Který z nich je „to, o čem
+      se právě mluví"? Kdyby všechny svítily stejně, matcher by neměl podle čeho vybírat. Potřebujeme,
+      aby světlo bylo <b>nerovnoměrné</b>: distinktivní slova jasně, výplňová slova skoro vůbec.</p>
+
+      <h3>Váha uzlu = idf: distinktivní slova svítí</h3>
+      <p>Metoda <code>feed(question_lemmas, dataloader)</code> zažehne uzly. Každé lemma otázky
+      dostane teplo rovné své <b>idf</b> — číslu, které je vysoké u vzácných, distinktivních slov
+      (Čapek, faraón, Svatoňovice) a nízké u slov, která jsou všude (být, a, který). Idf se počítá
+      z celého korpusu ve fázi indexace (Díl III) a slouží tu jako <b>váha uzlu</b>: světlo je od
+      první chvíle zacílené na to, co otázku odlišuje. Ve stejném kroku se přes tf·idf bránu
+      rozsvítí i celé <b>soubory</b> (<code>files[doc] += skóre</code>) — to jsou ty horké soubory,
+      které se nahrají.</p>
+
+      <h3>Vodivost hrany = idf × idf × proximity: světlo teče</h3>
+      <p>Světlo nezůstává v zažehnutých uzlech. Metoda <code>build_graph(corpus, grammar)</code>
+      postaví z nahraného korpusu graf hran a <code>spread()</code> po nich teplo rozlije. Hrana
+      nevzniká jen mezi bezprostředními sousedy (bigram), ale mezi všemi slovy v <b>okně jedné věty</b>
+      (parametr <code>window = 5</code> obsahových tokenů) — díky tomu se „pes" spojí se „šelma",
+      i když jsou od sebe pět slov. Váha hrany, její <b>vodivost</b>, je součin
+      <code>idf(a) × idf(b) × exp(−d/τ)</code>:</p>
+      <div class="tablewrap">
+      <table>
+        <tr><th>Činitel vodivosti</th><th>Co dělá</th><th>Hodnota / zdroj</th></tr>
+        <tr><td><code>idf(a) × idf(b)</code></td><td>funkční slova (nízké idf) světlo <b>nevedou</b>, obsahová ano</td><td>idf z indexu (Díl III)</td></tr>
+        <tr><td><code>exp(−d/τ)</code></td><td>bližší slova v okně vedou silněji než vzdálenější</td><td><code>tau = 2.0</code></td></tr>
+        <tr><td>okno</td><td>ko-okurence v rámci věty, ne jen dvojice sousedů</td><td><code>window = 5</code></td></tr>
+      </table>
+      </div>
+      <p>Graf je <b>symetrický</b> (hrana vede oběma směry). Ve <code>spread()</code> pak každé horké
+      slovo přihřeje své sousedy úměrně váze hrany, normalizované přes všechny sousedy
+      (<code>w / Σw</code>), s útlumem <code>spread_lambda = 0.5</code> na skok a dosahem
+      <code>hops = 2</code>. Rozsvítí se tak i pojmy, které otázka vůbec neřekla, ale jsou v textu
+      spojené — „spisovatel" přihřeje „český" a „drama", „Čapek" přihřeje „R.U.R.".</p>
+
+      <h3>Decay: mezi tahy světlo hasne</h3>
+      <p>V interaktivní session se pole mezi otázkami <b>neresetuje</b> — jen se utlumí. Metoda
+      <code>decay()</code> násobí všechno teplo (slova i soubory) konstantou
+      <code>decay = 0.7</code>. Staré světlo pohasne, čerstvé dominuje: vzniká <b>recency</b>
+      (nedávné téma je jasné, dávné tmavne) a s ním zapomínání. Rovnováha mezi útlumem a přihříváním
+      určuje, jak dlouho téma drží: protagonista, kterého se ptáš opakovaně, svítí dlouho, mimoděčná
+      zmínka rychle zhasne.</p>
+
+      <h3>Řetězení kontextu: navazující otázka zdědí téma</h3>
+      <p>Tady se světlo stává pamětí dialogu. Metoda <code>answer(question, carry_context=True)</code>
+      se u každého tahu rozhodne, jestli se o zbytkové světlo <b>opřít</b>, nebo ho <b>přepnout</b> —
+      a rozhodne to <i>sama otázka</i>. Test je jednoduchý: nese otázka nějaké vlastní distinktivní
+      slovo (idf ≥ 1.5), které není sloveso?</p>
+      <div class="tablewrap">
+      <table>
+        <tr><th>Situace</th><th>Podmínka v kódu</th><th>Co se stane s polem</th></tr>
+        <tr><td>navazující otázka<br>„Kdy se narodil?"</td><td>žádné vlastní distinktivní slovo → <code>follow_up</code></td><td>jen <code>decay()</code> (téma pohasne, ale drží); k otázce se přidají horké entity z minula</td></tr>
+        <tr><td>otázka s vlastní entitou<br>„Kdo napsal Švejka?"</td><td>nese distinktivní slovo → nové téma</td><td>slova, soubory i mount se <b>vymažou</b> — zbytkový žár minulého protagonisty zhasne</td></tr>
+      </table>
+      </div>
+      <p>Proč to vymazání u nového tématu: po dotazu na Čapka zůstává Čapek horký. Kdyby zbytkové
+      světlo nezhaslo, u otázky „Kdo napsal Švejka?" by v remíze kandidátů (predikát „napsat" nese
+      spoustu autorů) přehřátý Čapek přebil čerstvého Haška. Vymazání pole i nahraných dokumentů
+      tomu zabrání. Horké entity z minula vybírá <code>_hot_entities()</code> — jen slova s idf ≥ 1.5
+      nad prahem tepla, tedy skutečné téma, ne funkční slova.</p>
+
+      <p class="full">Na diagramu sleduj smyčku dole: <code>reinforce</code> vrací teplo zpět do
+      pole a <code>decay</code> ho mezi tahy tlumí — tak se drží (a zároveň pomalu ztrácí) kontext.</p>
+
+<pre class="mermaid">
+flowchart TD
+  accTitle: Tok světla jedním tahem aktivačního pole
+  accDescr: Otázka rozsvítí uzly a soubory, teplo se rozteče po hranách, zváží kandidáty, vítěz přihřeje kontext a mezi tahy vše utlumí decay.
+  Q["Otázka (lemmata)"] --> F["feed — uzly dostanou váhu idf,<br>soubory přes tf·idf bránu"]
+  F --> S["spread — teplo teče po hranách<br>idf×idf×proximity, 2 skoky"]
+  S --> W["weight_answer — teplo souboru<br>+ teplo entity kandidáta"]
+  W --> R["glow-orders-ties — base rozhoduje,<br>glow řadí jen remízu"]
+  R --> RE["reinforce — vítěz přihřeje<br>svou entitu a soubor"]
+  RE --> D["decay — mezi tahy × 0.7<br>(utichání, recency)"]
+  D -.->|navazující tah| F
+</pre>
+
+      <h3>Glow-orders-ties: světlo řadí jen remízu</h3>
+      <p>Teď to nejdůležitější pravidlo celého matcheru. Když se z kandidátů vybírá vítěz
+      (metoda <code>_rank</code>), aktivace <b>nerozhoduje jako první</b>. Nejdřív rozhoduje
+      <b>struktura</b>: jestli odpověď není jen echo slova z otázky, jestli role kandidáta sedí na
+      roli díry, jestli fakt nese známou entitu otázky, jestli typ sedí (místo pro „kde"), jestli
+      jde o přesnou shodu vzoru. Teprve <b>úplně poslední</b> složkou v porovnávacím klíči je teplo
+      (<code>glow</code>). Světlo tedy jen <b>řadí remízy</b> — mezi kandidáty, kteří jsou strukturně
+      nerozlišitelní, vybere ten nejvíc osvětlený.</p>
+      <p>Číselně: klíč kandidáta je n-tice <code>(echo_ok, role_fit, known_ov, def_fit, type_fit,
+      kind_pred, mq, glow)</code>, porovnávaná zleva. Dva kandidáti se dostanou na <code>glow</code>
+      jen tehdy, když se shodují ve všech předchozích složkách. Tím se ošetří <b>prosáklé světlo</b>:
+      bible plošně přihřívá mount (i pro dotaz na Čapka svítí kolem 0.7), ale to teplo nemůže přebít
+      strukturní shodu — jen dorovnat, když je struktura nerozhodná.</p>
+
+      <aside class="rationale">
+        <span class="lbl">Zdůvodňovací blok — glow-orders-ties</span>
+        <dl>
+          <dt>Rozhodnutí</dt><dd>V žebříčku kandidátů rozhoduje strukturní shoda; aktivace (glow) je poslední složka klíče a řadí jen remízu.</dd>
+          <dt>Problém</dt><dd>Světlo prosakuje. Nahraný korpus obsahuje i tematicky cizí soubory (bible svítí kolem 0.7 i u dotazu na Čapka), takže „nejteplejší uzel" nemusí být ta správná odpověď.</dd>
+          <dt>Mechanismus</dt><dd>Porovnávací klíč je n-tice, kde teplo stojí až za všemi strukturními signály. Dva kandidáti se porovnají teplem jedině tehdy, když jsou strukturně stejně silní — leaknuté světlo tak nemůže přebít strukturu, jen dorovnat nerozhodný stav.</dd>
+          <dt>Zvažované alternativy</dt><dd><b>Řadit čistě teplem (glow-first):</b> měřeno — prosáklé pozadí (bible) mispickuje odpověď u cizí domény. <b>Tvrdý práh na aktivaci:</b> zahodí správné, ale slabě osvětlené odpovědi (dim, ale strukturně jasné) — ubere víc, než přidá.</dd>
+          <dt>Kdy to přestane platit</dt><dd>Když by strukturní signály byly natolik jemné, že by nikdy nevznikla remíza, glow by se neuplatnil vůbec. Pak je aktivace zbytečná a stačí čistá struktura.</dd>
+          <dt>Cena</dt><dd>Dvousignálové řazení se hůř ladí: strukturní signály musí být dost hrubé (diskrétní), aby remízy vůbec vznikaly a glow měl co řadit. Přejemnělá struktura glow „vyhladoví".</dd>
+        </dl>
+      </aside>
+
+      <h3>Co nefunguje a proč</h3>
+      <p>Nováček logicky navrhne: „odpověď je prostě nejteplejší uzel po spreadu, vyber ho." Selže to
+      tiše přes prosáklé pozadí. U dotazu „Kdo napsal Švejka?" nad korpusem, kde je i bible, může být
+      po spreadu nejteplejší nějaké slovo z plošně rozsvícené bible — a systém vrátí sebevědomě
+      špatnou odpověď, která jen náhodou nasbírala teplo. Nic nespadne, nic nevypíše chybu; jen
+      dostaneš plausibilně znějící nesmysl. Přesně proto glow řadí <i>až</i> remízu, ne celý žebříček.</p>
+
+      <!-- ============================================================ -->
+      <!-- IV.3 -->
+      <!-- ============================================================ -->
+      <h2 id="iv-3">IV.3 VZOR matcher</h2>
+
+      <p>Druhý stav automatu z IV.1 se jmenoval „doostření vzorem". Světlo z IV.2 řeklo, <i>kde</i>
+      hledat; teď potřebujeme říct, <i>co</i> hledáme — jaký tvar má mít odpověď. To dělá VZOR
+      matcher v souboru <code>template_store.py</code>.</p>
+
+      <h3>Co je VZOR a co je stín</h3>
+      <p>VZOR je <b>strukturní otisk věty</b>: pole slotů kolem pivotu (obvykle přísudku nebo
+      tázacího slova) do šířky <code>r</code>. Slot popisuje slovní druh a pád, ne konkrétní slovo —
+      třeba <code>PROPN:Nom · VERB:Past · PROPN:Acc</code> je „vlastní jméno v prvním pádě, minulé
+      sloveso, vlastní jméno ve čtvrtém pádě" (například „Čapek napsal R.U.R."). Výchozí věta
+      systému zní: <b>každá otázka je stínem něčeho, co ji vygenerovalo.</b> Otázka „Kdo napsal
+      R.U.R.?" má svůj query-VZOR (<code>^ · PRON:Nom · VERB:Past · ?</code>), a ten je stínem
+      faktu se stejnou strukturou. Matcher hledá právě tenhle stín.</p>
+
+      <h3>Šablona: FAKT-VZOR × QUERY-VZOR × ODPOVĚĎ</h3>
+      <p>Ze surových vět se ve fázi syntézy (Díl III) předpočítají <b>shadow-páry</b> — objekty
+      <code>QueryTemplate</code>. Jeden pár je jeden řádek a nese tři propojené věci plus provenienci:</p>
+      <div class="tablewrap">
+      <table>
+        <tr><th>Pole šablony</th><th>Význam</th></tr>
+        <tr><td><code>fact_vzor</code></td><td>strukturní otisk věty, ze které fakt pochází</td></tr>
+        <tr><td><code>query_vzor</code></td><td>otisk otázky, která by na ten fakt mířila (stín)</td></tr>
+        <tr><td><code>role</code></td><td>role díry, kterou odpověď vyplní (who / where / when …)</td></tr>
+        <tr><td><code>answer</code></td><td>lemma odpovědi</td></tr>
+        <tr><td><code>surface_q</code></td><td>povrchová podoba otázky (pro čitelnost / doptání)</td></tr>
+        <tr><td><code>fact_ref</code></td><td>provenience: <code>(doc, sent)</code> — odkaz zpět do textu</td></tr>
+      </table>
+      </div>
+      <p>Šablony jsou <b>shardované per zdrojový soubor</b> (<code>data/templates/&lt;doc&gt;.jsonl</code>,
+      stejně jako korpus) a nahrávají se jen ty horké (mount, #60) — matcher nikdy nedrží celý korpus
+      šablon, jen to, co otázka rozsvítí. Persistence je append-only (event-log, slučitelný přírůstkově)
+      s deduplikací přes stabilní <code>id</code> (hash z <code>fact_ref + role + query_vzor</code>),
+      takže se týž pár mezi běhy nezdvojí.</p>
+
+      <h3>Matchování: exakt bije fuzzy, remízu řeší světlo</h3>
+      <p>Když přijde otázka, spočte se její query-VZOR a metoda <code>match_scored(query_vzor)</code>
+      vrátí kandidáty se skóre <code>mq</code> (match quality). Logika je dvoustupňová: existuje-li
+      <b>přesná</b> shoda query-VZORu, vezmou se jen ty šablony s <code>mq = 1.0</code>. Jinak se sáhne
+      po <b>fuzzy</b> shodě — spočítá se překryv množin slotů (Jaccard: průnik děleno sjednocením) a
+      přijmou se šablony nad prahem <code>fuzzy_min_overlap = 0.5</code>, seřazené sestupně podle
+      překryvu. To <code>mq</code> je pak <b>strukturní base</b> pro glow-orders-ties z IV.2: exaktní
+      shoda bije fuzzy, a mezi stejně silnými rozhodne až aktivace.</p>
+      <p>Matcher tedy vrátí <b>všechny</b> strukturně shodné stíny — mohou se překrývat — a světlo
+      z IV.2 mezi nimi vybere ten, který je právě osvětlený. Tak spolu drží dvě roviny: struktura
+      (VZOR) říká, <i>co se do sebe trefí</i>; aktivace říká, <i>co je právě relevantní</i>. Ve
+      skutečném matcheru (<code>answering.py</code>) je tahle window-VZOR cesta jemný tie-break;
+      hlavní práci nese predikátová cesta přes fakty z <a href="#iv-4">IV.4</a>, protože ta srovná
+      i věty s jiným slovosledem.</p>
+
+      <aside class="rationale">
+        <span class="lbl">Zdůvodňovací blok — VZOR místo karet</span>
+        <dl>
+          <dt>Rozhodnutí</dt><dd>Tvar odpovědi nese generický VZOR (pole slotů), ne ručně psaná karta „když tvar X, pak výjimka Y".</dd>
+          <dt>Problém</dt><dd>Ruční pravidla if-then se množí, křehnou a vedou zpátky k explozi složitosti karetního systému, jako odlehčení kterého tenhle projekt vznikl.</dd>
+          <dt>Mechanismus</dt><dd>VZOR je feature-vektor slotů. Matcher hledá týž stín napříč šablonami; mezi překrývajícími se stíny nerozhoduje další pravidlo, ale aktivace. Jeden mechanismus místo rostoucího výčtu výjimek.</dd>
+          <dt>Zvažované alternativy</dt><dd><b>Ruční if-then per tvar (karty):</b> měřeno — pravidlo opraví jeden tvar a rozbije tři jiné; za měsíc 40 pravidel a jsi zpátky u karet. <b>Přesná shoda řetězce / regex na otázku:</b> nepokryje parafráze (táž otázka má desítky tvarů).</dd>
+          <dt>Kdy to přestane platit</dt><dd>V doméně s jediným tvarem otázky je VZOR zbytečný — stačilo by přímé porovnání. Signál: distinct query-VZORů je jen hrstka.</dd>
+          <dt>Cena</dt><dd>VZOR je hrubší než ruční pravidlo: fuzzy překryv může spojit i nepodobné tvary. A shadow-páry se musí předpočítat (<code>build_templates_all.py</code>) — pokrytí je tak dobré, jak dobrá je syntéza.</dd>
+        </dl>
+      </aside>
+
+      <h3>Co nefunguje a proč</h3>
+      <p>První nápad je matchovat otázku na fakt přes <b>shodu slov</b>: najdi větu, která obsahuje
+      stejná slova jako otázka. Selže to na slovosledu. „Kde se narodil X" má tázací slovo vpředu,
+      kdežto fakt „Narodil se v Y" má místo uprostřed — okno kolem pivotu je v obou případech jiné,
+      takže window-VZOR obě strany <b>nesouměří</b> a vrátí nula nebo špatného kandidáta. Projeví se
+      to jako tichá díra: otázka, na kterou data existují, zůstane bez odpovědi. Právě kvůli tomu
+      existuje druhá, predikátová cesta v <a href="#iv-4">IV.4</a>, která spojí otázku a fakt přes
+      sdílený predikát bez ohledu na slovosled.</p>
+
+      <!-- ============================================================ -->
+      <!-- IV.4 -->
+      <!-- ============================================================ -->
+      <h2 id="iv-4">IV.4 Fakt-store a role</h2>
+
+      <p>Zatím jsme mluvili o „faktech" a „rolích" jako o samozřejmosti. Teď je rozebereme jako
+      datovou strukturu — je to jednoduchá, ale nosná část celého systému (soubor
+      <code>fact_store.py</code>).</p>
+
+      <h3>Datový model Fact</h3>
+      <p>Jeden fakt je predikát a k němu <b>role-sloty</b>. Predikát je lemma slovesa (nebo spony) —
+      to, co se děje. Role-sloty jsou slovník <code>{role: [lemmata]}</code>: kdo, kde, kdy, co,
+      jaký stav. K tomu fakt nese <b>provenienci</b> — odkud pochází, aby se dala dohledat původní
+      věta.</p>
+      <div class="tablewrap">
+      <table>
+        <tr><th>Pole <code>Fact</code></th><th>Význam</th><th>Příklad („Narodil se v Malých Svatoňovicích")</th></tr>
+        <tr><td><code>predicate</code></td><td>lemma přísudku — JOIN klíč</td><td><code>narodit</code></td></tr>
+        <tr><td><code>roles</code></td><td>slovník rolí → lemmata</td><td><code>{who:[Karel], where:[Svatoňovice]}</code></td></tr>
+        <tr><td><code>doc</code></td><td>zdrojový soubor (provenience)</td><td><code>wiki_karel_čapek</code></td></tr>
+        <tr><td><code>sent</code></td><td>index věty (provenience)</td><td><code>3</code></td></tr>
+        <tr><td><code>text</code></td><td>povrch věty (pro čitelnost)</td><td>„Narodil se v…"</td></tr>
+      </table>
+      </div>
+      <p>Role jsou <b>univerzální klíče</b> (who, where, when, whom_what, state, how_much,
+      which_attribute, as_what_state…). Přiřazuje je <code>role_catalog.py</code> z UDPipe rozboru,
+      ale mapování českých předložek a spojek na role je <b>data</b> v <code>lang/cs.json</code>, ne
+      kód. Stejný význam tak dostane stejný klíč napříč celým systémem a jazyk se dá vyměnit bez
+      zásahu do logiky.</p>
+
+      <h3>Matchování predikátem: parent-model</h3>
+      <p>Metoda <code>match(predicate, hole_role)</code> je jádro. Vrátí všechny fakty se zadaným
+      predikátem a z nich lemmata dané role díry. Klíč je <b>predikát</b> — a to je celý trik: predikát
+      přežije slovosled. Otázka „Kde se narodil Čapek?" i fakt „Narodil se v Y" nesou oba lemma
+      <code>narodit</code> a roli <code>where</code>, takže se potkají, i když je slovosled úplně jiný.
+      Tomuhle říkáme <b>parent-model</b> matching (převzato z rodičovského systému) a je to ta cesta,
+      kterou window-VZOR z IV.3 sám nezvládne.</p>
+      <p>Fakty jsou <b>shardované per soubor</b> (<code>data/facts/&lt;doc&gt;.jsonl</code>) a do
+      paměti se nahrají jen horké (mount, #60); nad nahranými se staví index <code>by_predicate</code>.
+      Mezi kandidáty jednoho predikátu (i napříč fakty) rozhodne až aktivace přes glow-orders-ties
+      z IV.2. Celý korpus má dnes <b>16&nbsp;028</b> faktů z registru, k tomu <b>24</b> z biografických
+      závorek a <b>114</b> vztahových hran, nad <b>52</b> soubory.</p>
+
+      <p class="full">Diagram ukazuje oba datové modely a jak se dělí o provenienci: šablona
+      (<code>QueryTemplate</code>) odkazuje přes <code>fact_ref</code> zpět na fakt, který obě strany
+      spojuje s původní větou.</p>
+
+<pre class="mermaid">
+classDiagram
+  accTitle: Datové modely Fact a QueryTemplate
+  accDescr: Fact drží predikát, role-sloty a provenienci; QueryTemplate drží shadow-pár VZORŮ s odpovědí a odkazem fact_ref zpět na fakt. Oba typy shardují jejich úložiště.
+  class Fact {
+    +str predicate
+    +dict roles
+    +str doc
+    +int sent
+    +str text
+    +as_row()
+  }
+  class QueryTemplate {
+    +str fact_vzor
+    +str query_vzor
+    +str role
+    +str answer
+    +tuple fact_ref
+    +id()
+  }
+  class FactStore {
+    +match(predicate, role)
+  }
+  class TemplateStore {
+    +match_scored(query_vzor)
+  }
+  FactStore "1" o-- "*" Fact : shardy per doc
+  TemplateStore "1" o-- "*" QueryTemplate : shardy per doc
+  QueryTemplate ..> Fact : fact_ref (doc, sent)
+</pre>
+
+      <h3>Provenience: cesta zpátky k textu</h3>
+      <p>Všimni si, že jak <code>Fact</code>, tak <code>QueryTemplate</code> nesou dvojici
+      <code>(doc, sent)</code>. To není náhoda — je to <b>vazba na původní text</b>, která se drží
+      napříč všemi fázemi. Token nese offset ve větě, věta nese svůj index, fakt nese doc i sent.
+      Systém tak umí od odpovědi dojít zpátky k větě, ze které pochází. Pro faktický systém je to
+      klíčové: odpověď se dá <b>doložit</b>, ne jen vyslovit.</p>
+
+      <h3>Co nefunguje a proč</h3>
+      <p>Nabízí se držet fakty v jedné tabulce klíčované <b>jménem entity</b> (klasické SELECT podle
+      jména). Selže to hned dvakrát. Za prvé se jména <b>rozpadají</b>: „R.U.R." se tokenizuje na
+      R/U/R, „Barbora Panklová" je jiný povrch než „Božena Němcová" — klíč podle jména je netrefí.
+      Za druhé české věty často <b>vynechávají podmět</b> (pro-drop): fakt „Narodil se v Y" nemá
+      v sobě „Čapka" vůbec, takže klíč podle jména by ten fakt nikdy nespojil s otázkou o Čapkovi.
+      Predikát je proti obojímu odolný — a chybějící podmět doplní koreference z
+      <a href="#iv-6">IV.6</a>.</p>
+
+      <!-- ============================================================ -->
+      <!-- IV.5 -->
+      <!-- ============================================================ -->
+      <h2 id="iv-5">IV.5 Assurance a naučená brána</h2>
+
+      <p>Třetí stav automatu z IV.1 — míra jistoty — je to, co odlišuje partnera do dialogu od
+      věštce. Teď se podíváme na jeho mechaniku (<code>_assurance</code> v <code>answering.py</code>)
+      a na pokus nahradit ruční kalibraci naučenou vrstvou.</p>
+
+      <h3>Tři konce: jasno, nejasno, nehádej</h3>
+      <p>Metoda <code>_assurance</code> nedostane jen vítěze, ale všechny kandidáty, a rozhodne, do
+      kterého ze tří konců tah spadne. Ke každému kandidátovi spočte <b>base</b> (strukturní signály),
+      <b>glow</b> (teplo z aktivace) a <b>sílu</b> (kolik strukturních signálů je splněno). Pak
+      kandidáty seřadí a porovná vítěze s druhým v pořadí:</p>
+      <div class="tablewrap">
+      <table>
+        <tr><th>Konec</th><th>Podmínka (zjednodušeně)</th><th>Chování</th></tr>
+        <tr><td><b>answer</b> — jasno</td><td>síla ≥ 1 <b>a</b> vítěz odstupuje: buď strukturou (<code>base &gt; druhý</code>), nebo světlem (<code>glow &gt; 2× druhý</code>)</td><td>odpoví</td></tr>
+        <tr><td><b>clarify</b> — nejasno</td><td>je evidence (síla ≥ 1 nebo glow &gt; 0), ale kandidáti jsou rovnocenní</td><td>„mám data o X, Y — upřesni?"</td></tr>
+        <tr><td><b>unsure</b> — nehádej</td><td>jen echo, žádná struktura</td><td>upřímný terminál: „o tom nemám jasná data"</td></tr>
+      </table>
+      </div>
+      <p>Odstup vítěze má dvě cesty schválně: buď je strukturně silnější, <b>nebo</b> ho světlo
+      zaostřilo tak, že dominuje (teplo přes dvojnásobek druhého). Vítěz s výrazně dominantním světlem
+      je tedy jistý i tam, kde je strukturní remíza — to je přesně místo, kde se uplatní alias merge
+      z <a href="#iv-6">IV.6</a> (sečtené světlo rozpadlého jména).</p>
+
+      <h3>Honest-negative: mlčení je vlastnost</h3>
+      <p>Třetí konec není nouzová brzda, ale <b>měřená přednost</b>. V kategorii honest-negative —
+      otázky, na které odpověď v korpusu vůbec není — systém dosahuje <b>7/7 (100&nbsp;%)</b>: poctivě
+      mlčí místo hádání <span class="mark mark-overeno">Ověřeno</span>. To je ta strana, kterou databáze
+      ani velký jazykový model neumějí: databáze vrátí prázdno bez rozlišení, model si odpověď vymyslí.</p>
+
+      <h3>Naučená brána: nápad</h3>
+      <p>Kalibrovat ručně, „kdy je odstup dost velký", je křehké. Nabízí se to <b>naučit z dat</b>:
+      malá neuronová vrstva, která z rysů vítěze předpoví pravděpodobnost, že je odpověď správná —
+      a když je nízká, přepne <code>answer</code> na <code>unsure</code> (nehádej). Přesně tohle je
+      v kódu zapojené: <code>gate.json</code> drží 13 malých pevných vah, metoda <code>_gate_p</code>
+      spočte sigmoidu a při <code>p &lt; gate_threshold = 0.30</code> odpověď potlačí. Rysů je 13:</p>
+      <div class="tablewrap">
+      <table>
+        <tr><th>Skupina rysů</th><th>Co zachycují</th></tr>
+        <tr><td>base signály (echo, role_fit, known_overlap, def_fit, type_fit, kind_pred)</td><td>strukturní kvalita vítěze</td></tr>
+        <tr><td>glow, margin (dominance nad 2. odpovědí), počet kandidátů</td><td>světlo a odstup</td></tr>
+        <tr><td>doc_act (je vítězův soubor horký?), home_match (je z domovského souboru entity?)</td><td>doména — cizí vs domácí</td></tr>
+        <tr><td>is_name (velké písmeno?), ans_idf (distinktivita odpovědi)</td><td>povaha odpovědi</td></tr>
+      </table>
+      </div>
+      <p>Trénink je <b>offline</b>; runtime by zůstal deterministický (pevné váhy, žádný neuron v běhu).
+      Cíl brány: rozlišit glow-správně (Švejk → Hašek) od sebevědomě špatně (bratr → Eliáš) a to druhé
+      potlačit.</p>
+
+      <h3>Proč je brána dnes VYPNUTÁ</h3>
+      <p>V konfiguraci je <code>gate_enabled = false</code> — brána je zapojená, ale <b>neběží</b>.
+      Důvod je poučný. V křížové validaci (leave-one-out) vypadala brána slibně: přesnost
+      <b>68,8&nbsp;%</b> na 77 answer-mode případech, práh 0,30 by odstranil <b>−13</b> sebevědomě
+      špatných za cenu <b>−3</b> správných <span class="mark mark-overeno">Ověřeno</span>. Jenže když
+      se pevné váhy natrénované na všech 76 vzorcích × 13 rysů pustí na skutečný korpus, potlačí
+      kolem <b>−19</b> odpovědí — <b>mnohem víc</b>, než odhadovalo LOO (kolem −2). Ta propast mezi
+      LOO (−2) a reálným během (−19) je učebnicový podpis <b>přeučení</b> na malém vzorku. Zapnutá
+      brána by tedy systém udělala přehnaně opatrným — mlčel by i tam, kde umí odpovědět. Proto je
+      vypnutá a ruční kalibrace odstupu v <code>_assurance</code> zatím zůstává.</p>
+      <p>Že myšlenka učit směrování z dat sama o sobě <b>nese</b>, ukázal jiný, čistě routovací pilot
+      (<code>nn_pilot.py</code>): drobný softmax nad <b>20</b> generickými strukturními rysy dotazu
+      předpověděl <b>typ</b> odpovědi v LOO s přesností <b>75,9&nbsp;%</b> proti <b>17,2&nbsp;%</b>
+      majoritní třídy — a rozdíl copula × relation, na kterém padalo ruční pravidlo, se naučil sám,
+      bez jediného „if genitiv" <span class="mark mark-overeno">Ověřeno</span>. Rozdíl proti bráně je
+      v úloze: router hádá <i>typ</i> otázky (to z tvaru poznat jde), zatímco brána hádá <i>správnost</i>
+      konkrétní odpovědi (to je věc dat, ne tvaru) — a na to je 76 vzorků málo.</p>
+
+      <aside class="rationale">
+        <span class="lbl">Zdůvodňovací blok — brána vypnutá</span>
+        <dl>
+          <dt>Rozhodnutí</dt><dd>Naučená assurance brána je v kódu zapojená, ale vypnutá (<code>gate_enabled = false</code>); práh „nehádej" drží ruční kalibrace v <code>_assurance</code>.</dd>
+          <dt>Problém</dt><dd>Chtěli jsme, aby se hranice mezi „odpověz" a „nehádej" naučila z dat místo ručního ladění odstupu.</dd>
+          <dt>Mechanismus</dt><dd>Malá NN nad 13 rysy vítěze (glow, margin, doména, je-li jméno…) předpoví p(správně); při p &lt; 0,30 přepne <code>answer</code> na <code>unsure</code>. Trénink offline, runtime deterministický.</dd>
+          <dt>Zvažované alternativy</dt><dd><b>Zapnout bránu:</b> reálný běh potlačí kolem −19 odpovědí proti −2 z LOO — přeučeno na 76 vzorcích × 13 rysů. <b>Míň rysů / víc dat:</b> zatím neměřeno, ale je to směr — router nad 20 rysy dokázal, že učení z dat funguje, když je úloha „poznatelná z tvaru".</dd>
+          <dt>Kdy to přestane platit</dt><dd>Až bude etalon dost velký (stovky answer-mode případů), aby 13 rysů generalizovalo místo memorování šumu. Signál: LOO a reálný běh potlačí podobný počet.</dd>
+          <dt>Cena</dt><dd>Dnes je brána mrtvý kód čekající na data. Při deployi je to past: mrtvé váhy projdou lintem a rsync je roznese — musí se hlídat, že zůstávají vypnuté.</dd>
+        </dl>
+      </aside>
+
+      <h3>Co nefunguje a proč</h3>
+      <p>Svůdný první krok je uvěřit číslu z křížové validace a bránu <b>nasadit</b> („68,8&nbsp;%, LOO
+      říká −13/−3, jdeme do toho"). Selže to potichu na živém korpusu: pevné váhy potlačí −19 odpovědí,
+      systém se stáhne do přehnaného „nevím" a ty to poznáš, až když ti přestane odpovídat na věci,
+      které dřív uměl. Poučení je obecné a stojí za zapamatování: <b>LOO na 76 vzorcích není chování
+      při nasazení.</b> Malý vzorek × mnoho rysů = přeučení, i když křížová validace vypadá hezky.</p>
+
+      <!-- ============================================================ -->
+      <!-- IV.6 -->
+      <!-- ============================================================ -->
+      <h2 id="iv-6">IV.6 Koreference, aliasy, řetězení kontextu</h2>
+
+      <p>Zbývá lepidlo, které drží předchozí kapitoly pohromadě. Fakty z IV.4 často nemají podmět,
+      jména z IV.4 se rozpadají a otázky z IV.2 na sebe navazují. Tři mechanismy — díry, aliasy,
+      kontext — to řeší, a všechny stojí na tomtéž světle z IV.2.</p>
+
+      <h3>Díry: chybějící podmět a zájmena</h3>
+      <p>Čeština běžně <b>vynechává podmět</b> (pro-drop): „Narodil se v Malých Svatoňovicích" nemá
+      slovo „Karel" — podmět je jen ve tvaru slovesa. K tomu přidej zájmena („ho", „jeho", „ten").
+      Tyhle prázdné pozice jsou <b>díry</b>, které ukazují na entitu nepojmenovanou v klauzuli.
+      Soubor <code>fill_holes.py</code> je detekuje <b>z gramatického rysu</b>, ne ze seznamu tvarů:
+      UDPipe lemmatizuje ho/mu/jemu na „on" a rozliší je rysem (PronType, Person, Tense), takže
+      detekce je univerzální. Rozlišuje kategorie jako <code>prodrop</code> (elidovaný podmět =
+      přísudek bez <code>nsubj</code>), <code>pron3</code> (osobní zájmeno 3. osoby),
+      <code>poss3</code> (přivlastňovací), <code>dem</code> (ukazovací).</p>
+      <p>Zaplnit díru znamená najít <b>antecedent</b> — na koho ukazuje. Základní resolver
+      (<code>resolve_document</code>) drží zpětnou cache v okně <code>window_sentences = 3</code> vět
+      a vybere nejlepší souhlasnou zmínku podle pravidla „podmět &gt; recency &gt; pozice". Shoda se
+      testuje překryvem <b>rodu</b> (ÚFAL kóduje syncretismus jako množinu, třeba „Masc,Neut") a
+      <b>čísla</b>. Pokročilejší varianty přidávají aktivační pole s útlumem
+      (<code>decay = 0.7</code>, podmět má váhu <code>subject_weight = 3.0</code>, vyřešená díra
+      referenta posílí o <code>reinforce = 2.0</code>) a „kotvu identity" (<code>anchor_bonus = 2.0</code>):
+      entita zavedená kopulou „X je/byl Y" se stane protagonistou a drží teplo navzdory útlumu, takže
+      ji lokálně nápadné slovo nepřebije. Je to <b>tentýž</b> mechanismus světla jako v IV.2.</p>
+
+      <h3>Díry do faktů: proč pak parent-model funguje</h3>
+      <p>Tady se koreference propojí s IV.4. Metoda <code>resolved_subjects</code> vezme vyřešené
+      pro-drop podměty a vrátí je jako mapu <code>(věta, predikát) → podmět</code>. Ve fázi syntézy
+      se tím do faktu <b>doplní chybějící who-slot</b>: fakt „Narodil se…" dostane <code>who=[Karel]</code>,
+      i když ho původní věta neobsahovala. Teprve díky tomu otázka „Kde se narodil Čapek?" najde ten
+      fakt přes sdílenou entitu — parent-model matching z IV.4 by bez doplněného podmětu neměl co
+      spojit.</p>
+
+      <h3>Aliasy: rozpadlé jméno soupeří samo se sebou</h3>
+      <p>„Kdo napsal Babičku?" má jasnou odpověď: Božena Němcová. Jenže extrakce jede token po tokenu
+      a táž osoba se v textu objeví pod víc jmény — a v assurance pak stojí <b>proti sobě</b>:</p>
+      <div class="tablewrap">
+      <table>
+        <tr><th>Kandidát</th><th>glow</th><th>kdo to je</th></tr>
+        <tr><td>Němcová</td><td>0,280</td><td>ta osoba</td></tr>
+        <tr><td>Barbora</td><td>0,160</td><td>TÁŽ osoba (Barbora Panklová)</td></tr>
+        <tr><td>Šalda</td><td>0,147</td><td>jiná osoba (kritik)</td></tr>
+      </table>
+      </div>
+      <p>Vítěz Němcová (0,280) nepřebije Barboru (0,160) o dvojnásobek (0,280 &lt; 0,320), takže
+      assurance vyhodnotí remízu a <b>doptá se</b> — přitom Barbora není soupeř, je to jen jiné jméno
+      téže osoby. <b>Alias merge</b> to spraví: v <code>_assurance</code> se každý kandidát kanonizuje
+      (metoda <code>_canon</code>) a varianty téže identity se sloučí do kanonického jména, přičemž
+      jejich <b>světlo se sečte</b>. Po sloučení má Barbora≡Němcová glow <b>0,440</b> a rozhodně
+      přebíjí Šaldu (0,147) — z remízy je jasný vítěz a systém <b>odpoví</b>.</p>
+      <p>Aliasy se neodvozují natvrdo v kódu, ale <b>z grafu</b>: z úvodní definiční věty dokumentu se
+      rozsvítí jmenný cluster (podmět a všechna PROPN připojená vztahem <code>flat</code> /
+      <code>flat:name</code> / <code>appos</code>) a kanonické jméno je dominantní podmět dokumentu.
+      Uloží se do indexu <code>_aliases.pkl</code> při reindexu. Klíčová je <b>doc-scoped</b> platnost:
+      pravidlo barbora → němcová platí jen v souboru <code>wiki_božena_němcová</code>, takže kandidát
+      „Čapek" ze souboru o R.U.R. se nekanonizuje na „karel" a „Kdo napsal R.U.R.?" zůstane Čapek.
+      Dosah slučování je tak jen na rozpadlé jméno protagonisty v jeho vlastním dokumentu.</p>
+
+      <h3>Řetězení kontextu: totéž světlo mezi tahy</h3>
+      <p>Řetězení kontextu (<code>carry_context</code>) jsme rozebrali v <a href="#iv-2">IV.2</a> —
+      zdůrazněme, že je to <b>tentýž</b> princip. Navazující otázka „Kdy se narodil?" nemá vlastní
+      entitu, tak si téma vezme z toho, co ještě svítí z minula (Karel Čapek). Vyplnění díry
+      v koreferenci je táž operace: „on / jeho / Ø" se rozřeší na nejteplejší souhlasnou entitu, tedy
+      na to, co ještě svítí. Řetěz světla = řetěz kontextu; jeden mechanismus obsluhuje dialog i
+      zájmena.</p>
+
+      <aside class="rationale">
+        <span class="lbl">Zdůvodňovací blok — alias merge (identita, ne povrch)</span>
+        <dl>
+          <dt>Rozhodnutí</dt><dd>Rozpadlé jméno slučovat na úrovni <b>identity</b> (kanonické lemma), ne rozšiřováním povrchového spanu z věty.</dd>
+          <dt>Problém</dt><dd>Extrakce token po tokenu rozpadne jednu osobu na soupeřící kandidáty (Němcová vs Barbora) → falešná remíza → zbytečné doptání.</dd>
+          <dt>Mechanismus</dt><dd>V assurance se kandidát kanonizuje doc-scoped (<code>_canon(lemma, doc)</code>) a světlo variant se sečte → jasný vítěz. Alias se odvodí z definiční věty (jmenný cluster přes flat/appos), ne z výčtu v kódu.</dd>
+          <dt>Zvažované alternativy</dt><dd><b>Svázat povrch (span v čase odpovědi):</b> měřeno a zahozeno — morfologie rozbíjí HIT („svatoňovice" gold není podřetězec „svatoňovicích"), span ukazuje skloňované tvary. <b>Globální alias tabulka:</b> přebila by cizí entity (Čapek → karel i v R.U.R.); doc-scoped platnost je pojistka.</dd>
+          <dt>Kdy to přestane platit</dt><dd>U entity bez definiční věty se alias neodvodí (nemá odkud). Signál: protagonista zavedený až uprostřed dokumentu se nesloučí.</dd>
+          <dt>Cena</dt><dd>Alias jen z úvodní věty → jména zavedená později v textu zůstanou rozpadlá; slučování řeší typický, ne každý případ.</dd>
+        </dl>
+      </aside>
+
+      <h3>Co nefunguje a proč</h3>
+      <p>Nejpřímější nápad na koreferenci je „vezmi <b>nejbližší</b> předchozí podstatné jméno".
+      Selže to tam, kde nejbližší jméno není téma. V Janově prologu je věta plná slova „svět", ale
+      protagonista je „Slovo" — nejbližší jméno by dosadilo špatnou entitu. A protože se vyřešený
+      podmět zapíše do faktu (viz výše), chyba se <b>tiše přenese</b> dál: fakt dostane špatný
+      who-slot a otázka na něj vrátí špatnou odpověď, aniž by cokoli spadlo. Proto se antecedent
+      neváže na blízkost, ale na <b>aktivaci</b> (téma diskurzu) a kotvu identity.</p>
+
+      <!-- ============================================================ -->
+      <h2>Co už umíš</h2>
+      <p>Prošel jsi celý motor. Umíš popsat <b>dialogový automat</b> jako tah přes tři stavy a tři
+      konce (IV.1). Víš, že první stav je <b>světlo</b>: váhy uzlů jsou idf, vodivost hran je
+      idf×idf×proximity, teplo se šíří spreadem, mezi tahy hasne decayem a — nejdůležitější —
+      glow-orders-ties znamená, že <b>struktura rozhoduje a světlo řadí jen remízu</b> (IV.2). Víš,
+      že druhý stav je <b>VZOR</b>, strukturní stín otázky, který matcher spojí s šablonou
+      FAKT-VZOR × QUERY-VZOR × ODPOVĚĎ (IV.3). Rozumíš <b>datovému modelu</b> — fakt je predikát plus
+      role-sloty plus provenience, a matchuje se predikátem, aby přežil slovosled (IV.4). Chápeš třetí
+      stav, <b>assurance</b>, včetně toho, proč je poctivé mlčení vlastnost a proč je naučená brána
+      dnes vypnutá (přeučení na 76 vzorcích, LOO −2 vs běh −19) (IV.5). A víš, jak <b>díry, aliasy a
+      kontext</b> drží celek pohromadě jedním sdíleným světlem (IV.6).</p>
+      <p>Hlavně bys teď měl umět to nejcennější: <b>předpovědět, kdy systém selže</b> — když
+      prosákne cizí světlo, když se jméno rozpadne bez definiční věty, když je odpověď mimo korpus,
+      nebo když nejbližší jméno není téma. V dalším dílu se od mechanismu přesuneme k
+      <b>měření</b>: jak se takový jazykový model vůbec testuje, proč ne na přesnou rovnost, a co
+      říkají skutečná čísla (velký etalon 43&nbsp;%, rozpad po kategoriích, sebevědomě špatné odpovědi).</p>
+
+      <div class="pager">
+        <a href="dil-3.html"><span class="dir">← předchozí</span>Díl III — Cesta dat</a>
+        <a href="dil-5.html"><span class="dir">další →</span>Díl V — Testování</a>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

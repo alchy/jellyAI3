@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Díl II — První kroky — hypothesis-one</title>
+<link rel="stylesheet" href="assets/style.css">
+<script defer src="assets/mermaid.min.js"></script>
+<script defer src="assets/script.js"></script>
+</head>
+<body>
+<div class="layout">
+
+  <aside class="sidebar">
+    <p class="brand"><a href="index.html">hypothesis-one</a></p>
+    <p class="tag">knižní dokumentace</p>
+    <nav aria-label="Obsah knihy">
+      <a href="index.html">Úvod</a>
+      <p class="part">Díl I — Než začneme</p><a href="dil-1.html">I · Co řeší, slovník, mapa</a>
+      <p class="part">Díl II — První kroky</p><a href="dil-2.html" class="active">II · Instalace, běh, data</a>
+      <p class="part">Díl III — Cesta dat</p><a href="dil-3.html">III · Fáze pipeline</a>
+      <p class="part">Díl IV — Jak to funguje</p><a href="dil-4.html">IV · Automat, aktivace, fakty</a>
+      <p class="part">Díl V — Testování</p><a href="dil-5.html">V · Testy, tvary, měření</a>
+      <p class="part">Díl VI — Rozšiřování</p><a href="dil-6.html">VI · Data, vztahy, testy</a>
+      <p class="part">Díl VII — Provoz</p><a href="dil-7.html">VII · UDPipe, viz, pasti</a>
+      <p class="part">Díl VIII — Otevřené body</p><a href="dil-8.html">VIII · Nedodělky a cesty</a>
+      <p class="part">Přílohy</p><a href="prilohy.html">Rejstřík, konfigurace, registry</a>
+    </nav>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <button class="iconbtn" id="theme-toggle" type="button" aria-label="Přepnout světlý/tmavý režim">◐ režim</button>
+    </div>
+    <div class="content">
+      <nav class="crumbs"><a href="index.html">Úvod</a> › Díl II › Instalace, běh, data</nav>
+      <p class="eyebrow">Díl II — První kroky</p>
+      <h1>Díl II — První kroky</h1>
+
+      <p class="lead">V Dílu I sis přečetl, <i>co</i> hypothesis-one dělá a <i>proč</i> je
+      deterministický. Teď to rozjedeme. Na konci téhle kapitoly budeš mít připravené prostředí,
+      položíš systému první otázku a dostaneš odpověď — a budeš rozumět tomu, co se přitom stalo
+      od stisku klávesy až po vypsaný řádek. Nakonec se naučíš přestavět všechna odvozená data
+      z ničeho, protože v repozitáři schválně nejsou.</p>
+
+      <h2 id="2-1">II.1 Předpoklady a instalace <span class="mark mark-prevzato">Převzato</span></h2>
+
+      <p>Systém je obyčejný Python projekt s jednou nezvyklostí: kromě knihoven z <code>pip</code>
+      potřebuje ještě jednu <b>běžící službu</b> — neuronový rozbor věty. Projděme si obojí.</p>
+
+      <p>Všechny příkazy v této knize se spouštějí z adresáře experimentu. Nejdřív se do něj přesuň
+      a založ virtuální prostředí, aby se knihovny nemíchaly se zbytkem systému:</p>
+
+<pre><code>$ cd experiments/hypothesis-one
+$ python3 -m venv .venv
+$ source .venv/bin/activate
+$ pip install -r ../../requirements.txt</code></pre>
+
+      <p>Soubor <code>requirements.txt</code> leží o dvě úrovně výš (v kořeni repozitáře, proto
+      <code>../../</code>) a je krátký — projekt si vystačí s numpy (výpočet indexů) a pytest (testy).
+      Runtime žádnou další knihovnu nepotřebuje: rozhodovací logika je čistý Python nad standardní
+      knihovnou.</p>
+
+      <p>Zbývá jediná vnější závislost, kterou <code>pip</code> nenainstaluje — <b>UDPipe 2</b>.
+      To je neuronový nástroj, který větu rozebere na slova, přiřadí každému slovní druh, základní
+      tvar (lemma) a závislostní vztah k ostatním slovům. Pojem UDPipe 2, lemma, upos a deprel
+      najdeš ve slovníku <a href="dil-1.html#slovnik">Dílu I</a>. Systém k němu mluví přes HTTP na
+      adrese z konfigurace:</p>
+
+<pre><code>// config.json
+"services": {
+  "udpipe_url": "http://127.0.0.1:8092/parse"
+}</code></pre>
+
+      <p>Klíč <code>services.udpipe_url</code> říká, kam se runtime obrací, když má rozebrat tvoji
+      otázku — na <b>lokální port 8092</b>. Tuhle službu si musíš spustit sám (jak přesně, rozebírá
+      <a href="dil-7.html">Díl VII</a>); dokud neposlouchá, systém otázku nerozebere. Zapamatuj si
+      jednu větu, na které stojí celá architektura projektu: <b>UDPipe 2 je JEDINÁ živá služba za
+      běhu.</b> Všechno ostatní — aktivace, výběr faktů, míra jistoty — se počítá deterministicky
+      v procesu, bez sítě a bez dalšího neuronu. Stejná otázka proto dá vždy stejnou odpověď.</p>
+
+      <p>Možná tě zmate, že v konfiguraci je ještě druhá adresa UDPipe — v bloku
+      <code>preprocessing</code> ukazuje <code>udpipe2_url</code> na veřejný server LINDAT. Ta se
+      použije <i>jednou</i> a <i>předem</i>, když se anotuje korpus (viz II.3); s během dotazů nemá
+      nic společného. Rozbor <b>otázky</b> za běhu jde vždy na lokální 8092.</p>
+
+      <div class="tablewrap">
+      <table>
+        <tr><th>Předpoklad</th><th>K čemu</th><th>Jak ověřit</th></tr>
+        <tr><td>Python 3</td><td>běh všech skriptů projektu</td><td><code>python3 --version</code></td></tr>
+        <tr><td>numpy, pytest</td><td>výpočty indexů; spouštění testů</td><td><code>pip install -r ../../requirements.txt</code></td></tr>
+        <tr><td>UDPipe 2 na <code>127.0.0.1:8092</code></td><td>rozbor otázky za běhu (jediná živá služba)</td><td>musí odpovídat na <code>/parse</code></td></tr>
+      </table>
+      </div>
+
+      <h2 id="2-2">II.2 První úspěšný běh <span class="mark mark-overeno">Ověřeno</span></h2>
+
+      <p>Prostředí je hotové a UDPipe 2 poslouchá na 8092. Položme systému první otázku. Skript
+      <code>ask.py</code> je interaktivní smyčka: napíšeš otázku, dostaneš odpověď, píšeš dál;
+      prázdný řádek (nebo Ctrl-D) skončí.</p>
+
+<pre><code>$ python3 ask.py
+Ptej se (prázdný řádek ukončí). Např.: Kdo napsal Švejka?
+
+? Kdo je Karel Čapek?
+  → spisovatel
+
+?
+$</code></pre>
+
+      <p>Na obrazovce uvidíš přesně tohle: úvodní řádek s příkladem, prázdný řádek a pak výzvu
+      <code>?&nbsp;</code>, za kterou píšeš. Odpověď se vypíše odsazená se šipkou:
+      <code>&nbsp;&nbsp;→ spisovatel</code>. Pak přijde nová výzva; když na ni jen zmáčkneš Enter,
+      program se ukončí a vrátíš se do shellu.</p>
+
+      <p><b>Co se právě stalo.</b> Sleduj to na diagramu níže. Skript <code>ask.py</code> sám
+      neumí skoro nic — vytvoří objekt <code>Answering</code> a předá mu tvoji větu voláním
+      <code>a.answer(q, carry_context=True)</code>. Objekt <code>answering.py</code> pošle větu
+      službě UDPipe 2 na port 8092, dostane zpět rozbor (lemma, slovní druhy, závislosti) a
+      teprve nad tímhle rozborem proběhne deterministická úvaha: rozsvítí se soubor o Karlu Čapkovi,
+      přiloží se VZOR pro otázku „Kdo je X?" a vybere se nejjistější kandidát. Výsledkem je slovník
+      s režimem a odpovědí, který si <code>ask.py</code> převezme a vypíše.</p>
+
+      <p class="full">Na diagramu si všimni, že jediná šipka ven ze systému míří na
+      <b>UDPipe 2</b> — to je ta jediná živá služba. Všechno ostatní (uzel „rozsvícení, VZOR,
+      assurance") se děje uvnitř <code>answering.py</code> bez sítě.</p>
+
+<pre class="mermaid">
+sequenceDiagram
+  accTitle: Tok jedné otázky systémem
+  accDescr: Otázka od uživatele projde skriptem ask.py do modulu answering.py, který pošle větu neuronové službě UDPipe 2 na portu 8092, dostane rozbor a vrátí režim s odpovědí zpět k vypsání.
+  participant U as Uživatel
+  participant ASK as ask.py
+  participant ANS as answering.py
+  participant UD as UDPipe 2 na portu 8092
+  U ->> ASK: napíše otázku o Karlu Čapkovi
+  ASK ->> ANS: volá answer s carry_context
+  ANS ->> UD: rozbor věty přes HTTP
+  UD -->> ANS: lemma, upos, deprel
+  Note over ANS: rozsvícení, VZOR, assurance
+  ANS -->> ASK: režim answer, odpověď spisovatel
+  ASK -->> U: vypíše spisovatel
+</pre>
+
+      <p>Odpověď „spisovatel" nepřišla proto, že by někde byl řádek <code>Karel Čapek = spisovatel</code>.
+      Slovo „Čapek" rozsvítilo soubor o Karlu Čapkovi; protože ses ptal „Kdo <i>je</i> X?", VZOR
+      hledal <b>jmenný přísudek</b> (to, co Karel <i>je</i>) a mezi kandidáty — spisovatel, dramatik,
+      novinář — měl „spisovatel" nejsilnější oporu s velkým náskokem. Náskok znamenal jistotu, a tak
+      systém odpověděl. Vnitřek téhle úvahy rozebírá <a href="dil-1.html">Díl IV</a>; tady stačí, že
+      víš, kudy otázka teče.</p>
+
+      <p><code>ask.py</code> umí vypsat tři různé konce — přesně ty tři režimy dialogového automatu
+      z Dílu I. Tady je jak vypadají na obrazovce, protože je při experimentování potkáš všechny:</p>
+
+      <div class="tablewrap">
+      <table>
+        <tr><th>Režim</th><th>Kdy</th><th>Co uvidíš na obrazovce</th></tr>
+        <tr><td><b>odpověď</b></td><td>jeden jasný vítěz</td><td><code>&nbsp;&nbsp;→ spisovatel</code></td></tr>
+        <tr><td><b>doptání</b></td><td>víc rovnocenných možností</td><td><code>&nbsp;&nbsp;nejsem si jist — mám data o: 1921, 1932, pes.  Upřesni prosím?</code></td></tr>
+        <tr><td><b>nevím</b></td><td>slabá nebo žádná evidence</td><td><code>&nbsp;&nbsp;— o tom nemám jasná data (nehádám)</code></td></tr>
+      </table>
+      </div>
+
+      <p>Je tu ještě čtvrtý řádek, na který můžeš narazit hned zkraje:
+      <code>&nbsp;&nbsp;— nerozumím otázce (chybí tázací slovo, nebo o tom nejsou data)</code>.
+      Ten se objeví, když věta nezačíná tázacím slovem (Kdo, Co, Kde, Kdy, Kolik, Čím…), z něhož
+      systém pozná, jaký <i>tvar</i> odpovědi hledáš. Bez tázacího slova nemá VZOR co přiložit.</p>
+
+      <h3>Co nefunguje a proč</h3>
+      <p>Nejčastější zádrhel prvního běhu není v Pythonu, ale v tom, že běží jen půlka. Spustíš
+      <code>ask.py</code>, ale <b>zapomeneš spustit UDPipe 2</b> na portu 8092. Protože rozbor otázky
+      je jediné místo, kde runtime sahá po síti, projeví se to hned u první otázky: místo odpovědi
+      dostaneš chybu spojení (odmítnuté připojení na 127.0.0.1:8092), nebo — když je port obsazený
+      něčím jiným — nesmyslný rozbor. Zákeřné je, že sám import a start <code>ask.py</code> projde
+      bez chyby; UDPipe se volá až při první otázce, takže se zdá, že „to nastartovalo" a teprve
+      dotaz to celé shodí. Pravidlo: než se ptáš, ověř, že služba na 8092 skutečně odpovídá.</p>
+
+      <h2 id="2-3">II.3 Přestavba dat z nuly <span class="mark mark-prevzato">Převzato</span></h2>
+
+      <p>Když se poprvé podíváš do složky <code>data/</code>, možná tě překvapí, že v Gitu skoro nic
+      není — žádný anotovaný korpus, žádné indexy, žádné fakty. Není to nedopatření. Všechna tahle
+      data jsou <b>odvozená</b>: dají se do posledního bajtu spočítat ze surových textů a z kódu.
+      Ukládat je do verzování by znamenalo verzovat velké binární soubory, které se mění při každém
+      přepočtu — a hlavně by to bylo zbytečné. Model UDPipe 2 je v konfiguraci <b>pinnutý</b> na
+      konkrétní verzi, takže stejný vstup dá vždy stejný výstup. Reprodukovatelnost nahrazuje
+      verzování.</p>
+
+      <p>Následující tabulka ukazuje, co všechno je odvozené (a proto v <code>.gitignore</code>) a
+      který skript to staví. Verzuje se jen kód, konfigurace a tvoje surové texty — nic z tohohle:</p>
+
+      <div class="tablewrap">
+      <table>
+        <tr><th>Cesta</th><th>Co obsahuje</th><th>Staví</th></tr>
+        <tr><td><code>data/corpus/*.pkl</code></td><td>anotace vět (shard na soubor)</td><td><code>annotate_corpus.py</code></td></tr>
+        <tr><td><code>data/index/*.pkl</code></td><td>tf·idf, idf, podmětový index, aliasy, doc-graf</td><td><code>build_indexes()</code></td></tr>
+        <tr><td><code>registry.jsonl</code></td><td>vazby fakt↔otázka↔odpověď</td><td><code>synth_registry.py</code></td></tr>
+        <tr><td><code>data/facts/*.jsonl</code></td><td>fakty (predikát + role) + koreference + čas</td><td><code>build_facts_all.py</code></td></tr>
+        <tr><td><code>data/templates/*.jsonl</code></td><td>VZOR šablony otázka↔fakt</td><td><code>build_templates_all.py</code></td></tr>
+      </table>
+      </div>
+
+      <p>Přestavba z nuly je pět kroků <b>v tomto pořadí</b> — každý krok je vstupem toho dalšího,
+      takže na pořadí záleží. Vše běží lokálně (jen první krok potřebuje UDPipe 2):</p>
+
+<pre><code>$ cd experiments/hypothesis-one
+$ python3 annotate_corpus.py                                          # ① raw → anotovaný korpus
+$ python3 -c "from dataloader import Dataloader; Dataloader().build_indexes()"   # ② tf·idf + indexy
+$ python3 synth_registry.py                                          # ④ registry.jsonl (fakt↔otázka)
+$ python3 build_facts_all.py                                         #    fakty + koreference + čas
+$ python3 build_templates_all.py                                     #    VZOR šablony</code></pre>
+
+      <p>Proč právě takhle za sebou? <b>Anotace</b> přečte surové texty a z každého udělá jeden
+      anotovaný shard — je přírůstková, už zpracované a nezměněné soubory přeskočí. <b>Indexy</b>
+      spočítají z korpusu tf·idf váhy, idf a pomocné tabulky. Ty musí být hotové <i>před</i> syntézou
+      registru, protože <code>synth_registry.py</code> nahrává soubory do grafu přes index — bez něj
+      by neměl podle čeho korpus mountovat. <b>Registr</b> je pak společný vstup pro fakty i šablony:
+      <code>build_facts_all.py</code> z něj agreguje fakty a doplní pro-drop podměty koreferencí,
+      datumy expertem Chronos a bio-závorky; <code>build_templates_all.py</code> z téhož registru
+      postaví VZOR šablony. Diagram ukazuje ten samý řetěz jako tok dat:</p>
+
+      <p class="full">Na diagramu sleduj, že z <code>registry.jsonl</code> vedou <b>dvě</b> šipky —
+      registr je rozcestník, ze kterého se paralelně staví fakty i šablony.</p>
+
+<pre class="mermaid">
+flowchart TD
+  accTitle: Přestavba dat z nuly
+  accDescr: Surové texty projdou anotací na korpus, z korpusu se spočítají indexy, pak registr vazeb, a z registru se paralelně postaví fakty a VZOR šablony.
+  RAW["data/raw/*.txt — surový text"]
+  COR["data/corpus/*.pkl — anotace UDPipe"]
+  IDX["data/index/ — tf-idf, idf, podměty, aliasy"]
+  REG["registry.jsonl — vazby fakt a otázka"]
+  FAC["data/facts/*.jsonl — fakty, koreference, čas"]
+  TPL["data/templates/*.jsonl — VZOR šablony"]
+  RAW -->|annotate_corpus.py| COR
+  COR -->|build_indexes| IDX
+  IDX -->|synth_registry.py| REG
+  REG -->|build_facts_all.py| FAC
+  REG -->|build_templates_all.py| TPL
+</pre>
+
+      <p>Pro představu o velikosti: nad korpusem 52 souborů z téhle přestavby vznikne 16&nbsp;028
+      registrovaných vazeb, k tomu 24 faktů z bio-závorek a 114 vztahových hran. Přesná čísla a to,
+      jak se z nich měří úspěšnost, přijdou v <a href="dil-5.html">Dílu V</a>.</p>
+
+      <aside class="rationale">
+        <span class="lbl">Zdůvodňovací blok</span>
+        <dl>
+          <dt>Rozhodnutí</dt><dd>Odvozená data (korpus, indexy, registr, fakty, šablony) se do Gitu neukládají a před použitím se přestaví ze surových textů.</dd>
+          <dt>Problém</dt><dd>Tahle data jsou velká, binární a mění se při každém přepočtu. Kdyby byla ve verzování, každý běh by plodil obří, nečitelné diffy a repozitář by rychle nabobtnal.</dd>
+          <dt>Mechanismus</dt><dd>Anotace i indexy jsou deterministické, protože model UDPipe 2 je pinnutý na konkrétní verzi. Stejný surový text + stejný kód → bajt po bajtu stejná data. Co je reprodukovatelné, není třeba verzovat — verzuje se recept (kód), ne výsledek.</dd>
+          <dt>Zvažované alternativy</dt><dd><b>Commitovat vygenerovaná data:</b> ušetří přestavbu, ale otráví historii binárními diffy a svádí k tomu, že se data a kód rozejdou (data z jiné verze skriptu). <b>Nepinovat model a brát vždy nejnovější:</b> ušetří konfiguraci, ale rozbije determinismus — po tiché aktualizaci UDPipe by se odpovědi změnily bez jediné změny v kódu.</dd>
+          <dt>Kdy to přestane platit</dt><dd>Když by přestavba trvala hodiny (mnohem větší korpus), vyplatí se vygenerovaná data cachovat jako artefakt sestavení — ale i pak mimo Git, ne v něm.</dd>
+          <dt>Cena</dt><dd>Po každém <code>git clone</code> a před každým nasazením musíš pětikrokovou přestavbu spustit ručně. Kdo na to zapomene, spustí systém nad prázdnými nebo zastaralými daty.</dd>
+        </dl>
+      </aside>
+
+      <h3>Co nefunguje a proč</h3>
+      <p>Typický první omyl: přidáš nový text do <code>data/raw/</code>, spustíš
+      <code>annotate_corpus.py</code> — a považuješ to za hotové. Anotace opravdu proběhne a vznikne
+      nový shard, jenže tím to nekončí. Indexy, registr, fakty ani šablony o novém souboru <b>nevědí</b>,
+      protože ses zastavil na kroku ①. Zeptáš se na něco z čerstvě přidaného textu a systém poctivě
+      odpoví „o tom nemám jasná data" — přesně jako by ten text vůbec neexistoval.</p>
+      <p>Selhání je <b>tiché</b>: žádná výjimka, žádné varování, jen odpověď, která vypadá jako
+      legitimní „nevím". A je zákeřnější, než se zdá — idf (unikátnost slova) závisí na počtu
+      dokumentů, takže přidání souboru posune váhy i u <i>ostatních</i> odpovědí. Proto se indexy
+      přepočítávají celé, ne jen nový soubor, a proto po každém zásahu do <code>data/raw/</code>
+      musí projít <b>všech pět kroků</b>, ne jen anotace. Pravidlo do paměti: <i>přidat data</i> se
+      rovná <i>přestavět data</i>.</p>
+
+      <h2>Co už umíš</h2>
+      <p>Umíš připravit prostředí (<code>.venv</code>, <code>requirements.txt</code>) a víš, že jediná
+      živá služba za běhu je UDPipe 2 na portu 8092 — všechno ostatní počítá systém deterministicky
+      sám. Položil jsi první otázku přes <code>python3 ask.py</code>, dostal odpověď „spisovatel" a
+      dokážeš popsat, kudy otázka tekla: přes <code>ask.py</code> do <code>answering.py</code>,
+      odtud na UDPipe pro rozbor a zpět k rozhodnutí o režimu. Rozeznáš čtyři řádky, které
+      <code>ask.py</code> umí vypsat, a víš, proč jsou generovaná data mimo Git a jak je pěti kroky
+      přestavět — i co se stane, když na přestavbu zapomeneš.</p>
+      <p>V dalším dílu půjdeme těch pět kroků do hloubky: <a href="dil-3.html">Díl III</a> sleduje
+      jednu větu o Karlu Čapkovi celou cestou od surového textu až po hotový fakt — fázi po fázi.</p>
+
+      <div class="pager">
+        <a href="dil-1.html"><span class="dir">← předchozí</span>Díl I — Než začneme</a>
+        <a href="dil-3.html"><span class="dir">další →</span>Díl III — Cesta dat</a>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

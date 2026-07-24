@@ -1,0 +1,371 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Díl I — Než začneme — hypothesis-one</title>
+<link rel="stylesheet" href="assets/style.css">
+<script defer src="assets/mermaid.min.js"></script>
+<script defer src="assets/script.js"></script>
+</head>
+<body>
+<div class="layout">
+
+  <aside class="sidebar">
+    <p class="brand"><a href="index.html">hypothesis-one</a></p>
+    <p class="tag">knižní dokumentace</p>
+    <nav aria-label="Obsah knihy">
+      <a href="index.html">Úvod</a>
+      <p class="part">Díl I — Než začneme</p><a href="dil-1.html" class="active">I · Co řeší, slovník, mapa</a>
+      <p class="part">Díl II — První kroky</p><a href="dil-2.html">II · Instalace, běh, data</a>
+      <p class="part">Díl III — Cesta dat</p><a href="dil-3.html">III · Fáze pipeline</a>
+      <p class="part">Díl IV — Jak to funguje</p><a href="dil-4.html">IV · Automat, aktivace, fakty</a>
+      <p class="part">Díl V — Testování</p><a href="dil-5.html">V · Testy, tvary, měření</a>
+      <p class="part">Díl VI — Rozšiřování</p><a href="dil-6.html">VI · Data, vztahy, testy</a>
+      <p class="part">Díl VII — Provoz</p><a href="dil-7.html">VII · UDPipe, viz, pasti</a>
+      <p class="part">Díl VIII — Otevřené body</p><a href="dil-8.html">VIII · Nedodělky a cesty</a>
+      <p class="part">Přílohy</p><a href="prilohy.html">Rejstřík, konfigurace, registry</a>
+    </nav>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <button class="iconbtn" id="theme-toggle" type="button" aria-label="Přepnout světlý/tmavý režim">◐ režim</button>
+    </div>
+    <div class="content">
+      <nav class="crumbs"><a href="index.html">Úvod</a> › Díl I</nav>
+      <p class="eyebrow">Díl I — Než začneme</p>
+      <h1>Než začneme: co to je, jak se tomu říká a kde to leží</h1>
+
+      <p class="lead">Kde jsme a kam jdeme: tohle je úplný začátek. Nepředpokládám, že o projektu
+      <b>hypothesis-one</b> něco víš — ani co dělá, ani z čeho se skládá, ani co znamenají slova,
+      která na tebe budou dál v knize padat. Tenhle díl tě vybaví třemi věcmi, bez kterých by
+      zbytek nedával smysl: <b>proč projekt vůbec existuje</b> (kapitola I.1), <b>co znamenají jeho
+      pojmy</b> (slovníček I.2, do kterého se budeš vracet) a <b>kde v repozitáři co najdeš</b>
+      (mapa I.3). Teprve pak, v Dílu II, projekt spustíme.</p>
+
+      <h2 id="i-1">I.1 Co hypothesis-one řeší a pro koho</h2>
+
+      <p>Začneme obyčejnou otázkou. Máš text — třeba encyklopedické heslo o spisovateli Karlu
+      Čapkovi — a chceš se ho ptát česky, vlastními slovy: <i>„Kdy se Karel Čapek narodil?"</i>,
+      <i>„Kdo byl jeho bratr?"</i> A chceš dostat krátkou, věcnou odpověď: <i>1890</i>, <i>Josef</i>.
+      Přesně tohle je úloha <b>otázka–odpověď</b> (anglicky <i>question answering</i>, zkratkou Q&amp;A):
+      systém dostane otázku v přirozeném jazyce a vrátí odpověď opřenou o nějaký zdroj textu.</p>
+
+      <p>hypothesis-one je taková Q&amp;A služba pro <b>češtinu</b>, se dvěma důležitými vlastnostmi,
+      které ji odlišují od toho, co dnes většina lidí zná pod „umělá inteligence".</p>
+
+      <p><b>Staví ze surového textu.</b> Nekrmíš ho ručně vyplněnou tabulkou faktů. Dáš mu obyčejné
+      textové soubory (v projektu jsou to hesla z české Wikipedie a knihy Bible) a on si z nich sám
+      poskládá vnitřní <b>mapu faktů</b> — kdo se kdy narodil, kdo co napsal, kdo je čí bratr. Slovo
+      „surový" (často uvidíš anglicky <i>raw</i>) tu znamená právě tohle: text tak, jak ho člověk
+      napsal, bez předzpracování do tabulek.</p>
+
+      <p><b>Je deterministický.</b> Deterministický znamená, že na <b>stejnou otázku vždy vrátí
+      stejnou odpověď</b> — dvakrát, stokrát, na tvém i na cizím počítači. Neházi kostkou. Tahle
+      vlastnost zní samozřejmě, ale velké jazykové modely (typu ChatGPT) ji nemají: tytéž modely na
+      tutéž otázku odpovědí pokaždé o něco jinak. Proč to u nás jde a proč to chceme, rozebereme za
+      chvíli ve zdůvodňovacím bloku.</p>
+
+      <p>A ještě jedna vlastnost, kterou uvidíš prolínat celou knihou: <b>když systém neví, tak
+      nehádá</b>. Radši přizná „o tom nemám data" nebo se doptá, než aby si odpověď vymyslel. To je
+      záměr, ne nedostatek — a je to jeden z hlavních důvodů, proč projekt vypadá, jak vypadá.</p>
+
+      <h3>Odkud se hypothesis-one vzal: odlehčení od „karet"</h3>
+
+      <p>Projekt nevznikl na zelené louce. Je to <b>odlehčená větev</b> staršího a mnohem
+      rozsáhlejšího projektu, který v hlavním adresáři žije jako <code>jellyai/</code> (v knize mu
+      budeme říkat <b>parent</b>, tedy „rodič"). Parent je bohatá zásobárna nápadů, jenže postavená
+      na konceptu <b>KARET</b> — malých pravidlových jednotek, kterých postupně přibývalo tolik, že
+      se jejich vzájemná provázanost stala neúnosnou. Odborně se tomu říká <b>exploze složitosti</b>:
+      každý nový případ si žádá další kartu, každá další karta může nečekaně ovlivnit ty staré, a
+      po čase nikdo nedohlédne, co se stane, když přidáš jednu další.</p>
+
+      <p>hypothesis-one je pokus říct totéž jednodušeji. Místo rostoucí hromady karet stojí na
+      dvou nosných myšlenkách — <b>VZOR</b> (opakovatelný gramatický tvar věty) a <b>aktivace</b>
+      („světlo", které se rozlije po mapě faktů kolem toho, na co se ptáš). Obojí si podrobně
+      vysvětlíme; zatím stačí, že cílem experimentu je <b>zjednodušit a ukotvit směr</b>, ne za
+      každou cenu parent nahradit. Užitečné střípky parentu (třeba oprava, jak se čte zkratka
+      <code>R.U.R.</code>) si bereme s sebou.</p>
+
+      <h3>Jak dnes odpovídá — na jednom příkladu</h3>
+
+      <p>Aby „mapa faktů" a „deterministický" nebyla jen slova, podívej se, co systém dnes reálně
+      vrací. Celou knihou nás bude provázet jedna postava — <b>Karel Čapek</b> — protože se na ní dá
+      ukázat skoro všechno. Tohle jsou skutečné dvojice otázka → odpověď, ověřené během vývoje:</p>
+
+      <div class="tablewrap">
+      <table>
+        <tr><th>Otázka</th><th>Odpověď systému</th><th>Co se ptáme</th></tr>
+        <tr><td>Kdo je Karel Čapek?</td><td>spisovatel</td><td>čím je (jmenný přísudek)</td></tr>
+        <tr><td>Kdy se narodil?</td><td>1890</td><td>rok — a všimni si: bez zopakování jména</td></tr>
+        <tr><td>Kde se narodil?</td><td>Svatoňovice</td><td>místo</td></tr>
+        <tr><td>Kdo byl bratr Karla Čapka?</td><td>Josef</td><td>vztah mezi dvěma lidmi</td></tr>
+        <tr><td>Kdo napsal Švejka?</td><td>Hašek</td><td>autorství</td></tr>
+        <tr><td>Je pes šelma?</td><td>ano</td><td>otázka ano/ne</td></tr>
+        <tr><td>Je kůň šelma?</td><td>ne</td><td>otázka ano/ne (poctivé „ne")</td></tr>
+      </table>
+      </div>
+      <p><span class="mark mark-overeno">Ověřeno</span> Tyhle odpovědi padly při skutečném běhu
+      systému během vývoje (větev, ke které se váže tato dokumentace). Druhý řádek stojí za
+      povšimnutí: <i>„Kdy se narodil?"</i> neobsahuje žádné jméno, a přesto systém ví, že jde pořád
+      o Karla Čapka — <b>drží si téma z předchozí otázky</b>. Tomuhle řetězení se budeme věnovat
+      později; teď jen chci, abys viděl, že „mapa faktů" opravdu drží souvislosti, ne jen izolovaná
+      slova.</p>
+
+      <p>A protože kniha nikde neslibuje víc, než co systém umí, hned dodám i druhou stranu. Jsou
+      otázky, na které dnes odpovídá <b>špatně</b>, a je poctivé to říct rovnou: <i>„Kdo objevil
+      mloky?"</i> vrátí <i>kapitán</i> (správně má být <i>Van Toch</i>), <i>„Kdo postavil archu?"</i>
+      vrátí <i>bůh</i>. Proč zrovna tyhle případy selhávají a co se s tím dá dělat, je náplň Dílů V
+      a VIII. Zmiňuju to tady, aby sis od začátku zvykl, že tahle kniha ti bude ukazovat i to, co
+      nefunguje — je to pro pochopení systému cennější než výčet úspěchů.</p>
+
+      <h3>Jak dobře to funguje — jedno číslo pro orientaci</h3>
+
+      <p>Abys měl měřítko: na velké testovací sadě 145 otázek dnes systém odpoví správně na
+      <b>63 z nich, tedy 43 %</b>; na menší, ručně vybrané sadě 25 otázek je to <b>18 z 25, tedy
+      72 %</b>. Tato čísla pocházejí ze skriptů <code>eval_large.py</code> a
+      <code>eval_answers.py</code>, které si v Dílu V spustíme sami a rozebereme, proč jsou zrovna
+      takhle vysoká (a proč zrovna takhle nízká). Jedno číslo je ale důležité už teď: v kategorii
+      otázek, na které v datech odpověď <b>není</b>, systém <b>7 ze 7</b> správně mlčí místo hádání.
+      To „poctivé mlčení" je vlastnost, ne chyba — a hned uvidíš proč.</p>
+
+      <h3>Proč deterministicky a symbolicky, a ne velkým jazykovým modelem</h3>
+
+      <p>Tady se nabízí zásadní námitka, kterou má smysl vzít vážně: <i>proč to celé nestavíme na
+      velkém jazykovém modelu?</i> Ten by přece odpověděl na všechno a hezky česky. Slovo
+      <b>symbolický</b> označuje opačný přístup než takový model: systém pracuje s <b>explicitními,
+      čitelnými pravidly a strukturami</b> (slovní druh, pád, role ve větě), ne s milionem
+      naučených číselných vah, do kterých není vidět. Následující blok vysvětluje, proč jsme zvolili
+      tuhle cestu — a je to zároveň první ukázka <b>zdůvodňovacího bloku</b>, se kterým se v knize
+      budeš potkávat u každého většího rozhodnutí.</p>
+
+      <aside class="rationale">
+        <span class="lbl">Zdůvodňovací blok</span>
+        <dl>
+          <dt>Rozhodnutí</dt><dd>Runtime (rozhodování o odpovědi za běhu) je deterministický a symbolický. Neuronový model se použije jen jednou předem, na anotaci textu (rozbor vět), nikdy ne k výběru odpovědi.</dd>
+          <dt>Problém</dt><dd>U faktického Q&amp;A je <b>sebejistě špatná odpověď horší než žádná</b>. Když systém na otázku mimo svá data plynně odpoví smyšlenkou, uživatel jí uvěří. A při ladění a testování potřebujeme, aby stejný vstup dal stejný výstup — jinak nejde poznat, jestli změna pomohla, nebo jen zamíchala kostkou.</dd>
+          <dt>Mechanismus</dt><dd>Symbolická cesta vede přes viditelné mezikroky: text se rozloží na slovní druhy a role ve větě, z toho se poskládají fakty, a odpověď je konkrétní fakt s doložitelným původem (víme, ze které věty a ze kterého souboru pochází). Protože žádný krok neobsahuje náhodu ani skryté váhy, dá se výsledek <b>zopakovat, vysvětlit a zamknout</b>. A protože fakty buď jsou, nebo nejsou, umí systém rozlišit „vím" od „nevím".</dd>
+          <dt>Zvažované alternativy</dt><dd><b>Velký jazykový model (LLM):</b> odpoví vždy a plynule, ale při neznalosti si fakt <i>vymyslí</i> (tzv. halucinace) a odpovídá pokaždé trochu jinak — obojí je pro faktický, testovatelný systém diskvalifikující. <b>Hybrid s vektorovými embeddingy v rozhodovací smyčce:</b> zněl by lákavě (lepší pokrytí parafrází), ale vnesl by do runtime nedeterminismus a neprůhlednost — přesně to, čemu se vyhýbáme; proto neuronové modely držíme striktně mimo běh (jen na přípravu dat předem, offline).</dd>
+          <dt>Kdy to přestane platit</dt><dd>Když by cílem přestala být doložitelnost a stačila „přibližně dobrá plynulá odpověď" (např. neformální chatbot), pak deterministická přísnost jen překáží a LLM je vhodnější. Signál: nikdo se neptá „odkud to víš" a nevadí občasná smyšlenka.</dd>
+          <dt>Cena</dt><dd>Nižší pokrytí. Systém, který nehádá, nutně nechá část otázek nezodpovězených — dnešních 43 % na velké sadě je i tímhle. Platíme šířkou za spolehlivost: co odpoví, tomu se dá věřit; zač neručí, to řekne.</dd>
+        </dl>
+      </aside>
+
+      <p>Pro koho tedy hypothesis-one je? Pro toho, kdo chce <b>ověřitelné faktické odpovědi z
+      vlastního textu</b> a komu <b>záleží na tom, aby systém přiznal neznalost</b> víc než na tom,
+      aby řekl vždycky něco. Není to náhrada za konverzačního asistenta; je to nástroj, u kterého
+      víš, odkud každá odpověď je.</p>
+
+      <h2 id="slovnik">I.2 Slovníček pojmů</h2>
+
+      <p>Tahle kapitola není ke čtení jedním dechem — je to <b>rejstřík, do kterého se vracíš</b>.
+      Kdykoli v knize narazíš na tučný pojem, který ti nic neříká, hledej ho tady. U každého najdeš
+      krátkou definici pro nováčka, <b>kde v projektu na něj narazíš</b> (soubor nebo vrstva) a
+      <b>související</b> pojmy, přes které se dostaneš dál. Pojmy jsou seřazené zhruba tak, jak na ně
+      budeš narážet — od stavebních kamenů textu k pojmům o kvalitě odpovědí.</p>
+
+      <div class="tablewrap">
+      <table>
+        <tr><th>Pojem</th><th>Krátká definice (pro nováčka)</th><th>Kde v projektu narazíš</th><th>Související</th></tr>
+
+        <tr><td><b>UDPipe 2</b></td><td>Cizí neuronový nástroj (ze střediska ÚFAL), který větu rozebere: rozřeže na slova, určí slovní druhy, pády a závislosti mezi slovy. Používá se jen jednou předem (offline), ne za běhu.</td><td><code>annotate_corpus.py</code>; služba na portu 8092</td><td>CoNLL-U, lemma, upos, deprel, ÚFAL</td></tr>
+
+        <tr><td><b>CoNLL-U</b></td><td>Textový formát, ve kterém UDPipe vrací rozbor věty: jeden řádek na slovo, sloupce s rysy (tvar, lemma, slovní druh, pád, na kom slovo závisí).</td><td>výstup anotace (vrstva ①)</td><td>UDPipe 2, lemma, upos, deprel</td></tr>
+
+        <tr><td><b>lemma</b></td><td>Základní (slovníkový) tvar slova. „psa", „psovi", „psi" mají lemma <i>pes</i>. Díky lemmatu systém pozná, že jde o totéž slovo v jiném tvaru.</td><td>rys tokenu; všude v rozboru</td><td>upos, CoNLL-U</td></tr>
+
+        <tr><td><b>upos</b> (UPOS)</td><td>Slovní druh podle jednotné mezinárodní sady: NOUN (podst. jméno), PROPN (vlastní jméno), VERB (sloveso), ADJ (přídavné), ADP (předložka), PRON (zájmeno)…</td><td>rys tokenu</td><td>lemma, deprel</td></tr>
+
+        <tr><td><b>deprel</b></td><td>Název závislosti mezi slovy — jakou roli slovo hraje vůči tomu, na kterém visí (podmět, předmět, přívlastek…). Surový vstup, který si projekt překládá do vlastních rolí.</td><td>vrstva ③ (<code>role_catalog.py</code>)</td><td>role, upos</td></tr>
+
+        <tr><td><b>NameType</b></td><td>Rys od UDPipe, který u vlastního jména říká jeho typ: <i>Giv/Sur</i> = osoba (křestní/příjmení), <i>Geo</i> = místo. Odsud se berou entity (o kom/o čem věta je).</td><td>vrstva ①; expert místa</td><td>UDPipe 2, entita, gazetteer</td></tr>
+
+        <tr><td><b>ÚFAL</b></td><td>Ústav formální a aplikované lingvistiky Matematicko-fyzikální fakulty UK — původ nástroje UDPipe 2 i formátu CoNLL-U.</td><td>externí zdroj</td><td>UDPipe 2</td></tr>
+
+        <tr><td><b>tf·idf</b></td><td>Míra, jak silně soubor „nese" určité slovo. <i>tf</i> = jak často je slovo v souboru, <i>idf</i> = jak vzácné je napříč všemi soubory. Součin cílí, které soubory k otázce nahrát.</td><td>vrstva ② (<code>dataloader.py</code>)</td><td>mount, idf, aktivace</td></tr>
+
+        <tr><td><b>VZOR</b> (frame_sig)</td><td>Přesný gramatický „otisk" okolí jedné entity ve větě (slovní druhy a pády sousedních slov). Je přesný na gramatiku, ale nezávislý na konkrétních slovech. Otázka i fakt se rozloží na stejné VZORy → shoda = odpověď.</td><td>vrstva ③ (<code>grammar_vzor.py</code>)</td><td>SLOT, role, díra</td></tr>
+
+        <tr><td><b>WORD / SLOT / DÍRA</b></td><td><b>WORD</b> je konkrétní slovo v textu. <b>SLOT</b> je předpis „sem patří slovo takového druhu a pádu". <b>DÍRA</b> je nevyplněný slot ve faktu — a právě dírou je otázka (chybějící kousek faktu).</td><td>vrstva ③–⑤</td><td>VZOR, role, koreference</td></tr>
+
+        <tr><td><b>role</b> (rolový klíč)</td><td>Náš vlastní, jazykově nezávislý název pro větný člen: <code>who</code> (kdo), <code>where</code> (kde), <code>when</code> (kdy), <code>state</code> (čím je), <code>whom_what</code> (koho/co)… Do rolí se rozkládá věta.</td><td>vrstva ③ (<code>role_catalog.py</code>, <code>lang/cs.json</code>)</td><td>deprel, fakt, díra</td></tr>
+
+        <tr><td><b>fakt</b> (Fact)</td><td>Jádrová jednotka mapy: <b>predikát</b> (děj/vztah, např. <i>narodit se</i>) + <b>role-sloty</b> (who, when, where…) + <b>původ</b> (ze které věty a souboru pochází). Odpověď je vždycky nějaký fakt.</td><td>vrstva ④ (<code>fact_store.py</code>)</td><td>role, predikát, provenience</td></tr>
+
+        <tr><td><b>mount</b> (nahrání)</td><td>Nahrání jen těch souborů, které se k otázce hodí (podle tf·idf), místo načítání celého korpusu. „Rozsvítí se" jen horké soubory. Interně koncept <b>#60</b> (fragmentový graf).</td><td>vrstva ② (<code>dataloader.py</code>)</td><td>tf·idf, aktivace, #60</td></tr>
+
+        <tr><td><b>aktivace / světlo / glow</b></td><td>„Teplo", které otázka rozlije po mapě faktů: slova otázky rozsvítí příbuzné uzly a světlo teče po hranách grafu. Distinktivní slova (jméno, letopočet) svítí silně, funkční („a", „být") skoro vůbec.</td><td><code>activation_field.py</code></td><td>mount, glow-orders-ties, VZOR</td></tr>
+
+        <tr><td><b>dialogový stavový automat</b></td><td>Způsob, jakým vzniká odpověď: ne vyhledáním v databázi, ale <b>průchodem stavy</b> — rozsvítit kontext → doostřit VZOREM → rozhodnout míru jistoty. Jádro celého projektu (viz Díl IV).</td><td><code>answering.py</code></td><td>aktivace, VZOR, assurance</td></tr>
+
+        <tr><td><b>assurance</b> (míra jistoty)</td><td>Poslední krok tahu: automat zváží, jak jistý je vítězný kandidát, a zvolí jeden ze tří konců — <b>jasno</b> (odpoví), <b>nejasno</b> (doptá se), <b>prázdno</b> (nehádá, přizná neznalost).</td><td><code>answering.py</code></td><td>honest-negative, glow-orders-ties, brána</td></tr>
+
+        <tr><td><b>glow-orders-ties</b></td><td>Pravidlo pořadí kandidátů: o výběru rozhoduje především strukturní shoda (base), a světlo (glow) slouží jen k <b>rozseknutí remízy</b> mezi jinak rovnocennými kandidáty — ne k přebití struktury.</td><td><code>answering.py</code></td><td>aktivace, assurance, VZOR</td></tr>
+
+        <tr><td><b>koreference / díra</b> (pro-drop)</td><td>Doplnění chybějícího odkazu. Čeština často podmět vypustí („Narodil se roku 1890" — kdo?). Systém tu díru zaplní z okolí („Karel Čapek"), aby fakt dostal svého původce.</td><td><code>fill_holes.py</code></td><td>DÍRA, alias, carry_context</td></tr>
+
+        <tr><td><b>echo-guard</b></td><td>Pojistka, aby systém nevrátil jako „odpověď" slovo, které si jen odezíral z otázky (echo), nebo prázdné měrové slovo (množství, řada). Takové kandidáty odfiltruje.</td><td><code>answering.py</code>; <code>config.json</code> (nonanswer_lemmas)</td><td>assurance, kandidát</td></tr>
+
+        <tr><td><b>carry_context</b> (řetězení kontextu)</td><td>Mezi otázkami zůstává „téma". Navazující otázka bez vlastní entity („Kdy se narodil?") zdědí téma z minula; otázka s novou entitou téma přepne a staré světlo pohasne.</td><td><code>answering.py</code>, <code>ask.py</code></td><td>aktivace, koreference</td></tr>
+
+        <tr><td><b>alias / identita</b></td><td>Sloučení různých pojmenování jedné osoby do jedné identity: <i>Barbora Panklová</i> ≡ <i>Božena Němcová</i>. Bez toho by se rozpadlé jméno tvářilo jako dvě různé bytosti.</td><td><code>dataloader.py</code>, <code>answering.py</code></td><td>koreference, entita</td></tr>
+
+        <tr><td><b>polární smyčka</b> (ano/ne)</td><td>Zpracování otázek typu „Je pes šelma?", kde se neptáme na slovo, ale na <b>platí / neplatí</b>. Odpověď je <i>ano</i>, <i>ne</i>, nebo poctivé mlčení.</td><td><code>answering.py</code></td><td>assurance, honest-negative</td></tr>
+
+        <tr><td><b>naučená brána</b> (gate)</td><td>Malý naučený model, který měl podle rysů rozhodovat, zda si odpovědí být jistý. V praxi se <b>přeučoval</b> na malém vzorku, takže je <b>vypnutá</b> (<code>gate_enabled=false</code>) a slouží jako poučný experiment.</td><td><code>gate.json</code>, <code>train_gate.py</code>, <code>config.json</code></td><td>assurance, confident-wrong</td></tr>
+
+        <tr><td><b>etalon / gold</b></td><td>Zlatá testovací sada — ručně připravené dvojice otázka + správná odpověď, proti kterým se měří kvalita. „Gold" = referenční pravda.</td><td><code>gold_large.json</code>, <code>gold_answers.json</code>; <code>eval_*.py</code></td><td>confident-wrong, honest-negative</td></tr>
+
+        <tr><td><b>confident-wrong</b></td><td>„Sebejistě špatně" — nejhorší třída chyby: systém sebevědomě vrátí odpověď, která je nesprávná, místo aby mlčel. Právě tyhle případy má potlačovat assurance.</td><td>metrika v <code>eval_large.py</code></td><td>assurance, honest-negative, gate</td></tr>
+
+        <tr><td><b>honest-negative</b></td><td>„Poctivě záporný" — otázka, na kterou v datech odpověď není a systém správně <b>mlčí</b>. Žádaná vlastnost, opak confident-wrong.</td><td>kategorie v <code>eval_large.py</code></td><td>confident-wrong, assurance</td></tr>
+
+        <tr><td><b>#60</b> (fragmentový graf)</td><td>Interní číslo záměru: korpus se dělí na fragmenty (soubor → odstavec), do grafu se nahrávají jen horké fragmenty podle otázky, ne celek naráz. Základ pro mount.</td><td>koncept napříč ②–⑤</td><td>mount, tf·idf, fakt</td></tr>
+      </table>
+      </div>
+
+      <p>Nedělej si starost, pokud ti půlka řádků teď zní abstraktně — na to je slovníček. Až
+      některý pojem potkáš „naživo" v Dílu III nebo IV, vrať se sem a definice ti sedne. Pojmy
+      z pořadu „jak vzniká odpověď" (aktivace, VZOR, assurance) dostanou celé vlastní kapitoly
+      v Dílu IV.</p>
+
+      <h2 id="i-3">I.3 Mapa repozitáře</h2>
+
+      <p>Teď víš, co projekt dělá a jak se věcem říká. Zbývá vědět, <b>kde co leží</b>. Repozitář
+      vypadá na první pohled jako hromada souborů <code>.py</code>, ale má jasnou stavbu: skoro
+      všechno je buď jeden krok <b>zpracovatelské linky</b> (pipeline), nebo <b>data</b>,
+      <b>konfigurace</b>, nebo <b>měření</b>. Na diagramu níže hledej hlavně jednu věc: <b>tok
+      shora dolů</b> — jak surový text prochází pěti vrstvami až k modulu, který odpovídá na živou
+      otázku.</p>
+
+      <p class="full">Uzly vlevo v řadě jsou pět vrstev pipeline (① až ⑤); po stranách jsou věci,
+      které do linky vstupují (konfigurace), z ní padají (data na disk) nebo ji měří (etalony,
+      testy).</p>
+
+<pre class="mermaid">
+flowchart TD
+  accTitle: Mapa repozitáře hypothesis-one
+  accDescr: Surový text prochází pěti vrstvami pipeline (anotace, indexy, gramatika, syntéza, dotaz) do modulu odpovědi. Konfigurace řídí anotaci, mezivýsledky se ukládají do adresáře data na disk, uživatel se ptá přes ask.py, a etalony s jednotkovými testy měří výstup.
+  RAW["data/raw/*.txt (surové texty)"]
+  ANN["annotate_corpus.py — ① anotace"]
+  DL["dataloader.py — ② indexy tf·idf"]
+  GR["grammar_vzor.py — ③ VZOR a role"]
+  SYN["synth_*, build_* — ④ mapa faktů"]
+  ANS["answering.py — ⑤ dotaz a odpoved"]
+  ASK["ask.py (vstupni bod uzivatele)"]
+  DATA["data/ (cache na disku, gitignored)"]
+  CFG["config.json + lang/cs.json (konfigurace)"]
+  EVAL["eval_*.py + gold_*.json (etalony)"]
+  TEST["test_*.py (jednotkove testy)"]
+  DOCS["docs/ (dokumentace + tato kniha)"]
+  RAW --> ANN --> DL --> GR --> SYN --> ANS
+  ASK --> ANS
+  CFG --> ANN
+  ANN --> DATA
+  SYN --> DATA
+  DATA --> ANS
+  EVAL --> ANS
+  TEST --> ANS
+</pre>
+
+      <p>Slovy: <b>surový text</b> (<code>data/raw/*.txt</code>) vejde do anotace ①, ta ho pošle
+      indexům ②, ty gramatice ③, ta syntéze ④, která postaví mapu faktů — a nad tou vším odpovídá
+      dotazová vrstva ⑤ (<code>answering.py</code>). Uživatel do ní vstupuje přes
+      <code>ask.py</code>. Konfigurace (<code>config.json</code> a <code>lang/cs.json</code>) řídí
+      chování — nic důležitého není „zadrátováno" v kódu. Mezivýsledky každé vrstvy se ukládají na
+      disk do adresáře <code>data/</code>, odkud si je čtou další kroky. A kvalitu hlídají dvě věci
+      stranou od linky: <b>etalony</b> (<code>eval_*.py</code> nad zlatými sadami
+      <code>gold_*.json</code>) a hrstka <b>jednotkových testů</b> (<code>test_*.py</code>).</p>
+
+      <h3>Pět vrstev pipeline — co dělá který soubor</h3>
+
+      <p>Projekt má jedno silné pravidlo pojmenování: <b>jméno modulu nese vrstvu</b>. Když víš, ve
+      které vrstvě se pohybuješ, víš, který soubor otevřít. Vrstvám se dostaneme na kůži v Dílu III;
+      tady je jen orientační přehled.</p>
+
+      <div class="tablewrap">
+      <table>
+        <tr><th>Vrstva</th><th>Hlavní soubor(y)</th><th>Co dělá (jednou větou)</th></tr>
+        <tr><td>① preprocessing</td><td><code>annotate_corpus.py</code></td><td>Pošle surový text nástroji UDPipe 2 a uloží rozbor každé věty.</td></tr>
+        <tr><td>② dataloader</td><td><code>dataloader.py</code></td><td>Spočítá tf·idf indexy a podle otázky vybírá, které soubory nahrát.</td></tr>
+        <tr><td>③ grammar</td><td><code>grammar_vzor.py</code>, <code>role_catalog.py</code></td><td>Rozloží věty na VZORy a přeloží gramatiku do našich rolí.</td></tr>
+        <tr><td>④ synthesis</td><td><code>synth_registry.py</code>, <code>build_facts_all.py</code>, <code>extract_bio.py</code>, <code>extract_relations.py</code>, <code>chronos.py</code></td><td>Z rolí poskládá fakty, doplní data narození, vztahy a časy — mapu faktů.</td></tr>
+        <tr><td>⑤ queryparser</td><td><code>answering.py</code>, <code>activation_field.py</code>, <code>fact_store.py</code>, <code>fill_holes.py</code></td><td>Vezme živou otázku, rozsvítí graf, doostří VZOREM a vrátí odpověď / doptání / mlčení.</td></tr>
+      </table>
+      </div>
+
+      <h3>Data, konfigurace, měření a dokumentace</h3>
+
+      <p>Vedle pipeline stojí čtyři skupiny souborů. <b>Data</b> žijí mimo repozitář hypothesis-one,
+      v sdíleném adresáři <code>data/</code> (v cestách uvidíš <code>../../data/</code>): surové
+      texty v <code>data/raw/</code>, z nich odvozená anotační cache v <code>data/corpus/</code>,
+      indexy v <code>data/index/</code>, hotové fakty v <code>data/facts/</code>. Korpus tvoří
+      <b>52 souborů</b> ve dvou doménách — hesla z české Wikipedie (spisovatelé jako Čapek, Hašek,
+      Němcová; domácí zvířata jako pes, kůň, koza) a knihy Bible. Z nich systém dnes drží zhruba
+      <b>16 000 záznamů</b> mapy faktů (plus 24 dat narození z životopisných závorek a 114
+      vztahových hran). To, že korpus míchá encyklopedii s Biblí, není náhoda — v Dílu VIII uvidíš,
+      že právě tohle míchání domén dělá systému potíže.</p>
+
+      <p><b>Konfigurace</b> je ve dvou souborech: <code>config.json</code> (parametry po vrstvách —
+      prahy, cesty, adresa služby UDPipe) a <code>lang/cs.json</code> (jazyková data pro češtinu —
+      rolový katalog, tázací slova). Zásada projektu zní <b>„jazyk je data, ne kód"</b>: přidat
+      podporu jiného jazyka má znamenat jiný JSON, ne zásah do Pythonu. <b>Měření</b> obstarávají
+      etalony (<code>eval_large.py</code>, <code>eval_answers.py</code>, <code>eval_coref.py</code>)
+      nad zlatými sadami (<code>gold_large.json</code> s 145 otázkami, <code>gold_answers.json</code>
+      s 25) a dvojice jednotkových testů (<code>test_phase1.py</code>, <code>test_determiner.py</code>).
+      Že jsou jednotkové testy jen dva, není přehlédnutí — je to vědomý stav, kterému se věnuje
+      Díl V. <b>Dokumentace</b> je celá v <code>docs/</code>, včetně této knihy v
+      <code>docs/kniha/</code>.</p>
+
+      <div class="tablewrap">
+      <table>
+        <tr><th>Kde</th><th>Co tam je</th><th>Verzované v gitu?</th></tr>
+        <tr><td><code>data/raw/*.txt</code></td><td>Surové texty — vstup všeho (52 souborů).</td><td>ano</td></tr>
+        <tr><td><code>data/corpus/</code>, <code>data/index/</code>, <code>data/facts/</code></td><td>Odvozená data: anotace, indexy, fakty.</td><td><b>ne</b> (gitignored)</td></tr>
+        <tr><td><code>config.json</code></td><td>Parametry pipeline po vrstvách.</td><td>ano</td></tr>
+        <tr><td><code>lang/cs.json</code></td><td>Jazyková data pro češtinu (role, tázací slova).</td><td>ano</td></tr>
+        <tr><td><code>gold_large.json</code>, <code>gold_answers.json</code></td><td>Zlaté testovací sady (145 a 25 otázek).</td><td>ano</td></tr>
+        <tr><td><code>eval_*.py</code>, <code>test_*.py</code></td><td>Měření kvality a jednotkové testy.</td><td>ano</td></tr>
+        <tr><td><code>docs/</code></td><td>Dokumentace včetně této knihy.</td><td>ano</td></tr>
+      </table>
+      </div>
+
+      <h3>Co nefunguje a proč</h3>
+
+      <p>Když si mapu prohlédneš, napadne tě přirozený zkrat: <i>„Data si přece můžu prohlédnout a
+      rovnou upravit v adresáři <code>data/</code>."</i> Tenhle nápad tě zradí a stojí za to vědět
+      proč hned teď. Skoro celý obsah <code>data/</code> je <b>odvozený</b> a v gitu
+      <b>ignorovaný</b> (řádky v <code>.gitignore</code>): anotace, indexy i fakty se generují ze
+      surových textů skripty pipeline. Ruční úprava v <code>data/</code> proto <b>selže tiše dvěma
+      způsoby</b>. Za prvé: tvoje změna zmizí při nejbližší přestavbě, protože skript soubor
+      přepíše — a ty nepochopíš, kam se poděla. Za druhé, a zákeřněji: čísla jako idf (vzácnost
+      slova) závisí na <b>všech</b> souborech dohromady, takže když ručně sáhneš do jednoho indexu,
+      rozladíš statistiku, aniž by cokoli spadlo — systém dál běží, jen hůř odpovídá, a příčinu
+      nikde nevidíš. Správná cesta vede vždy přes <b>surový text a přestavbu</b>: uprav
+      <code>data/raw/</code> a spusť pipeline znovu. Přesně to si ukážeme v Dílu II (kapitola
+      II.3, „Přestavba dat z nuly").</p>
+
+      <h2>Co už umíš</h2>
+
+      <p>Po tomhle dílu víš tři věci. Za prvé, <b>k čemu hypothesis-one je</b>: deterministický,
+      symbolický systém, který ze surového českého textu staví mapu faktů a odpovídá na otázky — a
+      radši mlčí, než by hádal. Umíš vysvětlit, proč nestojí na velkém jazykovém modelu (chceme
+      doložitelnost a schopnost přiznat neznalost). Za druhé, máš <b>slovníček</b> (I.2), do kterého
+      se budeš vracet, kdykoli tě zaskočí pojem. Za třetí, znáš <b>mapu repozitáře</b>: pět vrstev
+      pipeline od surového textu k odpovědi, data stranou linky (a proč se nesmí upravovat ručně),
+      konfiguraci v JSON a měření přes etalony.</p>
+
+      <p>V dalším dílu přejdeme od teorie k rukám: <a href="dil-2.html">Díl II — První kroky</a>
+      tě provede instalací, prvním úspěšným během (<code>python ask.py</code> → „Kdo je Karel
+      Čapek?" → spisovatel) a přestavbou dat z nuly, u které teď víš, proč je potřeba.</p>
+
+      <div class="pager">
+        <a href="index.html"><span class="dir">← předchozí</span>Úvod</a>
+        <a href="dil-2.html"><span class="dir">další →</span>Díl II — První kroky</a>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

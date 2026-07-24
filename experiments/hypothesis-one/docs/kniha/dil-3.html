@@ -1,0 +1,749 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Díl III — Cesta dat projektem — hypothesis-one</title>
+<link rel="stylesheet" href="assets/style.css">
+<script defer src="assets/mermaid.min.js"></script>
+<script defer src="assets/script.js"></script>
+</head>
+<body>
+<div class="layout">
+
+  <aside class="sidebar">
+    <p class="brand"><a href="index.html">hypothesis-one</a></p>
+    <p class="tag">knižní dokumentace</p>
+    <nav aria-label="Obsah knihy">
+      <a href="index.html">Úvod</a>
+      <p class="part">Díl I — Než začneme</p><a href="dil-1.html">I · Co řeší, slovník, mapa</a>
+      <p class="part">Díl II — První kroky</p><a href="dil-2.html">II · Instalace, běh, data</a>
+      <p class="part">Díl III — Cesta dat</p><a href="dil-3.html" class="active">III · Fáze pipeline</a>
+      <p class="part">Díl IV — Jak to funguje</p><a href="dil-4.html">IV · Automat, aktivace, fakty</a>
+      <p class="part">Díl V — Testování</p><a href="dil-5.html">V · Testy, tvary, měření</a>
+      <p class="part">Díl VI — Rozšiřování</p><a href="dil-6.html">VI · Data, vztahy, testy</a>
+      <p class="part">Díl VII — Provoz</p><a href="dil-7.html">VII · UDPipe, viz, pasti</a>
+      <p class="part">Díl VIII — Otevřené body</p><a href="dil-8.html">VIII · Nedodělky a cesty</a>
+      <p class="part">Přílohy</p><a href="prilohy.html">Rejstřík, konfigurace, registry</a>
+    </nav>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <button class="iconbtn" id="theme-toggle" type="button" aria-label="Přepnout světlý/tmavý režim">◐ režim</button>
+    </div>
+    <div class="content">
+      <nav class="crumbs"><a href="index.html">Úvod</a> › Díl III</nav>
+      <p class="eyebrow">Díl III — Cesta dat projektem</p>
+      <h1>Cesta dat projektem</h1>
+
+      <p class="lead">V Dílu II jsme projekt rozjeli a položili mu první otázku. Teď zpomalíme a
+      půjdeme po té otázce pěšky: od okamžiku, kdy je věta „Karel Čapek byl český spisovatel"
+      jen řádek v textovém souboru, až po okamžik, kdy systém na dotaz „Kdo je Karel Čapek?"
+      odpoví <b>spisovatel</b>. Mezi tím leží několik <b>fází</b> — každá vezme jeden tvar dat,
+      něco s ním udělá a předá dál tvar jiný. Tenhle díl je popíše jednu po druhé, vždy podle
+      stejné šablony, abys u každé přesně věděl, <i>co do ní vstupuje, co z ní vystupuje, co si
+      musíš pohlídat, aby zůstalo pravda, a co se v ní naopak nenávratně ztratí.</i></p>
+
+      <p>Než začneme, jedna orientační poznámka. V teoretických učebnicích se cesta textu na fakt
+      dělí na hodně malých kroků: normalizace, segmentace na věty, tokenizace, morfologická
+      analýza, závislostní rozbor. V tomhle projektu jsou <b>všechny tyhle kroky slité do jednoho</b> —
+      obstará je najednou externí nástroj <b>UDPipe 2</b>. Není to záměrný návrhový krok, spíš
+      důsledek toho, že se použil hotový nástroj; jestli by se to mělo rozdělit, rozebírá
+      <a href="dil-8.html">Díl VIII</a>. Zatím to ber jako fakt o krajině: první opravdová fáze
+      (III.2) je hodně široká, protože v ní pracuje jeden mocný nástroj za pět klasických kroků.</p>
+
+      <p>Fází je osm. Prvních pět (III.1–III.5) postaví jednou předem <b>statickou mapu faktů</b> —
+      to je ta pomalá, offline část, kterou po přidání dat spustíš znovu. Zbylé tři (III.6–III.8)
+      popisují, co se děje <b>za běhu jednoho dotazu</b>, a napojují se na Díl IV, kde je mechanismus
+      rozebraný do hloubky. Každou fázi čteš jako profilovou kartu: nejdřív tabulka
+      <i>účel / vstup / výstup / invariant / ztráta</i>, pak souvislý výklad, pak naše vlákno
+      „Karel Čapek" před a po, a nakonec „co se pokazí a jak to poznáš".</p>
+
+      <p class="full">Nejdřív se podívej na celou cestu z ptačí perspektivy. Vlevo surový text, vpravo
+      hotová odpověď; každý obdélník je jedna fáze tohohle dílu. Všimni si, že tři pomalé produkty
+      (indexy, VZORy, fakty) se sbíhají do jednoho živého dotazu.</p>
+
+<pre class="mermaid">
+flowchart LR
+  accTitle: Celá cesta dat osmi fázemi
+  accDescr: Surový text projde anotací do shardů, z nich se postaví indexy, VZORy a fakty, a živý dotaz je spojí do odpovědi s režimem.
+  R["III.1 raw .txt"] --> A["III.2 anotace (UDPipe 2)"]
+  A --> C["shard .pkl"]
+  C --> I["III.3 indexy (tf·idf)"]
+  C --> V["III.4 VZOR / role"]
+  C --> F["III.5 fakty + šablony"]
+  I --> Q["III.6 živý dotaz"]
+  V --> Q
+  F --> Q
+  Q --> O["III.7 odpověď + režim"]
+</pre>
+
+      <p>Slovní čtení diagramu: fáze III.1 a III.2 jsou <b>zdroj</b> — vyrobí anotovaný korpus
+      rozdělený na soubory (shardy). Z těch shardů rostou tři nezávislé produkty: <b>indexy</b> (III.3,
+      kde co hledat), <b>VZORy</b> (III.4, jaký tvar má odpověď) a <b>fakty</b> (III.5, samotná tvrzení).
+      Živý dotaz (III.6) si z těch tří produktů vybere jen to horké a spojí je do kandidátů; fáze III.7
+      z vítěze udělá odpověď. Poslední kapitola III.8 se vrací k této mapě a ukazuje, co přesně si
+      každý přechod mezi fázemi <b>musí uhlídat</b> — a proč se přitom vlákno k původnímu textu nikdy
+      nepřetrhne.</p>
+
+      <!-- ============================ III.1 ============================ -->
+      <h2 id="3-1">III.1 Vstup — surový korpus <span class="mark mark-prevzato">Převzato</span></h2>
+
+      <p>Všechno začíná obyčejnými textovými soubory. Žádná databáze, žádný speciální formát:
+      složka <code>data/raw/</code> a v ní soubory <code>*.txt</code> v kódování UTF-8. Jeden soubor =
+      jeden dokument. Jméno souboru bez přípony se stane <b>identifikátorem dokumentu</b>
+      (<code>doc_id</code>), který ponese každý token, každá věta a každý fakt až do konce cesty —
+      proto je jméno souboru důležitější, než vypadá.</p>
+
+      <div class="tablewrap">
+      <table>
+        <tr><th>Profil fáze</th><th>&nbsp;</th></tr>
+        <tr><td><b>Účel</b></td><td>Dodat surový text jako zdroj, ze kterého se všechno ostatní odvodí.</td></tr>
+        <tr><td><b>Vstup</b></td><td>Soubory <code>data/raw/*.txt</code> (UTF-8), člověkem připravené.</td></tr>
+        <tr><td><b>Výstup</b></td><td>Tytéž soubory — fáze s nimi <i>nic nedělá</i>, jen je předává dál. Jméno souboru = <code>doc_id</code>.</td></tr>
+        <tr><td><b>Invariant</b></td><td>Soubory se nikdy nepřepisují ani nemění. Zdroj je jediný „pramen pravdy".</td></tr>
+        <tr><td><b>Ztráta informace</b></td><td>Žádná uvnitř fáze; případná ztráta vzniká tím, <i>co do složky nedáš</i> (co v korpusu není, na to systém neodpoví).</td></tr>
+      </table>
+      </div>
+
+      <h3>Co se ve fázi děje</h3>
+      <p>Popravdě skoro nic — a to je záměr. Vstupní data jsou <b>posvátná</b>: annotátor v další fázi
+      je jen čte, nikdy nepřepisuje (viz metoda <code>run</code> v <code>annotate_corpus.py</code>, která
+      z <code>raw_dir</code> jen načítá). Čtenář, který přidává data, tedy pracuje výhradně tady:
+      hodí do <code>data/raw/</code> nový <code>.txt</code> a spustí přestavbu. Že je vstup neměnný,
+      má praktický důsledek popsaný v Dílu II — celá mapa faktů je <b>reprodukovatelná</b>: smažeš
+      všechno odvozené, spustíš přestavbu a dostaneš bit po bitu totéž, protože pramen se nehnul.</p>
+
+      <h3>Co do fáze nepatří</h3>
+      <p>Nepatří sem žádné „čištění" textu: žádné mazání diakritiky, žádné sjednocování uvozovek,
+      žádné dělení na věty. Pokušení „nejdřív si to trochu uklidím" je právě to, čemu se projekt
+      vyhýbá — každá ruční úprava vstupu je informace, kterou pozdější fáze <i>už neuvidí</i> a
+      nemůže se rozhodnout jinak. Jediná normalizace, která v pipeline existuje (sloučení tečkovaných
+      zkratek), se dělá až <b>nad</b> anotací v III.2, ne tady.</p>
+
+      <h3>Karel Čapek: před → po</h3>
+      <p>Soubor <code>data/raw/wiki_karel_čapek.txt</code> obsahuje mimo jiné větu:</p>
+<pre><code>Karel Čapek (9. ledna 1890 Malé Svatoňovice – 25. prosince 1938
+Praha) byl český spisovatel. Byl mladším bratrem malíře a
+spisovatele Josefa Čapka.</code></pre>
+      <p><b>Před:</b> jen znaky v souboru. <b>Po:</b> tytéž znaky — plus fakt, že se dokument teď
+      jmenuje <code>wiki_karel_čapek</code>. Nic víc se nestalo, a to je v pořádku.</p>
+
+      <h3>Chyby a jak se projeví</h3>
+      <p>Nejtišší chyba je <b>kódování</b>: soubor uložený jinak než v UTF-8 se načte s poškozenou
+      diakritikou a „Čapek" se stane „Äapek" — systém pak nikdy nespojí dotaz se souborem a bude
+      se tvářit, že o Čapkovi nic neví. Druhá tichá chyba je <b>prázdný soubor nebo špatná přípona</b>:
+      annotátor bere jen <code>*.txt</code>, takže <code>*.md</code> nebo <code>*.text</code> beze slova
+      zmizí z korpusu. Obojí se pozná až o dvě fáze dál (dokument chybí ve výpisu indexů), ne tady —
+      proto se vyplatí po přidání dat zkontrolovat, že se soubor v přestavbě opravdu objevil.</p>
+
+      <!-- ============================ III.2 ============================ -->
+      <h2 id="3-2">III.2 Anotace UDPipe 2 — z textu jazykově rozebraný korpus <span class="mark mark-prevzato">Převzato</span></h2>
+
+      <p>Tohle je nejširší a nejdůležitější fáze celého dílu, protože v ní se z pouhých znaků stane
+      <b>jazyk</b>: slova dostanou svůj slovní druh, základní tvar, mluvnické rysy a hlavně
+      <b>závislostní hrany</b> — kdo je komu podmětem, co je čí předmět. Bez toho by žádná pozdější
+      fáze neměla z čeho stavět. Obstará to jediný nástroj, <b>UDPipe 2</b> od ÚFAL MFF UK, přes
+      webové rozhraní (REST). Anotace se dělá <b>jednou předem</b> a uloží; runtime pak korpus už
+      jen čte, takže v rozhodovací smyčce dotazu <i>neběží žádný neuron</i> (to je klíčová teze celého
+      projektu — deterministický běh).</p>
+
+      <div class="tablewrap">
+      <table>
+        <tr><th>Profil fáze</th><th>&nbsp;</th></tr>
+        <tr><td><b>Účel</b></td><td>Přeměnit surový text na jazykově anotovaný korpus, se kterým umí pracovat symbolické fáze.</td></tr>
+        <tr><td><b>Vstup</b></td><td>Surový text jednoho dokumentu (z III.1).</td></tr>
+        <tr><td><b>Výstup</b></td><td>Jeden <b>shard</b> <code>data/corpus/&lt;doc&gt;.pkl</code> — věty jako seznamy tokenů + odvozené entity. Plus <code>_meta.json</code> s použitým modelem.</td></tr>
+        <tr><td><b>Invariant</b></td><td>Každý token nese znakové offsety <code>start/end</code> = přesné místo v původním souboru. Vazba na text se drží od tohoto bodu dál.</td></tr>
+        <tr><td><b>Ztráta informace</b></td><td>Formátování (odsazení, prázdné řádky uvnitř odstavce), přesné bílé znaky. Věta se ale rozseká na tokeny <i>tak, že se dá poskládat zpět</i> podle offsetů.</td></tr>
+      </table>
+      </div>
+
+      <p class="full">Podívej se, co se uvnitř fáze děje. Text se rozseká na velké dávky, každá jde
+      do UDPipe 2, výsledek se rozparsuje na tokeny, sloučí se zkratky a odvodí entity. Na výstupu je
+      jeden shard na dokument. Sleduj, že „merge zkratek" a „entity" jsou naše kroky <i>navíc</i> nad tím,
+      co vrátí UDPipe.</p>
+
+<pre class="mermaid">
+flowchart TD
+  accTitle: Vnitřek anotační fáze
+  accDescr: Text dokumentu se dělí na dávky po odstavcích, každá se anotuje UDPipe 2, výstup se parsuje na tokeny, sloučí zkratky a odvodí entity, výsledek je shard.
+  raw["surový text dokumentu"] --> chunk["dělení na dávky (≤ 40000 znaků, na odstavcích)"]
+  chunk --> net["UDPipe 2 REST: tokenizace + segmentace + morfologie + rozbor"]
+  net --> conllu["CoNLL-U (tabulkový text)"]
+  conllu --> parse["parse_conllu: token = form / lemma / upos / feats / head / deprel / offsety"]
+  parse --> merge["merge_abbreviations: R.U.R. → 1 token"]
+  merge --> ents["entities_from_nametype: osoba P / místo G"]
+  ents --> shard["shard doc.pkl (věty + entity)"]
+</pre>
+
+      <h3>Co se ve fázi děje, krok po kroku</h3>
+      <p><b>Dělení na dávky.</b> Dokument se nepošle celý najednou, ale po dávkách nejvýš
+      <code>batch_chars</code> = 40&nbsp;000 znaků (metoda <code>_chunks</code>). Dělí se výhradně
+      na hranicích odstavců (prázdný řádek), takže se věta nikdy neroztrhne vejpůl. To je obrana proti
+      pasti, na kterou projekt narazil: posílat text <b>inline</b> v parametru dotazu ořezává vstup na
+      ~485 znaků a bible tak kdysi ztrácela 95&nbsp;% textu. Proto se data posílají <b>přes dočasný
+      soubor</b> (<code>-F data=@soubor</code>), ne inline (metoda <code>_udpipe2</code>).</p>
+
+      <p><b>Anotace.</b> Každá dávka jde do UDPipe 2, který v jednom kroku udělá to, co učebnice dělí na
+      pět: rozseká text na tokeny (<b>tokenizace</b>), rozdělí ho na věty (<b>segmentace</b>), přiřadí
+      slovní druh a mluvnické rysy (<b>morfologie</b>) a postaví <b>závislostní strom</b> — u každého
+      slova řekne, na kterém jiném slově visí a jakým vztahem. Model se v konfiguraci <b>pinuje</b> na
+      konkrétní verzi (dnes <code>czech-pdtc-ud-2.17-251125</code>) a skutečně použitý model se zapíše do
+      <code>_meta.json</code>, aby byla anotace reprodukovatelná: kdyby se model na serveru vyměnil,
+      poznáš to.</p>
+
+      <p><b>Parsování výstupu.</b> UDPipe vrací formát <b>CoNLL-U</b> — prostý text, kde je každý token
+      na jednom řádku a sloupce oddělené tabulátorem nesou jeho vlastnosti. Metoda <code>parse_conllu</code>
+      z něj poskládá pro každý token slovník s klíči, které budou pozdější fáze číst:</p>
+      <div class="tablewrap">
+      <table>
+        <tr><th>Klíč tokenu</th><th>Co nese</th><th>Příklad u slova „Čapek"</th></tr>
+        <tr><td><code>form</code></td><td>tvar, jak stojí v textu</td><td><code>Čapek</code></td></tr>
+        <tr><td><code>lemma</code></td><td>základní tvar (1. pád j. č.)</td><td><code>Čapek</code></td></tr>
+        <tr><td><code>upos</code></td><td>slovní druh (univerzální značka)</td><td><code>PROPN</code> (vlastní jméno)</td></tr>
+        <tr><td><code>feats</code></td><td>mluvnické rysy (pád, rod, čas, <code>NameType</code>…)</td><td><code>Case=Nom, NameType=Sur</code></td></tr>
+        <tr><td><code>head</code> + <code>deprel</code></td><td>na kom slovo závisí a jakým vztahem</td><td><code>nsubj</code> slovesa „být"</td></tr>
+        <tr><td><code>start</code> / <code>end</code></td><td>znakové offsety v původním souboru</td><td>např. <code>0 / 5</code></td></tr>
+      </table>
+      </div>
+      <p>Ten poslední řádek je invariant celé fáze: offsety čte <code>parse_conllu</code> z pole
+      <code>TokenRange=start:end</code> (aby je UDPipe poslal, musí se volat s parametrem
+      <code>tokenizer=ranges</code>). Díky nim se dá kterýkoli token kdykoli později <b>zpětně
+      ukázat na přesné místo v textu</b> — to je nit, na kterou se v celém dílu odvoláváme a kterou
+      shrne III.8.</p>
+
+      <p><b>Sloučení zkratek.</b> UDPipe rozseká tečkovanou zkratku „R.U.R." na šest tokenů
+      (R / . / U / . / R / .). To je špatně: je to jeden název. Funkce <code>merge_abbreviations</code>
+      (převzatá z rodičovského projektu) je po anotaci slepí zpět do jednoho tokenu <code>PROPN</code>.
+      Tahle oprava se dělá <b>jen na korpusu</b> — a právě tady číhá jedna z nejznámějších pastí projektu,
+      o které za chvíli.</p>
+
+      <p><b>Odvození entit.</b> Nakonec z každé věty vzniknou <b>pojmenované entity</b> — ne z hotového
+      seznamu jmen, ale z mluvnického rysu <code>NameType</code>, který UDPipe dává jednotlivým slovům
+      (<code>Giv</code>/<code>Sur</code> = křestní/příjmení → osoba <code>P</code>; <code>Geo</code> →
+      místo <code>G</code>). Metoda <code>entities_from_nametype</code> spojuje jen <b>sousední slova
+      shodného pádu</b>, takže „Karla Čapka" drží pohromadě, ale „Ježíš" (1. pád) a „Duchem" (7. pád)
+      se neslepí do neexistující osoby „Ježíš Duchem". Tenhle <i>řez podle pádu</i> je obrana proti
+      slepencům jmen zabudovaná rovnou do anotace.</p>
+
+      <p>Výsledek se uloží jako <b>jeden shard na dokument</b>: <code>data/corpus/&lt;doc&gt;.pkl</code>.
+      Uvnitř je slovník, kde klíč je dvojice <code>(doc_id, index_věty)</code> a hodnota nese
+      <code>sentences</code> (věty jako seznamy tokenů) a <code>entities</code>.</p>
+
+      <aside class="rationale">
+        <span class="lbl">Zdůvodňovací blok</span>
+        <dl>
+          <dt>Rozhodnutí</dt><dd>Ukládat anotaci po <b>jednom souboru na dokument</b> (shard <code>&lt;doc&gt;.pkl</code>), ne do jednoho velkého balíku.</dd>
+          <dt>Problém</dt><dd>Za běhu dotazu nechceme do paměti tahat celý korpus — u otázky o Čapkovi je bible mrtvá váha. Potřebujeme nahrát (<i>mountnout</i>) jen ty soubory, které se otázky týkají.</dd>
+          <dt>Mechanismus</dt><dd>Když je každý dokument samostatný shard, dá se načíst jeden bez druhých. Pozdější fáze (III.3) k němu spočítá jeho vlastní index; runtime pak podle otázky vybere pár horkých souborů a jen ty rozbalí. Tomu se v projektu říká <b>fragmentový graf</b> (koncept #60): studený soubor = jen index na disku, horký se namountuje.</dd>
+          <dt>Zvažované alternativy</dt><dd><b>Jeden monolitický pickle:</b> jednodušší zápis, ale znemožnil by výběrové nahrávání — buď načteš vše, nebo nic; u tisíců dokumentů neúnosné. <b>Relační databáze:</b> zvládne výběr, ale přidá závislost a build krok, a projekt chce zůstat u prostých souborů reprodukovatelných z rawu.</dd>
+          <dt>Kdy to přestane platit</dt><dd>U pár desítek malých dokumentů je režie shardů zbytečná — vešly by se do paměti celé. Signál: mount vždycky vybere skoro všechno.</dd>
+          <dt>Cena</dt><dd>Víc souborů na disku a nutnost přepočítat globální statistiku (idf) po každém přidání dokumentu, protože závisí na jejich počtu.</dd>
+        </dl>
+      </aside>
+
+      <h3>Co do fáze nepatří</h3>
+      <p>Nepatří sem žádné rozhodování o <i>významu</i>. Anotace je věrná a nenormalizuje: surový
+      <code>deprel</code> (<code>nsubj</code>, <code>obl</code>…) se ukládá tak, jak ho UDPipe dal —
+      převod na naše role (kdo/kde/kdy) přijde až ve fázi III.4. Nepatří sem ani indexace, ani hledání
+      faktů, ani cokoli, co souvisí s dotazem. Fáze má jeden vstup a jeden výstup a nic mimo to.</p>
+
+      <h3>Karel Čapek: před → po</h3>
+      <p><b>Před:</b> řetězec znaků „Karel Čapek (9. ledna 1890 …) byl český spisovatel."
+      <b>Po:</b> věta jako seznam tokenů. Slovo „byl" má <code>lemma=být</code>, <code>upos=AUX</code>
+      a je to spona; „spisovatel" je <code>NOUN</code> v 1. pádě a mluvnicky visí přes tuhle sponu na
+      podmětu; „Čapek" je <code>PROPN</code> s <code>NameType=Sur</code>; „1890" je <code>NUM</code>;
+      „Svatoňovice" a „Praha" mají <code>NameType=Geo</code>. Entity věty: osoba „Karel Čapek",
+      místa „Malé Svatoňovice" a „Praha". Každý token si nese, na kterém znaku textu začíná a končí.</p>
+
+      <h3>Chyby a jak se projeví</h3>
+      <p><b>Výpadek služby (tichá ztráta dat).</b> Když UDPipe neodpoví, dávka se po několika pokusech
+      vzdá, zaloguje se vykřičníkem a <i>přeskočí</i> — zbytek dokumentu doběhne, ale ta dávka v korpusu
+      chybí. Projeví se to jako fakt, který v datech „záhadně není", i když v surovém souboru je. Proto
+      se po anotaci vyplatí porovnat počet vět v <code>_meta.json</code> s očekáváním.</p>
+      <p><b>Past R.U.R. → R/U/R.</b> Sloučení zkratek opravuje jen <b>korpus</b>. Když se ale zeptáš
+      naživo „Co je R.U.R.?", otázku parsuje tatáž anotace, ale <i>bez</i> kroku sloučení (na živé cestě
+      byl merge kdysi zaveden a pak vrácen jako regrese) — tázané „R.U.R." se rozpadne na R/U/R, ta
+      písmena rozsvítí bibli (kde se hláskování a iniciály vyskytují) a systém odpoví z úplně cizí
+      domény. Je to jedna z nejtvrdošíjnějších pastí; vede k plánu <b>node-based retrieval</b> v
+      <a href="dil-8.html">Dílu VIII</a>.</p>
+      <p><b>Chybějící <code>NameType</code>.</b> Když UDPipe u jména rys nedá, entita se neodvodí a
+      osoba pro pozdější fáze „neexistuje" jako entita — pozná se to tak, že vztahové a biografické
+      fakty (III.5) se z věty nevytěží, přestože věta vypadá v pořádku.</p>
+
+      <!-- ============================ III.3 ============================ -->
+      <h2 id="3-3">III.3 Indexace — kde co hledat <span class="mark mark-prevzato">Převzato</span></h2>
+
+      <p>Anotovaný korpus je bohatý, ale za běhu dotazu ho nechceme prohledávat celý. Fáze indexace
+      spočítá pro každý soubor <b>statistiku</b>, která umožní bleskově odpovědět na otázku „které
+      soubory se týkají těchhle slov?". Nejde o linguistiku — jde o počítání. Srdce fáze je metoda
+      <code>build_indexes</code> v <code>dataloader.py</code>; produkuje pět druhů indexů.</p>
+
+      <div class="tablewrap">
+      <table>
+        <tr><th>Profil fáze</th><th>&nbsp;</th></tr>
+        <tr><td><b>Účel</b></td><td>Umožnit runtime vybrat několik málo <i>horkých</i> souborů podle slov dotazu — brána do fragmentového grafu.</td></tr>
+        <tr><td><b>Vstup</b></td><td>Všechny shardy z III.2 (<code>data/corpus/*.pkl</code>).</td></tr>
+        <tr><td><b>Výstup</b></td><td>Pět indexů v <code>data/index/</code>: per-soubor tf·idf, globální idf, podmětový, aliasy, doc-graf.</td></tr>
+        <tr><td><b>Invariant</b></td><td>Index je vždy dopočítaný nad <i>aktuální</i> množinou shardů. Přidáš-li dokument, musíš přepočítat vše (idf závisí na počtu souborů).</td></tr>
+        <tr><td><b>Ztráta informace</b></td><td>Slovosled, mluvnice, věty — index je jen množina vážených lemmat. A slova s výskytem 1 (<code>min_count</code>=2) se do indexu vůbec nedostanou.</td></tr>
+      </table>
+      </div>
+
+      <h3>Co se ve fázi děje</h3>
+      <p>Základ je klasické <b>tf·idf</b>. Pro každý soubor se spočítá, jak často se v něm které lemma
+      vyskytuje (<i>tf</i>, četnost). Přes celý korpus se spočítá, v kolika souborech se lemma vůbec
+      objevuje, a z toho <b>idf</b> — míra <i>unikátnosti</i>: slovo, které je všude („a", „být"), má
+      idf nízké; slovo, které je jen v jednom souboru („Svatoňovice"), má idf vysoké. Váha lemmatu v
+      souboru je součin <code>tf × idf</code> a vektor souboru se normalizuje (L2), aby dlouhé a krátké
+      dokumenty byly srovnatelné. Za běhu se pak soubory řadí podle toho, jak dobře jejich vektor
+      „rezonuje" se slovy dotazu (metoda <code>select_files</code>). To je ta <b>brána</b>: distinktivní
+      slova jako „Čapek" nasměrují správné soubory, funkční slova skoro nic neváží.</p>
+      <p>Nad tímhle základem staví fáze čtyři pomocné indexy, každý řeší jednu konkrétní slabinu čisté
+      četnosti:</p>
+      <div class="tablewrap">
+      <table>
+        <tr><th>Index</th><th>Soubor</th><th>K čemu je</th></tr>
+        <tr><td><b>tf·idf per soubor</b></td><td><code>&lt;doc&gt;.pkl</code></td><td>základní výběr souborů podle četnosti × unikátnosti slov dotazu.</td></tr>
+        <tr><td><b>globální idf</b></td><td><code>_idf.pkl</code></td><td>váha (jas) každého slova; používá ji i aktivační pole v Dílu IV.</td></tr>
+        <tr><td><b>podmětový</b></td><td><code>_subjects.pkl</code></td><td>kolikrát je entita <i>podmětem</i> v souboru — soubor se rozsvítí podle entity jako podmětu, ne podle pouhé četnosti.</td></tr>
+        <tr><td><b>aliasy</b></td><td><code>_aliases.pkl</code></td><td>různá jména téže osoby v jednom dokumentu → jedna identita (Barbora Panklová ≡ Božena Němcová).</td></tr>
+        <tr><td><b>doc-graf</b></td><td><code>_doclinks.pkl</code></td><td>hrany mezi dokumenty = sdílené distinktivní entity; drží ekosystém pohromadě (Čapek → i R.U.R.).</td></tr>
+      </table>
+      </div>
+      <p>Proč zrovna tyhle čtyři? Čistá četnost by hledala „Slovo" v Korintským (kde je slovo „slovo"
+      časté), ne v evangeliu Jana, jehož je „Slovo" <i>podmětem</i> — proto podmětový index. Rozpadlé
+      jméno („Barbora" 0,16 vs „Němcová" 0,28) by v pozdějším rozhodování zůstalo remízou — proto se
+      sečtou aliasy. A když dotaz rozsvítí Čapka, chceme s ním nabrat i jeho svět (R.U.R.), i když ho
+      otázka nejmenuje — proto doc-graf jako bonusový co-mount. Prahy jsou v konfiguraci:
+      <code>top_files</code>=8 (kolik souborů se vezme), <code>subject_min</code>=3,
+      <code>doclink_top</code>=2.</p>
+
+      <h3>Co do fáze nepatří</h3>
+      <p>Indexace <b>nerozumí</b> textu — nedělá závislostní rozbor, nezná role, nestaví fakty. Je to
+      čistá statistika nad lemmaty. Taky nerozhoduje o odpovědi; jen připraví žebříček souborů, ze
+      kterého si runtime později vybere. A nemění korpus — čte shardy, zapisuje jen do
+      <code>data/index/</code>.</p>
+
+      <h3>Karel Čapek: před → po</h3>
+      <p><b>Před:</b> shard <code>wiki_karel_čapek.pkl</code> plný tokenů. <b>Po:</b> vektor tohoto
+      souboru, kde „čapek", „spisovatel", „drama", „svatoňovice" mají vysokou váhu (jsou unikátní),
+      zatímco „být" nebo „a" téměř nulovou. V podmětovém indexu je „čapek" veden jako častý podmět
+      tohoto souboru. V doc-grafu má hranu na <code>wiki_josef_čapek</code> a <code>wiki_r.u.r.</code>,
+      protože s nimi sdílí distinktivní jméno „Čapek". Dotaz „Kdo je Karel Čapek?" teď přes
+      <code>select_files</code> spolehlivě vybere právě tento soubor.</p>
+
+      <h3>Co nefunguje a proč</h3>
+      <p>Nováčka napadne indexaci přeskočit a za běhu prostě <b>fulltextově prohledat všechny soubory</b>.
+      Selže to dvakrát. Zaprvé pomalu: u tisíců dokumentů se každý dotaz mění na plné čtení korpusu.
+      Zadruhé <i>nepřesně</i>: fulltext dá stejnou váhu slovu „byl" jako slovu „Svatoňovice", takže dotaz
+      utáhnou funkční slova a správný soubor se ztratí v šumu. tf·idf tohle řeší tím, že slovo váží
+      jeho unikátností — a index navíc dovolí načíst jen hrstku horkých souborů místo všech.</p>
+
+      <h3>Chyby a jak se projeví</h3>
+      <p>Nejčastější past: přidáš dokument do <code>data/raw/</code>, zanotuješ ho (III.2), ale
+      <b>zapomeneš přepočítat indexy</b>. Nový soubor pak sice existuje jako shard, ale žádný dotaz ho
+      nevybere — je „neviditelný". Projeví se to jako dokument, který je na disku, ale systém z něj
+      neodpovídá. Proto <code>build_indexes</code> přepočítává <i>všechno</i>, ne jen nový soubor: idf
+      závisí na počtu dokumentů, takže po přírůstku musí být celá tabulka aktuální. Druhá tišší chyba je
+      práh <code>min_count</code>=2 — slovo, které se v souboru objeví jen jednou, se do indexu nedostane;
+      u velmi krátkých dokumentů to může znamenat, že se soubor nerozsvítí na slovo, které v něm
+      doslova je.</p>
+
+      <!-- ============================ III.4 ============================ -->
+      <h2 id="3-4">III.4 Gramatika a VZOR — jaký tvar má odpověď <span class="mark mark-prevzato">Převzato</span></h2>
+
+      <p>Zatím jsme text jen popsali a spočítali. Teď z něj vytěžíme <b>strukturu</b>: jazykové jádro
+      systému, které umí říct, jaký <i>tvar</i> má věta v daném místě a jakou <b>roli</b> tam hraje
+      konkrétní slovo. Tahle fáze nic neukládá — je to <b>sada čistých transformací</b> (moduly
+      <code>grammar_vzor.py</code> a <code>role_catalog.py</code>), které volají fáze další. Stojí za to
+      ji ale popsat samostatně, protože její dva pojmy — <b>VZOR</b> a <b>role</b> — se prolínají celou
+      knihou.</p>
+
+      <div class="tablewrap">
+      <table>
+        <tr><th>Profil fáze</th><th>&nbsp;</th></tr>
+        <tr><td><b>Účel</b></td><td>Ze surové anotace udělat dvě abstrakce: VZOR (strukturní otisk okolí slova) a roli (co slovo ve větě zastupuje).</td></tr>
+        <tr><td><b>Vstup</b></td><td>Jedna anotovaná věta (token = slovník z III.2).</td></tr>
+        <tr><td><b>Výstup</b></td><td>Pro dané slovo: SLOT (<code>PROPN:Nom</code>), VZOR (pole slotů), role (<code>who</code>/<code>where</code>/<code>state</code>…). Žádná persistence.</td></tr>
+        <tr><td><b>Invariant</b></td><td>Stejný význam → stejný klíč. Jeden mapovač <code>role_key</code> pro fakty i pro otázky (aby se v III.6 potkaly).</td></tr>
+        <tr><td><b>Ztráta informace</b></td><td>VZOR záměrně zapomíná konkrétní slovo (lexém) a drží jen mluvnici. „Karel" a „Josef" mají v témže místě identický VZOR.</td></tr>
+      </table>
+      </div>
+
+      <h3>Co je SLOT a VZOR</h3>
+      <p><b>SLOT</b> je match-obálka jednoho tokenu: jeho slovní druh plus nosné rysy — u jmen pád,
+      u sloves čas (metoda <code>slot</code>). Slovo „Čapek" v 1. pádě má SLOT <code>PROPN:Nom</code>.
+      Proč zrovna pád? Protože v češtině pád <i>je</i> role: 1. pád = kdo (podmět), 3. pád = komu,
+      4. pád = koho/co. SLOT tedy schválně drží mluvnici a zahazuje lexém.</p>
+      <p><b>VZOR</b> (v kódu <code>frame_sig</code>) je pole SLOTŮ v okně kolem jednoho slova (pivotu):
+      <code>r</code> slotů vlevo, pivot, <code>r</code> slotů vpravo a nakonec modalita věty (tečka /
+      otazník). Poloměr <code>r</code> je konfigurační (<code>radius</code>=1). Kraj věty se značí
+      <code>^</code> a <code>$</code>. VZOR je tak <b>přesný na gramatiku, ale slepý k lexému</b>:
+      „byl český <b>spisovatel</b> ." a „byl slavný <b>malíř</b> ." mají identický VZOR. Pokrytí se
+      pak nezískává rozmazáním jednoho vzoru, ale <b>množstvím přesných</b> — jako mluvnický vzor
+      „pán", který zastupuje tisíce slov, aniž by je vyjmenoval.</p>
+
+      <h3>Co je role a jak vzniká</h3>
+      <p>Surová anotace mluví jazykem UDPipe: <code>nsubj</code>, <code>obl</code>, <code>obj</code>.
+      My ale chceme mluvit jazykem otázek: <b>kdo, kde, kdy, komu</b>. Převod dělá jediná funkce
+      <code>role_key</code> (a nad ní <code>RoleCatalog.role_of</code>) — a je to jediné místo, kde se
+      surová anotace překládá na náš rolový katalog. Mapa i seznam předložek jsou <b>data</b> v
+      <code>lang/cs.json</code> (klíč <code>deprel_to_role</code>), ne kód:</p>
+      <div class="tablewrap">
+      <table>
+        <tr><th>Surová anotace</th><th>Naše role</th><th>Tázací slovo (<code>role_ask</code>)</th></tr>
+        <tr><td><code>nsubj</code> + životné</td><td><code>who</code></td><td>Kdo</td></tr>
+        <tr><td><code>obl</code> + 6. pád / předložka „v", „na"</td><td><code>where</code></td><td>Kde</td></tr>
+        <tr><td><code>obl</code> + 7. pád / předložka „s"</td><td><code>with_whom_what</code></td><td>S kým/Čím</td></tr>
+        <tr><td>jmenný přísudek se sponou</td><td><code>state</code></td><td>Kdo/Co (je)</td></tr>
+        <tr><td><code>obj</code> + 4. pád</td><td><code>whom_what</code></td><td>Koho/Co</td></tr>
+      </table>
+      </div>
+      <p>Dvě jemnosti stojí za zapamatování. Za prvé, <b>předložka může roli přebít</b>: „mluvil
+      <i>s</i> Mojžíšem" je <code>with_whom_what</code>, ne prostý předmět, protože předložka „s" má
+      přednost (seznam <code>role_prepositions</code>). Za druhé, <b>jmenný přísudek se sponou</b> („byl
+      spisovatel") dostane roli <code>state</code> — to, čím podmět <i>je</i>. Právě tahle role odliší
+      „Kdo <b>je</b> pes?" (ptám se, čím pes je) od „Kdo je podmětem věty".</p>
+
+      <h3>Kanonizace a rozklad na klauzule</h3>
+      <p>Fáze dělá i drobné, ale důležité čištění tvarů. <code>canon_lemma</code> převede přivlastňovací
+      přídavné jméno na základní jméno (Karlova → Karel, Čapkův → Čapek) a doplní vypadlé „-e-"
+      (Čapk → Čapek). A <code>RoleCatalog.decompose</code> rozloží souvětí na jednotlivé <b>klauzule</b>
+      (každý přísudek = jedna klauzule), přičemž vedlejší (vztažná) věta zdědí místo z věty řídící —
+      to je meziklauzulová inference (#59), na kterou se ještě podíváme v Dílu VIII.</p>
+
+      <h3>Co do fáze nepatří</h3>
+      <p>Tady se <b>neparsuje živá otázka</b> a <b>nevybírá odpověď</b> — to je vrstva III.6. Fáze pracuje
+      nad už anotovanou větou z korpusu a je úplně nezávislá na tom, odkud věta přišla; proto se dá volat
+      kdekoli v pipeline. A nic si nepamatuje mezi voláními: samé čisté funkce bez vedlejších efektů.</p>
+
+      <h3>Karel Čapek: před → po</h3>
+      <p><b>Před:</b> tokeny věty „…byl český spisovatel." <b>Po:</b> pro slovo „spisovatel" SLOT
+      <code>NOUN:Nom</code>, VZOR přibližně <code>ADJ:Nom·NOUN:Nom·$·.</code> (vlevo „český", vpravo
+      konec věty) a role <code>state</code> — protože je to jmenný přísudek se sponou „byl". Přesně tato
+      role <code>state</code> později umožní odpovědět na „Kdo je Karel Čapek?" slovem „spisovatel", a ne
+      třeba jménem podmětu.</p>
+
+      <h3>Chyby a jak se projeví</h3>
+      <p>Fáze je jen tak dobrá jako anotace pod ní. Když UDPipe označí podmět špatně (dá „Čapek"
+      <code>obj</code> místo <code>nsubj</code>), <code>role_key</code> z toho poctivě odvodí špatnou
+      roli a fakt vznikne pokřivený — pozná se to až jako špatná odpověď o dvě fáze dál. Druhý zdroj
+      potíží je <b>příliš malý poloměr</b> VZORu: s <code>radius</code>=1 vidí VZOR jen bezprostřední
+      sousedy, takže dvě mluvnicky odlišné věty mohou dostat týž VZOR a splynout. Pro tyhle případy má
+      projekt kurátorskou databázi (<code>curated.json</code>), která roli u konkrétního VZORu ručně
+      přebije.</p>
+
+      <!-- ============================ III.5 ============================ -->
+      <h2 id="3-5">III.5 Syntéza mapy faktů — z vět se stanou tvrzení <span class="mark mark-prevzato">Převzato</span></h2>
+
+      <p>Tady se láme chleba: z anotovaných vět vznikne <b>mapa faktů</b> — statická databáze tvrzení, nad
+      kterou pak běží dotazy. Fáze má několik nástrojů, ale všechny dělají totéž: berou větu a hledají
+      v ní <b>predikát</b> (o čem se mluví) a <b>role-sloty</b> (kdo, kde, kdy, čím). Výsledkem je pro
+      každý dokument soubor faktů <code>data/facts/&lt;doc&gt;.jsonl</code>. Skládá se ze čtyř toků, které
+      se slévají do jednoho fakt-storu.</p>
+
+      <div class="tablewrap">
+      <table>
+        <tr><th>Profil fáze</th><th>&nbsp;</th></tr>
+        <tr><td><b>Účel</b></td><td>Z korpusu postavit statickou mapu faktů (predikát + role-sloty + provenience), nad kterou se odpovídá.</td></tr>
+        <tr><td><b>Vstup</b></td><td>Shardy z III.2 (přes <code>Dataloader.mount</code>) + role z III.4.</td></tr>
+        <tr><td><b>Výstup</b></td><td><code>registry.jsonl</code> (vazby fakt↔otázka) → agregované fakty <code>data/facts/&lt;doc&gt;.jsonl</code> + šablony <code>data/templates/</code>.</td></tr>
+        <tr><td><b>Invariant</b></td><td>Každý fakt nese provenienci: <code>doc</code> + <code>sent</code> (odkud pochází). Odkaz na původní větu se nikdy neztratí.</td></tr>
+        <tr><td><b>Ztráta informace</b></td><td>Věty, které nenesou fakt (hedging, otázky, nejistota), se vynechají. Slova, která nejsou ani predikát, ani role-slot, spadnou do kontextu, nebo zmizí.</td></tr>
+      </table>
+      </div>
+
+      <h3>Co se ve fázi děje</h3>
+      <p><b>1) Registr (základní tok).</b> Modul <code>synth_registry.py</code> projde každou větu a
+      pokusí se z ní udělat vazbu fakt↔otázka. Nejdřív se zeptá <code>is_factual</code>, jestli věta
+      vůbec nese fakt — otázky, kondicionály („mohlo by") a slova nejistoty („možná", „nevím") se
+      vyřadí. Pak najde <b>predikát</b>: hlavní sloveso věty (root), a když ho není, spona (pak jde o
+      identitní fakt „X je Y"). Nakonec projde argumenty (podměty, předměty, příslovečná určení) a
+      každému přiřadí <b>roli</b> přes <code>role_key</code> z III.4. Výstup jednoho řádku registru:
+      predikát, seznam odpovědních slotů (lemma + role + rod) a kontext.</p>
+      <p><b>2) Agregace do faktů.</b> Skript <code>build_facts_all.py</code> slije řádky registru se
+      stejným <code>(doc, sent, predikát)</code> do jednoho objektu <code>Fact</code> s
+      <code>roles = {role: [lemmata]}</code>. A hlavně: má-li fakt <b>díru na místě podmětu</b>
+      (věta vynechala „on/ona" — pro-drop), doplní podmět <b>koreferencí</b> (kdo je „on" z okolních
+      vět) do role <code>who</code>. Tím se odemkne cesta „predikát + role" pro dotaz.</p>
+      <p><b>3) Biografická závorka.</b> Wikipediální konstrukce „Osoba (datum místo – datum místo) byl…"
+      je zlatý důl, který běžná extrakce zahazuje. Modul <code>extract_bio.py</code> ji rozparsuje:
+      levá půle před en-pomlčkou = <b>narození</b>, pravá = <b>úmrtí</b>; rok je 4místné číslo, místo je
+      entita typu Geo. Z jedné závorky tak vzniknou fakty <code>narodit(who, when, where)</code> a
+      <code>zemřít(who, when, where)</code>.</p>
+      <p><b>4) Čas (Chronos) a vztahy.</b> <code>chronos.py</code> najde ve větě rok a připne ho k
+      hlavnímu predikátu — tak dostane <code>when</code>-slot i fakt z <i>běžného</i> textu, ne jen ze
+      závorky. A <code>extract_relations.py</code> dělá to nejzajímavější: mění příbuzenské vztahy na
+      <b>hrany mezi osobami</b>. O tom je zdůvodňovací blok níže.</p>
+
+      <p>Datový model výsledku je prostý — jeden fakt je predikát, slovník rolí a provenience. Sleduj,
+      že provenience (<code>doc</code>, <code>sent</code>) je součástí faktu, ne přílepek:</p>
+<pre class="mermaid">
+classDiagram
+  accTitle: Datový model faktu
+  accDescr: Fakt nese predikát, slovník rolí na lemmata a provenienci doc plus sent, která ukazuje zpět na konkrétní větu korpusu.
+  class Fact {
+    +predicate
+    +roles
+    +doc
+    +sent
+    +text
+  }
+  class Role {
+    who
+    where
+    when
+    state
+    whom_what
+    whose_of_what
+  }
+  Fact --> Role : roles
+</pre>
+
+      <aside class="rationale">
+        <span class="lbl">Zdůvodňovací blok — vztah jako HRANA</span>
+        <dl>
+          <dt>Rozhodnutí</dt><dd>Příbuzenský vztah (bratr, manžel, otec) ukládat jako <b>hranu mezi dvěma osobami</b> — fakt s rolemi <code>who</code> + <code>whose_of_what</code> — ne jako pouhou vlastnost jedné osoby.</dd>
+          <dt>Problém</dt><dd>Věta „Byl mladším bratrem malíře Josefa Čapka" běžnou extrakcí vydá jen <code>state=bratr</code> a <b>ztratí obě osoby</b>. Na dotaz „Kdo byl bratr Karla Čapka?" pak není z čeho odpovědět — víme, že někdo je bratr, ale ne čí a kdo.</dd>
+          <dt>Mechanismus</dt><dd><code>extract_relations</code> vezme kopulovou konstrukci „podmět byl &lt;vztah&gt; &lt;osoba&gt;", udělá z vztahového slova <b>predikát hrany</b> (<code>bratr</code>), z držitele roli <code>who</code> (Karel) a z cílové osoby <code>whose_of_what</code> (Josef). Symetrické vztahy (bratr, manžel) se uloží <b>obousměrně</b>, takže funguje „bratr Karla" i „bratr Josefa". Měřeno na velkém etalonu: kategorie <b>relation</b> se posunula z <b>0 na 4/18</b> správných.</dd>
+          <dt>Zvažované alternativy</dt><dd><b>Uložit vztah jako stav</b> (<code>state=bratr</code>): jednodušší, ale ztrácí druhou entitu — nezvládne „bratr koho". <b>Rozšířit na slovesné a genitivní vztahy</b> (oženil se s…, bratr Karla bez spony, zájmenný genitiv): zkoušeno a <i>změřeno jako net-neutral</i> — přineslo stejně chyb (záměny osob, šum) kolik oprav, proto vráceno. Naráží to na entitní identitu a čeká na node-based retrieval.</dd>
+          <dt>Kdy to přestane platit</dt><dd>Mimo kopulový vzor. Slovesné vztahy a genitivní konstrukce bez spony se dnes nevytěží; jakmile bude entita samostatný uzel (Díl VIII), dá se pravidlo zobecnit.</dd>
+          <dt>Cena</dt><dd>Pokrytí jen 4/18; symetrické vztahy zdvojují fakty; a celé to visí na tom, že UDPipe označí obě jména jako <code>NameType</code> — nerozpoznané jméno hranu neutvoří.</dd>
+        </dl>
+      </aside>
+
+      <h3>Co do fáze nepatří</h3>
+      <p>Nepatří sem <b>živá otázka</b> — tady se staví statická mapa, ne odpovídá. Nepatří sem ani
+      rozhodování, které soubory nahrát (to je runtime, III.6): syntéza projede korpus celý. A nedělá
+      vlastní jazykový rozbor — role bere hotové z III.4, aby fakt a budoucí otázka mluvily <i>týmž
+      jazykem klíčů</i>.</p>
+
+      <h3>Karel Čapek: před → po</h3>
+      <p><b>Před:</b> dvě anotované věty o Čapkovi. <b>Po:</b> hrst faktů v
+      <code>data/facts/wiki_karel_čapek.jsonl</code>:</p>
+      <div class="tablewrap">
+      <table>
+        <tr><th>Predikát</th><th>Role-sloty</th><th>Zdroj</th></tr>
+        <tr><td><code>být</code></td><td>who=[Karel], state=[spisovatel]</td><td>registr, věta 0</td></tr>
+        <tr><td><code>narodit</code></td><td>who=[Karel], when=[1890], where=[Svatoňovice]</td><td>bio-závorka</td></tr>
+        <tr><td><code>zemřít</code></td><td>who=[Karel], when=[1938], where=[Praha]</td><td>bio-závorka</td></tr>
+        <tr><td><code>bratr</code></td><td>who=[Karel], whose_of_what=[Josef]</td><td>vztah-hrana (+ opačný směr)</td></tr>
+      </table>
+      </div>
+      <p>Každý z nich nese <code>doc=wiki_karel_čapek</code> a číslo věty. Tahle čtveřice pokryje otázky
+      „Kdo je?", „Kdy se narodil?", „Kde se narodil?" i „Kdo byl bratr?" — všechny z jednoho odstavce.</p>
+
+      <h3>Chyby a jak se projeví</h3>
+      <p>Fáze má za sebou dvě opravené pasti, které dobře ukazují, jak křehká extrakce je.
+      <b>Za prvé</b>, <code>is_factual</code> kdysi zahazovala celou větu při <i>jakémkoli</i> otazníku —
+      i když šlo jen o osamocené „?" v závorce („Vídeň ?"). Tím se ztrácela úvodní definiční věta.
+      Oprava: bere se jen <b>koncový</b> otazník. <b>Za druhé</b>, u souvětí „Králík je býložravec, který
+      využívá…" fallback na „první sloveso" chytal sloveso vedlejší věty (využívat) místo spony hlavní —
+      predikát pak byl „využívat" a stav „býložravec" se ztratil. Oprava: <b>kopula hlavní klauzule má
+      přednost</b>. Obě chyby se projevovaly stejně zákeřně: fakt buď úplně chyběl, nebo měl špatný
+      predikát, a špatná odpověď se objevila až u dotazu, ne tady. Obecné pravidlo: chyba v syntéze je
+      <i>tichá</i> — vstup projde, jen výstup je jiný, než čekáš, a poznáš to až etalonem (Díl V).</p>
+
+      <!-- ============================ III.6 ============================ -->
+      <h2 id="3-6">III.6 Inference — živý dotaz nad mapou <span class="mark mark-prevzato">Převzato</span></h2>
+
+      <p>Prvních pět fází běželo <b>jednou předem</b>. Teď jsme u toho, co se stane pokaždé, když někdo
+      položí otázku. Tahle kapitola dává jen přehled — samotný mechanismus (jak přesně teče světlo,
+      jak se počítá jistota) rozebírá <a href="dil-4.html">Díl IV</a>. Motor je metoda <code>answer</code>
+      v <code>answering.py</code>.</p>
+
+      <div class="tablewrap">
+      <table>
+        <tr><th>Profil fáze</th><th>&nbsp;</th></tr>
+        <tr><td><b>Účel</b></td><td>Z živé otázky vybrat kandidáty odpovědi a rozhodnout míru jistoty.</td></tr>
+        <tr><td><b>Vstup</b></td><td>Otázka (text) + prebuilt indexy (III.3), VZORy a fakty (III.4–III.5).</td></tr>
+        <tr><td><b>Výstup</b></td><td>Nejlepší kandidát + režim (jasno / doptat se / nehádat). Předává se do III.7.</td></tr>
+        <tr><td><b>Invariant</b></td><td>Jediná živá anotace je rozbor otázky (UDPipe 2); vlastní rozhodování je symbolické a deterministické.</td></tr>
+        <tr><td><b>Ztráta informace</b></td><td>Nemountnuté (studené) soubory se dotazu neúčastní — fakt v souboru, který se nerozsvítí, jako by neexistoval.</td></tr>
+      </table>
+      </div>
+
+      <h3>Co se ve fázi děje</h3>
+      <p>Otázka projde stejnou anotací jako korpus (parsuje ji UDPipe), z ní se určí <b>predikát</b>,
+      <b>role díry</b> (na co se ptáme — „Kdo" = <code>who</code>, „Kde" = <code>where</code>) a
+      <b>lemmata</b>. Slova otázky přes <code>select_files</code> (III.3) vyberou horké soubory a
+      <b>nahrají</b> (mount) jen jejich fakty a šablony. Nad tím se rozsvítí aktivační pole (světlo teče
+      po hranách grafu). Kandidáti odpovědi vznikají <b>dvěma cestami</b>: predikát + role z fakt-storu
+      (přesná cesta) a window-VZOR z šablon (jemný tie-break). Mezi kandidáty rozhodne pravidlo
+      <b>glow-orders-ties</b>: nejdřív struktura (sedí role? nese fakt známou entitu otázky?), a teprve
+      remízu řadí světlo. Nakonec <code>_assurance</code> zváží, jak jistý je vítěz.</p>
+      <p>Několik chytrých doplňků, které stojí za jméno:</p>
+      <div class="tablewrap">
+      <table>
+        <tr><th>Mechanismus</th><th>Co řeší</th></tr>
+        <tr><td><b>řetězení kontextu</b> (<code>carry_context</code>)</td><td>„Kdy se narodil?" po „Kdo je Karel Čapek?" zdědí téma — Karel ještě svítí z minulého tahu.</td></tr>
+        <tr><td><b>polární smyčka</b> (<code>_polar</code>)</td><td>otázka bez tázacího slova („Je pes šelma?") → hledá existenci fakt-tvaru → ano/ne, nebo mlčí.</td></tr>
+        <tr><td><b>relační dotaz</b> (<code>_relation_query</code>)</td><td>„Kdo byl bratr X?" pozná vztahové slovo jako kořen a zeptá se na osobu hrany z III.5.</td></tr>
+        <tr><td><b>naučená brána</b> (<code>gate</code>)</td><td>měla by potlačit sebevědomě špatné odpovědi — dnes <b>vypnutá</b>, přeučuje se (Díl V a VIII).</td></tr>
+      </table>
+      </div>
+
+      <h3>Co do fáze nepatří</h3>
+      <p>Fáze <b>nestaví ani nemění mapu</b> — čte prebuilt fakty, VZORy a indexy jen pro čtení. Kdyby
+      za běhu něco přepisovala, ztratila by se reprodukovatelnost i determinismus. Jediné, co si mezi
+      tahy drží, je teplo aktivačního pole (kvůli řetězení kontextu) — a to pohasíná útlumem, nezapisuje
+      se na disk.</p>
+
+      <h3>Karel Čapek: před → po</h3>
+      <p><b>Před:</b> otázka „Kde se narodil Karel Čapek?" <b>Po:</b> predikát <code>narodit</code>, role
+      díry <code>where</code>, mount <code>wiki_karel_čapek</code>, kandidát z faktu
+      <code>narodit(who=Karel, where=Svatoňovice)</code> — a protože Čapek je známá entita v jiné roli
+      než odpověď a „Svatoňovice" je podle experta na místa opravdu místo, vítěz je jasný.</p>
+
+      <h3>Chyby a jak se projeví</h3>
+      <p>Nejtypičtější potíž není špatný výběr uvnitř souboru, ale <b>špatný mount</b>. Bible plošně
+      znečišťuje výběr souborů (i pro dotaz o Čapkovi má nezanedbatelnou aktivaci), takže se sem tam
+      přimountuje a přinese cizí kandidáty. Projeví se to jako sebevědomě špatná odpověď z úplně jiné
+      domény (viz past R.U.R. z III.2). Druhá past je řetězení kontextu: navazující otázka může zdědit
+      staré téma i tam, kde už nemá — proto se při otázce s <i>vlastní</i> entitou minulý žár i mount
+      záměrně zhasnou.</p>
+
+      <!-- ============================ III.7 ============================ -->
+      <h2 id="3-7">III.7 Odpověď a režim — co systém vlastně řekne <span class="mark mark-overeno">Ověřeno</span></h2>
+
+      <p>Poslední fáze živého tahu je krátká, ale rozhodující pro <b>důvěru</b>. Nejde jen o to najít
+      odpověď — jde o to poznat, kdy ji <i>neříct</i>. Fáze zabalí rozhodnutí z III.6 do výsledku a
+      připne mu jeden ze tří <b>režimů</b>.</p>
+
+      <div class="tablewrap">
+      <table>
+        <tr><th>Profil fáze</th><th>&nbsp;</th></tr>
+        <tr><td><b>Účel</b></td><td>Z vítěze a míry jistoty udělat finální výstup s režimem, kterému se dá věřit.</td></tr>
+        <tr><td><b>Vstup</b></td><td>Vítězný kandidát + míra jistoty z III.6.</td></tr>
+        <tr><td><b>Výstup</b></td><td>Slovník <code>{answer, mode, offer, fact_ref, hole_role, candidates, via}</code>.</td></tr>
+        <tr><td><b>Invariant</b></td><td>Odpověď vždy nese odkaz na fakt (<code>fact_ref</code> = doc + sent), takže se dá dohledat, <i>odkud</i> pochází.</td></tr>
+        <tr><td><b>Ztráta informace</b></td><td>Poražení kandidáti se zahodí (kromě pár nejlepších v <code>offer</code> pro doptání).</td></tr>
+      </table>
+      </div>
+
+      <h3>Tři režimy</h3>
+      <div class="tablewrap">
+      <table>
+        <tr><th>Režim</th><th>Kdy nastane</th><th>Co uživatel uvidí</th></tr>
+        <tr><td><b>answer</b></td><td>silná struktura, jeden jasný vítěz</td><td>odpověď („spisovatel", „1890")</td></tr>
+        <tr><td><b>clarify</b></td><td>víc rovnocenných kandidátů</td><td>„mám data o X a Y — upřesni?"</td></tr>
+        <tr><td><b>unsure</b></td><td>jen echo, žádná struktura</td><td>poctivé „o tom nemám jasná data"</td></tr>
+      </table>
+      </div>
+      <p>Ten třetí režim je hlavní přednost, ne slabina: raději mlčet než hádat. Měření to potvrzuje —
+      kategorie <b>honest-negative</b> (otázky na fakty mimo korpus) má úspěšnost <b>7/7 = 100&nbsp;%</b>,
+      protože systém na ně poctivě neodpovídá. Naopak nejškodlivější třídou chyb jsou <b>sebevědomě
+      špatné</b> odpovědi (na velkém etalonu jich je 30) — a celý režim <code>unsure</code> existuje,
+      aby jich bylo co nejmíň. Když je odpověď v režimu <code>answer</code> a řetězíme kontext, vítěz se
+      navíc <b>zpětně přihřeje</b>, aby další navazující otázka věděla, o čem je řeč.</p>
+
+      <h3>Co do fáze nepatří</h3>
+      <p>Žádný nový výpočet — jen zabalení. Fáze nepočítá kandidáty znovu, nemění mapu; bere hotové
+      rozhodnutí a dává mu tvar, kterému rozumí volající (interaktivní režim, vizualizace, etalon).</p>
+
+      <h3>Karel Čapek: před → po <span class="mark mark-overeno">Ověřeno</span></h3>
+      <p>Tyhle odpovědi jsou ověřené během živého sezení nad postavenou mapou:</p>
+<pre><code>? Kdo je Karel Čapek?   → spisovatel   (mode answer)
+? Kdy se narodil?       → 1890         (mode answer, řetězení kontextu)
+? Kde se narodil?       → Svatoňovice  (mode answer)
+? Kdo byl bratr Karla Čapka? → Josef   (mode answer, vztah-hrana)</code></pre>
+      <p>Každá z nich nese <code>fact_ref</code> ukazující na konkrétní větu ve
+      <code>wiki_karel_čapek</code> — kdykoli se dá dohledat, odkud odpověď je.</p>
+
+      <h3>Chyby a jak se projeví</h3>
+      <p>Chyba téhle fáze je vždycky chyba <b>kalibrace</b> předchozí. Když je práh jistoty moc měkký,
+      systém sklouzne z <code>unsure</code> do <code>answer</code> a vznikne sebevědomě špatná odpověď.
+      Když je moc tvrdý, sklouzne z <code>answer</code> do <code>clarify</code> a otravuje doptáváním
+      tam, kde odpověď zná. Ani jedno se nepozná z jednoho dotazu — pozná se to jen na <b>etalonu</b>
+      (Díl V), kde se měří poměr správných k sebevědomě špatným.</p>
+
+      <!-- ============================ III.8 ============================ -->
+      <h2 id="3-8">III.8 Rozhraní mezi fázemi — a nit k původnímu textu <span class="mark mark-prevzato">Převzato</span></h2>
+
+      <p>Fáze jsme prošli. Teď se podíváme na <b>spáry mezi nimi</b>: v jakém tvaru data přecházejí,
+      co si každý přechod musí ohlídat a co se stane, když se to poruší. A hlavně na jednu vlastnost,
+      která prochází celou cestou a odlišuje tenhle systém od „černé skříňky": <b>vazba na původní
+      text se nikdy nepřetrhne.</b></p>
+
+      <p class="full">Zopakuj si celou cestu, tentokrát s důrazem na <i>tvar</i> dat na každém přechodu.
+      Sleduj, že token drží offsety a fakt drží dvojici doc + sent — to jsou dva konce téže nitě.</p>
+
+<pre class="mermaid">
+flowchart LR
+  accTitle: Rozhraní mezi fázemi a nit k textu
+  accDescr: Na každém přechodu se mění tvar dat, ale offsety tokenu a provenience faktu drží vazbu na původní větu od anotace až po odpověď.
+  T["text (znaky)"] -->|"offset start:end"| TOK["tokeny (shard)"]
+  TOK -->|"lemma + váha"| IDX["vážená lemmata (index)"]
+  TOK -->|"role_key"| ROLE["role-sloty"]
+  ROLE -->|"doc + sent"| FACT["Fact"]
+  FACT -->|"fact_ref"| ANS["odpověď"]
+  ANS -.->|"dohledání zpět"| T
+</pre>
+
+      <p>Slovní čtení: mezi textem a tokeny drží vazbu <b>offsety</b> (<code>start:end</code> z III.2).
+      Mezi tokeny a fakty ji drží <b>provenience</b> — každý fakt si pamatuje <code>doc</code> a
+      <code>sent</code> (III.5). A odpověď nese <code>fact_ref</code> (III.7), přes který se z ní dá
+      dojít zpět až k původní větě. Čárkovaná šipka zpět je celá pointa: odpověď „spisovatel" není
+      utržená — vede k větě „…byl český spisovatel." na konkrétních znacích konkrétního souboru.</p>
+
+      <h3>Tabulka přechodů</h3>
+      <div class="tablewrap">
+      <table>
+        <tr><th>Přechod</th><th>Tvar dat</th><th>Invariant</th><th>Při porušení</th><th>Kde se kontroluje</th></tr>
+        <tr><td>III.1 → III.2</td><td>text → tokeny</td><td>token nese offset <code>start/end</code></td><td>ztratí se vazba na text; nejde dohledat zdroj</td><td><code>parse_conllu</code> (pole <code>TokenRange</code>)</td></tr>
+        <tr><td>III.2 → III.3</td><td>tokeny → vážená lemmata</td><td>index nad <i>aktuální</i> množinou shardů</td><td>nový dokument je neviditelný pro mount</td><td><code>build_indexes</code> (přepočet všeho)</td></tr>
+        <tr><td>III.2 → III.4</td><td>tokeny → role</td><td>stejný význam → stejný klíč</td><td>fakt a otázka se v III.6 nepotkají</td><td><code>role_key</code> (jediný mapovač)</td></tr>
+        <tr><td>III.4 → III.5</td><td>role → Fact</td><td>fakt nese <code>doc</code> + <code>sent</code></td><td>fakt je bez zdroje; nedohledatelný</td><td><code>Fact</code> (třída, provenience)</td></tr>
+        <tr><td>III.3/5 → III.6</td><td>fakty → kandidáti</td><td>predikát + role díry se shodují</td><td>predikát se nespáruje; žádní kandidáti</td><td><code>FactStore.match</code></td></tr>
+        <tr><td>III.6 → III.7</td><td>kandidát → výsledek</td><td>odpověď nese <code>fact_ref</code></td><td>odpověď bez zdroje; nezkontrolovatelná</td><td><code>answer</code> (výstupní slovník)</td></tr>
+      </table>
+      </div>
+
+      <h3>Vazba na původní text se drží — výslovně</h3>
+      <p>Řekněme to bez obalu, protože je to důležité. Od okamžiku anotace (III.2) až po odpověď (III.7)
+      nese systém <b>dva odkazy</b>, které umožňují kdykoli ukázat prstem na zdroj:</p>
+      <p><b>Token → text.</b> Každý token má <code>start</code> a <code>end</code> — přesné znakové
+      offsety v původním souboru. „Čapek" v první větě není jen řetězec „Čapek", ale „znaky 0–5 souboru
+      <code>wiki_karel_čapek.txt</code>". Nic mezi tím se na tuhle informaci nesahá.</p>
+      <p><b>Fakt → věta.</b> Každý <code>Fact</code> nese <code>doc</code> a <code>sent</code> — ze
+      kterého dokumentu a které věty pochází. Odpověď v III.7 vrací <code>fact_ref = [doc, sent]</code>,
+      takže z „spisovatel" se dá dojít na fakt <code>být(who=Karel, state=spisovatel)</code>, z něj na
+      větu 0 dokumentu <code>wiki_karel_čapek</code> a z ní přes offsety tokenů na přesné znaky. Řetěz
+      je nepřerušený. To je vlastnost, kterou statistický jazykový model nemá — a proto tady systém
+      dokáže na každou odpověď říct <i>odkud ji ví</i>.</p>
+
+      <h3>Poznámka o „slitých" fázích</h3>
+      <p>Na začátku dílu jsme si řekli, že klasické kroky (normalizace, segmentace, tokenizace,
+      morfologie, rozbor) jsou v projektu <b>slité do jednoho</b> nástroje (UDPipe 2, III.2). Na
+      rozhraních je to vidět: mezi III.1 a III.4 je jediný široký přechod místo pěti úzkých. Není to
+      návrhový záměr — je to důsledek použití hotového nástroje. Jestli by se ten široký přechod měl
+      rozdělit na menší (a získat tím kontrolu nad jednotlivými kroky, třeba vlastní tokenizaci zkratek
+      hned na začátku, aby R.U.R. nepadalo), je otevřená otázka, kterou vede <a href="dil-8.html">Díl
+      VIII</a>. Zde ji zmiňujeme jen jako <b>pozorování o skutečném stavu</b>, ať tě širokost fáze III.2
+      nepřekvapí.</p>
+
+      <!-- ============================ ZÁVĚR ============================ -->
+      <h2>Co už umíš</h2>
+      <p>Prošel jsi celou cestu dat: od surového <code>.txt</code> (III.1) přes jazykovou anotaci
+      UDPipe 2 (III.2), statistické indexy (III.3), VZORy a role (III.4) až po syntézu mapy faktů (III.5);
+      a pak živý dotaz (III.6), který mapu čte, s jeho třemi režimy odpovědi (III.7). Umíš u každé fáze
+      říct, co do ní vstupuje a co vystupuje, co si musí pohlídat (invariant) a co v ní nenávratně
+      zmizí. Rozumíš, proč je fáze III.2 tak široká (slité kroky), proč se vztah ukládá jako hrana
+      (aby fungovalo „bratr koho") a proč systém někdy raději mlčí. A hlavně víš, že <b>od anotace po
+      odpověď se drží nit k původnímu textu</b> — každá odpověď je dohledatelná ke konkrétní větě.</p>
+      <p>V dalším dílu se ponoříme pod hladinu fáze III.6: <a href="dil-4.html">Díl IV</a> ukazuje, jak
+      přesně vzniká to „světlo", co je dialogový stavový automat a jak se počítá míra jistoty, kterou
+      tady používáme jen jako hotový nástroj.</p>
+
+      <div class="pager">
+        <a href="dil-2.html"><span class="dir">← předchozí</span>Díl II — První kroky</a>
+        <a href="dil-4.html"><span class="dir">další →</span>Díl IV — Jak to funguje</a>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

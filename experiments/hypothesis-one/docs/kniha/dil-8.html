@@ -1,0 +1,372 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Díl VIII — Otevřené body a možné cesty — hypothesis-one</title>
+<link rel="stylesheet" href="assets/style.css">
+<script defer src="assets/mermaid.min.js"></script>
+<script defer src="assets/script.js"></script>
+</head>
+<body>
+<div class="layout">
+
+  <aside class="sidebar">
+    <p class="brand"><a href="index.html">hypothesis-one</a></p>
+    <p class="tag">knižní dokumentace</p>
+    <nav aria-label="Obsah knihy">
+      <a href="index.html">Úvod</a>
+      <p class="part">Díl I — Než začneme</p><a href="dil-1.html">I · Co řeší, slovník, mapa</a>
+      <p class="part">Díl II — První kroky</p><a href="dil-2.html">II · Instalace, běh, data</a>
+      <p class="part">Díl III — Cesta dat</p><a href="dil-3.html">III · Fáze pipeline</a>
+      <p class="part">Díl IV — Jak to funguje</p><a href="dil-4.html">IV · Automat, aktivace, fakty</a>
+      <p class="part">Díl V — Testování</p><a href="dil-5.html">V · Testy, tvary, měření</a>
+      <p class="part">Díl VI — Rozšiřování</p><a href="dil-6.html">VI · Data, vztahy, testy</a>
+      <p class="part">Díl VII — Provoz</p><a href="dil-7.html">VII · UDPipe, viz, pasti</a>
+      <p class="part">Díl VIII — Otevřené body</p><a href="dil-8.html" class="active">VIII · Nedodělky a cesty</a>
+      <p class="part">Přílohy</p><a href="prilohy.html">Rejstřík, konfigurace, registry</a>
+    </nav>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <button class="iconbtn" id="theme-toggle" type="button" aria-label="Přepnout světlý/tmavý režim">◐ režim</button>
+    </div>
+    <div class="content">
+      <nav class="crumbs"><a href="index.html">Úvod</a> › Díl VIII › Otevřené body a možné cesty</nav>
+      <p class="eyebrow">Díl VIII — Otevřené body a možné cesty</p>
+      <h1>Otevřené body a možné cesty</h1>
+
+      <p class="lead">Kde jsme a kam jdeme: v Dílu VII jsme systém provozovali — spouštěli UDPipe,
+      dívali se na živou vizualizaci, obcházeli pasti nasazení. Teď uděláme něco jiného a méně
+      obvyklého pro dokumentaci: <b>poctivě přiznáme, co hotové není</b>. Kde je nedodělek, kde
+      vědomá provizorka, kde známe hranici a nepřekročili jsme ji, kde se teprve rozhoduje. Nic
+      tady není pokyn — jsou to <i>návrhy</i> a rozcestí. U každého bodu uvidíš, co dnes v kódu
+      opravdu je, proč to zůstalo nevyřešené, a nejméně dvě cesty dál i s cenou a rizikem každé
+      z nich.</p>
+
+      <p>Pár čísel na začátek, ať víme, o čem mluvíme. Velký etalon (145 otázek,
+      <code>eval_large.py</code>) dnes prochází na <b>63/145 = 43 %</b> a má <b>30</b> sebevědomě
+      špatných odpovědí. <span class="mark mark-overeno">Ověřeno</span> Rozpad po kategoriích ale
+      není rovnoměrný: honest-negative 7/7 (systém poctivě mlčí), kopula 16/21 a poloha 12/17
+      drží, zatímco <b>relation 4/18</b>, <b>temporal 9/25</b>, atribut 0/11 a počet 0/7 táhnou
+      výsledek dolů. Většina otevřených bodů v téhle kapitole míří přesně na tyhle slabé
+      kategorie — a jak uvidíme, hodně z nich má <b>jeden společný kořen</b>.</p>
+
+      <h2 id="8-jak-cist">Jak číst tuhle kapitolu</h2>
+      <p>Každý bod je jeden fialový blok <code>&lt;aside class="open-question"&gt;</code> se stejnou
+      kostrou: <b>Bod</b> (název a kategorie) → <b>Stav</b> (co dnes v kódu existuje) → <b>Proč
+      nevyřešeno</b> → <b>Možné cesty</b> (nejméně dvě, u každé podstata, cena, riziko a hlavně
+      <i>kdy je právě tahle cesta ta správná</i>) → <b>Signál</b> (podle čeho poznáš, že nastal
+      čas to řešit) → <b>Kde se dotkneš</b> (soubory, kterých by se změna týkala).</p>
+      <p>Kategorie rozlišujeme čtyři, ať je hned jasné, jakou povahu bod má:</p>
+      <div class="tablewrap">
+      <table>
+        <tr><th>Kategorie</th><th>Co znamená</th></tr>
+        <tr><td><b>nedodělek</b></td><td>Chtěli bychom to mít, práce ještě neproběhla nebo se vrátila.</td></tr>
+        <tr><td><b>nerozhodnuto</b></td><td>Existuje směr, ale není rozhodnuto, jestli se jím jít — chybí měření.</td></tr>
+        <tr><td><b>vědomé provizorium</b></td><td>Něco tam je, ale schválně vypnuté nebo dočasné, protože v současné podobě škodí.</td></tr>
+        <tr><td><b>známé omezení</b></td><td>Víme o hranici, akceptujeme ji, náprava by stála víc, než dnes vynese.</td></tr>
+      </table>
+      </div>
+      <p>Poslední bod kapitoly patří do páté, měkčí přihrádky — <b>pozorování</b>: není to defekt,
+      jen rozdíl mezi tím, „jak by se to podle učebnice mělo dělit", a tím, jak to skutečně
+      běží.</p>
+
+      <h2 id="8-1-node-based">Velký směr, který drží vše ostatní: retrieval po uzlech</h2>
+      <p>Než projdeme jednotlivé body, ukažme si mapu závislostí. Ne všechny otevřené body jsou
+      nezávislé — několik jich má společný kořen. Na diagramu sleduj, že <b>jeden</b> bod
+      (retrieval po uzlech) stojí nad třemi dalšími: kdyby se vyřešil on, tři body pod ním by
+      z velké části zmizely samy. A že ten kořen je motivovaný <b>měřením</b>, ne dojmem.</p>
+
+      <p class="full">Šipka „A → B" tady čti jako <i>„A odemyká B"</i>: dokud se nepohne A,
+      lokální oprava B naráží pořád na totéž.</p>
+
+<pre class="mermaid">
+flowchart TD
+  accTitle: Závislosti mezi otevřenými body
+  accDescr: Retrieval po uzlech je společný předpoklad — odemkl by relation zbytek, doménu R.U.R. i rozpad jmen. Motivuje ho měření: 87 procent gold odpovědí leží ve stejné větě jako dotaz, problém tedy není dosah, ale reprezentace entity.
+  REACH["Měření: 87 % odpovědí je ve stejné větě jako dotaz"]
+  NB["Retrieval po uzlech — entita je uzel, fakt je hrana"]
+  REL["Relation zbytek — verb-vztahy, oblique, genitiv"]
+  RUR["Doména R.U.R. — tokenizace R/U/R, cizí mount"]
+  NAME["Rozpad jmen — alias a identita entity"]
+  REACH --> NB
+  NB --> REL
+  NB --> RUR
+  NB --> NAME
+</pre>
+
+      <p>Slovy: dnes systém hledá odpovědi <b>po souborech</b>. Dotaz rozsvítí („mountne") hrstku
+      horkých souborů korpusu a v nich skládá fakty. Entita — Karel Čapek, R.U.R., mloci — přitom
+      není samostatný uzel s hranami; je to <b>řetězec jména</b>, který se dohledává přes tabulku
+      aliasů. Když se jméno v textu rozpadne nebo se špatně tokenizuje, opora zmizí a fakt se
+      navěsí špatně. „Retrieval po uzlech" znamená obrátit tuhle logiku: <b>entita = uzel grafu,
+      fakt = hrana mezi uzly</b>, a světlo teče po hranách entit, ne po hranicích souborů.</p>
+
+      <p>Proč je to největší páka, není dojem — je to <b>naměřeno</b>. Diagnostika zabudovaná do
+      <code>extract_relations.py</code> říká, že <b>87 % gold odpovědí leží ve stejné větě jako
+      dotaz</b>, jen nejsou vytěžené. Data tedy skoro vždycky <i>jsou na dosah</i>. Bottleneck není
+      v tom, že by systém nedosáhl do vzdáleného souboru — je v tom, že entitu ve větě neumí
+      spolehlivě reprezentovat a spojit ji hranou s tím, co o ní věta říká. Přesně to řeší uzel
+      s hranami, a přesně proto retrieval po uzlech odemyká relation, doménu R.U.R. i rozpad jmen
+      naráz.</p>
+
+      <aside class="open-question">
+        <span class="lbl">Otevřený bod · nedodělek / směr</span>
+        <dl>
+          <dt>Bod</dt><dd><b>Retrieval po uzlech</b> <span class="mark mark-navrh">Návrh</span> — entita jako prvotřídní uzel grafu, fakt jako hrana mezi uzly. Největší dopad ze všech bodů.</dd>
+          <dt>Stav</dt><dd>Retrieval dnes běží po souborech (<code>dataloader.select_files</code> mountne horké soubory). Fakty jsou trojice predikát + role-sloty + provenience ve <code>fact_store</code> (16 028 faktů + 24 bio + 114 vztahových hran nad 52 soubory). Entita ale není uzel — je to jméno dohledávané přes aliasy. Hrany dnes existují jen mezi fakty uvnitř věty a souboru.</dd>
+          <dt>Proč nevyřešeno</dt><dd>Je to velký architektonický zásah: znamenal by přepsat reprezentaci z per-souborového mountu na graf entit a s ním i aktivaci. Zatím se sbíraly levnější páky (polární smyčka, oprava extrakce, kopulové vztahy), které posunuly křivku 33 → 40 → 43 %.</dd>
+          <dt>Možné cesty</dt>
+          <dd><b>A — Postavit graf entit nad stávajícími fakty.</b> <i>Podstata:</i> reifikovat entity z <code>fact_store</code> jako uzly, hrany = sdílené fakty a věty; aktivace by tekla po hranách entit místo po souborech. <i>Cena:</i> nová vrstva plus přepis mountu a šíření světla. <i>Riziko:</i> migrace může dočasně rozbít stávajících 43 %. <i>Kdy je právě tato správná:</i> pokud měření potvrdí, že strop drží entitní identita — což dnešní diagnostika (relation net-neutral, cizí mount u R.U.R., reach 87 %) naznačuje. Pak je to jednoznačně největší páka.</dd>
+          <dd><b>B — Jen entitní index nad fakty, bez grafu.</b> <i>Podstata:</i> inverzní index entita → seznam faktů napříč soubory, dotaz na entitu by sjednotil fakty i z nemountnutých souborů. <i>Cena:</i> malá, žádný přepis aktivace. <i>Riziko:</i> neřeší rozpad jmen (entita zůstává řetězec), jen dosah přes soubory. <i>Kdy je právě tato správná:</i> kdyby se ukázalo, že hlavní ztráta je v <i>dosahu</i> přes soubory, ne v identitě — jako lacinější první krok, který lze později povýšit na plný graf.</dd>
+          <dt>Signál</dt><dd>Relation, R.U.R. a rozpad jmen se nehnou žádnou lokální opravou (opakovaně měřeno net-neutral) a sebevědomě špatné odpovědi se drží v kategoriích relation a authorship.</dd>
+          <dt>Kde se dotkneš</dt><dd><code>fact_store.py</code>, <code>dataloader.py</code> (<code>select_files</code>, doclinks), <code>activation_field.py</code>, <code>answering.py</code>.</dd>
+        </dl>
+      </aside>
+
+      <h3>Co nefunguje a proč</h3>
+      <p>Nejpřirozenější první nápad nováčka je nesahat na architekturu a slabé kategorie
+      „dohnat pravidly": <i>chybí vztahy? přidáme víc pravidel na extrakci vztahů.</i> Zní to
+      logicky a přesně tohle se zkoušelo. Selže to <b>tiše</b>: nová pravidla vytěží stejně
+      chyb jako správných faktů. Vztah se totiž navěsí na entitu — a když je entita jen řetězec,
+      který se v jiném tvaru nebo po rozpadu jména nespáruje, hrana skončí u špatného konce (tzv.
+      swap). Měřením vyšla taková rozšíření <b>net-neutral</b>: co přidala na pokrytí, ztratila na
+      přesnosti, takže se vrátila. Poučení je to samé, které dává diagram: bez uzlu s identitou
+      nemá kam vést spolehlivá hrana. Proto relation, R.U.R. i rozpad jmen míří na jeden kořen,
+      ne na tři samostatné záplaty.</p>
+
+      <h2 id="8-2-extrakce">Nedodělky extrakce faktů</h2>
+      <p>Tři body níž jsou nedodělky ve vytěžování faktů z textu. Data skoro vždycky ve větě jsou
+      (viz reach 87 %), jen je systém nedostane do mapy ve správném tvaru nebo na správnou
+      událost.</p>
+
+      <aside class="open-question">
+        <span class="lbl">Otevřený bod · nedodělek</span>
+        <dl>
+          <dt>Bod</dt><dd><b>Relation zbytek</b> <span class="mark mark-overeno">Ověřeno</span> — verb-vztahy, oblique a zájmenný genitiv nad rámec kopulového vzoru.</dd>
+          <dt>Stav</dt><dd>Extrakce vztahů funguje jen pro <b>kopulový vzor</b> (typu „bratrem … byl Josef" → hrana <i>bratr</i>). Verb-vztahy, oblique vazby a zájmenný genitiv byly zkoušeny a <b>naměřeny net-neutral</b> (přidaly stejně swapu a šumu, co zisku), a proto vráceny. Velký etalon: relation <b>4/18</b>.</dd>
+          <dt>Proč nevyřešeno</dt><dd>Tyhle vztahy narážejí na entitní identitu. Bez uzlu entity se hrana navěsí na rozpadlé nebo záměnné jméno — měření to potvrdilo a rozšíření se stáhla. Je to typický „blokováno velkým směrem" bod.</dd>
+          <dt>Možné cesty</dt>
+          <dd><b>A — Počkat na retrieval po uzlech a přidat verb-hrany až nad uzly entit.</b> <i>Podstata:</i> odložit, dokud identita nedrží, pak hrany „drží" samy. <i>Cena:</i> čas, závislost na velkém směru. <i>Riziko:</i> pořadí prací — relation čeká. <i>Kdy je právě tato správná:</i> pokud se potvrdí, že swap pramení z identity (reach 87 % ukazuje, že data ve větě jsou, chybí jen spolehlivá vazba).</dd>
+          <dd><b>B — Přidat verb-vztahy hned, ale s tvrdým guardem identity.</b> <i>Podstata:</i> vytěžit hranu jen tehdy, když <b>oba</b> konce jsou známé entity z gazetteeru. <i>Cena:</i> střední, plus údržba gazetteeru. <i>Riziko:</i> guard zahodí většinu vět → nízké pokrytí. <i>Kdy je právě tato správná:</i> kdyby stačilo pár vysoce jistých hran a nechtělo se čekat na node-based.</dd>
+          <dt>Signál</dt><dd>Relation kategorie stojí na 4/18 i po lokálních opravách a přidané vztahy pořád měří net-neutral.</dd>
+          <dt>Kde se dotkneš</dt><dd><code>extract_relations.py</code>, <code>build_facts_all.py</code>, <code>fact_store.py</code>, <code>build_gazetteer.py</code>.</dd>
+        </dl>
+      </aside>
+
+      <aside class="open-question">
+        <span class="lbl">Otevřený bod · nedodělek</span>
+        <dl>
+          <dt>Bod</dt><dd><b>Temporal 36 %</b> <span class="mark mark-overeno">Ověřeno</span> — datumy v běžném textu mimo biografickou závorku.</dd>
+          <dt>Stav</dt><dd>Velký etalon: temporal <b>9/25 = 36 %</b>. Fungují datumy v <b>bio-závorce</b> (Chronos + <code>extract_bio</code>, 24 bio faktů, „Karel Čapek (9. ledna 1890 …)" → who/when/where). Datum ve volné větě — „Hru napsal roku 1920" — se dnes nevytěží.</dd>
+          <dt>Proč nevyřešeno</dt><dd>Extrakce data je vázaná na vzor bio-závorky za jménem. Volný datum ve větě nemá vzor, který by ho spolehlivě navěsil na správnou událost, a naivní navěšení hrozí záměnou (datum jedné události na jinou).</dd>
+          <dt>Možné cesty</dt>
+          <dd><b>A — Rozšířit Chronos o vzory volného data.</b> <i>Podstata:</i> „číslo + měsíc + rok" jako when-díra napříč predikáty, ne jen v závorce. <i>Cena:</i> střední, nové vzory a jejich ladění. <i>Riziko:</i> špatné navěšení data na cizí událost (swap), stejná past jako u vztahů. <i>Kdy je právě tato správná:</i> kdyby byl temporal prioritou a volných dat je v korpusu hodně.</dd>
+          <dd><b>B — Navěsit volný datum přes retrieval po uzlech.</b> <i>Podstata:</i> událost je uzel, datum je jeho hrana <i>when</i>. <i>Cena:</i> stejná jako velký směr. <i>Riziko:</i> velký zásah, temporal čeká. <i>Kdy je právě tato správná:</i> společně s node-based, aby datum držel u správné události díky identitě, ne díky křehkému vzoru.</dd>
+          <dt>Signál</dt><dd>Temporal drží kolem třetiny, zatímco bio-datumy jsou fakticky 100 % — mezera je celá ve volném textu.</dd>
+          <dt>Kde se dotkneš</dt><dd><code>chronos.py</code>, <code>extract_bio.py</code>, <code>build_facts_all.py</code>, <code>role_catalog.py</code> (when-role).</dd>
+        </dl>
+      </aside>
+
+      <aside class="open-question">
+        <span class="lbl">Otevřený bod · nedodělek</span>
+        <dl>
+          <dt>Bod</dt><dd><b>Mnemos — zápis</b> <span class="mark mark-navrh">Návrh</span> — uživatel učí systém nové fakty za běhu.</dd>
+          <dt>Stav</dt><dd>Systém dnes mapu faktů jen <b>čte</b> — postaví ji jednou z korpusu a nad ní odpovídá. Zápisová cesta „Zapamatuj si, že …" chybí; nový fakt jde přidat jen novým dokumentem a přestavbou indexů (reindex). Nadřazený projekt má paměť souborem, tady analogická vrstva zatím není.</dd>
+          <dt>Proč nevyřešeno</dt><dd>Zápis by musel vytěžit fakt z <i>uživatelovy</i> věty (ne z korpusu), zapsat ho s proveniencí a ošetřit konflikt s existujícím faktem. Nebyla to priorita proti čtecí přesnosti — a špatně vytěžený uživatelský fakt umí mapu otrávit.</dd>
+          <dt>Možné cesty</dt>
+          <dd><b>A — Příkazová cesta „nauč se" přes stávající extrakci.</b> <i>Podstata:</i> uživatelova věta projde stejným řetězcem (<code>grammar_vzor</code> → fakt) a zapíše se s proveniencí <i>user</i>. <i>Cena:</i> střední, nová příkazová větev v answeru. <i>Riziko:</i> chybně vytěžený fakt otráví mapu a tváří se jako pravda. <i>Kdy je právě tato správná:</i> kdyby bylo uživatelské učení požadavek a extrakce je na tenhle typ vět dost spolehlivá.</dd>
+          <dd><b>B — Oddělená vrstva Mnemos s předností.</b> <i>Podstata:</i> uživatelské fakty žijí ve vlastní, přepisovatelné vrstvě, která má při dotazu přednost, ale je izolovaná od korpusu. <i>Cena:</i> nová vrstva plus slučování korpus × user při dotazu. <i>Riziko:</i> konflikty priorit (kdo vyhraje, korpus, nebo uživatel). <i>Kdy je právě tato správná:</i> pokud má uživatel korpus <i>opravovat a přebíjet</i>, ne jen doplňovat.</dd>
+          <dt>Signál</dt><dd>Přijde požadavek „chci systém učit za běhu", nebo je potřeba opravit chybný fakt bez reindexu.</dd>
+          <dt>Kde se dotkneš</dt><dd><code>answering.py</code> (příkazová větev), <code>fact_store.py</code> (zápis + provenience), <code>extract_*</code> (vytěžení z uživatelovy věty), <code>config.json</code>.</dd>
+        </dl>
+      </aside>
+
+      <h2 id="8-3-omezeni">Známá omezení domény a mountu</h2>
+      <p>Dva body, o jejichž hranici víme a zatím ji akceptujeme. Oba mají skutečnou nápravu opět
+      v retrieval po uzlech; do té doby jsou zvladatelné.</p>
+
+      <aside class="open-question">
+        <span class="lbl">Otevřený bod · známé omezení</span>
+        <dl>
+          <dt>Bod</dt><dd><b>R.U.R. / doména</b> <span class="mark mark-overeno">Ověřeno</span> — zkratka „R.U.R." se tokenizuje na R/U/R a dotaz mountne cizí doménu.</dd>
+          <dt>Stav</dt><dd>„R.U.R." se rozpadne na samostatné tokeny. Slití zkratek (<code>merge_abbreviations</code>) je opraveno na <b>korpusu</b> (<code>remerge_corpus.py</code>), ale na <b>živý dotaz</b> bylo revertnuto, protože jinde dělalo regrese. Bez slití se „Co je R.U.R.?" mountne špatně (do biblické domény) a skončí odpovědí „bůh" nebo doptáním — reprodukovatelné selhání.</dd>
+          <dt>Proč nevyřešeno</dt><dd>Živé slití zkratek působilo regrese jinde a bylo staženo. Hlubší příčina je ale entitní: R.U.R. není uzel, takže se dotaz opře o rozpadlé tokeny a mountne cizí doménu. Lokální oprava jednoho jevu odkrývá druhý.</dd>
+          <dt>Možné cesty</dt>
+          <dd><b>A — Vyřešit přes retrieval po uzlech.</b> <i>Podstata:</i> R.U.R. je uzel s hranou <i>napsal → Čapek</i>; tokenizace přestane o doméně rozhodovat. <i>Cena:</i> stejná jako velký směr. <i>Riziko:</i> velký zásah. <i>Kdy je právě tato správná:</i> společně s node-based — tehdy padne celá třída „zkratka mountne cizí doménu", ne jen R.U.R.</dd>
+          <dd><b>B — Znovu zapnout slití zkratek na živý dotaz, ale s guardem.</b> <i>Podstata:</i> slití jen pro zkratky doložené v gazetteeru, aby se předešlo plošné regresi z minula. <i>Cena:</i> malá. <i>Riziko:</i> guard je neúplný — jiná zkratka, která v gazetteeru není, propadne dál. <i>Kdy je právě tato správná:</i> kdyby byl R.U.R. akutní a node-based ještě daleko.</dd>
+          <dt>Signál</dt><dd>Dotazy na zkratkové entity systematicky mountnou cizí doménu a vracejí sebevědomě špatnou odpověď.</dd>
+          <dt>Kde se dotkneš</dt><dd><code>annotate_corpus.py</code> (normalizace / slití), <code>remerge_corpus.py</code>, <code>dataloader.select_files</code>, <code>build_gazetteer.py</code>.</dd>
+        </dl>
+      </aside>
+
+      <aside class="open-question">
+        <span class="lbl">Otevřený bod · známé omezení</span>
+        <dl>
+          <dt>Bod</dt><dd><b>Bible plošně znečišťuje mount</b> <span class="mark mark-prevzato">Převzato</span> — velký/frekventovaný soubor se rozsvítí i pro nesouvisející dotaz.</dd>
+          <dt>Stav</dt><dd>Biblický soubor se aktivuje i pro dotaz, který s ním nesouvisí (u Čapek-dotazu pozorovaná aktivace ~0.7). Je to pre-existing chování mountu po souborech (<code>select_files</code> plus co-mount přes doclinks): soubor s mnoha termy posbírá teplo i bez skutečné opory.</dd>
+          <dt>Proč nevyřešeno</dt><dd>Je to vlastnost mountu po souborech — velký soubor má velkou plochu, na kterou dopadne teplo. Skutečná náprava je opět mount po entitách, ne po souborech. Do té doby se to dá jen zmírnit.</dd>
+          <dt>Možné cesty</dt>
+          <dd><b>A — Normalizovat teplo souboru jeho velikostí.</b> <i>Podstata:</i> idf-váhy uzlů to dělají zčásti; přidat penalizaci délky, aby velký soubor „nejel zadarmo". <i>Cena:</i> malá. <i>Riziko:</i> přebití — penalizace potlačí i legitimní velké soubory. <i>Kdy je právě tato správná:</i> kdyby biblický mount měřitelně kazil odpovědi teď a node-based je daleko.</dd>
+          <dd><b>B — Mount po entitách místo po souborech.</b> <i>Podstata:</i> teplo teče entitami, ne plochou souboru, takže velikost přestane hrát roli. <i>Cena:</i> stejná jako velký směr. <i>Riziko:</i> velký zásah. <i>Kdy je právě tato správná:</i> společně s node-based, jako vedlejší přínos jednoho velkého kroku.</dd>
+          <dt>Signál</dt><dd>Dotazy mimo biblickou doménu mají bibli mezi horkými soubory a její přítomnost měnitelně ovlivní odpověď.</dd>
+          <dt>Kde se dotkneš</dt><dd><code>dataloader.select_files</code>, doclinks, <code>config.json</code> (<code>doclink_top</code>).</dd>
+        </dl>
+      </aside>
+
+      <h2 id="8-4-provizorium">Vědomé provizorium a nerozhodnutý směr</h2>
+      <p>Jeden bod, který <b>schválně vypínáme</b>, protože v současné podobě škodí; a jeden, u
+      kterého se teprve <b>rozhoduje</b>, jestli se jím vydat.</p>
+
+      <aside class="open-question">
+        <span class="lbl">Otevřený bod · vědomé provizorium (vypnuté)</span>
+        <dl>
+          <dt>Bod</dt><dd><b>Naučená brána přeučuje</b> <span class="mark mark-overeno">Ověřeno</span> — klasifikátor odpověď/mlčení se na malém vzorku naučí případy nazpaměť.</dd>
+          <dt>Stav</dt><dd>Brána je logistický klasifikátor nad 13 rysy (<code>gate.json</code> je commitnutý artefakt), který měl rozhodovat mezi odpovědí a mlčením. V <code>config.json</code> je <code>gate_enabled: false</code> — <b>vypnutá</b>. Křížová validace (leave-one-out, 77 answer-mode případů) dala přesnost 68,8 %; práh 0,30 v LOO ubral −13 sebevědomě špatných za cenu −3 správných. Jenže při reálném nasazení potlačila −19 odpovědí: přeučila se na 76 vzorcích × 13 rysů.</dd>
+          <dt>Proč nevyřešeno</dt><dd>Málo dat vůči počtu rysů — model si zapamatuje konkrétní případy místo pravidla, takže LOO vypadá dobře, ale běh škodí. Sběr většího anotovaného vzorku je práce a ruční assurance (glow-margin plus def_fit) zatím drží dost dobře.</dd>
+          <dt>Možné cesty</dt>
+          <dd><b>A — Posbírat víc trénovacích dat a přeučit, případně ubrat rysy.</b> <i>Podstata:</i> rozšířit gold a <code>gate_data</code> (přes <code>train_gate.collect</code>), snížit počet rysů proti počtu vzorků. <i>Cena:</i> anotace nových případů. <i>Riziko:</i> i pak přeučení — doména je malá. <i>Kdy je právě tato správná:</i> kdyby přibyl velký anotovaný korpus otázek.</dd>
+          <dd><b>B — Bránu zahodit a zůstat u ručních prahů.</b> <i>Podstata:</i> místo učení kalibrovat meze glow-margin ručně. <i>Cena:</i> ruční ladění prahů. <i>Riziko:</i> heuristika nezachytí jemné hraniční případy, na které by model uměl reagovat. <i>Kdy je právě tato správná:</i> dokud je doména malá a ruční pravidla drží — dnešní stav.</dd>
+          <dd><b>C — Nechat bránu jako stínovou (loguje, nerozhoduje).</b> <i>Podstata:</i> telemetrie shody s ruční assurance, bez vlivu na odpověď. <i>Cena:</i> skoro nula. <i>Riziko:</i> nikdy se nenasadí a jen sbírá data „do šuplíku". <i>Kdy je právě tato správná:</i> kdyby šlo hlavně o sběr dat pro budoucí přeučení bez rizika, že brána mezitím škodí.</dd>
+          <dt>Signál</dt><dd>Sebevědomě špatné odpovědi se dají výrazně srazit jen bránou a ruční prahy narazí na strop.</dd>
+          <dt>Kde se dotkneš</dt><dd><code>gate.json</code>, <code>config.json</code> (<code>gate_enabled</code>), <code>answering.py</code> (<code>_gate_p</code>), <code>train_gate.py</code>.</dd>
+        </dl>
+      </aside>
+
+      <aside class="open-question">
+        <span class="lbl">Otevřený bod · nerozhodnuto / směr</span>
+        <dl>
+          <dt>Bod</dt><dd><b>VZOR-síť do šířky r přes věty</b> <span class="mark mark-navrh">Návrh</span> — uzavřená smyčka fakt ↔ dotaz ↔ odpověď rozprostřená přes hranice vět.</dd>
+          <dt>Stav</dt><dd>VZOR (frame_sig) je dnes pole slotů kolem pivotu o šířce r <b>v rámci jedné věty</b>. Myšlenka je rozprostřít stejnou síť do šířky r i <b>přes hranice vět</b>, aby fakt, dotaz i odpověď sdílely jednu uzavřenou smyčku. Neměřeno — je to koncept, ne kód.</dd>
+          <dt>Proč nevyřešeno</dt><dd>Je to nerozhodnutý směr. Není jasné, jestli přinese zisk nad retrieval po uzlech, nebo jestli je to jen jiný pohled na totéž. Bez měření se do něj nechce investovat.</dd>
+          <dt>Možné cesty</dt>
+          <dd><b>A — Rozšířit r přes věty a změřit mezivětný zisk.</b> <i>Podstata:</i> vzor by přesáhl hranici věty (např. účelová klauzule zdědí místo z věty předchozí). <i>Cena:</i> střední, plus kombinatorika slotů. <i>Riziko:</i> počet kombinací slotů roste a s ním šum. <i>Kdy je právě tato správná:</i> kdyby se ukázalo, že chybějící odpovědi jsou <i>mezivětné</i>, ne entitní.</dd>
+          <dd><b>B — Nechat VZOR ve větě a mezivětné vazby řešit grafem entit.</b> <i>Podstata:</i> dělba práce — VZOR zůstane lokální, graf řeší globální vazby. <i>Cena:</i> konzistence s velkým směrem, žádná nová vrstva vzorů. <i>Riziko:</i> ryze mezivětné jevy (elipsa táhnoucí se přes větu) zůstanou nepokryté. <i>Kdy je právě tato správná:</i> pokud diagnostika potvrdí, že skoro vše je stejnovětné — a reach 87 % přesně tohle naznačuje, takže mezivětný VZOR by za svou cenu nemusel stát.</dd>
+          <dt>Signál</dt><dd>Měření ukáže, kolik gold odpovědí leží <i>mezi</i> větami. Dnešní diagnostika (87 % uvnitř věty) říká, že mezivětný potenciál je malý — proto „nerozhodnuto", ne „nedodělek".</dd>
+          <dt>Kde se dotkneš</dt><dd><code>grammar_vzor.py</code> (frame_sig, šířka r), <code>activation_field.py</code>, <code>answering.py</code>.</dd>
+        </dl>
+      </aside>
+
+      <h2 id="8-5-pozorovani">Pozorování: fáze slité do UDPipe</h2>
+      <p>Poslední bod není defekt ani nedodělek — je to <b>pozorování</b> o tom, jak se skutečná
+      pipeline liší od ideálního učebnicového rozdělení. Zaznamenáváme ho, aby čtenář, který v knize
+      hledá dvanáct oddělených fází, věděl, proč čtyři z nich najde slité v jedné.</p>
+
+      <aside class="open-question">
+        <span class="lbl">Otevřený bod · pozorování</span>
+        <dl>
+          <dt>Bod</dt><dd><b>Fáze slité do UDPipe</b> <span class="mark mark-prevzato">Převzato</span> — normalizace, segmentace, tokenizace a jazyková analýza probíhají v jednom kroku.</dd>
+          <dt>Stav</dt><dd>Učebnicové dělení předpokládá tyhle čtyři kroky samostatně. V projektu je dělá <b>najednou</b> UDPipe 2 (<code>annotate_corpus.py</code>) a dělá je dobře. Jediná ruční normalizace nad UDPipe je slití zkratek (merge zkratek, viz bod R.U.R.).</dd>
+          <dt>Proč nevyřešeno</dt><dd>Není co „řešit" — UDPipe zvládá všechny čtyři kroky ve vysoké kvalitě. Rozdělovat je zpět na čtyři samostatné fáze by bylo umělé a přineslo by údržbu bez užitku.</dd>
+          <dt>Možné cesty</dt>
+          <dd><b>A — Nechat slité a jen zdokumentovat mapu „ideál → skutečnost".</b> <i>Podstata:</i> přiznat slití (což tahle kniha dělá), nerozbíjet fungující krok. <i>Cena:</i> nulová. <i>Riziko:</i> kdo hledá dvanáct fází, hledá je zbytečně — proto ta poznámka. <i>Kdy je právě tato správná:</i> dokud UDPipe stačí a nechceme sami měnit tokenizaci.</dd>
+          <dd><b>B — Vyčlenit vlastní normalizaci před UDPipe.</b> <i>Podstata:</i> víc ručních kroků před anotací (slití zkratek je jejich zárodkem). <i>Cena:</i> údržba vlastní vrstvy paralelně s UDPipe modelem. <i>Riziko:</i> vlastní tokenizace se rozejde s tou, na které je UDPipe model natrénovaný. <i>Kdy je právě tato správná:</i> kdyby tokenizace UDPipe systematicky kazila doménu víc než jen u R.U.R.</dd>
+          <dt>Signál</dt><dd>Tokenizace UDPipe kazí víc případů než jen R.U.R. a samotné slití zkratek už nestačí.</dd>
+          <dt>Kde se dotkneš</dt><dd><code>annotate_corpus.py</code>, normalizace (slití zkratek), <code>remerge_corpus.py</code>.</dd>
+        </dl>
+      </aside>
+
+      <h2 id="8-6-registr">Mini-registr otevřených bodů</h2>
+      <p>Souhrn na jedné obrazovce. Sloupec <b>dopad</b> říká, kolik by vyřešení bodu vyneslo;
+      <b>blokuje</b> ukazuje, co na bodu visí (nebo že bod sám čeká na jiný). Všimni si, že čtyři
+      body míří šipkou na jediný řádek — <i>retrieval po uzlech</i> — a proto sedí nahoře jako
+      jediný s vysokým dopadem.</p>
+      <div class="tablewrap">
+      <table>
+        <tr><th>Bod</th><th>Kategorie</th><th>Dopad</th><th>Blokuje / je blokován</th><th>Kde</th></tr>
+        <tr>
+          <td><b>Retrieval po uzlech</b></td>
+          <td>nedodělek / směr</td>
+          <td><b>vysoký</b></td>
+          <td>odemyká relation, R.U.R., rozpad jmen, bible mount</td>
+          <td><code>fact_store</code>, <code>dataloader</code>, <code>activation_field</code>, <code>answering</code></td>
+        </tr>
+        <tr>
+          <td>Naučená brána</td>
+          <td>vědomé provizorium (vypnutá)</td>
+          <td>střední</td>
+          <td>drží pokles sebevědomě špatných</td>
+          <td><code>gate.json</code>, <code>config</code>, <code>answering</code>, <code>train_gate</code></td>
+        </tr>
+        <tr>
+          <td>Relation zbytek</td>
+          <td>nedodělek</td>
+          <td>střední</td>
+          <td>blokován retrieval po uzlech</td>
+          <td><code>extract_relations</code>, <code>build_facts_all</code>, <code>gazetteer</code></td>
+        </tr>
+        <tr>
+          <td>R.U.R. / doména</td>
+          <td>známé omezení</td>
+          <td>střední</td>
+          <td>blokován retrieval po uzlech</td>
+          <td><code>annotate_corpus</code>, <code>remerge_corpus</code>, <code>dataloader</code></td>
+        </tr>
+        <tr>
+          <td>Temporal 36 %</td>
+          <td>nedodělek</td>
+          <td>střední</td>
+          <td>—</td>
+          <td><code>chronos</code>, <code>extract_bio</code>, <code>build_facts_all</code></td>
+        </tr>
+        <tr>
+          <td>VZOR-síť do šířky r</td>
+          <td>nerozhodnuto / směr</td>
+          <td>nízký (dle měření)</td>
+          <td>—</td>
+          <td><code>grammar_vzor</code>, <code>activation_field</code>, <code>answering</code></td>
+        </tr>
+        <tr>
+          <td>Mnemos — zápis</td>
+          <td>nedodělek</td>
+          <td>nízký</td>
+          <td>uživatelské učení za běhu</td>
+          <td><code>answering</code>, <code>fact_store</code>, <code>extract_*</code></td>
+        </tr>
+        <tr>
+          <td>Bible plošné znečištění</td>
+          <td>známé omezení</td>
+          <td>nízký</td>
+          <td>blokován retrieval po uzlech</td>
+          <td><code>dataloader.select_files</code>, doclinks</td>
+        </tr>
+        <tr>
+          <td>Fáze slité do UDPipe</td>
+          <td>pozorování</td>
+          <td>nízký</td>
+          <td>—</td>
+          <td><code>annotate_corpus</code>, normalizace</td>
+        </tr>
+      </table>
+      </div>
+      <p>Kdyby ses měl rozhodnout, kam sáhnout jako první, měření mluví jasně: <b>retrieval po
+      uzlech</b>. Není to jen bod s nejvyšším dopadem sám o sobě — je to prerekvizita hned tří
+      dalších (relation, R.U.R., rozpad jmen) a vedlejšně i čtvrtého (bible mount). A protože
+      diagnostika ukazuje, že <b>87 % odpovědí už ve větě je</b>, nejde o to dosáhnout dál, ale
+      o to reprezentovat entitu tak, aby se na ni dala spolehlivě navěsit hrana. To je jádro, na
+      kterém stojí skoro všechno ostatní v tomhle dílu.</p>
+
+      <h2>Co už umíš</h2>
+      <p>Prošel jsi devět míst, kde hypothesis-one <b>není hotový</b> — a víš u každého, jestli jde
+      o nedodělek, vědomou provizorku, známé omezení, nerozhodnutý směr, nebo jen pozorování. Umíš
+      říct, proč ten bod zůstal otevřený, jaké nejméně dvě cesty z něj vedou, co každá z nich stojí
+      a čím riskuje, a hlavně <i>kdy</i> je právě ta která cesta správná. A rozumíš tomu
+      nejdůležitějšímu: že většina slabých kategorií má <b>jeden společný kořen</b> — reprezentaci
+      entity jako uzlu s hranami — a že to není dojem, ale závěr z měření (reach 87 %, relation
+      net-neutral, cizí mount u zkratek).</p>
+      <p>Tím se knižní část uzavírá. V <a href="prilohy.html">Přílohách</a> najdeš rejstřík pojmů,
+      přehled konfigurace (<code>config.json</code> a <code>cs.json</code>), seznam příkazů, registry
+      návrhových rozhodnutí i otevřených bodů a tabulku pokrytí staré dokumentace — vše k rychlému
+      dohledání zpět do textu.</p>
+
+      <div class="pager">
+        <a href="dil-7.html"><span class="dir">← předchozí</span>Díl VII — Provoz</a>
+        <a href="prilohy.html"><span class="dir">další →</span>Přílohy</a>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

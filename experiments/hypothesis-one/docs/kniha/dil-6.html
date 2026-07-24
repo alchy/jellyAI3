@@ -1,0 +1,437 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Díl VI — Rozšiřování — hypothesis-one</title>
+<link rel="stylesheet" href="assets/style.css">
+<script defer src="assets/mermaid.min.js"></script>
+<script defer src="assets/script.js"></script>
+</head>
+<body>
+<div class="layout">
+
+  <aside class="sidebar">
+    <p class="brand"><a href="index.html">hypothesis-one</a></p>
+    <p class="tag">knižní dokumentace</p>
+    <nav aria-label="Obsah knihy">
+      <a href="index.html">Úvod</a>
+      <p class="part">Díl I — Než začneme</p><a href="dil-1.html">I · Co řeší, slovník, mapa</a>
+      <p class="part">Díl II — První kroky</p><a href="dil-2.html">II · Instalace, běh, data</a>
+      <p class="part">Díl III — Cesta dat</p><a href="dil-3.html">III · Fáze pipeline</a>
+      <p class="part">Díl IV — Jak to funguje</p><a href="dil-4.html">IV · Automat, aktivace, fakty</a>
+      <p class="part">Díl V — Testování</p><a href="dil-5.html">V · Testy, tvary, měření</a>
+      <p class="part">Díl VI — Rozšiřování</p><a href="dil-6.html" class="active">VI · Data, vztahy, testy</a>
+      <p class="part">Díl VII — Provoz</p><a href="dil-7.html">VII · UDPipe, viz, pasti</a>
+      <p class="part">Díl VIII — Otevřené body</p><a href="dil-8.html">VIII · Nedodělky a cesty</a>
+      <p class="part">Přílohy</p><a href="prilohy.html">Rejstřík, konfigurace, registry</a>
+    </nav>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <button class="iconbtn" id="theme-toggle" type="button" aria-label="Přepnout světlý/tmavý režim">◐ režim</button>
+    </div>
+    <div class="content">
+      <nav class="crumbs"><a href="index.html">Úvod</a> › Díl VI — Rozšiřování</nav>
+      <p class="eyebrow">Díl VI — Rozšiřování</p>
+      <h1>Díl VI — Rozšiřování: data, vztahy, testy</h1>
+
+      <p class="lead">Kde jsme a kam jdeme: v Dílu V jsme se naučili systém <b>měřit</b> — etalony,
+      rozpad po kategoriích, sebevědomě špatné odpovědi. Teď ho začneme <b>měnit</b>. Tenhle díl je
+      čtyři návody, jak přidat vlastní obsah, vlastní slova a vlastní testy, aniž bys sáhl do
+      rozhodovací logiky. Každý návod má stejný tvar: co chceš, co musíš mít, přesné příkazy a
+      jejich výstup, jak si ověříš, že to zabralo — a hlavně <b>co udělá nováček špatně a proč</b>.
+      Poslední kapitola shrne čtyři pravidla, která nad tím vším drží pořádek.</p>
+
+      <p>Než začneme, jedna věc, která se táhne celým dílem a je v ní půl kouzla projektu: <b>jazyk
+      není v kódu</b>. Vztahová slova, tázací slova, rolové klíče — to všechno jsou <i>data</i>
+      v souborech <code>lang/cs.json</code> a <code>config.json</code>. Rozšířit, co systém umí,
+      proto většinou znamená přepsat řádek v JSONu a spustit přestavbu, ne editovat Python. Proč to
+      tak je, rozebereme u kapitoly VI.2 ve zdůvodňovacím bloku.</p>
+
+      <h2 id="6-1">VI.1 Přidat vlastní dokument nebo doménu <span class="mark mark-prevzato">Převzato</span></h2>
+
+      <p><b>Cíl.</b> Chceš, aby systém odpovídal na otázky o něčem, co dosud neuměl — o novém autorovi,
+      o nové knize, o vlastní doméně. Vstupem je jeden <code>.txt</code> soubor se souvislým textem;
+      výstupem je stav, kdy se na obsah toho souboru dá zeptat v <code>ask.py</code>.</p>
+
+      <p><b>Předpoklady.</b> Funkční instalace z Dílu II a <b>běžící UDPipe 2</b> na portu 8092
+      (bez něj se text nezanotuje — viz <a href="dil-7.html">Díl VII</a>). Data jsou v projektu
+      záměrně <i>gitignored</i>: nedistribuují se, staví se z <code>data/raw/</code> přestavbou. Tvůj
+      nový soubor tedy přidáš do surových dat a necháš přestavbu proběhnout.</p>
+
+      <h3>Postup</h3>
+      <p>Celá přestavba je řetěz pěti skriptů, kde výstup jednoho je vstupem dalšího. Nejdřív si ho
+      prohlédni jako celek — na diagramu sleduj, že tvůj <code>.txt</code> vstupuje úplně vlevo
+      nahoře a že se dotknou <b>všech</b> pěti kroků, ne jen prvního.</p>
+
+      <p class="full">Diagram čti shora dolů: obdélníky jsou skripty (co spustíš), zaoblené uzly jsou
+      data na disku (co vznikne). Poslední uzel je stav, kdy je systém připravený odpovídat.</p>
+
+<pre class="mermaid">
+flowchart TD
+  accTitle: Přestavba dat po přidání nového souboru
+  accDescr: Nový txt soubor projde pěti skripty pipeline (anotace, indexy, registr, fakty, šablony) a teprve pak se na jeho obsah dá zeptat.
+  RAW["nový .txt do data/raw/"] --> A["annotate_corpus.py (UDPipe 2)"]
+  A --> C(["shard data/corpus/doc.pkl"])
+  C --> D["dataloader.py — build_indexes()"]
+  D --> I(["indexy data/index/"])
+  I --> S["synth_registry.py"]
+  S --> REG(["registry.jsonl"])
+  REG --> F["build_facts_all.py"]
+  F --> FA(["fakty data/facts/"])
+  REG --> T["build_templates_all.py"]
+  T --> TE(["šablony data/templates/"])
+  FA --> Q(["ask.py / eval_large.py — připraveno"])
+  TE --> Q
+</pre>
+
+      <p>Teď po krocích. Nejprve vlož text do surových dat (jméno souboru bez diakritiky a mezer se
+      stane <i>id dokumentu</i>, pod kterým ho pak uvidíš v odpovědích):</p>
+<pre><code>$ cp muj_text.txt ../../data/raw/wiki_bozena_nemcova.txt</code></pre>
+
+      <p><b>1 — Anotace (vrstva ①).</b> UDPipe 2 rozebere každou větu na tokeny s lemmatem, slovním
+      druhem a závislostmi. Výsledek se uloží jako <i>shard</i> — jeden soubor <code>.pkl</code> na
+      jeden dokument (koncept #60: soubory se do grafu nahrávají po jednom podle potřeby, ne všechny
+      naráz).</p>
+<pre><code>$ python annotate_corpus.py</code></pre>
+      <p>Uvidíš logovací řádky ve tvaru <code>[i] DDMMYYHHMM : …</code>, které hlásí, kolik vět se
+      zanotovalo. Po doběhu existuje nový soubor <code>data/corpus/wiki_bozena_nemcova.pkl</code>.</p>
+
+      <p><b>2 — Indexy (vrstva ②).</b> Skript přepočítá tf·idf váhy pro <b>každý</b> soubor a globální
+      tabulku idf. Tady je důležité proč se přepočítává <i>všechno</i>, ne jen tvůj nový soubor: idf
+      (unikátnost slova) závisí na počtu dokumentů, takže přidání jednoho souboru mění váhy i ve všech
+      ostatních.</p>
+<pre><code>$ python dataloader.py
+[i] 2607241530 : indexy: 53 souborů, … termů, práh výskytů 2
+['spisovatel', 'drama', 'hra'] → [('wiki_karel_čapek', …), …]</code></pre>
+      <p>Řádek <code>indexy: 53 souborů</code> je tvůj důkaz, že přestavba tvůj soubor viděla — číslo
+      vzrostlo o jedna oproti předchozím 52. Skript navíc na konci vypíše ukázkový výběr souborů pro
+      dvě testovací sady slov (sanity check, že brána dokumentu funguje).</p>
+
+      <p><b>3 — Registr FAKT ↔ OTÁZKA (vrstva ④).</b> Pro každou větu s přísudkem vznikne syntetická
+      vazba: predikát, díra podmětu, odpovědní sloty s rolovým klíčem. To je surovina, ze které se
+      pak staví fakty i šablony.</p>
+<pre><code>$ python synth_registry.py     # → registry.jsonl</code></pre>
+
+      <p><b>4 — Fakt-store.</b> Registr se agreguje na <i>fakty</i> (predikát + role-sloty, jeden na
+      dvojici věta–predikát), obohatí se o koreferenčně doplněný podmět a — pro naši doménu důležité —
+      právě tady vznikají <b>vztahové hrany</b> mezi osobami (o těch je celá kapitola VI.2).</p>
+<pre><code>$ python build_facts_all.py</code></pre>
+
+      <p><b>5 — Šablony.</b> Z registru se odvodí deterministické šablony VZOR (FAKT × OTÁZKA ×
+      ODPOVĚĎ), sharded per soubor. Bez nich by matcher nad novým souborem neměl co přiložit
+      k rozsvícené oblasti.</p>
+<pre><code>$ python build_templates_all.py
+deterministických šablon: …  soubory: 53</code></pre>
+
+      <h3>Ověření</h3>
+      <p>Zeptej se na něco, co je jen v novém textu. Když odpoví správně, celý řetěz prošel:</p>
+<pre><code>$ python ask.py
+? Kdo napsal Babičku?
+  → Němcová</code></pre>
+      <p>Druhá kontrola je regresní: spusť velký etalon (<code>python eval_large.py</code>) a přesvědč
+      se, že celkové číslo <b>nekleslo</b>. Nový obsah má přidávat, ne ubírat; když číslo spadlo, něco
+      v nových datech znečistilo mount pro staré otázky (o plošném znečištění mountem viz
+      <a href="dil-8.html">Díl VIII</a>).</p>
+
+      <h2>Co nefunguje a proč</h2>
+      <p>Nejčastější první omyl: <b>zkopíruju <code>.txt</code> do <code>data/raw/</code> a rovnou se
+      ptám</b>. Systém odpoví přesně jako předtím — jako by nový soubor neexistoval. A on pro něj taky
+      neexistuje: <code>ask.py</code> nečte surový text, čte <i>shardy, indexy, fakty a šablony</i>.
+      Dokud neproběhne přestavba, nový raw soubor nemá v žádné z těch datových vrstev jediný záznam,
+      takže ho brána dokumentu nikdy nevybere. Chyba je <b>tichá</b>: nedostaneš žádné varování, jen
+      úpornou odpověď „o tom nemám jasná data" nebo starou odpověď z jiného souboru — a snadno
+      uvěříš, že je vadný systém, ne že chybí krok. Pravidlo: <b>každá změna v <code>data/raw/</code>
+      = celá přestavba ①→②→④.</b> A protože idf závisí na počtu souborů, nestačí přeindexovat jen
+      nový soubor; krok 2 musí přepočítat všechno.</p>
+
+      <h2 id="6-2">VI.2 Přidat vztahové slovo nebo tázací slovo <span class="mark mark-prevzato">Převzato</span></h2>
+
+      <p><b>Cíl.</b> Naučit systém nový <i>vztah</i> mezi osobami (aby uměl odpovědět „Kdo byl švagr
+      X?") nebo nové <i>tázací slovo</i> (aby otázku s ním nepovažoval za zjišťovací ano/ne). Ani
+      jedno nevyžaduje řádek Pythonu — obojí je zápis do datových souborů.</p>
+
+      <p><b>Předpoklady.</b> Rozumíš tomu, že „vztah = hrana": z věty „Byl mladším bratrem Josefa
+      Čapka" nechceme vytěžit jen <code>state=bratr</code> (a ztratit obě osoby), ale <b>hranu</b>
+      mezi Karlem a Josefem s predikátem <code>bratr</code>. Tuhle extrakci dělá
+      <code>extract_relations.py</code> a řídí se výhradně seznamem slov v jazykových datech.</p>
+
+      <h3>Postup A — vztahové slovo</h3>
+      <p>Otevři <code>lang/cs.json</code> a najdi pole <code>relation_nouns</code>. Je to prostý
+      seznam příbuzenských a vztahových podstatných jmen v <b>základním tvaru</b> (lemma). Přidej
+      nové slovo — pro ukázku „švagr":</p>
+<pre><code>"relation_nouns": [
+  "bratr", "sestra", "sourozenec", "manžel", "manželka",
+  "otec", "matka", "syn", "dcera", "rodič",
+  "přítel", "přítelkyně",
+  "švagr"
+],</code></pre>
+
+      <p>Druhá otázka: je ten vztah <b>symetrický</b>? „Bratr" je — když je A bratr B, je i B bratr A,
+      takže hrana má vést oběma směry a slovo patří i do <code>symmetric_relations</code>. U „švagr"
+      to platí mezi dvěma muži (oba jsou si navzájem švagrem), takže ho tam přidej také; kdyby vztah
+      symetrický nebyl (třeba „otec" — A je otec B, ale B není otec A), do
+      <code>symmetric_relations</code> nepatří.</p>
+<pre><code>"symmetric_relations": [
+  "bratr", "sestra", "sourozenec", "manžel", "manželka",
+  "přítel", "přítelkyně",
+  "švagr"
+],</code></pre>
+
+      <p>Tím je jazyková změna hotová. Aby se ale <b>promítla do faktů</b>, musí se přestavět
+      fakt-store — vztahové hrany vznikají v kroku 4 z kapitoly VI.1. Stačí ten jeden skript (korpus
+      i registr se nemění, mění se jen výklad slov):</p>
+<pre><code>$ python build_facts_all.py</code></pre>
+
+      <h3>Postup B — tázací slovo</h3>
+      <p>Tázací slova žijí v <code>config.json</code>, blok <code>answering</code>, pole
+      <code>interrog_lemmas</code>. Slouží k jedinému rozhodnutí: je otázka <i>doplňovací</i> (ptá se
+      na roli — kdo, kde, kdy), nebo <i>zjišťovací</i> (ano/ne)? Systém to pozná tak, že hledá tázací
+      slovo; když žádné nenajde a věta končí otazníkem, bere ji jako polární. Chybějící slovo v tom
+      seznamu proto znamená, že se otázka omylem sklouzne do ano/ne větve. Přidání je opět jen zápis
+      lemmatu:</p>
+<pre><code>"interrog_lemmas": [
+  "kdo", "co", "kde", "kam", "odkud", "kudy",
+  "kdy", "kolik", "kolikátý", "jaký", "který", "čí", "proč", "jak",
+  "odkdy"
+],</code></pre>
+      <p>Pro tázací slova není potřeba nic přestavovat — <code>config.json</code> se čte za běhu,
+      takže změna platí hned při dalším spuštění <code>ask.py</code>. (Souvisí ještě dvě jazykové
+      tabulky v <code>cs.json</code>, které říkají, jaký <i>tvar</i> odpovědi tázací slovo očekává:
+      <code>role_ask</code> mapuje roli na tázací slovo a <code>interrogative_slots</code> na
+      pádový/slovnědruhový vzor. Ty se dotýkáš jen tehdy, když zavádíš úplně novou <i>roli</i>, ne
+      nové slovo pro existující roli.)</p>
+
+      <h3>Ověření</h3>
+      <p>Po přestavbě faktů se zeptej na nový vztah v obou směrech — u symetrického musí fungovat oba:</p>
+<pre><code>$ python ask.py
+? Kdo byl bratr Karla Čapka?
+  → Josef
+? Kdo byl bratr Josefa Čapka?
+  → Karel</code></pre>
+      <p>A opět regresní kontrola etalonem. Vztahová kategorie je v měření vidět zvlášť
+      (<code>relation</code>), takže po zásahu do <code>relation_nouns</code> se koukni právě na její
+      řádek v rozpadu — má stoupnout nebo aspoň nesmí klesnout.</p>
+
+      <aside class="rationale">
+        <span class="lbl">Zdůvodňovací blok — proč je jazyk v datech, ne v kódu</span>
+        <dl>
+          <dt>Rozhodnutí</dt><dd>Všechna jazykově specifická slova a mapování (vztahová slova,
+          tázací slova, deprel → rolový klíč, předložky, spojky) jsou <b>data</b> v souborech
+          <code>lang/cs.json</code> a <code>config.json</code>. Kód pracuje jen s univerzálními klíči
+          (značky UD: deprel, pád, animovanost), které jsou stejné napříč jazyky.</dd>
+          <dt>Problém</dt><dd>Kdyby byl seznam vztahových slov nebo tázacích slov napsaný natvrdo
+          v Pythonu, byl by přidán do rozhodovací logiky. Rozšíření o jedno slovo by znamenalo
+          editovat kód, testovat kód a riskovat, že se rozbije něco jiného. A jiný jazyk (španělština)
+          by vyžadoval <i>duplikát celého kódu</i>, ne jen jiná data.</dd>
+          <dt>Mechanismus</dt><dd>Oddělení „co je univerzální" (struktura věty — role, pády, závislosti)
+          od „co je české" (konkrétní slova) znamená, že <code>extract_relations.py</code> se ptá jen
+          <code>grammar.LANG["relation_nouns"]</code> a nezajímá ho, jaká slova tam jsou. Přidat švagra
+          je pak změna dat, ne programu: nemění se žádná větev, jen množina, nad kterou tatáž větev
+          běží. Nový jazyk = nový soubor <code>es.json</code>, žádný zásah do <code>.py</code>.</dd>
+          <dt>Zvažované alternativy</dt><dd><b>Slova natvrdo v modulu:</b> nejrychlejší na napsání,
+          ale sváže jazyk s logikou — každé rozšíření je zásah do kódu a přidání dalšího jazyka je
+          přepis. Zamítnuto. <b>Externí databáze vztahů (např. WordNet):</b> pokryje víc slov, ale
+          přináší závislost na síti a runtime přestává být deterministický a offline — což je základní
+          vlastnost systému. Zamítnuto ve prospěch malého, verzovaného, ručně kurátorovaného seznamu.</dd>
+          <dt>Kdy to přestane platit</dt><dd>Až seznamů a mapování bude tolik, že sám JSON začne být
+          neudržitelný (stovky rolí, tisíce slov). Signál: úpravy v <code>cs.json</code> se navzájem
+          tlučou a jedno slovo mění chování na deseti nesouvisejících místech. Pak je namístě
+          strukturovanější jazykový zdroj, ne plochý seznam.</dd>
+          <dt>Cena</dt><dd>Plochý seznam neumí kontext: „muž" je i „dospělý člověk", nejen „manžel", a
+          seznam to nerozliší. Ruční kurátorství taky znamená, že seznam je jen tak úplný, jak ho někdo
+          udržuje — chybějící slovo je tichá mezera, ne chyba.</dd>
+        </dl>
+      </aside>
+
+      <h2>Co nefunguje a proč</h2>
+      <p>První nápad nováčka bývá dvojí a oba jsou past. Zaprvé: <b>přidám slovo do
+      <code>relation_nouns</code> a hned se ptám</b>. Nefunguje — vztahové hrany se materializují až
+      v kroku 4 (<code>build_facts_all.py</code>); dokud ho nepustíš, seznam je změněný, ale fakty
+      pořád staré, a odpověď se nezmění. Selhání je tiché: žádná chyba, jen „nemám data". Zadruhé:
+      <b>přidám slovo přímo do seznamu v <code>extract_relations.py</code></b> (protože „tam se to
+      přece používá"). Chyba nemá v tom souboru žádný takový seznam — bere ho z jazykových dat. I kdyby
+      měl, editace kódu obchází celý smysl oddělení jazyka od logiky a druhý jazyk by ji zdědil špatně.
+      A do třetice u <i>symetrie</i>: přidáš „švagr" jen do <code>relation_nouns</code>, ne do
+      <code>symmetric_relations</code>, a pak se divíš, že „bratr Karla" najde Josefa, ale „bratr Josefa"
+      nenajde Karla — hrana totiž vede jen jedním směrem.</p>
+
+      <h2 id="6-3">VI.3 Přidat testovací případ pro nový jazykový jev <span class="mark mark-prevzato">Převzato</span></h2>
+
+      <p><b>Cíl.</b> Tohle je nejdůležitější návod celého dílu. Kdykoli narazíš na otázku, kterou
+      systém zodpoví špatně — nebo naopak nově správně — <b>udělej z ní řádek v etalonu</b>. Chybové
+      hlášení uživatele se má stát testem. Jen tak se z jednorázového „aha, tady to nefunguje" stane
+      trvalá pojistka proti tomu, aby se to samé pokazilo znovu.</p>
+
+      <p><b>Předpoklady.</b> Znáš rozdíl mezi třemi režimy odpovědi z Dílu IV: <code>answer</code>
+      (systém odpoví), <code>clarify</code> (doptá se) a <code>unsure</code> (poctivě mlčí). Ten
+      režim je totiž součást testu — u některých otázek je <b>správná odpověď mlčení</b>, a test to
+      musí vědět, jinak by poctivé „nevím" počítal jako propad.</p>
+
+      <h3>Postup</h3>
+      <p>Velký etalon <code>gold_large.json</code> je pole objektů. Jedna položka = jedna otázka.
+      Přidej na konec pole nový objekt. Minimální tvar má čtyři povinná pole:</p>
+      <div class="tablewrap">
+      <table>
+        <tr><th>Pole</th><th>Význam</th><th>Příklad</th></tr>
+        <tr><td><code>q</code></td><td>otázka přesně tak, jak ji napíše uživatel</td><td><code>"Kdo byl švagr Karla Čapka?"</code></td></tr>
+        <tr><td><code>expect</code></td><td>seznam přijatelných povrchů odpovědi (porovnává se malými písmeny, i jako podřetězec)</td><td><code>["josef"]</code></td></tr>
+        <tr><td><code>mode</code></td><td>očekávaný režim: <code>answer</code> / <code>clarify</code> / <code>unsure</code></td><td><code>"answer"</code></td></tr>
+        <tr><td><code>kind</code></td><td>kategorie jevu (řídí rozpad měření po kategoriích)</td><td><code>"relation"</code></td></tr>
+      </table>
+      </div>
+      <p>Volitelně přidej <code>entity</code> a <code>src</code> (pro orientaci, ze kterého textu fakt
+      je), <code>factual</code> a — velmi užitečné — <code>pgroup</code>: když napíšeš tutéž otázku
+      v několika formulacích a dáš jim stejný <code>pgroup</code>, měření navíc ohlásí, jestli systém
+      odpovídá <b>napříč parafrázemi konzistentně</b>. Hotová položka:</p>
+<pre><code>{
+  "q": "Kdo byl švagr Karla Čapka?",
+  "expect": ["josef"],
+  "mode": "answer",
+  "kind": "relation",
+  "entity": "karel_čapek",
+  "src": "wiki_karel_čapek",
+  "factual": true
+}</code></pre>
+
+      <p>Klíčový, snadno přehlédnutý případ je otázka, na kterou <b>není odpověď v datech</b> a systém
+      má mlčet. Takový test se nepíše s odpovědí, ale s režimem <code>unsure</code> a kategorií
+      <code>honest-negative</code> — a projde tehdy, když systém <i>neodpoví sebevědomě</i>:</p>
+<pre><code>{
+  "q": "Kdy se narodil Ježíš?",
+  "expect": ["nevím"],
+  "mode": "unsure",
+  "kind": "honest-negative",
+  "factual": true
+}</code></pre>
+
+      <p>Pak spusť velký etalon. Vypíše jen propady (kvůli čitelnosti), pod nimi celkové skóre a rozpad
+      po kategoriích, a uloží podrobný výsledek do <code>baseline_large.json</code>:</p>
+<pre><code>$ python eval_large.py
+
+======================================================================
+VELKÝ ETALON — 146 otázek
+======================================================================
+  ✗ [relation       ] Kdo byl otec Milana Kundery?  → Jan  …
+-- CELKEM -- 64/146 = 43 %
+-- dle KATEGORIE (pass/total) --
+   temporal         9/25   36%  ████
+   relation         5/19   26%  ███
+   …
+</code></pre>
+      <p>Číslo <code>146</code> místo dřívějších 145 je tvůj důkaz, že etalon nový případ vidí. Jestli
+      je u něj ✗, právě jsi zdokumentoval jev, který systém neumí — a máš měřitelný cíl pro opravu.</p>
+
+      <h3>Ověření</h3>
+      <p>Etalon je JSON; nejčastější technická chyba je čárka navíc nebo chybějící. Jednoduchá
+      kontrola, že soubor je pořád platný a má o jednu položku víc:</p>
+<pre><code>$ python -c "import json; d=json.load(open('gold_large.json')); print(len(d), 'otázek')"
+146 otázek</code></pre>
+
+      <h2>Co nefunguje a proč</h2>
+      <p>Nováček, který přišel od klasického testování, napíše test jako <b>rovnost řetězců</b> a čeká,
+      že očekávaná odpověď musí padnout <i>doslova</i>. Naráží hned dvakrát. Zaprvé porovnání není
+      striktní rovnost: skórování srovnává malými písmeny a bere i <b>podřetězec v obou směrech</b>,
+      takže „josef" projde i proti odpovědi „Josef Čapek". Do <code>expect</code> proto patří
+      <i>jádro</i> odpovědi, ne celá věta — příliš dlouhý očekávaný text case naopak nechá propadnout.
+      Zadruhé, a to je ta zákeřná past: nováček <b>zapomene <code>mode</code></b> u otázky, na kterou
+      má systém správně mlčet. Chybějící pole se bere jako <code>answer</code>, takže test začne čekat
+      odpověď — a poctivé „nevím", které je tady <i>žádoucí chování</i>, spadne jako propad. Výsledek
+      je zavádějící regrese: měření hlásí zhoršení, kde se ve skutečnosti systém zachoval přesně
+      správně. Pravidlo: u každé otázky, kde je odpověď mlčení, vždy <code>mode: "unsure"</code>
+      a <code>kind: "honest-negative"</code>.</p>
+
+      <h2 id="6-4">VI.4 Styl kódu <span class="mark mark-prevzato">Převzato</span></h2>
+
+      <p>Předchozí tři návody nejsou náhodná trojice — každý je aplikací jednoho ze čtyř pravidel,
+      podle kterých je celý projekt psaný. Když je budeš mít v hlavě, uhodneš, kam patří skoro každá
+      změna, ještě než otevřeš soubor.</p>
+
+      <div class="tablewrap">
+      <table>
+        <tr><th>Pravidlo</th><th>Co znamená</th><th>Kde jsi ho viděl</th></tr>
+        <tr><td><b>Třída = soubor</b></td><td>jeden modul nese jednu vrstvu a jméno třídy se rovná jménu souboru (<code>dataloader.py</code> → <code>Dataloader</code>). Chceš vědět, kde něco žije? Napovídá to jméno souboru.</td><td>mapa modulů, <a href="dil-1.html">Díl I</a></td></tr>
+        <tr><td><b>Jazyk = data</b></td><td>nic jazykově specifického není v kódu; vše je v <code>lang/cs.json</code> a <code>config.json</code>. Kód zná jen univerzální klíče.</td><td>VI.2 — švagr do JSONu</td></tr>
+        <tr><td><b>Měř-first</b></td><td>každá změna se posuzuje etalonem. Nic „se zdá lepší" — buď je to v číslech, nebo to nepřijímáme.</td><td>VI.1 a VI.3 — regresní kontrola</td></tr>
+        <tr><td><b>Refaktor před použitím</b></td><td>než na existující mechanismus něco přilepíš, nejdřív ho uveď do tvaru, kam ta věc čistě patří — pak teprv přidej.</td><td>níže</td></tr>
+      </table>
+      </div>
+
+      <p><b>Třída = soubor</b> je navigační pravidlo: repozitář je plochý a jméno souboru je adresa.
+      Nehledáš „kde se staví indexy" grepem — víš, že to bude v <code>dataloader.py</code>, protože
+      dataloader je vrstva ②. <b>Jazyk = data</b> jsme rozebrali ve zdůvodňovacím bloku VI.2:
+      univerzální kód, česká data, nový jazyk = nový JSON. Zbývají dvě, která stojí za vlastní výklad.</p>
+
+      <p><b>Měř-first</b> znamená, že etalon není závěrečná zkouška, ale <i>součást každého kroku</i>.
+      Než změnu přijmeš, změříš stav před ní a po ní; přijímáš jen to, co číslo (celkové, nebo aspoň
+      v dotčené kategorii) nezhorší. Proto oba předchozí návody končí větou „a spusť etalon". Bez toho
+      bys optimalizoval podle pocitu — a u jazyka je pocit klamný: oprava jedné otázky snadno rozbije
+      tři jiné, které jsi netestoval. Nejcennější je přitom rozpad <b>po kategoriích</b> a počet
+      <b>sebevědomě špatných</b> odpovědí: celkové procento může stát a přitom se uvnitř přesypat
+      dobré za špatné.</p>
+
+      <p><b>Refaktor před použitím</b> je pravidlo o pořadí. Když chceš na nějaký mechanismus přidat
+      novou schopnost, přesuneš nejdřív kód do tvaru, kde ta schopnost přirozeně sedí — a teprve pak ji
+      přidáš. Opačné pořadí (nejdřív přilepit, refaktor „až bude čas") plodí větve na místech, kam
+      nepatří, a ty se pak drží navěky. Cena za tohle pravidlo je, že první změna je pomalejší; odměna,
+      že desátá je pořád stejně snadná jako první.</p>
+
+      <aside class="rationale">
+        <span class="lbl">Zdůvodňovací blok — proč se každá změna měří etalonem</span>
+        <dl>
+          <dt>Rozhodnutí</dt><dd>Žádná změna chování se nepřijímá bez měření na etalonu (velkém i malém);
+          rozhoduje číslo, ne dojem.</dd>
+          <dt>Problém</dt><dd>Jazyk je propojený: úprava, která opraví jednu formulaci, mění mount,
+          aktivaci nebo výběr kandidáta i pro otázky, na které jsi nemyslel. „Vypadá to líp" je u tak
+          provázaného systému nespolehlivý signál.</dd>
+          <dt>Mechanismus</dt><dd>Etalon je zafixovaná množina otázek s očekávaným režimem a odpovědí.
+          Spustíš ho před změnou a po ní a porovnáš dvě čísla plus rozpad po kategoriích. Regrese se
+          ukáže okamžitě a adresně — vidíš <i>která</i> kategorie spadla, ne jen že „něco je jinak".</dd>
+          <dt>Zvažované alternativy</dt><dd><b>Ruční kontrola pár otázek:</b> rychlá, ale slepá vůči
+          vedlejším škodám — otestuješ to, co tě napadlo, ne to, co jsi rozbil. <b>Jen celkové procento
+          bez rozpadu:</b> skryje přesypání (dobré za špatné při stejném součtu) a hlavně neukáže
+          nejdůležitější metriku — počet sebevědomě špatných odpovědí, které jsou horší než mlčení.</dd>
+          <dt>Kdy to přestane platit</dt><dd>Když etalon přestane reprezentovat reálné otázky — je moc
+          malý nebo zastaralý. Signál: skóre roste, ale uživatelé hlásí čím dál víc chyb. Léčba není
+          přestat měřit, ale etalon rozšířit (přesně to dělá VI.3).</dd>
+          <dt>Cena</dt><dd>Etalon je jen tak dobrý, jak dobře je napsaný; špatně zvolené <code>expect</code>
+          nebo <code>mode</code> měří vlastní chybu, ne systém. A každý běh něco stojí (čas, běžící
+          UDPipe), takže vývoj je pomalejší než „napsat a doufat".</dd>
+        </dl>
+      </aside>
+
+      <h2>Co nefunguje a proč</h2>
+      <p>Nejlákavější zkratka je <b>napsat jazykovou výjimku natvrdo do rozhodovacího kódu</b> — „tahle
+      jedna otázka se chová jinak, přidám do <code>answering.py</code> <code>if</code>". Selže dvakrát.
+      Za prvé tiše: druhý jazyk tu výjimku zdědí, ačkoli pro něj neplatí, protože leží v univerzálním
+      kódu místo v českých datech. Za druhé pomalu: takové <code>if</code>y se hromadí a za rok je
+      z rozhodovací smyčky spleť speciálních případů, kterou nikdo netroufá změnit. Druhá zkratka je
+      <b>refaktorovat bez měření</b> — „jen uklidím, chování se přece nemění". U provázaného jazykového
+      systému se chování mění skoro vždycky; bez etalonu před a po se regrese objeví až u uživatele,
+      kde je nejdražší ji najít. Obě zkratky mají společné to, že šetří minutu teď a berou hodinu
+      později.</p>
+
+      <h2>Co už umíš</h2>
+      <p>Umíš systém <b>rozšířit</b>, aniž bys sáhl do jeho rozhodovací logiky: přidat dokument nebo
+      doménu přes celou přestavbu ①→②→④ (a víš, proč pouhé zkopírování raw souboru nic neudělá);
+      přidat vztahové slovo do <code>relation_nouns</code> a tázací slovo do <code>interrog_lemmas</code>
+      (a víš, proč je jazyk v datech, ne v kódu); a hlavně proměnit každé chybové hlášení v trvalý test
+      v <code>gold_large.json</code> se správným režimem. A umíš pojmenovat čtyři pravidla — třída =
+      soubor, jazyk = data, měř-first, refaktor před použitím — podle kterých poznáš, kam skoro každá
+      změna patří.</p>
+      <p>V dalším dílu opustíme rozšiřování a podíváme se na provoz: <a href="dil-7.html">Díl VII</a> —
+      závislost na běžícím UDPipe, živá vizualizace, nasazení a pasti, které čekají na tom, kdo systém
+      spouští v ostrém prostředí (mimo jiné ta nejzrádnější: mrtvá data při deployi, přesně opačný konec
+      téhož řetězu, který jsi právě prošel).</p>
+
+      <div class="pager">
+        <a href="dil-5.html"><span class="dir">← předchozí</span>Díl V — Testování</a>
+        <a href="dil-7.html"><span class="dir">další →</span>Díl VII — Provoz</a>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

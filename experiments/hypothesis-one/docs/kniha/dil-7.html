@@ -1,0 +1,347 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Díl VII — Provoz a řešení potíží — hypothesis-one</title>
+<link rel="stylesheet" href="assets/style.css">
+<script defer src="assets/mermaid.min.js"></script>
+<script defer src="assets/script.js"></script>
+</head>
+<body>
+<div class="layout">
+
+  <aside class="sidebar">
+    <p class="brand"><a href="index.html">hypothesis-one</a></p>
+    <p class="tag">knižní dokumentace</p>
+    <nav aria-label="Obsah knihy">
+      <a href="index.html">Úvod</a>
+      <p class="part">Díl I — Než začneme</p><a href="dil-1.html">I · Co řeší, slovník, mapa</a>
+      <p class="part">Díl II — První kroky</p><a href="dil-2.html">II · Instalace, běh, data</a>
+      <p class="part">Díl III — Cesta dat</p><a href="dil-3.html">III · Fáze pipeline</a>
+      <p class="part">Díl IV — Jak to funguje</p><a href="dil-4.html">IV · Automat, aktivace, fakty</a>
+      <p class="part">Díl V — Testování</p><a href="dil-5.html">V · Testy, tvary, měření</a>
+      <p class="part">Díl VI — Rozšiřování</p><a href="dil-6.html">VI · Data, vztahy, testy</a>
+      <p class="part">Díl VII — Provoz</p><a href="dil-7.html" class="active">VII · UDPipe, viz, pasti</a>
+      <p class="part">Díl VIII — Otevřené body</p><a href="dil-8.html">VIII · Nedodělky a cesty</a>
+      <p class="part">Přílohy</p><a href="prilohy.html">Rejstřík, konfigurace, registry</a>
+    </nav>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <button class="iconbtn" id="theme-toggle" type="button" aria-label="Přepnout světlý/tmavý režim">◐ režim</button>
+    </div>
+    <div class="content">
+      <nav class="crumbs"><a href="index.html">Úvod</a> › Díl VII</nav>
+      <p class="eyebrow">Díl VII — Provoz a řešení potíží</p>
+      <h1>Provoz a řešení potíží</h1>
+
+      <p class="lead">Kde jsme a kam jdeme: v Dílu VI jsi přidával data, vztahová slova a testy —
+      měnil jsi, <i>co</i> systém umí. Tenhle díl je o něčem jiném: co dělat, když systém přestane
+      fungovat, nebo se chová divně, a návod na to nemá odpověď. Projdeme jedinou živou službu, na
+      které runtime stojí (UDPipe), nástroj na živé sledování dialogu (<code>viz.py</code>), tři
+      pasti, do kterých se snadno spadne, a postup nasazení na server. Cílem není seznam příkazů,
+      ale <b>schopnost sám najít příčinu</b>, když systém vrací nesmysl.</p>
+
+      <h2 id="7-1">VII.1 Závislost na UDPipe <span class="mark mark-prevzato">Převzato</span></h2>
+      <p>V Dílu I jsi četl, že runtime systému je <b>deterministický a symbolický</b> — v rozhodovací
+      smyčce žádný neuron. To platí, ale s jednou výjimkou, kterou musíš znát dřív, než začneš
+      provozovat: <b>rozbor položené otázky</b> stále dělá neuronový nástroj. Když napíšeš „Kdo je
+      Karel Čapek?", systém tu větu pošle jazykovému rozboru <b>UDPipe 2</b>, aby dostal lemmata,
+      slovní druhy a závislostní strom (co je podmět, co přísudek). Teprve nad tímhle rozborem běží
+      celá symbolická mašinérie z Dílů III–IV. Bez rozboru nemá s čím pracovat.</p>
+      <p>UDPipe je tak <b>jediná živá služba</b>, na které systém za běhu závisí. V konfiguraci ji
+      najdeš v <code>config.json</code>, blok <code>services</code>:</p>
+<pre><code>"services": {
+  "udpipe_url": "http://127.0.0.1:8092/parse"
+}</code></pre>
+      <p>Je to lokální HTTP služba na <b>portu 8092</b>. Kód jí pošle otázku jako JSON a dostane zpět
+      rozbor (soubor <code>roles.py</code>, funkce <code>udpipe</code>, a runtime cesta
+      <code>answering._parse</code>).</p>
+
+      <h3>Co se stane při výpadku</h3>
+      <p>Když UDPipe neběží, spojení na port 8092 selže. Důležité je, <b>jak</b> se to projeví:
+      runtime cesta <code>answering._parse</code> chybu <b>spolkne</b> a vrátí prázdný rozbor
+      (<code>[]</code>). Z prázdného rozboru nevznikne ani dotazový VZOR, ani predikát, takže metoda
+      <code>answer()</code> vrátí <code>None</code> — a to se navenek ukáže jako režim „nevím":</p>
+<pre><code>? Kdo je Karel Čapek?
+  — o tom nemám jasná data (nehádám)</code></pre>
+      <p>Tohle je <b>tichá chyba</b>, a proto zákeřná: systém nespadne, nevypíše výjimku, jen na
+      <b>každou</b> otázku (i na tu, kterou včera zvládal) začne odpovídat „nevím". Když vidíš, že
+      systém přestal vědět úplně všechno naráz, první podezřelý je vždycky UDPipe, ne data.</p>
+
+      <h3>Jak ověřit, že běží</h3>
+      <p>Nejrychlejší test je poslat službě jednu větu přesně tak, jak to dělá runtime — POST s JSON
+      tělem na endpoint <code>/parse</code>:</p>
+<pre><code>curl -s http://127.0.0.1:8092/parse \
+  -H "Content-Type: application/json" \
+  -d '{"text":"Kdo je Karel Čapek?"}'</code></pre>
+      <p>Když UDPipe žije, vrátí JSON s klíčem <code>sentences</code> a rozborem věty. Když neběží,
+      dostaneš <code>curl: (7) Failed to connect to 127.0.0.1 port 8092</code> — to je jednoznačná
+      diagnóza. Případně ověř, že port vůbec někdo poslouchá: <code>lsof -i :8092</code> nebo
+      <code>curl -sI http://127.0.0.1:8092/</code>.</p>
+
+      <p>Pozor na druhou, <b>oddělenou</b> závislost: <i>anotace korpusu při reindexu</i> (Díl III,
+      <code>annotate_corpus.py</code>) používá vlastní anotační endpoint s <b>připnutým modelem</b>
+      (<code>config.json</code> → <code>preprocessing.udpipe2_url</code>, <code>udpipe2_model</code>).
+      To je build-time cesta, ne runtime — týká se nasazení (VII.4), ne odpovídání. Když se
+      přestavba dat zasekne nebo shardy vycházejí prázdné, podezřelý je tenhle druhý endpoint, ne
+      port 8092.</p>
+
+      <h3>Tabulka chyb</h3>
+      <div class="tablewrap">
+      <table>
+        <tr><th>Hlášení / projev</th><th>Příčina</th><th>Řešení</th></tr>
+        <tr>
+          <td>Na <b>každou</b> otázku „o tom nemám jasná data" (i na dřív fungující)</td>
+          <td>UDPipe na :8092 neběží → <code>_parse</code> vrací <code>[]</code> → <code>answer()</code> vrací <code>None</code> (tichá degradace)</td>
+          <td>Spustit UDPipe službu na 8092; ověřit health-checkem výše</td>
+        </tr>
+        <tr>
+          <td><code>curl: (7) Failed to connect to 127.0.0.1 port 8092</code></td>
+          <td>Na portu nikdo neposlouchá — služba spadla, neběží, nebo běží na jiném portu</td>
+          <td>Nastartovat službu; zkontrolovat, že <code>services.udpipe_url</code> míří na správný port</td>
+        </tr>
+        <tr>
+          <td>Odpověď přichází pomalu, občas „nevím" i na známou otázku</td>
+          <td>UDPipe je přetížený — runtime dotaz má <code>timeout=10&nbsp;s</code>; po vypršení bere <code>_parse</code> odpověď jako prázdnou</td>
+          <td>Odlehčit službě / restartovat; UDPipe drží jako jediná živá závislost, nezatěžuj ho jinými úlohami</td>
+        </tr>
+        <tr>
+          <td>Reindex se zasekne, shard souboru vyjde <code>None</code></td>
+          <td>Build-time anotační endpoint (<code>preprocessing.udpipe2_url</code>, připnutý model) je nedostupný nebo pomalý</td>
+          <td>Ověřit dostupnost anotačního endpointu; <code>_udpipe2</code> zkouší 4× s rostoucí pauzou — počkej nebo spusť reindex znovu</td>
+        </tr>
+        <tr>
+          <td>Rozbor přijde, ale otázka se pořád „nechytí"</td>
+          <td>UDPipe je v pořádku — problém je jinde (data nebo VZOR), viz rozhodovací postup ve VII.3</td>
+          <td>Přejdi na ladicí diagram VII.3, tímhle bodem UDPipe z podezřelých vyřazuješ</td>
+        </tr>
+      </table>
+      </div>
+
+      <h3>Co nefunguje a proč</h3>
+      <p>Nováček často spoléhá, že „když je runtime deterministický, poběží i bez sítě a bez služeb".
+      Není to tak: rozbor otázky je jediné místo, kde se neuronový nástroj do runtime dostane, a bez
+      něj systém neumí položenou větu vůbec přečíst. Selže to tiše — místo chybové hlášky dostaneš
+      zdvořilé „nevím" na všechno — takže si výpadku snadno nevšimneš a začneš hledat chybu v datech,
+      kde žádná není.</p>
+
+      <h2 id="7-2">VII.2 Živá vizualizace <code>viz.py</code> <span class="mark mark-prevzato">Převzato</span></h2>
+      <p>Když chceš <b>vidět</b>, co se v systému děje — které soubory se otázkou rozsvítí, kudy teče
+      světlo, jaká odpevěď vyhraje — slouží k tomu <code>viz.py</code>. Napojuje se na <b>živý</b>
+      systém (ne na statický snímek): každý dotaz namountuje horké soubory, rozsvítí graf, nechá
+      světlo protéct po vodivých hranách a doostří odpověď. Graf „dýchá" s rozhovorem. Je to hlavní
+      nástroj, když ladíš dojem „proč se rozsvítil zrovna tenhle soubor".</p>
+
+      <h3>Spuštění</h3>
+      <p>Vizualizace staví na knihovně <b>viewBase</b> z nadřazeného projektu (import
+      <code>jellyai.viz.viewbase_view</code>). Ta žije v <code>.venv</code>, a proto se
+      <code>viz.py</code> musí spustit <b>interpretrem z <code>.venv</code></b>, ne systémovým
+      Pythonem:</p>
+<pre><code>.venv/bin/python experiments/hypothesis-one/viz.py
+# → http://127.0.0.1:8080</code></pre>
+      <p>viewBase server naběhne na <b>portu 8080</b>. V prohlížeči uvidíš graf, terminál („Ptej se —
+      graf se rozsvítí") a dva panely: <b>panel uzlů</b> (<code>open_nodes_panel</code>, uzly seřazené
+      podle jasu = živé aktivace) a <b>panel aktivních dokumentů</b> (<code>open_docs_panel</code>).
+      Panel dokumentů ukazuje soubory <i>podle aktivace</i>, ne podle mountu: soubor se při dotazu
+      nahraje, mezi tahy pohasíná (decay), a když spadne pod práh, z panelu <b>zmizí</b>. Přesně tak
+      poznáš, že „Kdy se narodil?" po „Kdo je Karel Čapek?" pořád svítí na tom správném souboru.</p>
+
+      <h3>Self-restart přes <code>.viz.pid</code></h3>
+      <p>Vizualizace je psaná tak, abys ji mohl <b>spouštět opakovaně</b> bez ručního zabíjení staré
+      instance. Slouží k tomu soubor <code>.viz.pid</code> (v adresáři experimentu; je gitignorovaný).
+      Když <code>viz.py</code> nastartuje, provede <code>_claim_singleton</code>:</p>
+      <div class="tablewrap">
+      <table>
+        <tr><th>Krok</th><th>Co se stane</th></tr>
+        <tr><td>1</td><td>Přečte PID předchozí instance z <code>.viz.pid</code> (pokud existuje).</td></tr>
+        <tr><td>2</td><td>Když ten proces ještě žije, pošle mu <code>SIGTERM</code> (zdvořilé ukončení).</td></tr>
+        <tr><td>3</td><td>Počká až ~5&nbsp;s, dokud starý proces skutečně neuvolní port 8080.</td></tr>
+        <tr><td>4</td><td>Zapíše do <code>.viz.pid</code> vlastní PID a zabere port.</td></tr>
+        <tr><td>5</td><td>Při ukončení (<code>atexit</code>) svůj <code>.viz.pid</code> smaže.</td></tr>
+      </table>
+      </div>
+      <p>Díky tomu re-run <code>viz.py</code> sám zabije starou instanci — nikdy nedostaneš
+      „address already in use" na portu 8080. Pokud by přece zůstal port zablokovaný (např. proces
+      spadl bez úklidu), smaž <code>.viz.pid</code> ručně a spusť znovu.</p>
+
+      <h3>Co nefunguje a proč</h3>
+      <p>Nejčastější první pokus je spustit vizualizaci <b>systémovým Pythonem</b>:
+      <code>python viz.py</code>. Selže hned na startu — <code>from jellyai.viz.viewbase_view import
+      ViewBaseView</code> skončí na <code>ModuleNotFoundError</code>, protože viewBase je nainstalovaný
+      jen v <code>.venv</code>. Není to tichá chyba (dostaneš výjimku), ale je matoucí: vypadá to, že
+      je rozbitá vizualizace, přitom chybí jen správný interpret. Pravidlo je jednoduché —
+      <code>viz.py</code> spouštěj <b>vždy</b> přes <code>.venv/bin/python</code>. (Panely uzlů a
+      dokumentů jsou naopak psané jako „nice-to-have": když je viewBase neumí otevřít, kód to tiše
+      přejde a graf běží dál.)</p>
+
+      <h2 id="7-3">VII.3 Pasti <span class="mark mark-prevzato">Převzato</span></h2>
+      <p>Tři situace vypadají jako chyba systému, ale jsou to <b>vědomé vlastnosti nebo známá
+      omezení</b>. Když je neznáš, ztratíš na jejich hledání hodiny. Projdeme je a pak z nich složíme
+      rozhodovací postup pro chvíli, kdy „mi systém vrací nesmysl".</p>
+
+      <h3>Past 1 — mrtvá data při nasazení <span class="mark mark-prevzato">Převzato</span></h3>
+      <p>Data, se kterými systém pracuje — anotovaný korpus (<code>data/corpus/</code>), tf·idf indexy
+      (<code>data/index/</code>), fakty (<code>data/facts/</code>), šablony (<code>data/templates/</code>),
+      gazetteer — jsou <b>gitignorovaná</b>. V repozitáři nejsou. Je to záměr: jsou plně
+      reprodukovatelná z <code>data/raw/*.txt</code> pomocí anotace a build skriptů, takže by je bylo
+      zbytečné (a velké) verzovat. Důsledek pro provoz je ale zásadní: když nasadíš přes <code>git</code>
+      nebo <code>rsync</code> jen zdrojový kód, <b>na cílovém stroji žádná data nejsou</b> — nebo tam
+      zůstala stará. Systém pak buď neví nic, nebo odpovídá podle zastaralého korpusu. Řešení je
+      reindex na serveru (VII.4).</p>
+
+      <h3>Past 2 — naučená brána přeučuje (proto je vypnutá) <span class="mark mark-prevzato">Převzato</span></h3>
+      <p>Systém umí volitelně použít <b>naučenou bránu</b> (soubor <code>gate.json</code>) — malý
+      klasifikátor, který podle rysů odhaduje, jestli odpovědi věřit. V konfiguraci je ale
+      <b>vypnutá</b>:</p>
+<pre><code>"answering": {
+  "gate_enabled": false,
+  "gate_threshold": 0.3
+}</code></pre>
+      <p>Není to nedodělek, je to vědomé provizorium. V řízeném testu (LOO-CV, 77 answer-mode případů)
+      měla brána přesnost 68,8 % a při prahu 0,30 vypadala lákavě: −13 sebevědomě špatných odpovědí
+      za cenu −3 správných. Jenže je natrénovaná jen na <b>76 vzorcích × 13 rysů</b> — a v reálném
+      běhu <b>přeučuje</b>: místo 2 potlačených odpovědí (jak slibovala křížová validace) jich
+      potlačila 19, včetně správných. Proto <code>gate_enabled=false</code>. Kdyby ti někdo bránu
+      zapnul (nebo ji zapneš omylem při kopírování cizí konfigurace), projeví se to jako náhlý úbytek
+      odpovědí: systém začne „nevím" i tam, kde předtím odpovídal správně. Podrobný rozbor je v
+      <a href="dil-8.html">Dílu VIII</a>.</p>
+
+      <h3>Past 3 — R.U.R. a doménová kolize <span class="mark mark-prevzato">Převzato</span></h3>
+      <p>Zkratka „R.U.R." se při tokenizaci rozpadne na <b>R / U / R</b> — tři jednopísmenné tokeny.
+      Ty nesou skoro nulovou rozlišovací sílu, takže otázka „Co je R.U.R.?" nerozsvítí soubor o Čapkově
+      hře, ale nechá se odnést nejsilnějším sousedem v korpusu — a tím bývá <b>bible</b> (viz níže).
+      Výsledek je sebevědomě špatná odpověď: „Co je R.U.R.? → bůh / doptání". Pokus opravit to
+      slepováním zkratek (<code>merge_abbreviations</code>) fungoval na korpusu, ale na živý dotaz byl
+      <b>revertován jako regrese</b> — proto zůstává jako známé omezení. Skutečné řešení (node-based
+      retrieval, kde entita je uzel s fakt-hranami) je otevřený bod v <a href="dil-8.html">Dílu VIII</a>.</p>
+      <p>Souvisí s tím <b>plošné znečištění mountem z bible</b>: bible je v korpusu tak rozsáhlá a
+      propojená, že se aktivuje i pro dotazy, které s ní nesouvisí (i pro čapkovskou otázku ~0,7
+      aktivace). Když ve <code>viz.py</code> vidíš, že se „ze zálohy" rozsvítil biblický soubor, není
+      to náhoda — je to tahle past.</p>
+
+      <h3>Rozhodovací postup: „proč mi systém vrací nesmysl"</h3>
+      <p>Když systém vrací nesmysl nebo pořád „nevím", nehádej příčinu — projdi ji v pořadí. Postup
+      jde od <b>nejlevnějšího a nejčastějšího</b> (výpadek služby) k <b>nejvzácnějšímu</b> (chyba v
+      extrakci). Na diagramu sleduj, že každý rozhodovací uzel tě buď pošle na konkrétní kapitolu, nebo
+      pustí o patro hlouběji.</p>
+
+<pre class="mermaid">
+flowchart TD
+  accTitle: Ladění — proč systém vrací nesmysl
+  accDescr: Rozhodovací postup od nejčastější příčiny k nejvzácnější — nejdřív běh UDPipe, pak přestavěná data, pak správně rozsvícený soubor (doménová kolize), pak vypnutá brána, teprve nakonec extrakce a VZOR.
+  Q["Systém vrací nesmysl nebo vždy nevím"]
+  U{"Běží UDPipe na 8092?"}
+  Ustop["Spusť UDPipe — viz VII.1"]
+  D{"Jsou data přestavěná z raw?"}
+  Dstop["Reindex na serveru — viz VII.4"]
+  M{"Rozsvítil se správný soubor? viz.py panel dokumentů"}
+  Mrur["Doménová kolize R.U.R. nebo bible — viz VII.3, Díl VIII"]
+  G{"Je zapnutá naučená brána?"}
+  Gstop["Vypni bránu — gate_enabled false"]
+  OK["Chyba je v extrakci nebo VZORu — viz Díl III a IV"]
+  Q --> U
+  U -- ne --> Ustop
+  U -- ano --> D
+  D -- ne --> Dstop
+  D -- ano --> M
+  M -- ne --> Mrur
+  M -- ano --> G
+  G -- ano --> Gstop
+  G -- ne --> OK
+</pre>
+
+      <p>Slovy: <b>UDPipe</b> je první podezřelý, protože jeho výpadek shodí odpovídání naráz a úplně
+      (VII.1). Pak ověř, že <b>data</b> na tomhle stroji vůbec existují a jsou čerstvá (past 1). Pak se
+      podívej ve <code>viz.py</code>, jestli se rozsvítil <b>správný soubor</b> — když ne, jde nejspíš
+      o doménovou kolizi (past 3). Pak zkontroluj, že ti někdo omylem nezapnul <b>bránu</b> (past 2).
+      Teprve když tohle všechno sedí, je chyba skutečně ve <b>vytěžení faktu nebo ve VZORu</b> — a tam
+      pokračuje Díl III (cesta dat) a Díl IV (jak automat vybírá odpověď).</p>
+
+      <aside class="rationale">
+        <span class="lbl">Zdůvodňovací blok</span>
+        <dl>
+          <dt>Rozhodnutí</dt><dd>Data (korpus, indexy, fakty, šablony, gazetteer) se do gitu <b>nekomitují</b> a na cílovém stroji se přestavují z <code>data/raw</code>.</dd>
+          <dt>Problém</dt><dd>Odvozená data jsou velká a rychle zastarávají: idf i tf·idf indexy závisí na počtu souborů, takže po přidání jediného textu se přepočítává všechno. Verzovaná kopie by byla neustále rozbitá vůči raw a bobtnala by historii repozitáře.</dd>
+          <dt>Mechanismus</dt><dd>Jediný zdroj pravdy je <code>data/raw/*.txt</code> (verzovaný). Anotace a build skripty jsou deterministické, takže z téhož raw vznikne bit po bitu totéž. Nasazuje se jen kód a raw; data se dopočtou na místě (VII.4).</dd>
+          <dt>Zvažované alternativy</dt><dd><b>Verzovat i odvozená data:</b> historie repozitáře by rostla o megabajty binárních shardů při každé změně a stejně by hrozil rozpor s raw. <b>Kopírovat hotová data na server přes <code>rsync --delete</code>:</b> smazalo by produkční stav (např. naučenou paměť) a přenášelo by velké soubory — proto se nasazuje bez <code>--delete</code> a bez adresáře <code>data/</code>, a reindex se pouští odděleně.</dd>
+          <dt>Kdy to přestane platit</dt><dd>Až bude anotace natolik drahá (velký korpus, dlouhý běh UDPipe), že přestavba na serveru přesáhne únosné okno výpadku. Signál: reindex trvá déle, než je přijatelná odstávka — pak dává smysl stavět data v CI a přenášet je jako artefakt.</dd>
+          <dt>Cena</dt><dd>Nasazení má dva kroky (kód + reindex) místo jednoho, a když se druhý zapomene, běží se nad starými nebo prázdnými daty — přesně past 1.</dd>
+        </dl>
+      </aside>
+
+      <h2 id="7-4">VII.4 Nasazení <span class="mark mark-prevzato">Převzato</span></h2>
+      <p>Z pastí VII.3 plyne, jak vypadá zdravé nasazení: nasadí se <b>kód a surová data</b>, a
+      <b>odvozená data se přestaví na serveru</b>. Data se nikdy nepushují — vznikají z raw. Konkrétní
+      přenos (git archive, rsync bez <code>--delete</code> a bez <code>data/</code>) je věc runbooku
+      daného serveru; tady popíšeme tu část, která platí vždy: <b>reindex pipeline</b>.</p>
+      <p>Na diagramu sleduj, že řetěz začíná u surových textů a končí u dat, která runtime mountuje —
+      každý článek čte výstup předchozího.</p>
+
+<pre class="mermaid">
+flowchart LR
+  accTitle: Reindex na serveru
+  accDescr: Z raw textů se přes anotaci UDPipe, přepočet indexů a syntézu registru přestaví fakty, šablony a gazetteer, které runtime mountuje.
+  raw["data/raw/*.txt"]
+  ann["annotate_corpus.py"]
+  idx["dataloader.py (build_indexes)"]
+  syn["synth_registry + synth_determination"]
+  facts["build_facts / templates / gazetteer"]
+  raw --> ann
+  ann --> idx
+  idx --> syn
+  syn --> facts
+</pre>
+
+      <p>Krok po kroku, tak jak to běží na serveru po nasazení kódu a raw:</p>
+      <div class="tablewrap">
+      <table>
+        <tr><th>#</th><th>Příkaz</th><th>Co udělá</th><th>Vyžaduje</th></tr>
+        <tr><td>1</td><td><code>python annotate_corpus.py</code></td><td>Raw texty → anotace UDPipe → shardy <code>data/corpus/&lt;doc&gt;.pkl</code></td><td>build-time UDPipe (připnutý model, <code>preprocessing.udpipe2_url</code>)</td></tr>
+        <tr><td>2</td><td><code>python dataloader.py</code></td><td><code>build_indexes()</code> — přepočte <b>všechny</b> tf·idf indexy + idf + subjekty + doclinky + aliasy</td><td>hotové shardy z kroku 1</td></tr>
+        <tr><td>3</td><td><code>python synth_registry.py</code></td><td>Grafikon FAKT↔OTÁZKA → <code>registry.jsonl</code></td><td>indexy</td></tr>
+        <tr><td>4</td><td><code>python synth_determination.py</code></td><td>Slovník VZOR→role → <code>determination.json</code></td><td>registry</td></tr>
+        <tr><td>5</td><td><code>python build_facts_all.py</code></td><td>Z registru staví fakt-store (<code>data/facts/</code>) + koreferenční doplnění pro-drop podmětu</td><td>registry + korpus</td></tr>
+        <tr><td>6</td><td><code>python build_templates_all.py</code></td><td>Šablony QueryTemplate (<code>data/templates/</code>) pro VZOR matcher napříč doménami</td><td>registry</td></tr>
+        <tr><td>7</td><td><code>python build_gazetteer.py</code></td><td>Gazetteer míst (<code>data/gazetteer.json</code>) pro experta Topos</td><td>korpus</td></tr>
+      </table>
+      </div>
+      <p>Kroky 1–4 jsou v README ověřené jádro; kroky 5–7 přidávají fakty, šablony a gazetteer, které
+      runtime mountuje (aktuálně řádově <b>16&nbsp;028 faktů z registru + 24 z bio-závorek + 114
+      vztahových hran nad 52 soubory korpusu</b>). Po dokončení řetězu ověř nasazení jednou reálnou
+      otázkou — nejjednodušší je interaktivní <code>python ask.py</code> a věta z Dílu II („Kdo je
+      Karel Čapek? → spisovatel"). Když projde, běží nad čerstvými daty.</p>
+
+      <h3>Co nefunguje a proč</h3>
+      <p>Nejsvůdnější zkratka je <b>zkopírovat hotové <code>data/</code> z vývojového stroje na server</b>
+      místo reindexu. Občas to projde, ale skrývá dvě tiché pasti. Zaprvé, tf·idf a idf indexy
+      <b>závisí na počtu souborů</b> — když se raw na serveru byť trochu liší, přenesené indexy tiše
+      „lžou" a rozsvěcují špatné soubory. Zadruhé, hrubý přenos přes <code>rsync --delete</code> nad
+      <code>data/</code> smaže produkční stav, který na serveru vzniká za běhu (např. naučenou paměť).
+      Proto se data nikdy nepřenášejí — <b>přestavějí se z raw</b>, a přenos kódu jde vždy bez
+      <code>--delete</code> a mimo adresář <code>data/</code>.</p>
+
+      <h2>Co už umíš</h2>
+      <p>Teď víš, že runtime stojí na jediné živé službě — <b>UDPipe na portu 8092</b> — a poznáš její
+      výpadek podle toho, že systém začne „nevím" na všechno naráz; umíš ho ověřit jedním
+      <code>curl</code>. Umíš spustit živou vizualizaci <code>viz.py</code> přes <code>.venv</code>,
+      chápeš její self-restart přes <code>.viz.pid</code> a víš, proč ji systémový Python nespustí.
+      Znáš tři pasti — mrtvá data při nasazení, přeučující brána, doménová kolize R.U.R./bible — a máš
+      rozhodovací postup, který tě od „vrací nesmysl" dovede k příčině bez hádání. A víš, že nasazení
+      není kopie dat, ale <b>reindex z raw na serveru</b>.</p>
+      <p>V dalším dílu se podíváme na to, co ještě není hotové: <a href="dil-8.html">Díl VIII —
+      Otevřené body a možné cesty</a> rozebírá node-based retrieval (obešel by past R.U.R.), vypnutou
+      bránu, zbytek vztahové extrakce i plošné znečištění z bible — u každého bodu proč není vyřešený a
+      kudy dál.</p>
+
+      <div class="pager">
+        <a href="dil-6.html"><span class="dir">← předchozí</span>Díl VI — Rozšiřování</a>
+        <a href="dil-8.html"><span class="dir">další →</span>Díl VIII — Otevřené body</a>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>
