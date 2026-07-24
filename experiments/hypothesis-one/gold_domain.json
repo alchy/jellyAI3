@@ -1,0 +1,674 @@
+{
+ "collision": [
+  {
+   "q": "Kdy se narodil Josef Čapek?",
+   "expect": [
+    "1887"
+   ],
+   "expect_doc": "wiki_josef_čapek",
+   "mode": "answer",
+   "kind": "collision",
+   "trap": "bratr → 1890"
+  },
+  {
+   "q": "Kde se narodil Josef Čapek?",
+   "expect": [
+    "Hronov"
+   ],
+   "expect_doc": "wiki_josef_čapek",
+   "mode": "answer",
+   "kind": "collision",
+   "trap": "bratr → Malé Svatoňovice"
+  },
+  {
+   "q": "Kdy zemřel Josef Čapek?",
+   "expect": [
+    "1945"
+   ],
+   "expect_doc": "wiki_josef_čapek",
+   "mode": "answer",
+   "kind": "collision",
+   "trap": "bratr → 1938"
+  },
+  {
+   "q": "Kde zemřel Josef Čapek?",
+   "expect": [
+    "Bergen-Belsen",
+    "Bergen",
+    "Belsen"
+   ],
+   "expect_doc": "wiki_josef_čapek",
+   "mode": "answer",
+   "kind": "collision",
+   "trap": "bratr → Praha"
+  },
+  {
+   "q": "Kdo je Josef Čapek?",
+   "expect": [
+    "malíř",
+    "grafik"
+   ],
+   "expect_doc": "wiki_josef_čapek",
+   "mode": "answer",
+   "kind": "collision",
+   "trap": "bratr → spisovatel"
+  },
+  {
+   "q": "Kdy se narodil Karel Čapek?",
+   "expect": [
+    "1890"
+   ],
+   "expect_doc": "wiki_karel_čapek",
+   "mode": "answer",
+   "kind": "collision",
+   "trap": "bratr → 1887"
+  },
+  {
+   "q": "Kde se narodil Karel Čapek?",
+   "expect": [
+    "Svatoňovice",
+    "Malé Svatoňovice"
+   ],
+   "expect_doc": "wiki_karel_čapek",
+   "mode": "answer",
+   "kind": "collision",
+   "trap": "bratr → Hronov"
+  },
+  {
+   "q": "Kdy zemřel Karel Čapek?",
+   "expect": [
+    "1938"
+   ],
+   "expect_doc": "wiki_karel_čapek",
+   "mode": "answer",
+   "kind": "collision",
+   "trap": "bratr → 1945"
+  },
+  {
+   "q": "Kde zemřel Karel Čapek?",
+   "expect": [
+    "Praha"
+   ],
+   "expect_doc": "wiki_karel_čapek",
+   "mode": "answer",
+   "kind": "collision",
+   "trap": "bratr → Bergen-Belsen"
+  },
+  {
+   "q": "Kdo je Karel Čapek?",
+   "expect": [
+    "spisovatel",
+    "dramatik"
+   ],
+   "expect_doc": "wiki_karel_čapek",
+   "mode": "answer",
+   "kind": "collision",
+   "trap": "bratr → malíř"
+  },
+  {
+   "q": "Kdy se narodil Čapek?",
+   "expect": [
+    "1887",
+    "1890"
+   ],
+   "mode": "unsure",
+   "kind": "collision",
+   "trap": "Josef 1887 vs Karel 1890 — má doptat"
+  },
+  {
+   "q": "Kdy se narodil Jaroslav?",
+   "expect": [
+    "1883",
+    "1901"
+   ],
+   "mode": "unsure",
+   "kind": "collision",
+   "trap": "Hašek 1883 vs Seifert 1901 — má doptat"
+  }
+ ],
+ "coverage": [
+  {
+   "q": "Kdy se narodil Bohumil Hrabal?",
+   "expect": [
+    "1914"
+   ],
+   "mode": "answer",
+   "kind": "temporal",
+   "src": "wiki_bohumil_hrabal"
+  },
+  {
+   "q": "Kdy zemřel Bohumil Hrabal?",
+   "expect": [
+    "1997"
+   ],
+   "mode": "answer",
+   "kind": "temporal",
+   "src": "wiki_bohumil_hrabal"
+  },
+  {
+   "q": "Kde se narodil Bohumil Hrabal?",
+   "expect": [
+    "Židenice"
+   ],
+   "mode": "answer",
+   "kind": "spatial",
+   "src": "wiki_bohumil_hrabal"
+  },
+  {
+   "q": "Kde zemřel Bohumil Hrabal?",
+   "expect": [
+    "Praha"
+   ],
+   "mode": "answer",
+   "kind": "spatial",
+   "src": "wiki_bohumil_hrabal"
+  },
+  {
+   "q": "Kdo je Bohumil Hrabal?",
+   "expect": [
+    "prozaik",
+    "spisovatel"
+   ],
+   "mode": "answer",
+   "kind": "copula",
+   "src": "wiki_bohumil_hrabal"
+  },
+  {
+   "q": "Kdy se narodila Božena Němcová?",
+   "expect": [
+    "1820"
+   ],
+   "mode": "answer",
+   "kind": "temporal",
+   "src": "wiki_božena_němcová"
+  },
+  {
+   "q": "Kdy zemřela Božena Němcová?",
+   "expect": [
+    "1862"
+   ],
+   "mode": "answer",
+   "kind": "temporal",
+   "src": "wiki_božena_němcová"
+  },
+  {
+   "q": "Kde se narodila Božena Němcová?",
+   "expect": [
+    "Vídeň"
+   ],
+   "mode": "answer",
+   "kind": "spatial",
+   "src": "wiki_božena_němcová"
+  },
+  {
+   "q": "Kde zemřela Božena Němcová?",
+   "expect": [
+    "Praha"
+   ],
+   "mode": "answer",
+   "kind": "spatial",
+   "src": "wiki_božena_němcová"
+  },
+  {
+   "q": "Kdo je Božena Němcová?",
+   "expect": [
+    "spisovatelka"
+   ],
+   "mode": "answer",
+   "kind": "copula",
+   "src": "wiki_božena_němcová"
+  },
+  {
+   "q": "Kdy se narodil Ivan Olbracht?",
+   "expect": [
+    "1882"
+   ],
+   "mode": "answer",
+   "kind": "temporal",
+   "src": "wiki_ivan_olbracht"
+  },
+  {
+   "q": "Kdy zemřel Ivan Olbracht?",
+   "expect": [
+    "1952"
+   ],
+   "mode": "answer",
+   "kind": "temporal",
+   "src": "wiki_ivan_olbracht"
+  },
+  {
+   "q": "Kde se narodil Ivan Olbracht?",
+   "expect": [
+    "Semily"
+   ],
+   "mode": "answer",
+   "kind": "spatial",
+   "src": "wiki_ivan_olbracht"
+  },
+  {
+   "q": "Kde zemřel Ivan Olbracht?",
+   "expect": [
+    "Praha"
+   ],
+   "mode": "answer",
+   "kind": "spatial",
+   "src": "wiki_ivan_olbracht"
+  },
+  {
+   "q": "Kdo je Ivan Olbracht?",
+   "expect": [
+    "spisovatel",
+    "prozaik"
+   ],
+   "mode": "answer",
+   "kind": "copula",
+   "src": "wiki_ivan_olbracht"
+  },
+  {
+   "q": "Kdy se narodil Jan Neruda?",
+   "expect": [
+    "1834"
+   ],
+   "mode": "answer",
+   "kind": "temporal",
+   "src": "wiki_jan_neruda"
+  },
+  {
+   "q": "Kdy zemřel Jan Neruda?",
+   "expect": [
+    "1891"
+   ],
+   "mode": "answer",
+   "kind": "temporal",
+   "src": "wiki_jan_neruda"
+  },
+  {
+   "q": "Kde se narodil Jan Neruda?",
+   "expect": [
+    "Praha"
+   ],
+   "mode": "answer",
+   "kind": "spatial",
+   "src": "wiki_jan_neruda"
+  },
+  {
+   "q": "Kde zemřel Jan Neruda?",
+   "expect": [
+    "Praha"
+   ],
+   "mode": "answer",
+   "kind": "spatial",
+   "src": "wiki_jan_neruda"
+  },
+  {
+   "q": "Kdo je Jan Neruda?",
+   "expect": [
+    "básník",
+    "novinář"
+   ],
+   "mode": "answer",
+   "kind": "copula",
+   "src": "wiki_jan_neruda"
+  },
+  {
+   "q": "Kdy se narodil Jaroslav Hašek?",
+   "expect": [
+    "1883"
+   ],
+   "mode": "answer",
+   "kind": "temporal",
+   "src": "wiki_jaroslav_hašek"
+  },
+  {
+   "q": "Kdy zemřel Jaroslav Hašek?",
+   "expect": [
+    "1923"
+   ],
+   "mode": "answer",
+   "kind": "temporal",
+   "src": "wiki_jaroslav_hašek"
+  },
+  {
+   "q": "Kde se narodil Jaroslav Hašek?",
+   "expect": [
+    "Praha"
+   ],
+   "mode": "answer",
+   "kind": "spatial",
+   "src": "wiki_jaroslav_hašek"
+  },
+  {
+   "q": "Kde zemřel Jaroslav Hašek?",
+   "expect": [
+    "Lipnice",
+    "Lipnice nad Sázavou"
+   ],
+   "mode": "answer",
+   "kind": "spatial",
+   "src": "wiki_jaroslav_hašek"
+  },
+  {
+   "q": "Kdo je Jaroslav Hašek?",
+   "expect": [
+    "spisovatel"
+   ],
+   "mode": "answer",
+   "kind": "copula",
+   "src": "wiki_jaroslav_hašek"
+  },
+  {
+   "q": "Kdy se narodil Jaroslav Seifert?",
+   "expect": [
+    "1901"
+   ],
+   "mode": "answer",
+   "kind": "temporal",
+   "src": "wiki_jaroslav_seifert"
+  },
+  {
+   "q": "Kdy zemřel Jaroslav Seifert?",
+   "expect": [
+    "1986"
+   ],
+   "mode": "answer",
+   "kind": "temporal",
+   "src": "wiki_jaroslav_seifert"
+  },
+  {
+   "q": "Kde se narodil Jaroslav Seifert?",
+   "expect": [
+    "Žižkov"
+   ],
+   "mode": "answer",
+   "kind": "spatial",
+   "src": "wiki_jaroslav_seifert"
+  },
+  {
+   "q": "Kde zemřel Jaroslav Seifert?",
+   "expect": [
+    "Praha"
+   ],
+   "mode": "answer",
+   "kind": "spatial",
+   "src": "wiki_jaroslav_seifert"
+  },
+  {
+   "q": "Kdo je Jaroslav Seifert?",
+   "expect": [
+    "básník",
+    "spisovatel"
+   ],
+   "mode": "answer",
+   "kind": "copula",
+   "src": "wiki_jaroslav_seifert"
+  },
+  {
+   "q": "Kdy se narodil Karel Hynek Mácha?",
+   "expect": [
+    "1810"
+   ],
+   "mode": "answer",
+   "kind": "temporal",
+   "src": "wiki_karel_hynek_mácha"
+  },
+  {
+   "q": "Kdy zemřel Karel Hynek Mácha?",
+   "expect": [
+    "1836"
+   ],
+   "mode": "answer",
+   "kind": "temporal",
+   "src": "wiki_karel_hynek_mácha"
+  },
+  {
+   "q": "Kde se narodil Karel Hynek Mácha?",
+   "expect": [
+    "Praha"
+   ],
+   "mode": "answer",
+   "kind": "spatial",
+   "src": "wiki_karel_hynek_mácha"
+  },
+  {
+   "q": "Kde zemřel Karel Hynek Mácha?",
+   "expect": [
+    "Litoměřice"
+   ],
+   "mode": "answer",
+   "kind": "spatial",
+   "src": "wiki_karel_hynek_mácha"
+  },
+  {
+   "q": "Kdo je Karel Hynek Mácha?",
+   "expect": [
+    "básník",
+    "prozaik"
+   ],
+   "mode": "answer",
+   "kind": "copula",
+   "src": "wiki_karel_hynek_mácha"
+  },
+  {
+   "q": "Kdy se narodil Milan Kundera?",
+   "expect": [
+    "1929"
+   ],
+   "mode": "answer",
+   "kind": "temporal",
+   "src": "wiki_milan_kundera"
+  },
+  {
+   "q": "Kdy zemřel Milan Kundera?",
+   "expect": [
+    "2023"
+   ],
+   "mode": "answer",
+   "kind": "temporal",
+   "src": "wiki_milan_kundera"
+  },
+  {
+   "q": "Kde se narodil Milan Kundera?",
+   "expect": [
+    "Brno"
+   ],
+   "mode": "answer",
+   "kind": "spatial",
+   "src": "wiki_milan_kundera"
+  },
+  {
+   "q": "Kde zemřel Milan Kundera?",
+   "expect": [
+    "Paříž"
+   ],
+   "mode": "answer",
+   "kind": "spatial",
+   "src": "wiki_milan_kundera"
+  },
+  {
+   "q": "Kdo je Milan Kundera?",
+   "expect": [
+    "spisovatel"
+   ],
+   "mode": "answer",
+   "kind": "copula",
+   "src": "wiki_milan_kundera"
+  },
+  {
+   "q": "Kdy se narodil Vítězslav Nezval?",
+   "expect": [
+    "1900"
+   ],
+   "mode": "answer",
+   "kind": "temporal",
+   "src": "wiki_vítězslav_nezval"
+  },
+  {
+   "q": "Kdy zemřel Vítězslav Nezval?",
+   "expect": [
+    "1958"
+   ],
+   "mode": "answer",
+   "kind": "temporal",
+   "src": "wiki_vítězslav_nezval"
+  },
+  {
+   "q": "Kde se narodil Vítězslav Nezval?",
+   "expect": [
+    "Biskoupky"
+   ],
+   "mode": "answer",
+   "kind": "spatial",
+   "src": "wiki_vítězslav_nezval"
+  },
+  {
+   "q": "Kde zemřel Vítězslav Nezval?",
+   "expect": [
+    "Praha"
+   ],
+   "mode": "answer",
+   "kind": "spatial",
+   "src": "wiki_vítězslav_nezval"
+  },
+  {
+   "q": "Kdo je Vítězslav Nezval?",
+   "expect": [
+    "básník",
+    "spisovatel"
+   ],
+   "mode": "answer",
+   "kind": "copula",
+   "src": "wiki_vítězslav_nezval"
+  },
+  {
+   "q": "Kdy se narodil Vladislav Vančura?",
+   "expect": [
+    "1891"
+   ],
+   "mode": "answer",
+   "kind": "temporal",
+   "src": "wiki_vladislav_vančura"
+  },
+  {
+   "q": "Kdy zemřel Vladislav Vančura?",
+   "expect": [
+    "1942"
+   ],
+   "mode": "answer",
+   "kind": "temporal",
+   "src": "wiki_vladislav_vančura"
+  },
+  {
+   "q": "Kde se narodil Vladislav Vančura?",
+   "expect": [
+    "Háj",
+    "Háj ve Slezsku"
+   ],
+   "mode": "answer",
+   "kind": "spatial",
+   "src": "wiki_vladislav_vančura"
+  },
+  {
+   "q": "Kde zemřel Vladislav Vančura?",
+   "expect": [
+    "Praha"
+   ],
+   "mode": "answer",
+   "kind": "spatial",
+   "src": "wiki_vladislav_vančura"
+  },
+  {
+   "q": "Kdo je Vladislav Vančura?",
+   "expect": [
+    "spisovatel",
+    "dramatik"
+   ],
+   "mode": "answer",
+   "kind": "copula",
+   "src": "wiki_vladislav_vančura"
+  },
+  {
+   "q": "Co je pes domácí?",
+   "expect": [
+    "šelma"
+   ],
+   "mode": "answer",
+   "kind": "taxonomy",
+   "src": "wiki_pes_domácí"
+  },
+  {
+   "q": "Co je kočka domácí?",
+   "expect": [
+    "forma"
+   ],
+   "mode": "answer",
+   "kind": "taxonomy",
+   "src": "wiki_kočka_domácí"
+  },
+  {
+   "q": "Co je koza domácí?",
+   "expect": [
+    "přežvýkavec"
+   ],
+   "mode": "answer",
+   "kind": "taxonomy",
+   "src": "wiki_koza_domácí"
+  },
+  {
+   "q": "Co je králík domácí?",
+   "expect": [
+    "forma"
+   ],
+   "mode": "answer",
+   "kind": "taxonomy",
+   "src": "wiki_králík_domácí"
+  },
+  {
+   "q": "Co je kůň domácí?",
+   "expect": [
+    "lichokopytník"
+   ],
+   "mode": "answer",
+   "kind": "taxonomy",
+   "src": "wiki_kůň_domácí"
+  },
+  {
+   "q": "Co je ovce domácí?",
+   "expect": [
+    "přežvýkavec"
+   ],
+   "mode": "answer",
+   "kind": "taxonomy",
+   "src": "wiki_ovce_domácí"
+  },
+  {
+   "q": "Kdo napsal R.U.R.?",
+   "expect": [
+    "Čapek",
+    "Karel Čapek"
+   ],
+   "mode": "answer",
+   "kind": "authorship-who",
+   "src": "wiki_r.u.r."
+  },
+  {
+   "q": "Kdo napsal Válku s Mloky?",
+   "expect": [
+    "Čapek",
+    "Karel Čapek"
+   ],
+   "mode": "answer",
+   "kind": "authorship-who",
+   "src": "wiki_válka_s_mloky"
+  },
+  {
+   "q": "Kdo napsal Bílou nemoc?",
+   "expect": [
+    "Čapek",
+    "Karel Čapek"
+   ],
+   "mode": "answer",
+   "kind": "authorship-who",
+   "src": "wiki_bílá_nemoc"
+  }
+ ]
+}

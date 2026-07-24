@@ -6,6 +6,7 @@ import tempfile
 import unittest
 
 from fact_store import FactStore
+from answering import Answering
 
 
 class EntityRoutingTest(unittest.TestCase):
@@ -40,6 +41,31 @@ class EntityRoutingTest(unittest.TestCase):
         self.assertEqual([], store.route_docs("narodit", "when", {"Čapek"}, max_docs=4))
         self.assertEqual(["capek"], store.route_docs(
             "narodit", "where", {"Karel", "Čapek"}, max_docs=1, max_fact_refs=1))
+
+
+class ComposeMountTest(unittest.TestCase):
+    """Kompozice routed × lexikálního mountu (answering._compose_mount) — přes stub self,
+    bez těžké inicializace Answering (offline, bez UDPipe/dat)."""
+
+    class _Stub:
+        pass
+
+    def _compose(self, mode, routed, lexical):
+        stub = self._Stub()
+        stub.entity_retrieval = {"mode": mode}
+        return Answering._compose_mount(stub, routed, lexical)
+
+    def test_replace_keeps_only_routed(self):
+        self.assertEqual(["A", "B"], self._compose("replace", ["A", "B"], ["B", "C", "D"]))
+
+    def test_union_adds_lexical_without_dupes(self):
+        self.assertEqual(["A", "B", "C", "D"], self._compose("union", ["A", "B"], ["B", "C", "D"]))
+
+    def test_union_cap_limits_to_max_side(self):
+        self.assertEqual(["A", "B", "C"], self._compose("union_cap", ["A", "B"], ["B", "C", "D"]))
+
+    def test_no_routed_falls_back_to_lexical(self):
+        self.assertEqual(["B", "C", "D"], self._compose("union", [], ["B", "C", "D"]))
 
 
 if __name__ == "__main__":

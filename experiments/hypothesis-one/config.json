@@ -72,10 +72,11 @@
     "enabled": true
   },
   "entity_retrieval": {
-    "_comment": "Líný runtime index nad hlavičkami fact shardů. Nečte fakta do paměti: dotaz entita × predikát × odpovědní role vybere jen několik dokumentů, které se pak mountnou běžnou cestou. Bez shody se použije původní tf-idf loader.",
+    "_comment": "Líný runtime index nad hlavičkami fact shardů. Nečte fakta do paměti: dotaz entita × predikát × odpovědní role vybere jen několik dokumentů, které se pak mountnou běžnou cestou. Bez shody se použije původní tf-idf loader. mode = kompozice s lexikálním mountem (viz answering._compose_mount): replace|union|union_cap. MĚŘENO na velkém etalonu: replace 61/145 (regrese Seifert+Kundera assurance answer→clarify), union/union_cap 63/145 (parita s OFF, bez regrese). union = default; collision testy rozhodnou finálně.",
     "enabled": true,
     "max_docs": 4,
-    "max_fact_refs": 24
+    "max_fact_refs": 24,
+    "mode": "union"
   },
   "neural_training": {
     "_comment": "Build-time korpus pro podpůrný ranker. Otázky se generují z existujících registry facts přes lokální Ollamu; split je deterministicky po dokumentech, aby se nepletly tytéž entity mezi train a test.",

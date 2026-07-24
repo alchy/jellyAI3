@@ -416,6 +416,25 @@ class Answering:
         return [echo, rf, ko, df, tf, kp, round(gb, 4), round(margin, 4), n_ans,
                 round(doc_act, 4), is_name, round(ans_idf, 3), home_match]
 
+    def _compose_mount(self, routed, lexical):
+        """Sloučí routed (strukturální) a lexikální (tf·idf) mount dle `entity_retrieval.mode`.
+
+        replace   = routed NAHRADÍ lexikální (původní chování; riskuje vyhladovění pole →
+                    assurance answer→clarify, i když je odpověď stejná).
+        union     = routed má prioritu, lexikální DOPLNÍ (důkaz jistý + pole zdravé) — default.
+        union_cap = union oříznutý na max(|routed|, |lexical|) — nepřemountuje, drží proporce.
+        Bez routed shody je chování identické s původním selective loaderem.
+        """
+        if not routed:
+            return lexical
+        mode = self.entity_retrieval.get("mode", "union")
+        if mode == "replace":
+            return routed
+        merged = routed + [d for d in lexical if d not in routed]
+        if mode == "union_cap":
+            return merged[:max(len(routed), len(lexical))]
+        return merged
+
     def answer(self, question, carry_context=False, hole_override=None, return_features=False):
         """Živá otázka → odpověď / klarifikace / upřímný terminál (dialogový stavový automat).
 
@@ -473,9 +492,10 @@ class Answering:
                 max_docs=self.entity_retrieval.get("max_docs", 4),
                 max_fact_refs=self.entity_retrieval.get("max_fact_refs", 24),
             )
-        # Přímý faktový důkaz má přednost před lexikálním mountem. Bez něj je
-        # chování identické s původním selective loaderem.
-        hot = routed or [d for d, _s in self.dl.select_files(lemmas)]
+        # Routing dává STRUKTURÁLNÍ důkaz (přesný soubor), select_files LEXIKÁLNÍ pole.
+        # Kompozice řízena configem (entity_retrieval.mode) — viz _compose_mount.
+        lexical = [d for d, _s in self.dl.select_files(lemmas)]
+        hot = self._compose_mount(routed, lexical)
         if not hot and not (carry_context and self.store.mounted):
             return None
         self.store.mount(hot)                                    # NAHRAJ šablony horkých (#60)
