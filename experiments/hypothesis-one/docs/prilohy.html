@@ -64,7 +64,8 @@
         <a href="#registr-otevrenych">Registr otevřených bodů</a> ·
         <a href="#overeni">Tabulka ověření</a> ·
         <a href="#matice-tvaru">Matice tvarů dat</a> ·
-        <a href="#pokryti">Pokrytí staré dokumentace</a>.</p>
+        <a href="#pokryti">Pokrytí staré dokumentace</a> ·
+        <a href="#hinty">Přenesené hinty (ověřené)</a>.</p>
 
       <!-- ============================================================ -->
       <h2 id="rejstrik">Rejstřík pojmů</h2>
@@ -336,6 +337,56 @@
       <p>Rozpor kód × dokumentace: <code>otevrene-otazky.html</code> tvrdí 64 %, kód dnes dává velký
       etalon 43 % a malý 72 %; <code>k-doreseni.html</code> a <code>napady.html</code> mohou obsahovat
       už vyřešené body. Vše patří do Dílu VIII jako rozpor, ne do výkladu jako fakt.</p>
+
+      <!-- ============================================================ -->
+      <h2 id="hinty">Přenesené hinty z původní dokumentace (ověřené)</h2>
+      <p>Původní <code>docs/</code> nesla hodnotné hinty, které kniha neměla. Tady jsou —
+      ale <b>až po ověření proti dnešnímu kódu</b> (2026-07-24). Zastaralá čísla a tvrzení,
+      která už neplatí, sem <b>nešla</b>; sloupec <i>doloženo</i> ukazuje, kde se hint dá
+      v kódu ověřit. Úplné staré stránky zůstávají archivované ve <code>__old__/docs-old/</code>.</p>
+
+      <h3>Slovník a VZOR</h3>
+      <div class="tablewrap"><table>
+        <tr><th>Hint</th><th>Doloženo</th><th>Poznámka</th></tr>
+        <tr><td>SLOT je řetězec <code>UPOS[:Case[:Tense]]</code> (např. <code>PROPN:Nom</code>, <code>VERB:Past</code>); <code>SLOT_ARRAY ≡ VZOR</code>. Atomy mají dvě rodiny: konkrétní <code>WORD*</code> vs virtuální <code>SLOT*</code>.</td><td><code>grammar_vzor.slot()</code> (feats Case,Tense)</td><td>ověřeno</td></tr>
+        <tr><td>Skutečný rolový katalog (mapa <code>deprel_to_role</code>): <code>nsubj→who/what_subject</code> (dle životnosti), <code>obj:Gen→whose_of_what</code>/<code>default→whom_what</code>, <code>iobj→to_whom</code>, <code>obl:{Dat→to_whom, Ins→with_whom_what, Loc/def→where, Acc→whom_what, Gen→whose_of_what}</code>; předložky přebíjejí (<code>for_what_purpose</code>, <code>about_whom_what</code>). Jmenný přísudek → <code>state</code>.</td><td><code>config/lang/cs.json</code> · <code>grammar_vzor.role_key()</code></td><td>OPRAVENO: stará stránka uváděla ~22 klíčů; skutečná mapa má 6 deprelů. <code>amod/nmod→which_attribute</code> v mapě <b>není</b>.</td></tr>
+        <tr><td>Pokrytí parafrází se získává <b>KVANTITOU přesných vzorů, ne rozmazáním jednoho</b> — přímý protiklad k embeddingům.</td><td>designová teze (symbolický přístup)</td><td>ověřeno konceptem</td></tr>
+        <tr><td>Odpověď je sama fakt (indexuje se stejně) → má vlastní šablonu; princip je <b>rekurzivní</b>. Otázka je <b>stín faktu</b> s jednou dírou: <code>napsat(?, R.U.R.)</code> — proto se musí do něčeho trefit, jinak honest-negative.</td><td>grafikon FAKT↔OTÁZKA↔ODPOVĚĎ (④)</td><td>ověřeno konceptem</td></tr>
+      </table></div>
+
+      <h3>Cesta dat (fáze ①–④)</h3>
+      <div class="tablewrap"><table>
+        <tr><th>Hint</th><th>Doloženo</th><th>Poznámka</th></tr>
+        <tr><td>Poloměr VZORu <code>vzor_radius = 2</code> je kompromis: <code>r=1</code> příliš úzký (vzor sdílí moc kontextů → nejednoznačno), <code>r=3+</code> přefragmentuje na hapaxy (mizí generalizace).</td><td><code>config synthesis.vzor_radius=2</code></td><td>POZOR: knižní „radius=1" je JINÝ parametr (top-level <code>radius</code>, okno preprocessingu).</td></tr>
+        <tr><td><code>SynthDetermination</code> (<code>data/determination.json</code>) povyšuje na CONFIRMED jen <b>ZAČIŠTĚNÉ</b> VZORy: <b>PURE</b> (jediná role na VZOR) + <b>FREQUENT</b> (≥ prahu) + content-role. „Revize je konzistence, ne správnost"; <code>curated.json</code> má nejvyšší prioritu, impure/vzácné zůstávají kandidáty.</td><td><code>synth_determination.py</code> (docstring + <code>confirmed()</code>)</td><td>čísla pokrytí stripnuta (zastaralá)</td></tr>
+        <tr><td>Díry (pro-drop podmět, zájmena) se detekují <b>ÚFAL rysem</b> (<code>PronType/Person/Poss/Tense</code>), <b>ne seznamem tvarů</b> — <code>ho/mu/jemu</code> ÚFAL lemmatizuje na <code>on</code>, takže je detekce univerzální.</td><td><code>fill_holes.py</code> (docstring + <code>_placeholders</code>)</td><td>ověřeno</td></tr>
+        <tr><td>Entity se <b>neberou z NameTagu</b> (lepil jména se sousedy → person-slepenci), ale odvozují z rysu <code>NameType</code> UDPipe 2 — tenčí, ale bez slepenců.</td><td><code>annotate_corpus.py</code> (komentář)</td><td>historie: zamítnutý NameTag</td></tr>
+        <tr><td>Doc-graf #60 (hrany soubor↔soubor přes sdílené distinktivní entity, PROPN×idf) je <b>POSTAVENÝ</b> (<code>_doclinks.pkl</code>), ale <b>ještě nezapojený do aktivace</b> (jede jen mesh slovo↔slovo).</td><td><code>dataloader._build_doclinks</code> · <code>activation_field</code> (TODO)</td><td>OPRAVENO: stará stránka tvrdila „shipnuté" — je postavené, ne zapojené.</td></tr>
+        <tr><td>Past: inline <code>-F data=…</code> tiše ořezával velký vstup (~485 znaků) → bible ztrácela ~95 % textu. Proto se posílá jako soubor/stream.</td><td>Díl VII pasti</td><td>absolutní počty vět stripnuty</td></tr>
+      </table></div>
+
+      <h3>Mechanismy (automat, aktivace, koreference)</h3>
+      <div class="tablewrap"><table>
+        <tr><th>Hint</th><th>Doloženo</th><th>Poznámka</th></tr>
+        <tr><td>Měřený nález: na goldu koreference chytřejší resolvery (activation, zone) <b>NEpřekonaly baseline</b> — <i>fill rate ≠ přesnost</i>; mj. proto, že striktní shoda lemmatu trestá správnou entitu s jiným lemmatem (<code>on→kněz = Zachariáš</code>).</td><td><code>fill_holes</code> (baseline/activation/zone) · <code>eval_coref.py</code></td><td>konkrétní čísla stripnuta; lekce ponechána</td></tr>
+        <tr><td>VZOR-zóna: entita má <b>rolový profil</b> (v jakých pádech běžně žije); kandidát se dosadí do role díry a změří se <code>fit</code> — předmětné zájmeno vyhraje ten, kdo bývá předmětem, <b>bez jediného if</b>.</td><td><code>fill_holes.build_zone()</code> + <code>_fit()</code> + <code>zone_beta</code></td><td>mechanismus ověřen; ukázkové poměry stripnuty</td></tr>
+        <tr><td>Guard proti slepenci: fakt, kde je známá entita <b>co-fillerem odpovědní role</b> (<code>who:[Švejk, Olbracht]</code>), se odmítne — entita musí být v <b>jiné</b> roli než odpověď. Drží „Kdo napsal Švejka?"→Hašek.</td><td><code>answering</code> (<code>_known_overlap</code>) · <code>fact_store</code> (route guard)</td><td>měřený dopad (regrese) stripnut</td></tr>
+        <tr><td>Antecedent se vybírá <b>shodou rysu, ne pořadím</b>: „To bylo…" → <code>To</code>=Neut, <code>Slovo</code>=Neut, <code>Bůh</code>=Masc → vyhrává Slovo (ne nejbližší jméno). Týž rys, který díru kategorizoval, ji i rozřeší.</td><td><code>fill_holes</code> (shoda rodu = množina kvůli syncretismu + číslo)</td><td>ověřeno</td></tr>
+        <tr><td>Negativní katalog „co NENÍ díra": <code>se/si</code> (Reflex — gramatické), <code>kdo/co/který</code> (Int/Rel — to je sama otázka), kvantifikátory (nemají antecedent), neosobní reflexivum „stalo se". Placeholdery navíc: 1./2. os. (mluvčí/adresát v rámu přímé řeči), zvratné <code>svůj</code>→podmět.</td><td><code>fill_holes._placeholders</code> (kategorie pron3/person12/poss_reflex…)</td><td>ověřeno</td></tr>
+        <tr><td>Past navazování v dialogu: po „Kdo napsal Švejka?" je nejteplejší uzel <b>Švejk</b> (dílo/postava = nejpropojenější), ne Hašek (odpověď) — kotvou navazování má být odpověď minulého tahu, ne nejteplejší objekt.</td><td><code>answering.carry_context</code> / <code>_hot_entities</code> (idf ≥ 1.5)</td><td>protipříklad — otevřený bod (Díl VIII)</td></tr>
+        <tr><td>Zásada měř-first: jeden dynamický práh <b>už emergentně existuje</b> (decay × reinforce — laťka pro přebití tématu roste s časem na tématu), takže laditelný skalár se nepřidává „na tušení"; práh <code>idf ≥ 1.5</code> je vlastnost <b>korpusu</b>, ne rozhovoru → statický.</td><td><code>activation_field</code> (decay/reinforce)</td><td>correct-way zásada</td></tr>
+      </table></div>
+
+      <h3>Provoz a externí zdroje</h3>
+      <div class="tablewrap"><table>
+        <tr><th>Hint</th><th>Doloženo</th><th>Poznámka</th></tr>
+        <tr><td>MorfFlex byl zvažován jako kanonizátor a <b>zamítnut</b>: UDPipe 2 kanonizuje lépe, MorfFlex zaváděl chyby u vzácných jmen. RobeCzech se přímo nepoužívá — syrový dává jen vektory a embeddingy v runtime by porušily determinismus.</td><td>není v živém kódu (grep <code>morfflex/robeczech</code> prázdný)</td><td>historie zamítnutých alternativ (chrání před návratem)</td></tr>
+        <tr><td>Model UDPipe 2 má licenci <b>CC BY-NC-SA</b> (výzkum/nekomerčně) — provozní omezení jediné živé závislosti.</td><td>externí fakt (LINDAT)</td><td>neověřitelné z kódu — externí</td></tr>
+      </table></div>
+
+      <p class="sub">Designové <b>směry</b> z <code>napady/otevrene-otazky/k-doreseni/naucene-smerovani</code>
+      (naučený router, margin ≠ správnost, eval není entity-aware, Metron pro počet, Echo kompozice,
+      experti jako reflektory…) jsou konsolidovány v <a href="dil-8.html#8-6-registr">Dílu VIII, mini-registru</a>.</p>
 
       <div class="pager">
         <a href="dil-8.html"><span class="dir">← předchozí</span>Díl VIII — Otevřené body</a>

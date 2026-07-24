@@ -567,6 +567,30 @@ flowchart TD
         kterém většina slabých kategorií visí.</p>
       </aside>
 
+      <h3 id="8-smery-stare">Další směry z původní dokumentace (ověřené premisy)</h3>
+      <p>Původní stránky <code>napady / otevrene-otazky / k-doreseni / naucene-smerovani / fuze</code>
+      nesly směry, které registr výše nemá. Přenášíme je — ale jen s <b>premisou ověřenou proti
+      dnešnímu kódu</b>; stará konkrétní čísla (pilotní přesnosti, oracle odstupy) jsou odstraněna,
+      protože se od té doby změnila. Zajímavé je, že jeden z nich (routing = jen minor páka, skutečná
+      páka je assurance) <b>potvrzuje</b> náš měřený nález o entity routingu z odd. 8-1.</p>
+      <div class="tablewrap"><table>
+        <tr><th>Směr</th><th>Ověřená premisa</th><th>Kde</th></tr>
+        <tr><td>Jedno primitivum <b>transpozice VZORu</b> sjednocuje generování otázky, koreferenci i generování odpovědi/parafráze (pohyb pivotu po VZORu).</td><td>transpozice fakt-VZOR↔query-VZOR reálně existuje</td><td><code>grammar_vzor</code>, <code>synth_queries</code></td></tr>
+        <tr><td>Query-VZOR (stín) je <b>konstruovatelný transpozicí</b> z fakt-VZORu → deterministické pokrytí zdarma; Ollama je jen variabilita povrchů, ne závislost (standalone běží bez NN).</td><td>šablony jsou deterministické; Ollama build-time</td><td><code>synth_queries</code>, <code>build_templates_all</code></td></tr>
+        <tr><td><b>Rolový profil entity</b> (zóna) typuje odpověď a klasifikuje entity (osoba/místo/pojem) z distribuce pádů — bez slovníku/gazetteeru.</td><td>zóna <code>build_zone</code>/<code>_fit</code> existuje</td><td><code>fill_holes</code>, <code>topos</code></td></tr>
+        <tr><td><b>Margin ≠ správnost</b>: odstup vítěze měří „přebíjí ostatní", ne „je správně" (confident-wrong při každém prahu). Směr: shoda VÍCE nezávislých signálů (aktivace × zóna × identita).</td><td>assurance staví na glow-margin + def_fit</td><td><code>answering._assurance</code>, <code>_gate_feats</code></td></tr>
+        <tr><td>Routing tvaru dotazu na roli díry lze <b>naučit</b> (nahradit ruční <code>_answer_role</code>); a měřením: <b>i perfektní routing je jen minor páka</b> — skutečná páka je assurance, a je taky učitelná.</td><td>ruční <code>_answer_role</code> existuje; shodné s nálezem 8-1</td><td><code>answering</code>, <code>train_gate</code></td></tr>
+        <tr><td><b>Eval není entity-aware</b>: porovnává lemma, ale kněz=Zachariáš je táž entita → striktní shoda podhodnocuje přesnost. Směr: aliasové clustery sdílené evalem i resolverem.</td><td><code>accept()</code> je substring, ne entita</td><td><code>eval_*.py</code></td></tr>
+        <tr><td><code>is_factual</code> bránu nasadit i na <b>runtime vstup</b> (Mnemos): „možná přijde" se nesmí stát tvrzeným faktem; provázat s proveniencí OBSERVED vs ASSOCIATED. Díra brány: nezávazná budoucnost a disjunktivní hedge zatím projdou.</td><td><code>is_factual</code> existuje (build-time)</td><td><code>grammar_vzor.is_factual</code>, <code>answering</code></td></tr>
+        <tr><td><b>Role-mismatch → „nemám" (unsure), ne clarify</b>: když vítěz nesedí rolí díry (when-otázka, kandidát who), přiznat nevím místo doptání odpadem.</td><td><code>role_fit</code> se počítá; clarify/unsure existují</td><td><code>answering._assurance</code></td></tr>
+        <tr><td><b>Řetězení kontextu</b> mezi tahy: přetrvávající aktivační pole v session, decay jen po úspěchu; kotva navazování = odpověď minulého tahu, ne nejteplejší objekt.</td><td><code>carry_context</code>/<code>_hot_entities</code> existují</td><td><code>answering</code></td></tr>
+        <tr><td><b>Completeness self-repair</b>: chybí-li role v otázkovém setu, ji deterministickou transpozicí <b>dogenerovat</b> (ne jen hlásit) → grafikon per fakt kompletní bez ohledu na drift Ollamy.</td><td>transpozice deterministická</td><td><code>synth_queries</code>, <code>build_templates_all</code></td></tr>
+        <tr><td><b>VZOR-ifikace extrakce</b> (dluh): <code>extract_bio</code> je natvrdo (závorka/pomlčka/NUM/Geo) → převést na VZOR přes <code>frame_sig</code> + rekurze (vnořená místa „Praha – Nové Město").</td><td><code>extract_bio</code> je natvrdo</td><td><code>extract_bio</code>, <code>grammar_vzor</code></td></tr>
+        <tr><td>Nulové kategorie (<b>atribut, počet</b>) nemají vlastní bod — odemknout VZOR-cestou query-tvar→fakt-tvar; expert <b>Metron</b> pro <code>how_much</code>/count (aritmetika/počítání faktů, routovaný rolí díry). <b>Echo</b> složí holé lemma na větu přes <code>role_ask</code> šablony.</td><td>výstup je dnes holé lemma; role_ask v cs.json</td><td><code>answering</code>, <code>role_catalog</code>, <code>cs.json</code></td></tr>
+        <tr><td>Experti (Chronos/Topos) jako <b>reflektory do aktivace</b> — přisvítí fakty uvnitř intervalu/oblasti; <b>ne tvrdý filtr, ale světlo</b>. Gate má slepé místo: same-domain záměnu (bratr Karla → spisovatel) nechytá.</td><td>Chronos/Topos existují; gate vypnutá</td><td><code>chronos</code>, <code>topos</code>, <code>activation_field</code></td></tr>
+        <tr><td>Pasti (zamítnuto): <b>doc-protagonista prior</b> je cheat; <b>over-anchoring</b> každého copula-subjektu přehřívá — vážení kotvy silou nepomohlo; téma = entita s nejvíc <b>zpětných referencí</b>, ne nejvíc copula-vět.</td><td>měřené neúspěchy (revert v historii)</td><td><code>fill_holes</code>, <code>build_facts_all</code></td></tr>
+      </table></div>
+
       <h2>Co už umíš</h2>
       <p>Prošel jsi devět míst, kde hypothesis-one <b>není hotový</b> — a víš u každého, jestli jde
       o nedodělek, vědomou provizorku, známé omezení, nerozhodnutý směr, nebo jen pozorování. Umíš
