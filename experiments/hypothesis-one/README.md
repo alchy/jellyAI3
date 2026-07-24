@@ -5,6 +5,9 @@
 předem, offline**; runtime je deterministický a symbolický — v rozhodovací smyčce žádný
 neuron není.
 
+Adresář je **self-contained**: kopie `experiments/hypothesis-one/` běží i buildí samostatně
+(všechna data uvnitř, viz níže).
+
 ## Architektura ve vrstvách
 
 ```
@@ -25,10 +28,24 @@ raw text ─▶ ① preprocessing ─▶ anotovaný korpus (shardy) ─▶ ② d
 | ② dataloader | `dataloader.py` | `Dataloader` | tf·idf indexy + nahrávání souborů do grafu podle matche |
 | ③ grammar | `grammar_vzor.py`, `role_catalog.py` | `GrammarVzor`, `RoleCatalog` | VZOR (frame_sig) + rozklad věty na role (deprel → náš klíč) |
 | ④ synthesis | `synth_registry.py`, `synth_determination.py` | `SynthRegistry`, `SynthDetermination` | grafikon FAKT↔OTÁZKA + slovník VZOR→role |
-| ⑤ queryparser | `answering.py`, `phase1_api.py` | — | živá otázka → odpověď _(staví se)_ |
+| ⑤ queryparser | `answering.py` | `Answering` | živá otázka → odpověď / klarifikace / upřímný terminál |
 | sdílené | `logger.py` | — | `logger(severity, message)` → `[i] DDMMYYHHMM : zpráva` |
 
-Konfigurace: `config.json` (bloky po vrstvách — nic natvrdo v kódu).
+Konfigurace: `config/config.json` (bloky po vrstvách — nic natvrdo v kódu).
+
+## Struktura adresáře
+
+```
+*.py            kód (jen .py, žádný JSON)
+config/         config.json, lang/cs.json, curated.json
+data/           self-contained data (reprodukovatelné → gitignored):
+  raw/ corpus/ facts/ index/ templates/  gazetteer.json annotations.pkl
+  registry.jsonl determination.json query_templates.jsonl …
+  gold/         kurátorovaný ground truth (etalony) — TRACKOVANÝ
+  results/      výstupy měření (baseline_*)
+docs/           knižní dokumentace (docs/index.html) + last-test.html (scoreboard)
+__old__/        nepoužité / legacy (sim_*, phase1-klastr, staré HTML docs)
+```
 
 ## Jak spustit
 
@@ -37,37 +54,47 @@ Konfigurace: `config.json` (bloky po vrstvách — nic natvrdo v kódu).
 python annotate_corpus.py
 
 # ② přepočet indexů pro dynamické nahrávání (data/index/)
-python dataloader.py         # build_indexes() + sanity výběr souborů
+python dataloader.py           # build_indexes() + sanity výběr souborů
 
 # ④ syntéza: grafikon FAKT↔OTÁZKA + slovník VZOR→role
-python synth_registry.py     # → registry.jsonl
-python synth_determination.py  # → determination.json
+python synth_registry.py       # → data/registry.jsonl
+python synth_determination.py  # → data/determination.json
 
-# testy
-python test_phase1.py
-python test_determiner.py
+# dotaz
+python ask.py "Kdo napsal R.U.R.?"
+
+# etalony (vyžadují běžící UDPipe 2)
+python eval_answers.py         # malý faktický etalon (25)
+python eval_large.py           # velký etalon (145)
+python eval_domain.py          # doménový etalon (71) → docs/last-test.html
+python eval_domain.py --sweep  # + porovnání módů mountu (scoreboard routingu)
+
+# offline testy (bez UDPipe)
+python test_entity_routing.py
 ```
 
 ## Data (perzistentní)
 
 | cesta | co |
 |---|---|
-| `../../data/raw/*.txt` | surové texty (vstup, verzované) |
-| `../../data/corpus/<doc>.pkl` | anotační cache — shard per soubor |
-| `../../data/index/<doc>.pkl`, `_idf.pkl` | tf·idf indexy pro dynamické nahrávání |
-| `config.json`, `lang/cs.json` | konfigurace + jazyková data |
-| `curated.json`, `determination.json`, `registry.jsonl` | rolový slovník + grafikon |
+| `data/raw/*.txt` | surové texty (vstup) |
+| `data/corpus/<doc>.pkl` | anotační cache — shard per soubor |
+| `data/index/<doc>.pkl`, `_idf.pkl` | tf·idf indexy pro dynamické nahrávání |
+| `data/facts/<doc>.jsonl`, `data/templates/` | fakty a šablony (mount per otázka) |
+| `config/config.json`, `config/lang/cs.json` | konfigurace + jazyková data |
+| `config/curated.json`, `data/determination.json`, `data/registry.jsonl` | rolový slovník + grafikon |
+| `data/gold/*.json` | kurátorovaný ground truth (etalony) — jediná trackovaná data |
+
+Data `data/` jsou gitignorovaná (reprodukovatelná přes `annotate_corpus` / `build_*` / `synth_*`);
+self-contained je přes **kopii adresáře**, ne přes git.
 
 ## Přidání nového obsahu
 
-1. vlož `.txt` do `../../data/raw/`;
+1. vlož `.txt` do `data/raw/`;
 2. `python annotate_corpus.py` (nový shard);
 3. `python dataloader.py` (přepočte **všechny** staty — idf závisí na počtu souborů).
 
 ## Dokumentace
 
-Otevři `docs/index.html`. Každá fáze má stránku stavěnou na příkladu (vstup → akce →
-výstup) s popisem každé třídy a metody (≥ 2 věty, ukázka volání, vstup/výstup). Samostatné
-stránky: [Dynamické nahrávání](docs/dynamicke-nahravani.html),
-[Anotační cache](docs/anotacni-cache.html), [Termíny a klíče](docs/terminy.html),
-[Externí zdroje](docs/externi-zdroje.html).
+Otevři **`docs/index.html`** — knižní dokumentace (Díl I–VIII + přílohy). Aktuální výsledky
+testů: **`docs/last-test.html`** (scoreboard po doménách, přepisuje `eval_domain.py`).

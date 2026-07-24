@@ -169,6 +169,35 @@ flowchart TD
         s identitou popsaný výše, ne přes další povrchová pravidla.)</em></p>
       </aside>
 
+      <h3>Naměřeno: první řez „retrieval po uzlech" (entity routing) zisk nepřinesl <span class="mark mark-overeno">Ověřeno</span></h3>
+      <p>Cesta <b>B</b> z bloku výše — <i>levný entitní index nad fakty, bez grafu</i> — už byla postavena
+      a <b>změřena</b>. Modul <code>fact_store.route_docs</code> udělá z hlaviček fakt-shardů malý index
+      <code>(predikát × role díry × známá entita) → dokumenty</code> a jimi nahradí lexikální výběr souborů.
+      Otázka zněla: přinese tahle přesnější volba souboru zisk? <b>Nepřinesla.</b></p>
+
+      <p>První řez (režim <code>replace</code>: routed <i>nahradí</i> lexikální mount) dokonce <b>uškodil</b>:
+      užší sada souborů vyhladověla aktivační pole a assurance spadla z <code>answer</code> na
+      <code>clarify</code> — odpověď byla přitom stejná, jen shozená na doptání. Oprava
+      (<code>answering._compose_mount</code>, režim <code>union</code>: routed jen <i>doplní</i> lexikál)
+      regresi srovnala na paritu s vypnutým routingem.</p>
+
+      <div class="tablewrap"><table>
+        <tr><th>režim mountu</th><th>velký etalon</th><th>doménový etalon</th><th>pozn.</th></tr>
+        <tr><td><code>replace</code> (první řez)</td><td>61 / 145</td><td>64 / 71</td><td>routed nahradí lexikál → assurance answer→clarify</td></tr>
+        <tr><td>OFF (bez routingu)</td><td>63 / 145</td><td>65 / 71</td><td>referenční tf·idf výběr souborů</td></tr>
+        <tr><td><code>union</code> (default)</td><td>63 / 145</td><td>65 / 71</td><td>routed doplní lexikál → parita s OFF</td></tr>
+      </table></div>
+
+      <p>Klíčové čtení: režimy se na celém korpusu liší v <b>jediné</b> otázce. I <b>kolize sdíleného
+      příjmení</b> (Josef vs. Karel Čapek — různá místa i roky narození) vyjdou správně <b>bez</b>
+      routingu, protože křestní jméno v dotazu už samo silně váží správný soubor. Zisk volby souboru se
+      tedy neprojeví — přesně jak předpovídá teze téhle kapitoly: úzké místo <b>není dosah přes soubory,
+      ale identita entity</b>. Levná cesta B je proto dnes <b>neškodná pojistka</b> (necháváme ji zapnutou
+      v režimu <code>union</code>), ne zdroj přesnosti; skutečná páka je až cesta A — <b>graf entit</b>.
+      Měření cenu potvrdilo tím, že ji <i>nenašlo</i> tam, kde by ji lokální řešení čekalo. (Doložení:
+      <code>eval_domain.py --sweep</code>, doménový scoreboard <code>docs/last-test.html</code>;
+      spec <code>docs/specs/2026-07-24-mount-tuning-domenove-testy.md</code>.)</p>
+
       <h2 id="8-2-extrakce">Nedodělky extrakce faktů</h2>
       <p>Tři body níž jsou nedodělky ve vytěžování faktů z textu. Data skoro vždycky ve větě jsou
       (viz reach 87 %), jen je systém nedostane do mapy ve správném tvaru nebo na správnou

@@ -3,119 +3,102 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Dokumentace — hypothesis-one</title>
-<link rel="stylesheet" href="style.css">
-<style>
-  .grid { display: grid; grid-template-columns: 1fr; gap: .8rem; margin: 1.2rem 0; }
-  @media (min-width: 640px) { .grid { grid-template-columns: 1fr 1fr; } }
-  .card { display: block; border: 1px solid var(--line); border-radius: 10px;
-    background: var(--surface); padding: 1rem 1.15rem; text-decoration: none; color: var(--ink); }
-  .card:hover { border-color: var(--accent); }
-  .card h3 { margin: 0 0 .3rem; }
-  .card p { margin: 0; color: var(--muted); font-size: .92rem; }
-  .card.todo { opacity: .55; pointer-events: none; }
-  .layers { font-family: var(--mono); font-size: .82rem; background: var(--code-bg);
-    border: 1px solid var(--line); border-radius: 8px; padding: 1rem; overflow-x: auto;
-    line-height: 1.7; }
-</style>
+<title>hypothesis-one — knižní dokumentace</title>
+<link rel="stylesheet" href="assets/style.css">
+<script defer src="assets/mermaid.min.js"></script>
+<script defer src="assets/script.js"></script>
 </head>
 <body>
-<div class="wrap">
+<div class="layout">
 
-<p class="eyebrow">Experiment · hypothesis-one</p>
-<h1>Dokumentace</h1>
-<p class="lead"><b>Co stavíme:</b> dialogový <b>stavový automat</b>, který ze surového českého
-textu postaví <b>mapu faktů</b> — a pak nad ní, pomocí <b>grafu</b> (tekoucí světlo / aktivace) a
-<b>lingvistických vzorů</b> (VZOR), <b>dohledá fakt</b> a odpoví uživateli na jeho dotaz. Kde je
-jasno, odpoví; kde není, doptá se; když neví, <b>nehádá</b>.</p>
-<p class="lead" style="font-size: 1rem;">Tok: surový text → mapa faktů (predikát + role) → živá
-otázka rozsvítí graf → VZOR doostří odpověď. Neuron (UDPipe 2) jen na anotaci předem; runtime je
-deterministický (stejná otázka = stejná odpověď). Dokumentace je stavěná na příkladech — projdeš
-shora dolů a víš, jak to funguje.</p>
+  <aside class="sidebar">
+    <p class="brand"><a href="index.html">hypothesis-one</a></p>
+    <p class="tag">knižní dokumentace · v0 kostra</p>
+    <nav aria-label="Obsah knihy">
+      <a href="index.html" class="active">Úvod</a>
+      <p class="part">Díl I — Než začneme</p>
+      <a href="dil-1.html">I · Co řeší, slovník, mapa</a>
+      <p class="part">Díl II — První kroky</p>
+      <a href="dil-2.html">II · Instalace, běh, data</a>
+      <p class="part">Díl III — Cesta dat</p>
+      <a href="dil-3.html">III · Fáze pipeline</a>
+      <a href="dil-3-program.html" class="sub-prog">III · programová příloha</a>
+      <p class="part">Díl IV — Jak to funguje</p>
+      <a href="dil-4.html">IV · Automat, aktivace, fakty</a>
+      <a href="dil-4-program.html" class="sub-prog">IV · programová příloha</a>
+      <p class="part">Díl V — Testování</p>
+      <a href="dil-5.html">V · Testy, tvary, měření</a>
+      <a href="last-test.html" class="sub-prog">▣ Poslední test (scoreboard)</a>
+      <p class="part">Díl VI — Rozšiřování</p>
+      <a href="dil-6.html">VI · Data, vztahy, testy</a>
+      <a href="dil-6-program.html" class="sub-prog">VI · programová příloha</a>
+      <p class="part">Díl VII — Provoz</p>
+      <a href="dil-7.html">VII · UDPipe, viz, pasti</a>
+      <a href="dil-7-program.html" class="sub-prog">VII · programová příloha</a>
+      <p class="part">Díl VIII — Otevřené body</p>
+      <a href="dil-8.html">VIII · Nedodělky a cesty</a>
+      <p class="part">Přílohy</p>
+      <a href="prilohy.html">Rejstřík, konfigurace, registry</a>
+    </nav>
+  </aside>
 
-<div class="note"><span class="lbl">Vztah k parentu:</span> hypothesis-one je <b>odlehčení</b>
-od systému KARET předchozího projektu (<code>jellyai/</code> v hlavním adresáři) — ten je bohatá
-studnice nápadů tvořená dlouho, ale karty se postupně staly <b>kamenem úrazu</b> (exploze
-složitosti). Tady je místo karet <b>VZOR + aktivace</b>. Cíl: <b>zjednodušit a ukotvit směr</b>
-(ne nutně nahradit); fragmenty parentu, co přesahují k nám (např. oprava tokenizace zkratek
-<code>R.U.R.</code>), využíváme.</div>
+  <main class="main">
+    <div class="topbar">
+      <button class="iconbtn" id="theme-toggle" type="button" aria-label="Přepnout světlý/tmavý režim">◐ režim</button>
+    </div>
+    <div class="content">
+      <p class="eyebrow">Naučná kniha · ne referenční příručka</p>
+      <h1>hypothesis-one od nuly</h1>
+      <p class="lead">Tahle kniha tě provede projektem <b>hypothesis-one</b> — deterministickým
+      systémem, který ze surového českého textu postaví mapu faktů a pak na ni odpovídá na otázky.
+      Nepředpokládá, že o projektu, o zpracování jazyka nebo o téhle doméně něco víš. Každý pojem
+      vysvětlíme, až na něj poprvé narazíme.</p>
 
-<h2>Architektura ve vrstvách</h2>
-<div class="layers">
-raw text ─▶ <b>① preprocessing</b> ─▶ anotovaný korpus (shardy) ─▶ <b>② dataloader</b> ─▶ graf + tf·idf index<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;│<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>③ grammar</b> (VZOR / rolový katalog) ───────────────┤<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;▼<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>④ synthesis</b>: grafikon FAKT↔OTÁZKA↔ODPOVĚĎ<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;│<br>
-živá otázka ─▶ <b>⑤ queryparser</b> ─▶ brána dokumentu → fakt → odpověď ◀───┘
-</div>
+      <p>Většina technické dokumentace je psaná jako referenční příručka: seznam funkcí, každá s
+      jednou větou. Kdo projekt zná, dohledá si v ní detail. Kdo ho nezná, se z ní nedozví, <b>proč</b>
+      věci fungují tak, jak fungují — a proto neumí rozhodnout v situaci, kterou příručka nepopisuje.
+      Tahle kniha je psaná opačně: staví jeden koncept na druhém, ukazuje na konkrétním příkladu, co
+      se stane, a než ukáže kód, vysvětlí, proč ho ukazuje.</p>
 
-<h2>Fáze</h2>
-<div class="grid">
-  <a class="card" href="faze-1-preprocessing.html"><h3>① Preprocessing</h3>
-    <p>Raw text → UDPipe 2 → anotovaný korpus (shardy). Třída <code>AnnotateCorpus</code>.</p></a>
-  <a class="card" href="faze-2-dataloader.html"><h3>② Dataloader</h3>
-    <p>tf·idf indexy + nahrávání souborů do grafu. Třída <code>Dataloader</code>.</p></a>
-  <a class="card" href="faze-3-grammar.html"><h3>③ Grammar</h3>
-    <p>VZOR a rolový katalog; normalizace deprel → náš klíč. <code>grammar_vzor.py</code>, <code>role_catalog.py</code>.</p></a>
-  <a class="card" href="faze-4-synthesis.html"><h3>④ Synthesis</h3>
-    <p>Grafikon FAKT↔OTÁZKA + slovník VZOR→role. <code>synth_registry.py</code>, <code>synth_determination.py</code>.</p></a>
-  <a class="card" href="faze-5-queryparser.html"><h3>⑤ Queryparser</h3>
-    <p>Živá otázka → odpověď (celý tah): kandidáti, glow-orders-ties, assurance. <code>answering.py</code>.</p></a>
-</div>
+      <h2>Jak je kniha uspořádaná</h2>
+      <p>Knihu čteš shora dolů. Každý díl předpokládá, že máš přečtený ten předchozí, a posouvá tě
+      o úroveň dál — od orientace přes první spuštění až po rozšiřování a provoz.</p>
 
-<h2>Koncepty a data</h2>
-<div class="grid">
-  <a class="card" href="stav.html"><h3>★ Stav projektu (AKTUÁLNÍ SNÍMEK)</h3>
-    <p>Vstupní bod: metriky (velký etalon 145, brána −13 confident-wrong), co je postavené, co
-    nefunguje, architektonický směr, jak spustit a měřit.</p></a>
-  <a class="card" href="last-test.html"><h3>▣ Poslední test (SCOREBOARD)</h3>
-    <p>Výsledek posledního běhu doménového etalonu (<code>eval_domain.py</code>): skóre po
-    doménách + otázka / odpověď / očekávaná odpověď. Přepisuje se každým během.</p></a>
-  <a class="card" href="pouziti.html"><h3>▶ Použití — jak systém používat</h3>
-    <p>Pro uživatele: jak spustit dotaz (<code>ask.py</code>), přidat vlastní text a reindexovat.
-    Praktický návod s příklady.</p></a>
-  <a class="card" href="dialogovy-automat.html"><h3>★ Dialogový stavový automat (JÁDRO)</h3>
-    <p>Původní koncept: vše na grafu, tekoucí světlo → VZOR doostří → jasno odpoví / nejasno se
-    doptá. Parentovo jádro + poctivý stav fúze.</p></a>
-  <a class="card" href="otevrene-otazky.html"><h3>★ Otevřené otázky (PŘEDÁNÍ)</h3>
-    <p>Vstupní bod pokračování: stav 64 %, zbývající tvrdý ocas po příčinách, priority P1–P3,
-    zásady, jak spustit.</p></a>
-  <a class="card" href="naucene-smerovani.html"><h3>★ Naučené směrování nad VZORY (SMĚR)</h3>
-    <p>Malá NN nad maticí VZORŮ + aktivací místo ručních if-then. Pilot 76 % vs 17 %; workflow +
-    kontrakty funkcí. Univerzálnost místo bobtnajících pravidel.</p></a>
-  <a class="card" href="vzor-matcher.html"><h3>★ VZOR matcher — šablony × aktivace</h3>
-    <p>Vyvrcholení: šablony FAKT-VZOR × QUERY-VZOR × ODPOVĚĎ, VZOR matcher, aktivace, nahrání dle otázky.</p></a>
-  <a class="card" href="aktivace-dialog.html"><h3>★ Aktivace v dialogu — proudění světla</h3>
-    <p>Nejpodrobnější místo: jak aktivace vzniká, teče po hranách, drží kontext a utichá.</p></a>
-  <a class="card" href="aliasy-identita.html"><h3>★ Aliasy a identita — vztah mezi tokeny</h3>
-    <p>Odpověď = vícetokenový vztah, ne jeden token. Rozpadlé jméno (Barbora ≡ Němcová) sloučeno
-    do identity → Babička clarify→HIT. Dvě varianty měřením (span vs identita).</p></a>
-  <a class="card" href="fuze.html"><h3>★ Fúze parent × experiment</h3>
-    <p>Vzít z parentu to nejlepší, zbytek zahodit — srovnání po dimenzích, ověření světla,
-    plán měřením otevřený (glow-orders-ties, experti dle role).</p></a>
-  <a class="card" href="dynamicke-nahravani.html"><h3>Dynamické nahrávání a formát</h3>
-    <p>Soubory jako fragmenty; mount podle matche (tf·idf); předdefinovaný index. Koncept #60.</p></a>
-  <a class="card" href="anotacni-cache.html"><h3>Anotační cache a perzistentní data</h3>
-    <p>Naše statická offline cache; formát shardů; jak se přidává nový obsah.</p></a>
-  <a class="card" href="terminy.html"><h3>Termíny a klíče</h3>
-    <p>WORD/SLOT/VZOR/DÍRA, rolový katalog, vysvětlení klíčů.</p></a>
-  <a class="card" href="externi-zdroje.html"><h3>Externí zdroje</h3>
-    <p>UDPipe 2, NameType, Ollama — proč a jak je používáme.</p></a>
-  <a class="card" href="diry.html"><h3>Díry — čím je zaplníme</h3>
-    <p>Placeholdery (zájmena, elidovaný podmět) detekované ÚFAL rysem → antecedent / těžiště.</p></a>
-  <a class="card" href="koreference.html"><h3>Koreference (mechanismus)</h3>
-    <p>Jak plníme díry: aktivační pole + VZOR-zóna + transpozice. Měřeno, rozpracováno.</p></a>
-  <a class="card" href="koreference-do-faktu.html"><h3>★ Koreference do faktů (NEXT)</h3>
-    <p>Vyplnit pro-drop podměty do who-slotu faktů → odemkne predikátovou cestu. Měřený
-    prerekvizit pivotu (díry napřed).</p></a>
-  <a class="card" href="k-doreseni.html"><h3>K dořešení</h3>
-    <p>Běžící backlog otevřených nedostatků — s měřením a směrem řešení.</p></a>
-  <a class="card" href="napady.html"><h3>Nápady a podněty</h3>
-    <p>Příležitosti zahlédnuté cestou — s konkrétním „kde využít".</p></a>
-</div>
+      <div class="tablewrap">
+      <table>
+        <tr><th>Díl</th><th>Co na konci umíš</th></tr>
+        <tr><td><b>I — Než začneme</b></td><td>Víš, k čemu projekt je, z čeho se skládá a co znamenají jeho pojmy.</td></tr>
+        <tr><td><b>II — První kroky</b></td><td>Rozjedeš projekt na svém stroji a položíš mu první otázku.</td></tr>
+        <tr><td><b>III — Cesta dat</b></td><td>Sleduješ, jak se ze surového textu krok po kroku stane odpověď.</td></tr>
+        <tr><td><b>IV — Jak to funguje</b></td><td>Chápeš mechanismus a umíš předpovědět, kdy selže.</td></tr>
+        <tr><td><b>V — Testování</b></td><td>Rozumíš, proč se jazykový model netestuje na přesnou rovnost, a čteš jeho čísla.</td></tr>
+        <tr><td><b>VI — Rozšiřování</b></td><td>Přidáš vlastní data, vztah nebo testovací případ.</td></tr>
+        <tr><td><b>VII — Provoz</b></td><td>Vyřešíš problém, který návod nepokrývá.</td></tr>
+        <tr><td><b>VIII — Otevřené body</b></td><td>Víš, co v projektu není hotové, a nešaháš na to naslepo.</td></tr>
+      </table>
+      </div>
 
+      <h2>Značky důvěry</h2>
+      <p>U každého postupu, příkladu a příkazu najdeš značku, která ti bez přemýšlení řekne, jak
+      moc mu věřit:</p>
+      <p>
+        <span class="mark mark-overeno">Ověřeno</span> někdo to spustil a výstup souhlasí, nebo to hlídá test — drž se toho.<br>
+        <span class="mark mark-prevzato">Převzato</span> odpovídá kódu, ale nikdo to v této podobě nespustil — při potížích podezírej dokumentaci.<br>
+        <span class="mark mark-navrh">Návrh</span> nápad, možná cesta, neověřeno — neber jako pokyn.
+      </p>
+
+      <h2>Kudy začít</h2>
+      <p>Čti odshora: <a href="dil-1.html">Díl I — Než začneme</a> tě zorientuje (co projekt je,
+      slovník pojmů, mapa repozitáře), pak tě <a href="dil-2.html">Díl II</a> dovede k prvnímu
+      úspěšnému běhu. Srdce celého systému rozebírá <a href="dil-4.html#iv-1">IV.1 Dialogový
+      stavový automat</a> — pokud chceš rovnou k jádru, začni tam.</p>
+
+      <div class="pager">
+        <span></span>
+        <a href="dil-1.html"><span class="dir">další →</span>Díl I — Než začneme</a>
+      </div>
+    </div>
+  </main>
 </div>
 </body>
 </html>
