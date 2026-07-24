@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stav projektu — hypothesis-one</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+
+<nav class="crumbs"><a href="index.html">Dokumentace</a> › Stav projektu</nav>
+
+<p class="eyebrow">Aktuální snímek · větev hypothesis-two</p>
+<h1>Stav projektu</h1>
+<p class="lead">Deterministický český Q&amp;A systém: ze surového textu postaví <b>mapu faktů</b> a
+nad ní <b>grafem</b> (tekoucí světlo) + <b>lingvistickými vzory</b> (VZOR) dohledá fakt. Runtime je
+deterministický (jediná živá služba = UDPipe 2 na rozbor otázky). <b>Kde je jasno, odpoví; kde ne,
+doptá se; když neví, nehádá</b> — nově i díky <b>naučené assurance bráně</b>.</p>
+
+<div class="note"><span class="lbl">Vstupní bod pokračování:</span> tato stránka = aktuální stav
+(metriky, co je hotové, co ne, jak měřit). Směr dál: <a href="naucene-smerovani.html">naučené
+směrování nad VZORY</a>. Jádro konceptu: <a href="dialogovy-automat.html">dialogový automat</a>.</div>
+
+<h2>1. Metriky (měřidlo eval_large.py — 145 otázek)</h2>
+<p><b>Velký etalon</b> (145 ukotvených otázek napříč kategoriemi vč. polárních, vztahů, parafrází,
+poctivých „nevím") je hlavní měřidlo — malý 25položkový míjel to nejdůležitější.</p>
+<div style="overflow-x:auto">
+<table>
+<tr><th></th><th>PASS</th><th>confident-wrong (sebevědomě špatně)</th></tr>
+<tr><td>retrieval (brána OFF)</td><td>59/145 (40 %)</td><td>35</td></tr>
+<tr><td><b>+ naučená brána (ON)</b></td><td>55/145</td><td><b>20</b> (LOO odhad −13)</td></tr>
+<tr><td>malý etalon (25, nezávislý)</td><td>18/25 (72 %)</td><td>2 (bez regrese)</td></tr>
+</table>
+</div>
+
+<h3>Podle kategorie (retrieval, brána OFF)</h3>
+<div style="overflow-x:auto">
+<table>
+<tr><th>kategorie</th><th>skóre</th><th></th></tr>
+<tr><td>honest-negative (nehádá)</td><td>7/7</td><td>✅ 100 %</td></tr>
+<tr><td>copula (Kdo je X?)</td><td>16/21</td><td>✅ 76 %</td></tr>
+<tr><td>spatial (kde narodil/zemřel)</td><td>12/17</td><td>✅ 70 %</td></tr>
+<tr><td>polar (ano/ne)</td><td>9/14</td><td>◑ 64 %</td></tr>
+<tr><td>temporal (kdy / rok)</td><td>9/25</td><td>◔ 36 %</td></tr>
+<tr><td>authorship-who (Kdo napsal Y?)</td><td>6/20</td><td>◔ 30 %</td></tr>
+<tr><td><b>relation</b> (bratr/manžel/matka)</td><td>0/18</td><td>❌ 0 %</td></tr>
+<tr><td><b>attribute</b> (jméno/povolání)</td><td>0/11</td><td>❌ 0 %</td></tr>
+<tr><td><b>count</b> (kolik)</td><td>0/7</td><td>❌ 0 %</td></tr>
+<tr><td>authorship-what / taxonomy</td><td>0/3, 0/2</td><td>❌ 0 %</td></tr>
+</table>
+</div>
+
+<h2>2. Co je postavené</h2>
+<p>Pipeline vrstev ①–⑤ (viz <a href="index.html">rozcestník</a>: preprocessing → dataloader →
+grammar → synthesis → queryparser). Nad tím tato session přidala:</p>
+<ul>
+<li><b>Řetězení kontextu v dialogu</b> (<a href="aktivace-dialog.html#s4b">§4b</a>) — navazující
+otázka zdědí téma, otázka s vlastní entitou přepne. „Kdy se narodil?" po „Kdo je Karel Čapek?" → 1890.</li>
+<li><b>Aliasy / identita</b> (<a href="aliasy-identita.html">stránka</a>) — rozpadlé jméno
+(Barbora ≡ Němcová) sloučeno → Babička clarify→HIT.</li>
+<li><b>is_factual fix</b> — stray „?" v závorce nezahodí definiční větu (Božena → spisovatelka).</li>
+<li><b>Kvantifikátor guard</b> — „množství/řada" není faktická odpověď.</li>
+<li><b>Polární smyčka VZORŮ</b> (ano/ne) — existence fakt-tvaru → ano/ne. „Je pes šelma? → ano".</li>
+<li><b>Kopula hlavní klauzule</b> má přednost před slovesem vedlejší věty (extrakce).</li>
+<li><b>Naučená assurance brána</b> (<a href="naucene-smerovani.html">směr</a>) — malá NN nad
+rysy+aktivací: p(správně)&lt;práh → nehádej. −13 confident-wrong, deterministická inference.</li>
+</ul>
+
+<h2>3. Architektonický směr</h2>
+<p>Klíčový obrat session: <b>ruční if-then pravidla nejsou správný systém</b> (množí se → regrese
+ke kartám; relation-guard to dokázal — regredoval). Směr = <b>malá NN nad maticí VZORŮ + aktivací</b>,
+učení offline → inference deterministická. Měření ukázalo: <b>routing je minor páka</b> (oracle strop
++4/−6), <b>skutečná páka je assurance</b> — a je učitelná. První realizace = <b>assurance brána</b>
+(už běží). Detail a čísla: <a href="naucene-smerovani.html">naučené směrování nad VZORY</a>.</p>
+
+<h2>4. Poctivě — co nefunguje</h2>
+<ul>
+<li><b>relation / attribute / count = 0 %.</b> Systém tvar otázky nedovede na fakt („Kdo byl bratr
+X?", „Kolik zubů?"). Chybí VZOR-cesta k těmto fakt-tvarům.</li>
+<li><b>Subtilní confident-wrongy</b> brána nechytá — „bratr Karla → spisovatel" (profese z
+DOMOVSKÉHO souboru vypadá jako platná identita). Chytá jen křiklavé cross-domain (bible pro Čapka).</li>
+<li><b>R.U.R. doména</b> — „R.U.R." se tokenizuje na R/U/R → mountne bible; datumy/co-je selhávají.
+Čeká na node-based retrieval.</li>
+<li><b>temporal 36 %</b> — půlka dat se neextrahuje (běžný text mimo bio-závorku).</li>
+</ul>
+
+<h2>5. Jak spustit a měřit</h2>
+<pre>ptát se (REPL):        python3 ask.py            # řetězí kontext
+živá vizualizace:      .venv/bin/python viz.py   # viewBase :8080 (+ panel dokumentů)
+velký etalon (145):    python3 eval_large.py     # mode-aware, po kategoriích
+malý etalon (25):      python3 eval_answers.py
+trénink brány:         python3 train_gate.py     # → gate.json (gate_data.json se dogeneruje)
+přestavba dat:         python3 annotate_corpus.py → dataloader.build_indexes()
+                       → synth_registry.py → build_facts_all.py → build_templates_all.py</pre>
+<p>Data (korpus/index/fakty/šablony) jsou <b>gitignored</b> (reprodukovatelné z raw + build_*).
+Na deploy je nutné je přestavět. <code>gate.json</code> je commitnutý artefakt (malé váhy).</p>
+
+<h2>6. Další kroky</h2>
+<ol>
+<li><b>Chytit subtilní confident-wrongy</b> — jemnější typové/doménové rysy brány (typ entity,
+cross-doc vzdálenost); potřebují čistší data.</li>
+<li><b>Hygiena fakt-store</b> → odemkne auto-gen tréninku (dnes moc zašuměný, po filtru 31 čistých).</li>
+<li><b>Odemknout nulové kategorie</b> — relation/count VZOR-cestou (query-tvar → fakt-tvar).</li>
+<li><b>R.U.R. / doména</b> — node-based retrieval (entita = uzel s fakty).</li>
+</ol>
+
+<h2>Kde co žije</h2>
+<p><code>answering.py</code> (⑤ + brána: <code>_gate_feats</code>/<code>_gate_p</code>, polární
+<code>_polar</code>), <code>gate.json</code> (váhy), <code>train_gate.py</code>/<code>gen_train.py</code>
+(trénink), <code>eval_large.py</code> + <code>gold_large.json</code> (měřidlo), <code>nn_pilot.py</code>
+(pilot routeru). Větev <b>hypothesis-two</b>. Dokumentace: rozcestník <a href="index.html">index</a>.</p>
+
+<nav class="crumbs" style="margin-top:2.5rem"><a href="index.html">← zpět na rozcestník</a></nav>
+
+</div>
+</body>
+</html>
