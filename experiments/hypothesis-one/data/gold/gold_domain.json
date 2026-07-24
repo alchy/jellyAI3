@@ -670,5 +670,311 @@
    "kind": "authorship-who",
    "src": "wiki_bílá_nemoc"
   }
+ ],
+ "bible": [
+  {
+   "q": "Kdo pokřtil Ježíše?",
+   "expect": [
+    "Jan",
+    "Křtitel"
+   ],
+   "mode": "answer",
+   "kind": "bible",
+   "sub": "who",
+   "src": "bible_markus"
+  },
+  {
+   "q": "Kdo zradil Ježíše?",
+   "expect": [
+    "Jidáš",
+    "Iškariotský"
+   ],
+   "mode": "answer",
+   "kind": "bible",
+   "sub": "who",
+   "src": "bible_matous"
+  },
+  {
+   "q": "Kdo zapřel Ježíše?",
+   "expect": [
+    "Petr",
+    "Šimon"
+   ],
+   "mode": "answer",
+   "kind": "bible",
+   "sub": "who",
+   "src": "bible_matous"
+  },
+  {
+   "q": "Kde se narodil Ježíš?",
+   "expect": [
+    "Betlém",
+    "Betlémě"
+   ],
+   "mode": "answer",
+   "kind": "bible",
+   "sub": "spatial",
+   "src": "bible_matous"
+  },
+  {
+   "q": "Odkud byl Ježíš?",
+   "expect": [
+    "Nazaret",
+    "Nazareta"
+   ],
+   "mode": "answer",
+   "kind": "bible",
+   "sub": "spatial",
+   "src": "bible_markus"
+  },
+  {
+   "q": "Kde byl Ježíš pokřtěn?",
+   "expect": [
+    "Jordán",
+    "Jordánu"
+   ],
+   "mode": "answer",
+   "kind": "bible",
+   "sub": "spatial",
+   "src": "bible_markus"
+  },
+  {
+   "q": "Kde křtil Jan?",
+   "expect": [
+    "Jordán",
+    "Jordánu"
+   ],
+   "mode": "answer",
+   "kind": "bible",
+   "sub": "spatial",
+   "src": "bible_markus"
+  },
+  {
+   "q": "Kam přišel Ježíš po křtu?",
+   "expect": [
+    "Galilej",
+    "Galileje"
+   ],
+   "mode": "answer",
+   "kind": "bible",
+   "sub": "spatial",
+   "src": "bible_markus"
+  },
+  {
+   "q": "Kolik dní byl Ježíš na poušti?",
+   "expect": [
+    "čtyřicet",
+    "40"
+   ],
+   "mode": "answer",
+   "kind": "bible",
+   "sub": "num",
+   "src": "bible_markus"
+  },
+  {
+   "q": "Kolik měl Ježíš učedníků?",
+   "expect": [
+    "dvanáct",
+    "12",
+    "dvanácti"
+   ],
+   "mode": "answer",
+   "kind": "bible",
+   "sub": "num",
+   "src": "bible_markus"
+  },
+  {
+   "q": "Kdo byl bratr Šimona?",
+   "expect": [
+    "Ondřej"
+   ],
+   "mode": "answer",
+   "kind": "bible",
+   "sub": "relation",
+   "src": "bible_markus"
+  },
+  {
+   "q": "Kdo byl bratr Jakuba?",
+   "expect": [
+    "Jan"
+   ],
+   "mode": "answer",
+   "kind": "bible",
+   "sub": "relation",
+   "src": "bible_markus"
+  },
+  {
+   "q": "Kdo byl otec Jakuba a Jana?",
+   "expect": [
+    "Zebedeus",
+    "Zebedea",
+    "Zebedeův"
+   ],
+   "mode": "answer",
+   "kind": "bible",
+   "sub": "relation",
+   "src": "bible_markus"
+  },
+  {
+   "q": "Co kázal Jan?",
+   "expect": [
+    "pokání"
+   ],
+   "mode": "answer",
+   "kind": "bible",
+   "sub": "preach",
+   "src": "bible_markus"
+  },
+  {
+   "q": "Co kázal Ježíš?",
+   "expect": [
+    "evangelium",
+    "evangelia"
+   ],
+   "mode": "answer",
+   "kind": "bible",
+   "sub": "preach",
+   "src": "bible_markus"
+  },
+  {
+   "q": "Kdo byl Pilát Pontský?",
+   "expect": [
+    "vladař",
+    "místodržitel"
+   ],
+   "mode": "answer",
+   "kind": "bible",
+   "sub": "who",
+   "src": "bible_matous"
+  },
+  {
+   "q": "Kdo byl Herodes?",
+   "expect": [
+    "král"
+   ],
+   "mode": "answer",
+   "kind": "bible",
+   "sub": "who",
+   "src": "bible_matous"
+  },
+  {
+   "q": "Kdo byl Jairos?",
+   "expect": [
+    "představený",
+    "synagóg"
+   ],
+   "mode": "answer",
+   "kind": "bible",
+   "sub": "who",
+   "src": "bible_markus"
+  },
+  {
+   "q": "Koho vzkřísil Ježíš?",
+   "expect": [
+    "Lazar",
+    "Lazara"
+   ],
+   "mode": "answer",
+   "kind": "bible",
+   "sub": "who",
+   "src": "bible_jan"
+  },
+  {
+   "q": "Co přinesli mudrci Ježíšovi?",
+   "expect": [
+    "zlato",
+    "kadidlo",
+    "myrha"
+   ],
+   "mode": "answer",
+   "kind": "bible",
+   "sub": "whom_what",
+   "src": "bible_matous"
+  },
+  {
+   "q": "Kolika chleby nasytil Ježíš zástup?",
+   "expect": [
+    "pět",
+    "5"
+   ],
+   "mode": "answer",
+   "kind": "bible",
+   "sub": "num",
+   "src": "bible_jan"
+  },
+  {
+   "q": "Kde proměnil Ježíš vodu ve víno?",
+   "expect": [
+    "Kána",
+    "Káně",
+    "Kán"
+   ],
+   "mode": "answer",
+   "kind": "bible",
+   "sub": "spatial",
+   "src": "bible_jan"
+  },
+  {
+   "q": "Kde byl Ježíš ukřižován?",
+   "expect": [
+    "Golgota",
+    "Golgotu"
+   ],
+   "mode": "answer",
+   "kind": "bible",
+   "sub": "spatial",
+   "src": "bible_matous"
+  },
+  {
+   "q": "Kdo byl Ježíš?",
+   "expect": [
+    "Kristus",
+    "syn",
+    "Nazaretský"
+   ],
+   "mode": "answer",
+   "kind": "bible-narrativa",
+   "sub": "narrativa",
+   "src": "bible_markus",
+   "indicator": true
+  },
+  {
+   "q": "Co řekl Ježíš učedníkům?",
+   "expect": [
+    "rybář",
+    "rybáře",
+    "pojďte"
+   ],
+   "mode": "answer",
+   "kind": "bible-narrativa",
+   "sub": "narrativa",
+   "src": "bible_markus",
+   "indicator": true
+  },
+  {
+   "q": "Co řekl Ježíš Janovi?",
+   "expect": [
+    "pokřtít",
+    "spravedlnost",
+    "nech"
+   ],
+   "mode": "answer",
+   "kind": "bible-narrativa",
+   "sub": "narrativa",
+   "src": "bible_matous",
+   "indicator": true
+  },
+  {
+   "q": "Kde se setkal Ježíš s Janem?",
+   "expect": [
+    "Jordán",
+    "Jordánu"
+   ],
+   "mode": "answer",
+   "kind": "bible-narrativa",
+   "sub": "narrativa",
+   "src": "bible_markus",
+   "indicator": true
+  }
  ]
 }

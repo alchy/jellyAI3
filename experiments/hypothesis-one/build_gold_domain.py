@@ -61,6 +61,49 @@ WORKS = [
     ("wiki_bílá_nemoc",     "Bílou nemoc",      "1937"),
 ]
 
+# --- NOVÝ ZÁKON — faktické otázky, odpovědi OVĚŘENÉ proti raw textu evangelií (data/raw/bible_*.txt).
+# (q, [expect+aliasy], sub, src). Doslovné doklady ve zdroji, ne z (zašuměné) extrakce.
+BIBLE = [
+    # kdo-udělal-co
+    ("Kdo pokřtil Ježíše?",            ["Jan", "Křtitel"],          "who",      "bible_markus"),   # „v Jordánu od Jana pokřtěn"
+    ("Kdo zradil Ježíše?",             ["Jidáš", "Iškariotský"],    "who",      "bible_matous"),   # „Jidáš, který ho zradil"
+    ("Kdo zapřel Ježíše?",             ["Petr", "Šimon"],           "who",      "bible_matous"),   # „třikrát mě zapřeš" (Petr)
+    # geografie (kde/kam/odkud) — jen co je ve vstupním textu
+    ("Kde se narodil Ježíš?",          ["Betlém", "Betlémě"],       "spatial",  "bible_matous"),   # „narodil se v Judském Betlémě"
+    ("Odkud byl Ježíš?",               ["Nazaret", "Nazareta"],     "spatial",  "bible_markus"),   # „Ježíš z Nazareta"
+    ("Kde byl Ježíš pokřtěn?",         ["Jordán", "Jordánu"],       "spatial",  "bible_markus"),   # „byl v Jordánu pokřtěn"
+    ("Kde křtil Jan?",                 ["Jordán", "Jordánu"],       "spatial",  "bible_markus"),   # „křtít v řece Jordánu"
+    ("Kam přišel Ježíš po křtu?",      ["Galilej", "Galileje"],     "spatial",  "bible_markus"),   # „přišel Ježíš do Galileje"
+    # číselné
+    ("Kolik dní byl Ježíš na poušti?", ["čtyřicet", "40"],          "num",      "bible_markus"),   # „čtyřicet dní"
+    ("Kolik měl Ježíš učedníků?",      ["dvanáct", "12", "dvanácti"], "num",    "bible_markus"),   # „Ustanovil jich dvanáct"
+    # vztahové
+    ("Kdo byl bratr Šimona?",          ["Ondřej"],                  "relation", "bible_markus"),   # „Šimona a jeho bratra Ondřeje"
+    ("Kdo byl bratr Jakuba?",          ["Jan"],                     "relation", "bible_markus"),   # „Jakuba… a jeho bratra Jana"
+    ("Kdo byl otec Jakuba a Jana?",    ["Zebedeus", "Zebedea", "Zebedeův"], "relation", "bible_markus"),  # „Jakuba Zebedeova"
+    # kázání
+    ("Co kázal Jan?",                  ["pokání"],                  "preach",   "bible_markus"),   # „kázal: Čiňte pokání"
+    ("Co kázal Ježíš?",                ["evangelium", "evangelia"], "preach",   "bible_markus"),   # „kázal Boží evangelium"
+    # kdo-byl (role) + více postav
+    ("Kdo byl Pilát Pontský?",         ["vladař", "místodržitel"],  "who",      "bible_matous"),   # „vladaři Pilátovi"
+    ("Kdo byl Herodes?",               ["král"],                    "who",      "bible_matous"),   # „krále Heroda"
+    ("Kdo byl Jairos?",                ["představený", "synagóg"],  "who",      "bible_markus"),   # „představený synagógy, jménem Jairos"
+    # umíme řešit (odpověď je ve vstupním textu), ale zatím nezodpovíme — frontiér
+    ("Koho vzkřísil Ježíš?",           ["Lazar", "Lazara"],         "who",      "bible_jan"),      # „Lazar z Betanie"
+    ("Co přinesli mudrci Ježíšovi?",   ["zlato", "kadidlo", "myrha"], "whom_what", "bible_matous"), # „zlato, kadidlo a myrhu"
+    ("Kolika chleby nasytil Ježíš zástup?", ["pět", "5"],           "num",      "bible_jan"),      # „pět chlebů a dvě ryby"
+    ("Kde proměnil Ježíš vodu ve víno?", ["Kána", "Káně", "Kán"],   "spatial",  "bible_jan"),      # „v Káně Galilejské"
+    ("Kde byl Ježíš ukřižován?",       ["Golgota", "Golgotu"],      "spatial",  "bible_matous"),   # „Golgota, to znamená Lebka"
+]
+# NARATIVNÍ INDIKÁTORY — chceme pokryto vše; tyto systém (zatím) neumí → fail = poctivá značka
+# mezery (user). Očekávaná odpověď je ověřená ve zdroji, ale je to obsah/parafráze, ne holé lemma.
+BIBLE_NARR = [
+    ("Kdo byl Ježíš?",                 ["Kristus", "syn", "Nazaretský"], "bible_markus"),          # narativní/otevřené
+    ("Co řekl Ježíš učedníkům?",       ["rybář", "rybáře", "pojďte"],    "bible_markus"),          # „Pojďte za mnou… rybáře lidí"
+    ("Co řekl Ježíš Janovi?",          ["pokřtít", "spravedlnost", "nech"], "bible_matous"),        # křest — otevřené
+    ("Kde se setkal Ježíš s Janem?",   ["Jordán", "Jordánu"],            "bible_markus"),           # u Jordánu (křest)
+]
+
 
 def born(fem):
     return "narodila" if fem else "narodil"
@@ -115,11 +158,27 @@ def collision():
     return items
 
 
+def bible():
+    """Novozákonní faktické otázky (kind=bible) + narativní indikátory (kind=bible-narrativa).
+
+    Odpovědi OVĚŘENÉ proti raw evangeliím (ne proti zašuměné extrakci). Narativní jsou
+    záměrně těžké (fail = poctivá značka nepokrytého — chceme pokryto vše).
+    """
+    items = []
+    for q, expect, sub, src in BIBLE:
+        items.append({"q": q, "expect": expect, "mode": "answer",
+                      "kind": "bible", "sub": sub, "src": src})
+    for q, expect, src in BIBLE_NARR:
+        items.append({"q": q, "expect": expect, "mode": "answer",
+                      "kind": "bible-narrativa", "sub": "narrativa", "src": src, "indicator": True})
+    return items
+
+
 def main():
-    data = {"collision": collision(), "coverage": coverage()}
+    data = {"collision": collision(), "coverage": coverage(), "bible": bible()}
     json.dump(data, open(OUT, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
-    nc, nv = len(data["collision"]), len(data["coverage"])
-    print(f"→ {OUT}\n  collision {nc} + coverage {nv} = {nc + nv} položek")
+    n = {k: len(v) for k, v in data.items()}
+    print(f"→ {OUT}\n  " + " + ".join(f"{k} {v}" for k, v in n.items()) + f" = {sum(n.values())} položek")
 
 
 if __name__ == "__main__":
