@@ -150,6 +150,22 @@ stávající infrastruktura (rozbor, VZOR, fakt-store, aktivace).</p>
 </table>
 </div>
 
+<h2>7b. Realizováno + změřeno (kam nás data dovedla)</h2>
+<div class="note"><span class="lbl">Měření přesměrovalo z routingu na assurance:</span> oracle
+routing-strop = jen <b>+4 PASS / −6 confident-wrong</b> → i perfektní routing je minor páka (29/35
+chyb přežije, glow je bere dál). <b>Skutečná páka = assurance</b>, a je taky učitelná.</div>
+<p><b>Naučená assurance brána POSTAVENA</b> (<code>train_gate.py</code> → <code>gate.json</code>;
+<code>answer()</code>: <code>_gate_p(feats) &lt; práh → nehádej</code>). Cesta poctivě po krocích:</p>
+<ul>
+<li>auto-gen tréninku z faktů <b>zamítnut</b> — fakt-store moc zašuměný (bůh→zvěst), po filtru 31 čistých;</li>
+<li><b>richer rysy</b> (13: base + glow + odstup + <b>doména</b> „vítěz z domovského souboru entity
+vs cizí bible" + je-jméno + idf) → LOO 68.8 %;</li>
+<li><b>práh</b> rozsekl trade: konzervativní 0.30 → <b>−13 confident-wrong / −3 správné</b> (LOO,
+poctivý odhad); velký etalon 35→20 confident-wrong (train=test), malý etalon 72 % <b>bez regrese</b>.</li>
+</ul>
+<p>= tvá teze potvrzena: malá NN nad vzory + aktivací (doména!) sníží <em>nehádej</em>-chyby, kde
+ruční prah nešel. Runtime deterministický (čistá python sigmoid, pevné váhy).</p>
+
 <h2>8. Další kroky (měřeně)</h2>
 <ol>
 <li><b>Obohatit rysy o aktivaci</b> — typ nejteplejšího uzlu (osoba/dílo/místo), rozseknout
