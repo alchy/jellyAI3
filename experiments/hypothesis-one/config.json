@@ -71,6 +71,20 @@
     "dir": "../../data/facts",
     "enabled": true
   },
+  "entity_retrieval": {
+    "_comment": "Líný runtime index nad hlavičkami fact shardů. Nečte fakta do paměti: dotaz entita × predikát × odpovědní role vybere jen několik dokumentů, které se pak mountnou běžnou cestou. Bez shody se použije původní tf-idf loader.",
+    "enabled": true,
+    "max_docs": 4,
+    "max_fact_refs": 24
+  },
+  "neural_training": {
+    "_comment": "Build-time korpus pro podpůrný ranker. Otázky se generují z existujících registry facts přes lokální Ollamu; split je deterministicky po dokumentech, aby se nepletly tytéž entity mezi train a test.",
+    "pairs": "neural_pairs.jsonl",
+    "questions_per_fact": 2,
+    "max_examples_per_doc": 80,
+    "train_percent": 80,
+    "dev_percent": 10
+  },
   "topos": {
     "_comment": "Expert MÍSTO — gazetteer lemmat GEO entit (NER NameType=Geo) z korpusu (build_gazetteer.py). is_place(lemma) rozliší place vs ne-place → výběr správného where-slotu (Svatoňovice > rodina) mezi kandidáty téže role. Mirror parent/Topos; zatím jen typ (is_place), containment (Praha⊂Čechy) je pozdější rozšíření.",
     "gazetteer": "../../data/gazetteer.json"

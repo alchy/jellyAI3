@@ -48,6 +48,9 @@ class Answering:
         cfg = json.load(open(config_path, encoding="utf-8"))
         # parent-model predikát+role cesta: MĚŘENO regresní bez koreference → default OFF (viz config)
         self.facts_enabled = cfg.get("fact_store", {}).get("enabled", False)
+        # Přesná, ale kapacitně omezená routingová cesta nad metadata fact shardů.
+        # Při chybějící shodě zůstává beze změny původní tf-idf loader.
+        self.entity_retrieval = cfg.get("entity_retrieval", {})
         # KVANTIFIKÁTORY („množství povídek") nejsou nikdy faktická odpověď — data v configu,
         # filtrují se z kandidátů jako echo (viz _candidates). Jazyk = JSON, ne kód.
         self.nonanswer = set(cfg.get("answering", {}).get("nonanswer_lemmas", []))
@@ -463,7 +466,16 @@ class Answering:
                 self.store.mounted.clear()
                 if self.facts_enabled:
                     self.facts.mounted.clear()
-        hot = [d for d, _s in self.dl.select_files(lemmas)]      # DLE OTÁZKY vybere soubory
+        routed = []
+        if self.facts_enabled and self.entity_retrieval.get("enabled", False):
+            routed = self.facts.route_docs(
+                predicate, hole_role, known,
+                max_docs=self.entity_retrieval.get("max_docs", 4),
+                max_fact_refs=self.entity_retrieval.get("max_fact_refs", 24),
+            )
+        # Přímý faktový důkaz má přednost před lexikálním mountem. Bez něj je
+        # chování identické s původním selective loaderem.
+        hot = routed or [d for d, _s in self.dl.select_files(lemmas)]
         if not hot and not (carry_context and self.store.mounted):
             return None
         self.store.mount(hot)                                    # NAHRAJ šablony horkých (#60)

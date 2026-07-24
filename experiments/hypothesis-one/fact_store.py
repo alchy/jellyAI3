@@ -50,11 +50,15 @@ class FactStore:
 
     def __init__(self, config_path=CONFIG_PATH):
         """Načte cestu shardů z configu; prázdný mount."""
-        cfg = json.load(open(config_path, encoding="utf-8"))
+        with open(config_path, encoding="utf-8") as config_file:
+            cfg = json.load(config_file)
         self.dir = os.path.join(HERE, cfg.get("fact_store", {}).get("dir", "../../data/facts"))
         self.mounted = {}                       # doc -> [Fact]
         self.by_predicate = defaultdict(list)
         self.by_ref = {}                        # (doc, sent) -> Fact
+        # Líný, pouze metadata index pro selektivní routing. Nevzniká jako nový
+        # build artefakt a neobsahuje Fact objekty: drží jen odkazy do shardů.
+        self._route_index = None
 
     # ---- persistence (build-time) -------------------------------------------
 
@@ -119,6 +123,72 @@ class FactStore:
             for lem in f.roles.get(hole_role, []):
                 out.append((lem, f))
         return out
+
+    # ---- runtime entity routing (bez preprocessing artefaktu) --------------
+
+    @staticmethod
+    def _norm(value):
+        return (value or "").strip().lower()
+
+    def _build_route_index(self):
+        """Postaví malý index `(predicate, answer_role, known_lemma) -> refs`.
+
+        Index se staví až při prvním dotazu, čte řádky faktových shardů, ale
+        nemountuje je ani nevytváří ``Fact`` objekty. ``known_lemma`` musí být
+        v jiné roli než hledaná odpověď; tím odpovídá stejnému guardu jako
+        parent-model v ``Answering._candidates``. Hodnotou je jen ``(doc,sent)``.
+        """
+        index = defaultdict(list)
+        for doc in self.document_ids():
+            path = os.path.join(self.dir, f"{doc}.jsonl")
+            with open(path, encoding="utf-8") as fact_file:
+                for line in fact_file:
+                    if not line.strip():
+                        continue
+                    row = json.loads(line)
+                    predicate = self._norm(row.get("predicate"))
+                    roles = row.get("roles") or {}
+                    ref = (doc, row.get("sent"))
+                    if not predicate:
+                        continue
+                    for answer_role in roles:
+                        links = set()
+                        for role, lemmata in roles.items():
+                            if role != answer_role:
+                                links.update(self._norm(lemma) for lemma in lemmata)
+                        for lemma in links:
+                            if lemma:
+                                index[(predicate, answer_role, lemma)].append(ref)
+        self._route_index = index
+
+    def route_docs(self, predicate, hole_role, known, max_docs=4, max_fact_refs=24):
+        """Vrátí omezené dokumenty s přímým strukturálním důkazem.
+
+        Je to jen routing layer: z celého fact-store se načtou metadata, pak se
+        vrátí nejvýše ``max_docs`` document shardů. Samotné fakta načte až
+        ``mount`` v běžném runtime tahu. Přesné shody se řadí podle počtu
+        referencí, remízy stabilně podle id dokumentu.
+        """
+        predicate, hole_role = self._norm(predicate), self._norm(hole_role)
+        if not predicate or not hole_role:
+            return []
+        if self._route_index is None:
+            self._build_route_index()
+        refs = []
+        matched_terms = defaultdict(set)
+        for lemma in sorted({self._norm(value) for value in known if self._norm(value)}):
+            term_refs = self._route_index.get((predicate, hole_role, lemma), ())
+            refs.extend(term_refs)
+            for doc, _sent in term_refs:
+                matched_terms[doc].add(lemma)
+        # Tatáž věta může být zasažena více lemmaty otázky; nesmí spotřebovat budget.
+        refs = sorted(set(refs))[:max_fact_refs]
+        counts = defaultdict(int)
+        for doc, _sent in refs:
+            counts[doc] += 1
+        return [doc for doc, _count in sorted(
+                counts.items(), key=lambda item: (-len(matched_terms[item[0]]), -item[1], item[0]))
+                [:max_docs]]
 
 
 if __name__ == "__main__":
