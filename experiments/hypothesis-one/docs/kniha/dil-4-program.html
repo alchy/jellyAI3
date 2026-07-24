@@ -171,6 +171,32 @@ flowchart LR
       <div class="sig">decay() → None (teplo *= decay pro words i files)</div>
       <p class="io"><b>vstup</b> žádný &nbsp;·&nbsp; <b>výstup</b> žádný &nbsp;·&nbsp; <b>efekt</b> zmenší všechna tepla na místě. Parametr <code>decay</code> (0.7) je v configu.</p>
 
+      <h3>Řetězení mezi tahy — navázat, nebo přepnout téma <span class="mark mark-prevzato">Převzato</span></h3>
+      <p><b>Princip.</b> V interaktivní session (<code>answer(q, carry_context=True)</code>) světlo mezi
+      tahy nezhasne, jen se tlumí (<code>decay</code>). Otázka „Kdy se narodil?" pak nemá vlastní entitu
+      — a systém musí poznat, jestli <b>navazuje</b> na minulé téma, nebo otevírá <b>nové</b>. Rozhoduje
+      jediná prahová podmínka: <b>nese otázka vlastní distinktivní slovo?</b></p>
+      <p>Kritérium je <code>idf ≥ 1.5</code> u některého lemmatu otázky (<code>answering.py:450</code>).
+      „Kdy se narodil?" žádné takové slovo nemá (samá funkční/tázací) → je to <b>follow-up</b>: pole se
+      NEčistí a ke známým entitám se přidá <b>téma z minula</b> (<code>_hot_entities</code>). „A co
+      Švejk?" naopak nese distinktivní „Švejk" (idf ≥ 1.5) → <b>přepnutí tématu</b>: pole i mount se
+      <b>vymažou</b> a začíná se nad čistým stolem.</p>
+      <div class="sig">_hot_entities(top=6, floor=0.4, idf_min=1.5) → [lemma]</div>
+      <p class="io"><b>vstup</b> prahy (nad minulým polem) &nbsp;·&nbsp; <b>výstup</b> až 6 lemmat, která
+      jsou po decayi ještě horká (<code>heat ≥ floor</code>) a zároveň distinktivní
+      (<code>idf ≥ idf_min</code>) &nbsp;·&nbsp; <b>efekt</b> žádný. To je „téma" nesené do dalšího tahu.</p>
+<pre><code># jádro rozhodnutí (answering.py, carry_context=True)
+follow_up = not any(field.idf.get(l, 0) &gt;= 1.5 for l in lemmata_otázky)
+if follow_up:
+    known |= self._hot_entities()      # NAVÁZAT: zděď téma minula
+else:
+    field.words.clear(); field.files.clear()
+    store.mounted.clear(); facts.mounted.clear()   # PŘEPNOUT: vyčisti stůl</code></pre>
+      <p>Proč zrovna idf ≥ 1.5, a ne detekce zájmen nebo elipsy? Práh je <b>lexikální</b>: rozhoduje
+      distinktivita slova, ne slovní druh — funguje tak i na otázky bez zájmena („Kdy se narodil?"
+      žádné zájmeno nemá). Je to <b>pevný</b> práh (1.5) v kódu, ne učený; držet ho fixní je záměr —
+      plovoucí práh by řetězení mezi tahy rozkolísal.</p>
+
       <h3>weight_answer — kolik světla má kandidát <span class="mark mark-overeno">Ověřeno</span></h3>
       <p><b>Princip.</b> Kandidát na odpověď je vždycky dvojice <code>(odpověď, soubor)</code>. Jeho
       „osvětlení" je součet dvou tepel: kolik svítí jeho soubor a kolik svítí jeho odpovědní entita

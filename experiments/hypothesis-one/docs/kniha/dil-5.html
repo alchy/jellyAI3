@@ -430,6 +430,35 @@ VELKÝ ETALON — 145 otázek
       <b>vyžaduje běžící UDPipe 2</b> na portu 8092 (živý rozbor otázky přes síť, viz
       <a href="dil-7.html">Díl VII</a>) — bez něj se rozbor otázky neprovede.</p>
 
+      <h3>Determinismus: jak je zaručen a jak ho ověřit <span class="mark mark-overeno">Ověřeno</span></h3>
+      <p>Že měření dá pokaždé totéž číslo, není náhoda — je to <b>vlastnost, kterou systém drží
+      záměrně</b>. Stejná otázka nad stejnými daty vrátí vždy stejnou odpověď a přestavba ze stejného
+      rawu dá <b>bajt po bajtu</b> stejné fakty. Stojí to na čtyřech věcech:</p>
+      <p><b>1 · Žádná náhoda ani hodiny v rozhodování.</b> V celé odpovědní cestě není
+      <code>random</code> ani čtení systémového času — rozhodnutí jsou čisté funkce nad daty. (Jediné
+      <code>datetime.now()</code> v projektu je v <code>logger.py</code> a slouží jen k časovému razítku
+      logovacího řádku, ne k výběru odpovědi.)</p>
+      <p><b>2 · Remízy se lámou stabilním klíčem.</b> Kdekoli se řadí kandidáti, má řazení <i>druhotný</i>
+      klíč, takže shodné skóre nerozhodne podle pořadí načtení, ale podle jména. Brána souborů:
+      <code>scored.sort(key=lambda x: (-skóre, jméno))</code> (<code>dataloader.py:225</code>). Výběr
+      vítěze (<a href="dil-4-program.html#matcher">glow-orders-ties</a>) je lexikografická n-tice a glow
+      je aritmetika nad polem, ne los.</p>
+      <p><b>3 · Pinnutý jazykový model.</b> UDPipe 2 model je zamčený v konfiguraci
+      (<code>preprocessing.udpipe2_model</code>). Jiný model = jiné lemma/deprel = jiné VZORy a fakty,
+      proto se verze nemění pod rukama.</p>
+      <p><b>4 · Kanonizace identity.</b> Rozpadlé jméno se přes <code>_canon</code> sloučí na jeden kanon
+      (dominantní podmět dokumentu), takže se pořadí variant nepromítne do výsledku.</p>
+      <p><b>Jak to ověříš.</b> Determinismus není víra — dá se změřit:</p>
+<pre><code># stejná otázka dvakrát → stejná odpověď
+$ python3 -c "from answering import Answering; a=Answering(); print(a.answer('Kdo je Karel Čapek?'))"
+
+# bitově shodná přestavba: postav fakty dvakrát a porovnej artefakty
+$ python3 build_facts_all.py &amp;&amp; cp -r ../../data/facts /tmp/facts_a
+$ python3 build_facts_all.py &amp;&amp; diff -r /tmp/facts_a ../../data/facts   # → žádný rozdíl</code></pre>
+      <p>Když se výstup mezi dvěma běhy liší, je to <b>chyba</b> (vloudila se závislost na pořadí, čase
+      nebo prostředí) — ne přijatelná odchylka jako u velkého jazykového modelu (<a href="#5-1">V.1</a>).
+      Právě tahle bitová shoda je nejtvrdší regresní test: dva seedy se musí rovnat.</p>
+
       <h2 id="5-6">V.6 Naměřené výsledky <span class="mark mark-prevzato">Převzato</span></h2>
       <p>Následují <b>skutečná</b> čísla z projektu, ke commitu <code>b8b2d5c…d20a5ec</code> na větvi
       <code>hypothesis-two</code>. Nic zde není odhad.</p>

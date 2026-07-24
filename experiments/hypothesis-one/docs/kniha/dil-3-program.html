@@ -292,6 +292,57 @@ if os.path.exists(shard) and os.path.getmtime(shard) >= os.path.getmtime(path):
       dokument a <b>zapomene zavolat <code>build_indexes()</code></b>, dostane tichou chybu: shard na
       disku je, ale žádný dotaz ho nevybere — je „neviditelný".</p>
 
+      <h3>Přesná stavba cache slov — idf vzorec, tf·idf, L2-norma <span class="mark mark-overeno">Ověřeno</span></h3>
+      <p>Konkrétně (<code>dataloader.py:81–106</code>) běží stavba ve třech krocích a je to čistá
+      aritmetika, žádné učení:</p>
+      <p><b>1 · idf z četnosti dokumentů.</b> Pro každé lemma se spočítá <code>df</code> — v kolika z
+      <code>n</code> souborů se vůbec objevuje — a z toho globální váha
+      <code>idf = math.log(n / df) + 1.0</code>. Slovo ve všech souborech má <code>idf = 1</code>
+      (log 1 = 0, plus konstanta), slovo v jediném souboru má idf nejvyšší. Tahle tabulka jde do
+      <code>_idf.pkl</code> jako <code>{"idf": {lemma: idf}, "n": n}</code> a je to ta <b>statická</b>
+      váha slova (jas uzlu), kterou za běhu čte i aktivační pole v
+      <a href="dil-4-program.html#pole">Dílu IV</a>.</p>
+      <p><b>2 · per-soubor tf·idf vektor.</b> Pro každý soubor se váha lemmatu spočítá jako
+      <code>tf × idf</code> (četnost v souboru krát globální unikátnost), ale jen pro lemmata s
+      <code>tf ≥ min_count</code> (=2) — hapaxy (výskyt 1) se zahodí jako šum. Vektor se pak
+      <b>L2-normalizuje</b> (<code>w / √Σw²</code>), aby byl dlouhý a krátký dokument srovnatelný, a
+      uloží se do <code>&lt;doc&gt;.pkl</code>.</p>
+      <p><b>3 · invariant „vždy celé".</b> Na rozdíl od UDPipe cache (anotační cache výše), která se
+      invaliduje po jednotlivých souborech přes <code>mtime</code>, se cache slov <b>vždy přepočítává
+      kompletně</b> — idf závisí na <code>n</code>, takže přidání jediného souboru mění váhy všech.
+      <code>build_indexes()</code> proto není inkrementální; je idempotentní nad aktuální množinou shardů.</p>
+      <p>Reálné hodnoty z živé cache (<code>_idf.pkl</code>, 53 dokumentů, 21&nbsp;177 lemmat):</p>
+<pre>n = 53 dokumentů
+  svatoňovice   idf = 4.277   (ve 2 souborech z 53 → vysoká distinktivita)
+  čapek         idf = 2.773   (v 9)
+  spisovatel    idf = 2.331   (v 14)
+  být           idf = 1.000   (ve všech 53 → neváží)
+
+wiki_karel_čapek.pkl  (per-soubor vektor)  top: čapek 0.494 · karel 0.283 · …   L2-norma = 1.000</pre>
+      <p>Číslo sedí na vzorec: <code>být</code> je ve všech 53 souborech, tedy
+      <code>log(53/53)+1 = 1.0</code>; <code>svatoňovice</code> ve dvou, <code>log(53/2)+1 ≈ 4.28</code>.
+      Per-soubor vektor má po L2-normalizaci délku přesně 1 — proto jsou soubory různé délky
+      porovnatelné.</p>
+
+      <h3>Jak se loader spouští — build-time vs runtime <span class="mark mark-overeno">Ověřeno</span></h3>
+      <p>Cache slov se staví jindy, než se čte — rozliš dva okamžiky:</p>
+      <p><b>Build-time (jednou po přidání dat).</b> <code>build_indexes()</code> spustí přestavba dat:
+      v reindexu je to krok ② hned po anotaci (<a href="dil-2.html">Díl II</a>, „Přestavba dat z nuly" —
+      <code>python3 -c "from dataloader import Dataloader; Dataloader().build_indexes()"</code>). Musí
+      doběhnout <b>před</b> syntézou faktů, protože <code>synth_registry.py</code> mountuje soubory přes
+      index. Není inkrementální (viz invariant výše) — přidáš raw soubor, spustíš celý reindex.</p>
+      <p><b>Runtime (na každý dotaz).</b> <code>Answering</code> vytvoří <b>jednu</b> instanci loaderu
+      v konstruktoru (<code>answering.py:42</code>, <code>self.dl = Dataloader()</code>) a drží ji po
+      celou session — ne novou na dotaz. Každý tah <code>answer()</code> tuhle jednu instanci spustí
+      dvakrát: <code>select_files(lemmata_otázky)</code> vybere hrstku horkých souborů (brána ②) a
+      <code>mount(horké)</code> jejich shardy nahraje do paměti; nad nimi teprve stojí graf a světlo
+      (<a href="dil-4-program.html#tah">Díl IV, život tahu</a>). Symetricky si i
+      <code>ActivationField</code> při své konstrukci vytáhne z loaderu statickou idf tabulku
+      (<code>load_idf()</code>, <code>activation_field.py:38</code>) jako jas uzlů.</p>
+      <p>Prakticky: <b>statická</b> část (idf, per-soubor vektory) vznikne jednou při reindexu a mezi
+      dotazy se nemění; <b>dynamická</b> část (které soubory jsou zrovna horké) se počítá znovu na
+      každou otázku z té statické cache. Loader je tak most mezi build-time daty a runtime rozhodnutím.</p>
+
       <!-- ============================ VZOR ============================ -->
       <h2 id="vzor">III·4 VZOR — formát, kde je uložen, jak se staví, jak se načítá</h2>
 

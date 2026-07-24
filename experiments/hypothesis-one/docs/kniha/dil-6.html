@@ -86,10 +86,12 @@
 <pre class="mermaid">
 flowchart TD
   accTitle: Přestavba dat po přidání nového souboru
-  accDescr: Nový txt soubor projde pěti skripty pipeline (anotace, indexy, registr, fakty, šablony) a teprve pak se na jeho obsah dá zeptat.
+  accDescr: Nový txt soubor projde šesti skripty pipeline (anotace, indexy, gazetteer míst, registr, fakty, šablony) a teprve pak se na jeho obsah dá zeptat.
   RAW["nový .txt do data/raw/"] --> A["annotate_corpus.py (UDPipe 2)"]
   A --> C(["shard data/corpus/doc.pkl"])
   C --> D["dataloader.py — build_indexes()"]
+  C --> G["build_gazetteer.py"]
+  G --> GZ(["místa data/gazetteer.json (Topos)"])
   D --> I(["indexy data/index/"])
   I --> S["synth_registry.py"]
   S --> REG(["registry.jsonl"])
@@ -99,6 +101,7 @@ flowchart TD
   T --> TE(["šablony data/templates/"])
   FA --> Q(["ask.py / eval_large.py — připraveno"])
   TE --> Q
+  GZ --> Q
 </pre>
 
       <p>Teď po krocích. Nejprve vlož text do surových dat (jméno souboru bez diakritiky a mezer se
@@ -123,6 +126,14 @@ flowchart TD
       <p>Řádek <code>indexy: 53 souborů</code> je tvůj důkaz, že přestavba tvůj soubor viděla — číslo
       vzrostlo o jedna oproti předchozím 52. Skript navíc na konci vypíše ukázkový výběr souborů pro
       dvě testovací sady slov (sanity check, že brána dokumentu funguje).</p>
+
+      <p><b>2b — Gazetteer míst (Topos).</b> Z korpusu se vytáhnou zeměpisné entity (GEO z NER) do
+      seznamu míst <code>data/gazetteer.json</code>. Za běhu podle něj expert Topos pozná, že
+      „Svatoňovice" je místo a „rodina" ne — <b>vynecháš-li tenhle krok, otázky „Kde…" ztratí typový
+      filtr</b> a odpovědní role <code>where</code> začne vybírat nesmysly. Potřebuje jen korpus, takže
+      může běžet hned po anotaci (nezávisle na indexech i registru). <code>gazetteer.json</code> je
+      generovaný (není v repu), po přidání dokumentu s místy ho přestav.</p>
+<pre><code>$ python build_gazetteer.py    # → data/gazetteer.json (seznam míst pro Topos)</code></pre>
 
       <p><b>3 — Registr FAKT ↔ OTÁZKA (vrstva ④).</b> Pro každou větu s přísudkem vznikne syntetická
       vazba: predikát, díra podmětu, odpovědní sloty s rolovým klíčem. To je surovina, ze které se

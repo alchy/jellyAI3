@@ -145,6 +145,37 @@
         <tr><td><code>gate_threshold</code></td><td>float</td><td>0.3</td><td>Práh pravděpodobnosti správnosti, pod kterým by brána odpověď zamlčela. Účinný jen při gate_enabled=true.</td><td><code>0.3</code></td></tr>
         <tr><td><code>nonanswer_lemmas</code></td><td>seznam</td><td>množství, řada, spousta, mnoho, hromada, počet</td><td>Kvantifikátory, které nikdy nejsou faktická odpověď — echo-guard je vyhodí z kandidátů.</td><td><code>["množství", "řada", …]</code></td></tr>
         <tr><td><code>interrog_lemmas</code></td><td>seznam</td><td>kdo, co, kde, kam, odkud, kudy, kdy, kolik, kolikátý, jaký, který, čí, proč, jak</td><td>Tázací slova. Jejich NEPŘÍTOMNOST + koncové „?" značí polární (ano/ne) otázku.</td><td><code>["kdo", "co", "kde", …]</code></td></tr>
+        <tr><td colspan="5"><b>config.json → kořenové klíče</b> (globální parametry VZORu a modality)</td></tr>
+        <tr><td><code>lang</code></td><td>string</td><td>cs</td><td>Kód jazyka — vybírá jazyková data (dnes „cs").</td><td><code>"cs"</code></td></tr>
+        <tr><td><code>radius</code></td><td>int</td><td>1</td><td>Poloměr okna VZORu (<code>frame_sig</code>) na dotazové/faktové cestě — kolik slotů kolem pivotu se bere. Čte grammar_vzor a phase1.</td><td><code>1</code></td></tr>
+        <tr><td><code>modality_marks</code></td><td>seznam</td><td>. ? ! :</td><td>Koncová interpunkce, která určuje modalitu věty — PUNCT s tímto tvarem rozhodne fakt vs otázka (<code>sentence_modality</code>).</td><td><code>["?", "."]</code></td></tr>
+        <tr><td><code>punct_keep</code></td><td>seznam</td><td>. ? ! : , ; – -</td><td>Interpunkce, která se ve VZORu drží doslova (nese význam, např. „:" před přímou řečí); zbytek se sloučí na obecné PUNCT.</td><td><code>[":", ","]</code></td></tr>
+        <tr><td><code>lambda</code></td><td>float</td><td>0.55</td><td><b>Rezerva</b> — dnes nečteno žádným modulem (aktivace používá <code>activation.spread_lambda</code>). Pro budoucí mesh.</td><td><code>0.55</code></td></tr>
+        <tr><td><code>mesh_eps</code></td><td>float</td><td>0.05</td><td><b>Rezerva</b> — práh mesh/doc-graf (λ^d), zatím nezapojeno (žádný čtenář).</td><td><code>0.05</code></td></tr>
+        <tr><td colspan="5"><b>config.json → preprocessing</b> (① anotace UDPipe 2 → korpus)</td></tr>
+        <tr><td><code>udpipe2_url</code></td><td>string</td><td>lindat.mff.cuni.cz/…</td><td>URL UDPipe 2 pro anotaci i živé parsování otázky. Výchozí LINDAT cloud; deploy přemapuje na lokální ÚFAL.</td><td><code>"https://lindat…/process"</code></td></tr>
+        <tr><td><code>udpipe2_model</code></td><td>string</td><td>czech-pdtc-ud-2.17-251125</td><td>Pinnutý model kvůli reprodukovatelnosti — jiný model = jiné lemma/deprel = jiné fakty.</td><td><code>"czech-pdtc-ud-2.17-…"</code></td></tr>
+        <tr><td><code>batch_chars</code></td><td>int</td><td>40000</td><td>Velikost dávky znaků na jeden požadavek na UDPipe (řídí počet volání služby).</td><td><code>40000</code></td></tr>
+        <tr><td colspan="5"><b>config.json → services</b> (lokální UDPipe — pomocné/deploy skripty)</td></tr>
+        <tr><td><code>udpipe_url</code></td><td>string</td><td>127.0.0.1:8092/parse</td><td>Lokální UDPipe — čtou jen pomocné skripty (phase1) a nasazení; hlavní cesta jede přes <code>preprocessing.udpipe2_url</code>.</td><td><code>"http://127.0.0.1:8092/parse"</code></td></tr>
+        <tr><td colspan="5"><b>config.json → fill_holes</b> (koreference — zaplnění děr)</td></tr>
+        <tr><td><code>window_sentences</code></td><td>int</td><td>3</td><td>Kolik vět zpět se hledá antecedent díry (zájmena / pro-drop podmětu).</td><td><code>3</code></td></tr>
+        <tr><td><code>candidate_upos</code></td><td>seznam</td><td>NOUN, PROPN</td><td>Slovní druhy, které smějí být antecedentem díry.</td><td><code>["NOUN", "PROPN"]</code></td></tr>
+        <tr><td><code>subject_weight</code></td><td>float</td><td>3.0</td><td>Kolikrát víc váží entita v roli podmětu (podmět je pravděpodobnější antecedent).</td><td><code>3.0</code></td></tr>
+        <tr><td><code>reinforce</code></td><td>float</td><td>2.0</td><td>O kolik se posílí referent po vyřešení díry — drží téma diskurzu přes řetěz zájmen.</td><td><code>2.0</code></td></tr>
+        <tr><td><code>anchor_bonus</code></td><td>float</td><td>2.0</td><td>Bonus protagonisty zavedeného kopulou (kotva identity), aby ho lokálně salientní slovo nepřebilo.</td><td><code>2.0</code></td></tr>
+        <tr><td colspan="5"><b>config.json → synthesis</b> (④ registr + CONFIRMED slovník rolí)</td></tr>
+        <tr><td><code>vzor_radius</code></td><td>int</td><td>2</td><td>Poloměr VZORu při syntéze/determinaci a v <code>curated.json</code> — širší okno než dotazový <code>radius</code>=1.</td><td><code>2</code></td></tr>
+        <tr><td><code>determination_min</code></td><td>int</td><td>3</td><td>Kolikrát musí VZOR→role vyjít shodně, aby se povýšil do CONFIRMED slovníku (<code>determination.json</code>).</td><td><code>3</code></td></tr>
+        <tr><td colspan="5"><b>config.json → template_store</b> (VZOR šablony, sharded per soubor)</td></tr>
+        <tr><td><code>fuzzy_min_overlap</code></td><td>float</td><td>0.5</td><td>Minimální překryv slotů, aby se nepřesná shoda VZORu ještě počítala jako kandidát (pod tím se zahodí).</td><td><code>0.5</code></td></tr>
+        <tr><td colspan="5"><b>config.json → topos</b> (expert MÍSTO — gazetteer)</td></tr>
+        <tr><td><code>gazetteer</code></td><td>cesta</td><td>../../data/gazetteer.json</td><td>Seznam míst (GEO z NER, staví <code>build_gazetteer.py</code>). <code>is_place</code> z něj rozliší místo od ne-místa → správný where-slot (Svatoňovice &gt; rodina).</td><td><code>"…/gazetteer.json"</code></td></tr>
+        <tr><td colspan="5"><b>config.json → paths</b> (cesty k datovým/jazykovým souborům)</td></tr>
+        <tr><td><code>curated</code></td><td>cesta</td><td>curated.json</td><td>Kurátorské opravy rolí (VZOR → opravená role, přebíjí ÚFAL). Verzováno v repu. Viz <a href="dil-6-program.html#curated">Díl VI, programová příloha</a>.</td><td><code>"curated.json"</code></td></tr>
+        <tr><td><code>determination</code></td><td>cesta</td><td>determination.json</td><td>CONFIRMED slovník VZOR→role ze synthesis. Verzováno; přegeneruje <code>synth_determination.py</code>.</td><td><code>"determination.json"</code></td></tr>
+        <tr><td><code>candidates</code></td><td>cesta</td><td>candidates.json</td><td>Kandidáti oprav rolí (nečisté/vzácné VZORy) k ruční revizi — vstup pro kurátora <code>curated.json</code>.</td><td><code>"candidates.json"</code></td></tr>
+        <tr><td><code>annotations</code></td><td>cesta</td><td>../../data/annotations.pkl</td><td>Globální anotační cache (mimo per-soubor shardy korpusu).</td><td><code>"…/annotations.pkl"</code></td></tr>
         <tr><td colspan="5"><b>lang/cs.json</b> (jazyková data — klíče univerzální, hodnoty české)</td></tr>
         <tr><td><code>copula_lemma</code></td><td>string</td><td>být</td><td>Lemma spony. Kopulový vzor („X je Y") staví jmenný přísudek do state-slotu a nese vztah jako hranu.</td><td><code>"být"</code></td></tr>
         <tr><td><code>relation_nouns</code></td><td>seznam</td><td>bratr, sestra, sourozenec, manžel, manželka, žena, muž, otec, matka, syn, dcera, rodič, láska, přítel, přítelkyně</td><td>Příbuzenská/vztahová slova, ze kterých se v kopulovém vzoru stává hrana mezi entitami (vztah = hrana).</td><td><code>["bratr", "otec", …]</code></td></tr>

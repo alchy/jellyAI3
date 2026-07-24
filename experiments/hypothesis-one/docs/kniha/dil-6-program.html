@@ -422,7 +422,58 @@ return table.get(feats.get("Case", ""), table["default"])</code></pre>
       z <code>config.json</code>; tabulky v <code>cs.json</code> řeší tvar odpovědi, ne směrování
       otázky.</p>
 
-      <h2 id="kontrakty">5. Tabulka kontraktů</h2>
+      <h2 id="curated">5. Oprava role přes <code>curated.json</code> — když ÚFAL taguje špatně <span class="mark mark-overeno">Ověřeno</span></h2>
+
+      <p>Rozklad rolí (§3) stojí na <code>deprel</code> z UDPipe. Jenže ÚFAL model občas otaguje
+      závislost <b>nekonzistentně</b> nebo přímo chybně — a fakt pak dostane špatnou roli. Protože jazyk
+      je data, neopravuje se to zásahem do kódu, ale <b>kurátorskou databází výjimek</b>
+      <code>curated.json</code>, která podle VZORu okna přebije standardní roli. Je to hlavní páka, jak
+      opravit špatně vytěženou roli, aniž bys sáhl do <code>role_catalog.py</code>.</p>
+
+      <h3>Formát a princip</h3>
+      <p>Klíč je <b>VZOR okna</b> kolem tokenu (<code>frame_sig</code> s poloměrem r=2, viz
+      <a href="dil-3-program.html#vzor">Díl III, VZOR</a>), hodnota je opravená role plus poznámka proč
+      (reálné záznamy ze souboru):</p>
+<pre><code>{
+  "^·PROPN:Nom·,·PROPN:Nom·,·PROPN:Nom·.": {
+      "role": "who",
+      "note": "výčet vlastních jmen osob = činitelé; ÚFAL část konjunktů značil jako přívlastek"
+  },
+  "^·VERB:Past·PRON:Dat·:·PUNCT·.": {
+      "role": "to_whom",
+      "note": "dativ zájmeno (jim/mi/si) před přímou řečí = adresát; ÚFAL značil jako předmět"
+  }
+}</code></pre>
+      <p>Klíč je tedy <b>gramatický kontext</b> (posloupnost slotů), ne konkrétní slovo — jedna oprava
+      pokryje všechny věty se stejným tvarem okna. Pole <code>note</code> je jen dokumentace záměru,
+      program ho ignoruje (čte se jen <code>role</code>).</p>
+
+      <h3>Jak to program čte a přebíjí</h3>
+      <p><code>RoleCatalog</code> načte <code>curated.json</code> při konstrukci
+      (<code>role_catalog.py:47</code>, cesta z <code>config.json → paths.curated</code>) do mapy
+      <code>{VZOR: role}</code>. Při přiřazování role každému tokenu se nejdřív spočítá VZOR jeho okna;
+      <b>když sedí na kurátorský klíč, vezme se opravená role a standardní odvození se přeskočí</b>:</p>
+      <div class="sig">RoleCatalog — rozkladová smyčka (role_catalog.py ~139)</div>
+<pre><code>vz = self.g.frame_sig(sent, i, mod, r)         # VZOR okna kolem tokenu (r=2)
+if vz in self._curated:
+    out.append((t, self._curated[vz], True))   # OPRAVENÁ role přebíjí standard_role
+else:
+    ...                                         # standard_role: deprel → role</code></pre>
+      <p>Poslední <code>True</code> ve trojici říká „tuhle roli určil kurátor" — odliší opravenou roli
+      od odvozené. <code>curated.json</code> je <b>verzovaný v repu</b> (na rozdíl od generovaných dat),
+      takže oprava se veze s kódem a nepřestavuje se reindexem.</p>
+
+      <h3>Kdy po něm sáhnout — a co nefunguje</h3>
+      <p>Použij ho, když <b>tentýž tvar věty</b> systém opakovaně taguje špatně a projeví se to jako
+      chybná role ve faktu (třeba adresát přímé řeči hlášený jako předmět). Postup: zjisti VZOR okna
+      (<code>frame_sig</code> nad tou větou), přidej ho jako klíč s opravenou rolí a poznámkou.</p>
+      <p><b>Co nefunguje:</b> psát klíč „od oka" — musí to být <i>přesná</i> signatura, jakou vrací
+      <code>frame_sig</code> (stejný poloměr, stejné sloty), jinak se nikdy netrefí a oprava <b>tiše
+      nezabere</b>. A pozor na míru: moc úzký VZOR opraví jednu větu, ale ne její varianty; moc široký
+      může přebít i věty, kde ÚFAL taguje správně. Proto je <code>curated.json</code> záměrně malý
+      (dnes 4 záznamy) — je to skalpel na doložené chyby, ne plošné přepisování rolí.</p>
+
+      <h2 id="kontrakty">6. Tabulka kontraktů</h2>
 
       <p>Souhrn funkcí, které data z <code>cs.json</code> (a přilehlé přestavby) spotřebovávají —
       signatura, co čtou, co vrací, vedlejší efekt. Značka důvěry: <span class="mark mark-overeno">Ověřeno</span>
