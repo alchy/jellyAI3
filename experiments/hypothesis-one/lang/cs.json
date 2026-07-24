@@ -231,6 +231,32 @@
   "hedge_root_predicates": [
     "moci"
   ],
+  "relation_nouns": [
+    "bratr",
+    "sestra",
+    "sourozenec",
+    "manžel",
+    "manželka",
+    "žena",
+    "muž",
+    "otec",
+    "matka",
+    "syn",
+    "dcera",
+    "rodič",
+    "láska",
+    "přítel",
+    "přítelkyně"
+  ],
+  "symmetric_relations": [
+    "bratr",
+    "sestra",
+    "sourozenec",
+    "manžel",
+    "manželka",
+    "přítel",
+    "přítelkyně"
+  ],
   "interrogative_slots": {
     "who": "PRON:Nom",
     "what_subject": "PRON:Nom",

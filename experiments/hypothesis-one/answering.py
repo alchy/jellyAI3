@@ -133,6 +133,24 @@ class Answering:
             return self.g.LANG.get("copula_lemma", "být")
         return None
 
+    def _relation_query(self, toks):
+        """„Kdo byl bratr X?" — kopulový root je VZTAHOVÉ slovo (bratr/otec/manžel…) s genitivní
+        entitou → ptáme se na OSOBU vztahu (fakt-hrana z extract_relations). Vrací vztah-lemma
+        (predikát pro fakt-match) nebo None. Vztahová slova = jazyková data."""
+        reln = set(self.g.LANG.get("relation_nouns", []))
+        if not reln or not any(t.get("deprel") == "cop" for t in toks):
+            return None
+        root_id = next((i + 1 for i, t in enumerate(toks) if t.get("head") == 0), None)
+        root = toks[root_id - 1] if root_id else None
+        if root is None or root["upos"] != "NOUN":
+            return None
+        rel = self.g.canon_lemma(root).lower()
+        if rel not in reln:
+            return None
+        has_gen = any(t.get("head") == root_id and (t.get("feats") or {}).get("Case") == "Gen"
+                      for t in toks)
+        return rel if has_gen else None
+
     def _candidates(self, q_vzor, predicate, hole_role, known):
         """Sesbírá kandidáty DVĚMA cestami do jednotného tvaru {answer, role, doc, mq, kind}.
 
@@ -413,6 +431,9 @@ class Answering:
         if hole_override is not None:                           # router / oracle vnutí roli
             hole_role = hole_override
         predicate = self._predicate(toks)
+        rel = self._relation_query(toks)                        # „Kdo byl bratr X?" → vztah-fakt
+        if rel is not None:
+            predicate, hole_role = rel, "who"
         if q_vzor is None and hole_role is None:            # bez tázacího slova → možná POLÁRNÍ
             pol = self._polar(toks)
             if pol is not None:

@@ -16,6 +16,7 @@ import pickle
 from fact_store import FactStore, Fact
 from fill_holes import FillHoles
 from extract_bio import bio_facts
+from extract_relations import relation_facts
 from chronos import Chronos
 from logger import logger
 
@@ -55,7 +56,9 @@ def main():
     ch = Chronos()
     subjects = {}                                   # (doc, sent, predikát) -> (podmět, conf)
     bio = []                                        # [Fact] z biografických závorek
+    rels = []                                       # [Fact] vztahů (bratr/manžel/otec…) jako hrany
     temporal = []                                   # (doc, sent, predikát, rok) z běžného textu
+    from collections import Counter
     for doc in sorted({d for (d, _s, _p) in agg}):
         try:
             sents = _load_sentences(doc)
@@ -66,9 +69,19 @@ def main():
         if sents:                                   # JEN úvodní věta = definice narození/úmrtí
             for pred, roles in bio_facts(sents[0], fh.g):
                 bio.append(Fact(pred, roles, doc, 0))
-        for si, s in enumerate(sents):              # Chronos: rok → when-slot hlavního predikátu
+        prot = Counter()                            # protagonista = nejčastější podmět-osoba (holder)
+        for s in sents:
+            for t in s:
+                fe = t.get("feats") or {}
+                if t.get("deprel") in ("nsubj", "nsubj:pass") and t["upos"] == "PROPN" \
+                        and fe.get("NameType") in ("Giv", "Sur"):
+                    prot[fh.g.canon_lemma(t)] += 1
+        holder = prot.most_common(1)[0][0] if prot else None
+        for si, s in enumerate(sents):              # Chronos: rok → when; + vztahové hrany
             for pred, year in ch.temporal_facts(s, fh.g):
                 temporal.append((doc, si, pred, year))
+            for pred, roles in relation_facts(s, fh.g, holder):
+                rels.append(Fact(pred, roles, doc, si))
     for (doc, si, pred, year) in temporal:          # doplň when do existujícího faktu (nebo založ)
         e = agg.setdefault((doc, si, pred), {"roles": {}, "subj_hole": False})
         b = e["roles"].setdefault("when", [])
@@ -91,12 +104,13 @@ def main():
             continue
         store.append(Fact(predicate, roles, doc, sent))
         docs.add(doc)
-    for f in bio:                                   # biografické fakty ze závorek
+    for f in bio + rels:                            # biografické závorky + vztahové hrany
         store.append(f)
         docs.add(f.doc)
-    logger("i", f"fakty: {len(agg)}+{len(bio)} bio nad {len(docs)} soubory ({lines} bindings); "
-                f"koreferencí doplněno who: {enriched}")
-    print(f"faktů: {len(agg)}  bio-závorka: {len(bio)}  soubory: {len(docs)}  koref-who: {enriched}")
+    logger("i", f"fakty: {len(agg)}+{len(bio)} bio +{len(rels)} vztahy nad {len(docs)} soubory "
+                f"({lines} bindings); koreferencí doplněno who: {enriched}")
+    print(f"faktů: {len(agg)}  bio: {len(bio)}  vztahy: {len(rels)}  soubory: {len(docs)}  "
+          f"koref-who: {enriched}")
 
 
 if __name__ == "__main__":
