@@ -16,15 +16,28 @@
     <p class="tag">knižní dokumentace</p>
     <nav aria-label="Obsah knihy">
       <a href="index.html">Úvod</a>
-      <p class="part">Díl I — Než začneme</p><a href="dil-1.html">I · Co řeší, slovník, mapa</a>
-      <p class="part">Díl II — První kroky</p><a href="dil-2.html">II · Instalace, běh, data</a>
-      <p class="part">Díl III — Cesta dat</p><a href="dil-3.html">III · Fáze pipeline</a>
-      <p class="part">Díl IV — Jak to funguje</p><a href="dil-4.html" class="active">IV · Automat, aktivace, fakty</a>
-      <p class="part">Díl V — Testování</p><a href="dil-5.html">V · Testy, tvary, měření</a>
-      <p class="part">Díl VI — Rozšiřování</p><a href="dil-6.html">VI · Data, vztahy, testy</a>
-      <p class="part">Díl VII — Provoz</p><a href="dil-7.html">VII · UDPipe, viz, pasti</a>
-      <p class="part">Díl VIII — Otevřené body</p><a href="dil-8.html">VIII · Nedodělky a cesty</a>
-      <p class="part">Přílohy</p><a href="prilohy.html">Rejstřík, konfigurace, registry</a>
+      <p class="part">Díl I — Než začneme</p>
+      <a href="dil-1.html">I · Co řeší, slovník, mapa</a>
+      <p class="part">Díl II — První kroky</p>
+      <a href="dil-2.html">II · Instalace, běh, data</a>
+      <p class="part">Díl III — Cesta dat</p>
+      <a href="dil-3.html">III · Fáze pipeline</a>
+      <a href="dil-3-program.html" class="sub-prog">III · programová příloha</a>
+      <p class="part">Díl IV — Jak to funguje</p>
+      <a href="dil-4.html" class="active">IV · Automat, aktivace, fakty</a>
+      <a href="dil-4-program.html" class="sub-prog">IV · programová příloha</a>
+      <p class="part">Díl V — Testování</p>
+      <a href="dil-5.html">V · Testy, tvary, měření</a>
+      <p class="part">Díl VI — Rozšiřování</p>
+      <a href="dil-6.html">VI · Data, vztahy, testy</a>
+      <a href="dil-6-program.html" class="sub-prog">VI · programová příloha</a>
+      <p class="part">Díl VII — Provoz</p>
+      <a href="dil-7.html">VII · UDPipe, viz, pasti</a>
+      <a href="dil-7-program.html" class="sub-prog">VII · programová příloha</a>
+      <p class="part">Díl VIII — Otevřené body</p>
+      <a href="dil-8.html">VIII · Nedodělky a cesty</a>
+      <p class="part">Přílohy</p>
+      <a href="prilohy.html">Rejstřík, konfigurace, registry</a>
     </nav>
   </aside>
 
@@ -36,6 +49,7 @@
       <nav class="crumbs"><a href="index.html">Úvod</a> › Díl IV</nav>
       <p class="eyebrow">Díl IV — Jak to uvnitř funguje</p>
       <h1>Jak to uvnitř funguje</h1>
+      <p class="prog-callout">Pro vývojáře: <a href="dil-4-program.html">programová příloha — kontrakty funkcí a reálné ukázky nad kódem →</a></p>
 
       <p class="lead">Kde jsme a kam jdeme: v Dílu III jsme sledovali, jak se ze surového textu
       stane mapa faktů uložená na disku. Teď otevřeme motor. Uvidíš, co se přesně stane, když
@@ -532,6 +546,16 @@ classDiagram
         </dl>
       </aside>
 
+      <aside class="correct-way">
+        <span class="lbl">Correct way — cílový stav</span>
+        <p>Hranice mezi „odpověz" a „nehádej" je spolehlivá a naučená z dat: sebevědomě špatných
+        odpovědí je řádově méně než dnešních <b>30</b>, aniž by systém potlačil jedinou odpověď,
+        kterou umí správně. Míra jistoty sama rozliší glow-správně (Švejk → Hašek) od sebevědomě
+        špatně (bratr → Eliáš), bez ručního ladění odstupu — a bez propasti mezi křížovou validací
+        a živým během (dnes −2 vs −19). Naučená brána tak není mrtvý kód čekající na data, ale živá
+        součást, která na reálném korpusu potlačí právě ty špatné odpovědi a nic víc.</p>
+      </aside>
+
       <h3>Co nefunguje a proč</h3>
       <p>Svůdný první krok je uvěřit číslu z křížové validace a bránu <b>nasadit</b> („68,8&nbsp;%, LOO
       říká −13/−3, jdeme do toho"). Selže to potichu na živém korpusu: pevné váhy potlačí −19 odpovědí,
@@ -627,6 +651,16 @@ classDiagram
       podmět zapíše do faktu (viz výše), chyba se <b>tiše přenese</b> dál: fakt dostane špatný
       who-slot a otázka na něj vrátí špatnou odpověď, aniž by cokoli spadlo. Proto se antecedent
       neváže na blízkost, ale na <b>aktivaci</b> (téma diskurzu) a kotvu identity.</p>
+
+      <aside class="correct-way">
+        <span class="lbl">Correct way — cílový stav</span>
+        <p>Každý vypuštěný podmět i zájmeno se rozřeší na <b>skutečné téma diskurzu</b>, ne na
+        nejbližší jméno — v Janově prologu tedy „Přišel" dostane „Slovo", ne „svět". Protože se
+        vyřešený podmět zapisuje do faktu, nese fakt vždy <b>správný</b> who-slot (nebo raději žádný
+        než tichý omyl), takže se koreferenční chyba nikdy nepřenese dál do odpovědi. „Kde se narodil
+        Čapek?" tak najde svůj fakt i tam, kde původní věta jméno vůbec neobsahuje, protože doplněný
+        podmět je spolehlivě ten pravý.</p>
+      </aside>
 
       <!-- ============================================================ -->
       <h2>Co už umíš</h2>

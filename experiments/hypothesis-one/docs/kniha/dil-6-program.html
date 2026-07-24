@@ -1,0 +1,520 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Díl VI — programová příloha — hypothesis-one</title>
+<link rel="stylesheet" href="assets/style.css">
+<script defer src="assets/mermaid.min.js"></script>
+<script defer src="assets/script.js"></script>
+</head>
+<body>
+<div class="layout">
+
+  <aside class="sidebar">
+    <p class="brand"><a href="index.html">hypothesis-one</a></p>
+    <p class="tag">knižní dokumentace</p>
+    <nav aria-label="Obsah knihy">
+      <a href="index.html">Úvod</a>
+      <p class="part">Díl I — Než začneme</p>
+      <a href="dil-1.html">I · Co řeší, slovník, mapa</a>
+      <p class="part">Díl II — První kroky</p>
+      <a href="dil-2.html">II · Instalace, běh, data</a>
+      <p class="part">Díl III — Cesta dat</p>
+      <a href="dil-3.html">III · Fáze pipeline</a>
+      <a href="dil-3-program.html" class="sub-prog">III · programová příloha</a>
+      <p class="part">Díl IV — Jak to funguje</p>
+      <a href="dil-4.html">IV · Automat, aktivace, fakty</a>
+      <a href="dil-4-program.html" class="sub-prog">IV · programová příloha</a>
+      <p class="part">Díl V — Testování</p>
+      <a href="dil-5.html">V · Testy, tvary, měření</a>
+      <p class="part">Díl VI — Rozšiřování</p>
+      <a href="dil-6.html">VI · Data, vztahy, testy</a>
+      <a href="dil-6-program.html" class="sub-prog active">VI · programová příloha</a>
+      <p class="part">Díl VII — Provoz</p>
+      <a href="dil-7.html">VII · UDPipe, viz, pasti</a>
+      <a href="dil-7-program.html" class="sub-prog">VII · programová příloha</a>
+      <p class="part">Díl VIII — Otevřené body</p>
+      <a href="dil-8.html">VIII · Nedodělky a cesty</a>
+      <p class="part">Přílohy</p>
+      <a href="prilohy.html">Rejstřík, konfigurace, registry</a>
+    </nav>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <button class="iconbtn" id="theme-toggle" type="button" aria-label="Přepnout světlý/tmavý režim">◐ režim</button>
+    </div>
+    <div class="content">
+      <nav class="crumbs"><a href="index.html">Úvod</a> › <a href="dil-6.html">Díl VI</a> › programová příloha</nav>
+      <p class="eyebrow">Díl VI — programová příloha</p>
+      <h1>Programová příloha: jazyk jako data — <code>lang/cs.json</code></h1>
+
+      <p class="lead">Narativní Díl VI ti ukázal, <i>že</i> se systém rozšiřuje editací JSONu. Tahle
+      příloha je pro vývojáře, který chce vědět <i>proč to funguje</i> a <i>kde přesně v kódu</i> se
+      každý řádek <code>cs.json</code> čte. Projdeme soubor klíč po klíči — u každé skupiny
+      <b>co</b> v ní je (reálná hodnota), <b>proč</b> tam je (jaké rozhodnutí řídí) a <b>kde</b> ji
+      program čte (soubor a funkce, ověřeno grepem). Pak si ukážeme kontrakty funkcí, které data
+      spotřebovávají, a workflow rozšíření — se selháními, na která nováček narazí.</p>
+
+      <p>Předpoklad čtenáře: umíš Python a JSON, o lingvistice ani o tomhle projektu nevíš nic. Pojmy
+      jako <i>lemma</i> (základní tvar slova), <i>deprel</i> (typ závislosti mezi slovy z rozboru
+      věty), <i>role</i> (větný člen — kdo, kde, kdy) vysvětlím při prvním výskytu; hlouběji je najdeš
+      v <a href="dil-1.html#slovnik">slovníku Dílu I</a>.</p>
+
+      <h2 id="uvod">1. Princip: jazyk je JSON, kód zná jen univerzální klíče</h2>
+
+      <p><b>Problém.</b> Systém pracuje s češtinou — vztahová slova (<i>bratr</i>, <i>otec</i>),
+      tázací slova (<i>kdo</i>, <i>kde</i>), předložky, spony. Kdyby tahle slova ležela natvrdo
+      v Pythonu, byla by přimíchaná do rozhodovací logiky: každé rozšíření o slovo by byl zásah do
+      kódu a jiný jazyk (španělština) by znamenal duplikát celého programu.</p>
+
+      <p><b>Intuice.</b> Odděl <i>co je univerzální</i> od <i>co je české</i>. Univerzální je struktura
+      věty — role (podmět, příslovečné určení místa), pády, typy závislostí; ty jsou z anotace UDPipe
+      stejné napříč jazyky a žijí v kódu jako klíče. České je jen <i>naplnění</i> — která konkrétní
+      slova jsou vztahová, jak se který pád jmenuje. To všechno je <i>datový soubor</i>.</p>
+
+      <p><b>Přesně.</b> Veškerá jazykově specifická data jsou v jediném souboru
+      <code>lang/cs.json</code>. Cesta k němu není v kódu natvrdo — bere se z
+      <code>config.json</code>, klíč <code>paths.lang</code> (hodnota <code>"lang/cs.json"</code>).
+      Jádro systému, třída <code>GrammarVzor</code>, ho při vzniku načte celý do atributu
+      <code>self.LANG</code> (obyčejný Python <code>dict</code>) a všechny ostatní vrstvy — rozklad
+      rolí, extrakce vztahů, syntéza otázek — sahají pro jazyková data právě do něj. Přidat jazyk =
+      přidat soubor <code>es.json</code> a přesměrovat <code>config.json</code>; ani řádek
+      <code>.py</code> se nemění.</p>
+
+      <div class="sig">GrammarVzor.__init__(config_path=CONFIG_PATH) → GrammarVzor</div>
+      <p class="io"><b>vstup</b> cesta k <code>config.json</code> · <b>výstup</b> instance s načtenými
+      parametry VZORu a jazykovými daty · <b>efekt</b> přečte dva JSON soubory z disku
+      (<code>config.json</code> a <code>paths.lang</code>), nic nezapisuje · <b>klíč</b>
+      <code>self.LANG</code> = celý obsah <code>cs.json</code> jako dict
+      <span class="mark mark-prevzato">Převzato</span></p>
+
+      <p>V kódu (<code>grammar_vzor.py:40</code>) je to jeden řádek:
+      <code>self.LANG = json.load(open(os.path.join(HERE, cfg["paths"]["lang"])))</code>. Od té chvíle
+      je <code>self.LANG</code> jediný zdroj jazyka. Živý běh dotazu si <code>GrammarVzor</code> vytvoří
+      v <code>answering.py:40</code> (<code>self.g = GrammarVzor(config_path)</code>) a předá ho dál do
+      rozkladu rolí (<code>self.rc = RoleCatalog(self.g)</code>) — takže <b>všechny vrstvy sdílejí
+      jednu a tutéž instanci jazykových dat</b>. Jeden soubor, mnoho čtenářů.</p>
+
+      <h2 id="anatomie">2. Anatomie <code>cs.json</code> — co, proč, kde se čte</h2>
+
+      <p>Následující tabulka je jádro téhle přílohy. Každý řádek je jeden klíč souboru: reálná ukázka
+      jeho hodnoty, rozhodnutí, které řídí, a místo v kódu, kde se čte (ověřeno grepem v této session
+      — sloupec „kde čteno“ ukazuje skutečný <code>soubor:řádek</code>). Velikosti v závorkách jsou
+      počty položek dnes.</p>
+
+      <div class="tablewrap">
+      <table>
+        <tr><th>Klíč (velikost)</th><th>Co v něm je (ukázka)</th><th>Proč — jaké rozhodnutí řídí</th><th>Kde se čte</th></tr>
+
+        <tr>
+          <td><code>copula_lemma</code> (1)</td>
+          <td><code>"být"</code></td>
+          <td>Lemma spony. Kdo/co je jmenný přísudek („byl <b>králem</b>“) a co je predikát faktů se sponou. Pozná kopulovou otázku „Kdo je X?“.</td>
+          <td><code>answering.py:113,133</code> · <code>role_catalog.py:176</code> · <code>synth_registry.py:86</code></td>
+        </tr>
+        <tr>
+          <td><code>vowels</code> (skalár)</td>
+          <td><code>"aeiouyáéíóúůýěäö"</code></td>
+          <td>Samohlásky pro epentezi (vsuvné <i>-e-</i>) při kanonizaci: <i>Čapk</i> → <i>Čapek</i>. Aby přivlastňovací tvar dostal správný základ jména.</td>
+          <td><code>grammar_vzor.py:41</code> → <code>_epen_stem</code></td>
+        </tr>
+        <tr>
+          <td><code>possessive_adj_suffixes</code> (3)</td>
+          <td><code>["ův","ový","in"]</code></td>
+          <td>Přípony přivlastňovacích přídavných jmen. <i>Čapkův</i> → <i>Čapek</i>, <i>Karlova</i> → <i>Karel</i> — aby „bratr Karlův“ mířil na entitu Karel, ne na přídavné jméno.</td>
+          <td><code>grammar_vzor.py:104</code> → <code>canon_lemma</code></td>
+        </tr>
+        <tr>
+          <td><code>deprel_to_role</code> (6)</td>
+          <td><code>nsubj:{anim:who, inanim:what_subject}</code>, <code>obl:{Loc:where, Ins:with_whom_what, Dat:to_whom, …}</code></td>
+          <td><b>Jádro.</b> Mapa surová závislost UDPipe + pád → náš rolový klíč. Tady se z <code>obl+Loc</code> stane <code>where</code>, z živého <code>nsubj</code> podmět-osoba <code>who</code>.</td>
+          <td><code>grammar_vzor.py:134</code> → <code>role_key</code></td>
+        </tr>
+        <tr>
+          <td><code>role_prepositions</code> (4)</td>
+          <td><code>where:[v,na,u,k,z,do,…]</code>, <code>with_whom_what:[s,se]</code>, <code>about_whom_what:[o]</code></td>
+          <td>Předložka může <b>přebít</b> pádovou roli: „<i>o</i> kom“ → <code>about_whom_what</code>, „<i>s</i> kým“ → <code>with_whom_what</code>. Řeší nejednoznačné pády.</td>
+          <td><code>grammar_vzor.py:131</code> → <code>role_key</code></td>
+        </tr>
+        <tr>
+          <td><code>relative_place_adverbs</code> (4)</td>
+          <td><code>["kde","kam","odkud","kudy"]</code></td>
+          <td>Příslovce místa (deprel <code>advmod</code>) → role <code>where</code>. Bez seznamu by „kde“ zůstalo neurčeným způsobovým příslovcem.</td>
+          <td><code>role_catalog.py:43,84</code> → <code>role_of</code></td>
+        </tr>
+        <tr>
+          <td><code>relative_time_adverbs</code> (3)</td>
+          <td><code>["kdy","dokdy","odkdy"]</code></td>
+          <td>Příslovce času → role <code>when</code>. Analogicky pro časovou osu.</td>
+          <td><code>role_catalog.py:44,85</code> → <code>role_of</code></td>
+        </tr>
+        <tr>
+          <td><code>participle_passive_suffixes</code> (10)</td>
+          <td><code>["n","na","no","t","ta","to",…]</code></td>
+          <td>Koncovky trpného příčestí (<i>zvolen</i>, <i>přijat</i>). Rozliší trpné (<code>passive_participle</code>) od činného. Nese pasivní pohled na děj („byla napsána“).</td>
+          <td><code>role_catalog.py:45,66</code> → <code>_participle_key</code></td>
+        </tr>
+        <tr>
+          <td><code>deprel_structural</code> (12)</td>
+          <td><code>case:preposition</code>, <code>cop:copula</code>, <code>punct:punctuation</code>, <code>flat:name_part</code>, <code>mark:subordinator</code></td>
+          <td>Strukturální závislosti → strukturální klíče. Tohle je „lepidlo, ne obsah“ — předložka/spojka/interpunkce dostane vlastní klíč, aby nepletla obsahové role.</td>
+          <td><code>role_catalog.py:110</code> → <code>standard_role</code></td>
+        </tr>
+        <tr>
+          <td><code>structural_roles</code> (8)</td>
+          <td><code>preposition:"Předložka — nese pád…"</code>, <code>copula:"Spona (být)…"</code></td>
+          <td>Množina + popis strukturálních klíčů. Syntéza podle ní pozná, co je lepidlo a nemá z toho tvořit odpověď.</td>
+          <td><code>synth_determination.py:41</code> → <code>self.STRUCT</code></td>
+        </tr>
+        <tr>
+          <td><code>uncertainty_markers</code> (12)</td>
+          <td><code>["možná","snad","asi","prý","údajně","nejspíš",…]</code></td>
+          <td><b>Faktualitní brána.</b> Věta s markerem nejistoty NENÍ fakt — nesmí se z ní tvořit tvrzení. „Možná zemřel“ se zanotuje, ale fakt nedá.</td>
+          <td><code>grammar_vzor.py:42,160</code> → <code>is_factual</code></td>
+        </tr>
+        <tr>
+          <td><code>hedge_root_predicates</code> (1)</td>
+          <td><code>["moci"]</code></td>
+          <td>Modální kořen „<i>může</i> to být“ = hypotéza, ne fakt. Součást téže brány jako nejistota.</td>
+          <td><code>grammar_vzor.py:43,165</code> → <code>is_factual</code></td>
+        </tr>
+        <tr>
+          <td><code>relation_nouns</code> (15)</td>
+          <td><code>["bratr","sestra","otec","matka","manžel","syn","dcera",…]</code></td>
+          <td><b>Která kopulová slova jsou vztah</b> = hrana mezi dvěma osobami. Z „byl bratrem Josefa“ vznikne hrana <code>bratr(Karel, Josef)</code>, ne jen ztracený stav.</td>
+          <td><code>extract_relations.py:16</code> · <code>answering.py:140</code></td>
+        </tr>
+        <tr>
+          <td><code>symmetric_relations</code> (7)</td>
+          <td><code>["bratr","sestra","manžel","přítel",…]</code></td>
+          <td>Které vztahy vedou <b>oběma směry</b>. Když je A bratr B, je i B bratr A → hrana se založí obousměrně, aby „bratr Karla“ i „bratr Josefa“ fungovaly.</td>
+          <td><code>extract_relations.py:17</code> → <code>relation_facts</code></td>
+        </tr>
+        <tr>
+          <td><code>role_ask</code> (21)</td>
+          <td><code>who:"Kdo"</code>, <code>where:"Kde"</code>, <code>with_whom_what:"S kým/Čím"</code></td>
+          <td>Lidský štítek tázacího slova pro každou roli. Při syntéze otázky z faktu určí, jak se na díru zeptat.</td>
+          <td><code>synth_registry.py:107</code></td>
+        </tr>
+        <tr>
+          <td><code>interrogative_slots</code> (14)</td>
+          <td><code>who:"PRON:Nom"</code>, <code>where:"ADV"</code>, <code>which_attribute:"DET:Nom"</code></td>
+          <td>Jaký <b>tvar</b> (SLOT) má tázací slovo pro danou roli. Umožní transpozici: fakt-VZOR → dotaz-VZOR nahrazením odpovědního slotu tázacím.</td>
+          <td><code>synth_queries.py:115</code> → <code>_deterministic_vzor</code></td>
+        </tr>
+        <tr>
+          <td><code>role_catalog</code> (21)</td>
+          <td><code>who:"Podmět (činitel děje…)"</code></td>
+          <td>Lidsky čitelný popis <b>každé</b> role (dokumentace + nástroje). Referenční slovník klíčů; živý výběr odpovědi ho nepotřebuje.</td>
+          <td>ref. v pomocné/paralelní linii <code>roles.py:25</code> <span class="todo">OVĚŘIT: v živé answering cestě není čten</span></td>
+        </tr>
+        <tr>
+          <td><code>stopwords</code> (9)</td>
+          <td><code>["kdo","co","být","který","kde","kdy","jak","proč",…]</code></td>
+          <td>Tázací a funkční slova vyříznutá z dotazových lemmat (nesvítí graf). Používají generátory variant a srovnávací nástroje.</td>
+          <td>nástroje <code>sim_ask.py:24</code>, <code>gen_variants.py:28</code> <span class="todo">OVĚŘIT: živá answering cesta filtruje přes <code>config.json</code> interrog_lemmas</span></td>
+        </tr>
+        <tr>
+          <td><code>clause_markers</code> (4)</td>
+          <td><code>for_what_purpose:[aby,…]</code>, <code>on_what_condition:[kdyby,pokud,-li]</code>, <code>why:[protože,…]</code></td>
+          <td>Podřadicí spojka → příslovečná role vedlejší věty. <span class="mark mark-navrh">Návrh</span> Dnes připraveno v datech, rozhodovací logika ho zatím plně nekonzumuje (rezerva pro klauzulové role).</td>
+          <td>načteno jen jako konstanta <span class="todo">OVĚŘIT: bez aktivního čtenáře v rozkladu rolí</span></td>
+        </tr>
+        <tr>
+          <td><code>participle_active_suffixes</code> (5)</td>
+          <td><code>["l","la","lo","li","ly"]</code></td>
+          <td>Koncovky činného příčestí (<i>narodil</i>, <i>odešli</i>). <span class="mark mark-navrh">Návrh</span> Dnes se činné příčestí určuje jako opak trpného (else-větev), takže tento seznam žádný čtenář nemá.</td>
+          <td>bez čtenáře <span class="todo">OVĚŘIT: grep 0 výskytů čtení; rezervní data</span></td>
+        </tr>
+      </table>
+      </div>
+
+      <p>Dva poslední řádky jsou upřímný nález: <code>participle_active_suffixes</code> a
+      <code>clause_markers</code> v souboru jsou, ale živý kód je (zatím) nečte — první proto, že se
+      činné příčestí odvozuje jako „není trpné“, druhý jako rezerva pro budoucí klauzulové role. Necháváme
+      je tam jako <b>dokumentaci záměru</b>; kdo je bude chtít zapojit, ví, kde data leží. Pravidlo
+      poctivosti: přítomnost klíče v datech neznamená, že ho někdo čte — proto sloupec „kde čteno“.</p>
+
+      <aside class="correct-way">
+        <span class="lbl">Correct way — cílový stav</span>
+        <p>Systém rozumí i příslovečným rolím vedlejších vět — z „aby“ vytěží účel, z „kdyby/pokud“
+        podmínku, z „protože“ příčinu — a účelová klauzule zdědí místo z řídící věty. Klíč
+        <code>clause_markers</code> tak má svého živého čtenáře v rozkladu rolí a otázky mířící na tyto
+        role dostanou odpověď. (Nečtený seznam koncovek činného příčestí je jiný případ — činné
+        příčestí systém určuje správně už dnes, takže tam žádný cílový stav nechybí.)</p>
+      </aside>
+
+      <h2 id="jak-cte">3. Jak to program čte: <code>self.LANG</code> → <code>role_key</code> → rozklad rolí</h2>
+
+      <p>Teď si projdeme <i>tok</i> — od jediného souboru k jednotlivým čtenářům. Nejdřív si ho
+      prohlédni jako celek. Na diagramu je vlevo zdroj (<code>cs.json</code>), uprostřed loader, který
+      ho drží (<code>GrammarVzor.self.LANG</code>), a vpravo funkce, které z něj berou konkrétní klíče.
+      Šipka nese <i>jméno klíče</i>, který si daný čtenář vyzvedne.</p>
+
+      <p class="full">Diagram čti zleva doprava. Všimni si, že do jádra <code>role_key</code> vede
+      <b>víc</b> klíčů (mapa i předložky) a že vztahová extrakce a syntéza otázek čtou týž
+      <code>self.LANG</code> — nikdo si data nedrží zvlášť.</p>
+
+<pre class="mermaid">
+flowchart LR
+  accTitle: Kdo v programu čte který klíč z cs.json
+  accDescr: cs.json je jediný zdroj; GrammarVzor ho drží v self.LANG a jednotlivé funkce si z něj berou konkrétní klíče pro rozklad rolí, kanonizaci, faktualitní bránu, extrakci vztahů a syntézu otázek.
+  JSON["lang/cs.json (jediný zdroj)"] --> LANG["GrammarVzor.self.LANG"]
+  LANG -->|"deprel_to_role, role_prepositions"| RK["role_key()"]
+  LANG -->|"possessive_adj_suffixes, vowels"| CL["canon_lemma()"]
+  LANG -->|"uncertainty_markers, hedge_root_predicates"| IF["is_factual()"]
+  RK --> RO["RoleCatalog.role_of()"]
+  LANG -->|"relative_place/time_adverbs, deprel_structural"| RO
+  LANG -->|"relation_nouns, symmetric_relations"| ER["extract_relations.relation_facts()"]
+  LANG -->|"role_ask, interrogative_slots"| SY["synth_registry / synth_queries"]
+</pre>
+
+      <p>Slovní popis: <code>role_key</code> je JEDINÉ místo, kde se surová anotace mění na náš klíč,
+      a čte dva klíče — pádovou mapu i předložky. <code>role_of</code> (rozklad jednoho tokenu) staví
+      na <code>role_key</code> a přidává příslovce a strukturální lepidlo. <code>canon_lemma</code>
+      a <code>is_factual</code> jsou nezávislé brány. A extrakce vztahů i syntéza jsou samostatní
+      čtenáři téhož <code>self.LANG</code>.</p>
+
+      <h3>Kontrakt jádra — <code>role_key</code></h3>
+      <div class="sig">role_key(deprel, upos, feats, prep="", nominal_pred=False) → role | None</div>
+      <p class="io"><b>vstup</b> surový deprel z UDPipe (<code>"obl"</code>), slovní druh, rysy (dict
+      s pádem/životností), volitelně předložka a příznak jmenného přísudku · <b>výstup</b> náš rolový
+      klíč (<code>"where"</code>) nebo <code>None</code>, když deprel nemapujeme · <b>efekt</b> žádný
+      (čistá funkce), jen čtení <code>self.LANG</code> · <b>čte</b> <code>deprel_to_role</code>,
+      <code>role_prepositions</code> <span class="mark mark-prevzato">Převzato</span></p>
+
+      <p>Reálná ukázka z docstringu (a přesně to, co vrátí běh):
+      <code>role_key("obl", "NOUN", {"Case":"Loc"})</code> → <code>"where"</code>. Logika je krátká
+      a stojí za rozbor, protože je to celá esence „jazyk jako data“:</p>
+<pre><code>if nominal_pred:                    # jmenný přísudek se sponou → stav
+    return "state"
+if prep:                            # předložka může roli přebít
+    for key, preps in self.LANG["role_prepositions"].items():
+        if prep in preps:
+            return key
+table = self.LANG["deprel_to_role"].get(deprel)
+if not table:
+    return None
+if "anim" in table:                 # subjekt rozlišuje životnost
+    anim = feats.get("Animacy") == "Anim" or bool(feats.get("NameType")) or upos == "PROPN"
+    return table["anim"] if anim else table["inanim"]
+return table.get(feats.get("Case", ""), table["default"])</code></pre>
+      <p>Všimni si, co v té funkci <b>není</b>: ani jedno české slovo, ani jeden pád napsaný natvrdo.
+      Vše přijde z <code>self.LANG</code>. Kdybys chtěl jiný jazyk, tahle funkce zůstane bez škrtu —
+      mění se jen <code>deprel_to_role</code> a <code>role_prepositions</code> v jiném souboru.</p>
+
+      <h3>Kontrakt rozkladu — <code>role_of</code></h3>
+      <div class="sig">RoleCatalog.role_of(t, sent, byid) → role | None</div>
+      <p class="io"><b>vstup</b> token, celá věta, index tokenů podle 1-based id · <b>výstup</b>
+      obsahová role tokenu (<code>who</code>/<code>where</code>/<code>which_attribute</code>…) nebo
+      <code>None</code> · <b>efekt</b> žádný · <b>čte</b> (přes <code>role_key</code>)
+      <code>deprel_to_role</code>, <code>role_prepositions</code> + přímo
+      <code>relative_place_adverbs</code>, <code>relative_time_adverbs</code>
+      <span class="mark mark-prevzato">Převzato</span></p>
+      <p>Souřadný člen zdědí roli řídícího slova; argumentová závislost jde přes
+      <code>role_key</code>; příslovce se rozdělí na místo/čas/způsob podle seznamů z
+      <code>cs.json</code>. Tak se z jedné anotované věty stane rozklad na naše klíče, plně
+      jazykově nezávislý na výstupu.</p>
+
+      <h3>Kanonizace a faktualitní brána</h3>
+      <div class="sig">canon_lemma(tok) → lemma</div>
+      <p class="io"><b>vstup</b> token · <b>výstup</b> základní tvar; přivlastňovací ADJ → base jméno ·
+      <b>efekt</b> žádný · <b>čte</b> <code>possessive_adj_suffixes</code>, <code>vowels</code>
+      <span class="mark mark-prevzato">Převzato</span></p>
+      <div class="sig">is_factual(tokens) → bool</div>
+      <p class="io"><b>vstup</b> věta (list tokenů) · <b>výstup</b> <code>True</code>, když věta nese
+      fakt (ne nejistotu/hypotézu/otázku) · <b>efekt</b> žádný · <b>čte</b>
+      <code>uncertainty_markers</code>, <code>hedge_root_predicates</code>
+      <span class="mark mark-prevzato">Převzato</span></p>
+      <p>Reálná ukázka: <code>is_factual(parse("Tak nějak nevím."))</code> → <code>False</code> —
+      protože „nějak“ je v <code>uncertainty_markers</code>. Přidat/ubrat marker = změnit, co projde
+      branou, bez dotyku kódu.</p>
+
+      <h2 id="pridat">4. Workflow: přidat vztahové a tázací slovo (a co nefunguje)</h2>
+
+      <p>Narativní <a href="dil-6.html#6-2">kapitola VI.2</a> ukázala <i>kliknutí</i> — sem patří
+      <i>kontrakt</i>: co se v kódu stane, když do dat přidáš slovo, a proč to jinak nezabere.</p>
+
+      <h3>Vztahové slovo → hrana mezi osobami</h3>
+      <p>Rozšíření se zapíše do dvou polí v <code>cs.json</code>: <code>relation_nouns</code> (slovo je
+      vztah) a — je-li obousměrný — <code>symmetric_relations</code>. Konzumentem je jediná funkce:</p>
+      <div class="sig">extract_relations.relation_facts(sent, grammar, holder=None) → [(vztah_predikát, roles)]</div>
+      <p class="io"><b>vstup</b> anotovaná věta, instance <code>grammar</code> (nese
+      <code>LANG</code>), volitelně <code>holder</code> = protagonista dokumentu pro větu bez
+      explicitního podmětu · <b>výstup</b> seznam vztahových faktů, každý jako dvojice predikát
+      a slovník rolí · <b>efekt</b> žádný (čistá extrakce) · <b>čte</b> <code>relation_nouns</code>,
+      <code>symmetric_relations</code> <span class="mark mark-prevzato">Převzato</span></p>
+      <p>Reálný výstup nad „Byl mladším bratrem Josefa Čapka“ (protagonista dokumentu = Karel):
+      <code>[("bratr", {"who":["Josef"], "whose_of_what":["Karel"]}),
+      ("bratr", {"who":["Karel"], "whose_of_what":["Josef"]})]</code> — dvě hrany, protože „bratr“ je
+      v <code>symmetric_relations</code>. Kdyby tam nebyl, vznikne jen jedna. Funkce si vztahová slova
+      bere řádkem <code>reln = set(grammar.LANG.get("relation_nouns", []))</code> — žádný seznam
+      slov v tom souboru není, jen odkaz do dat.</p>
+      <p>Tahle extrakce běží ve vrstvě faktů. Aby se změna dat promítla do odpovědí, musí se
+      <b>přestavět fakt-store</b> (<code>python build_facts_all.py</code>, které
+      <code>relation_facts</code> volá na řádku 83). Korpus ani indexy se nemění — mění se jen výklad
+      slov.</p>
+
+      <aside class="rationale">
+        <span class="lbl">Zdůvodňovací blok — proč je jazyk data a ne kód (pohled vývojáře)</span>
+        <dl>
+          <dt>Rozhodnutí</dt><dd>Jazykově specifická data (vztahová slova, mapa deprel→role, předložky,
+          markery nejistoty) žijí výhradně v <code>lang/cs.json</code>. Kód zná jen univerzální klíče
+          UD (deprel, pád, životnost) a naše rolové klíče. Každý čtenář si data bere přes jedinou
+          instanci <code>self.LANG</code>.</dd>
+          <dt>Problém</dt><dd>Jazyk je propojený a rozsáhlý. Kdyby byl v kódu, přidání slova by byl
+          zásah do rozhodovací logiky (test kódu, riziko regrese jinde) a druhý jazyk by znamenal
+          zkopírovat celý program. Runtime by navíc přestal být přenositelný na jiný jazyk bez
+          rekompilace myšlení.</dd>
+          <dt>Mechanismus</dt><dd>Oddělení univerzální struktury od českého naplnění znamená, že
+          <code>relation_facts</code> se ptá jen <code>grammar.LANG["relation_nouns"]</code>
+          a nezajímá ho, co v tom seznamu je. Přidání slova je změna množiny, nad kterou <b>tatáž</b>
+          větev běží — ne nová větev. Nový jazyk = nový soubor, žádný <code>.py</code>.</dd>
+          <dt>Zvažované alternativy</dt><dd><b>Slova natvrdo v modulu:</b> nejrychlejší zápis, ale
+          sváže jazyk s logikou; každé rozšíření je zásah do kódu a druhý jazyk je přepis. Zamítnuto.
+          <b>Externí databáze vztahů (WordNet, LLM za běhu):</b> pokryje víc slov, ale přinese síť
+          a nedeterminismus — a základní zásada projektu je „neuron jen offline, runtime symbolický
+          a reprodukovatelný“ (viz stará <code>externi-zdroje</code>). Zamítnuto ve prospěch malého,
+          verzovaného, ručně kurátorovaného seznamu, který jde zamknout a zopakovat.</dd>
+          <dt>Kdy to přestane platit</dt><dd>Až bude klíčů a mapování tolik, že plochý JSON přestane
+          být udržitelný (stovky rolí, tisíce slov, vzájemně se tlukoucí úpravy). Signál: jedno slovo
+          mění chování na deseti nesouvisejících místech. Pak je namístě strukturovanější jazykový
+          zdroj, ne plochý seznam.</dd>
+          <dt>Cena</dt><dd>Plochý seznam neumí kontext („muž“ = manžel i dospělý člověk) a je jen tak
+          úplný, jak ho někdo udržuje — chybějící slovo je <b>tichá</b> mezera, ne chyba. A rozšíření
+          vyžaduje znát, který krok pipeline se musí přestavět (fakty vs. indexy vs. běh).</dd>
+        </dl>
+      </aside>
+
+      <h3>Tázací slovo → doplňovací vs. zjišťovací otázka</h3>
+      <p>Pozor na past pojmenování: hlavní tázací seznam pro <b>živý běh</b> není v
+      <code>cs.json</code>, ale v <code>config.json</code>, blok <code>answering</code>, pole
+      <code>interrog_lemmas</code>. Řídí jediné rozhodnutí: má-li otázka tázací slovo, je
+      <i>doplňovací</i> (ptá se na roli); nemá-li a končí otazníkem, bere se jako <i>polární</i>
+      (ano/ne). Chybějící slovo = otázka omylem spadne do ano/ne větve. <code>config.json</code> se
+      čte za běhu, takže změna platí ihned, bez přestavby.</p>
+      <p>Dvě jazykové tabulky v <code>cs.json</code> — <code>role_ask</code> a
+      <code>interrogative_slots</code> — se dotýkáš jen tehdy, když zavádíš úplně <b>novou roli</b>
+      (nový druh díry), ne nové slovo pro existující roli. <code>interrogative_slots</code> říká, jaký
+      SLOT (tvar) má tázací slovo pro danou roli, a používá se při transpozici fakt-VZORu na
+      dotaz-VZOR (<code>synth_queries.py:115</code>): pivot faktu se nahradí tázacím slotem, modalita
+      tečkou za otazník. Např. <code>who → "PRON:Nom"</code> promění tvrzení „X napsal Y“ na šablonu
+      otázky „Kdo napsal Y?“.</p>
+
+      <h3>Co nefunguje a proč</h3>
+      <p><b>Nováčkův omyl č. 1 — hledá seznam slov v extrakčním kódu.</b> „Vztahy dělá
+      <code>extract_relations.py</code>, tam to přidám.“ V tom souboru <i>žádný seznam slov není</i> —
+      jen řádek <code>grammar.LANG.get("relation_nouns")</code>. Editace kódu obchází celý smysl
+      oddělení a druhý jazyk by ji zdědil špatně. Selhání je zákeřné tím, že by <i>zdánlivě fungovalo</i>
+      pro češtinu a tiše rozbilo přenositelnost.</p>
+      <p><b>Omyl č. 2 — přidá slovo a hned se ptá.</b> Vztahové hrany se materializují až v
+      <code>build_facts_all.py</code>. Dokud ho nepustíš, data jsou změněná, ale fakty staré —
+      a odpověď se nezmění. Chyba je <b>tichá</b>: žádné varování, jen stará odpověď nebo „nemám data“.</p>
+      <p><b>Omyl č. 3 — zapomene na symetrii.</b> Přidáš „švagr“ jen do <code>relation_nouns</code>,
+      ne do <code>symmetric_relations</code>. „Bratr Karla“ najde Josefa, ale „bratr Josefa“ nenajde
+      Karla — hrana vede jen jedním směrem, protože <code>relation_facts</code> druhou dvojici založí
+      jen pro slova ze symetrické množiny.</p>
+      <p><b>Omyl č. 4 — přidá tázací slovo do <code>cs.json</code> místo <code>config.json</code>.</b>
+      Zapíše ho do <code>role_ask</code> nebo <code>interrogative_slots</code> a diví se, že polární
+      větev pořád zabírá. Živé rozhodnutí doplňovací/zjišťovací čte <code>interrog_lemmas</code>
+      z <code>config.json</code>; tabulky v <code>cs.json</code> řeší tvar odpovědi, ne směrování
+      otázky.</p>
+
+      <h2 id="kontrakty">5. Tabulka kontraktů</h2>
+
+      <p>Souhrn funkcí, které data z <code>cs.json</code> (a přilehlé přestavby) spotřebovávají —
+      signatura, co čtou, co vrací, vedlejší efekt. Značka důvěry: <span class="mark mark-overeno">Ověřeno</span>
+      = doloženo grepem/během v této session; <span class="mark mark-prevzato">Převzato</span>
+      = signatura odpovídá zdroji, nespuštěno.</p>
+
+      <div class="tablewrap">
+      <table>
+        <tr><th>Funkce</th><th>Signatura</th><th>Čte z <code>cs.json</code></th><th>Vrací / efekt</th><th>Značka</th></tr>
+        <tr>
+          <td><code>GrammarVzor.__init__</code></td>
+          <td><code>(config_path) → GrammarVzor</code></td>
+          <td>celý soubor → <code>self.LANG</code></td>
+          <td>instance; čte 2 JSONy z disku</td>
+          <td><span class="mark mark-prevzato">Převzato</span></td>
+        </tr>
+        <tr>
+          <td><code>role_key</code></td>
+          <td><code>(deprel, upos, feats, prep="", nominal_pred=False) → role|None</code></td>
+          <td><code>deprel_to_role</code>, <code>role_prepositions</code></td>
+          <td>rolový klíč; čistá</td>
+          <td><span class="mark mark-overeno">Ověřeno</span></td>
+        </tr>
+        <tr>
+          <td><code>canon_lemma</code></td>
+          <td><code>(tok) → lemma</code></td>
+          <td><code>possessive_adj_suffixes</code>, <code>vowels</code></td>
+          <td>základní tvar; čistá</td>
+          <td><span class="mark mark-prevzato">Převzato</span></td>
+        </tr>
+        <tr>
+          <td><code>is_factual</code></td>
+          <td><code>(tokens) → bool</code></td>
+          <td><code>uncertainty_markers</code>, <code>hedge_root_predicates</code></td>
+          <td>faktualita věty; čistá</td>
+          <td><span class="mark mark-prevzato">Převzato</span></td>
+        </tr>
+        <tr>
+          <td><code>RoleCatalog.role_of</code></td>
+          <td><code>(t, sent, byid) → role|None</code></td>
+          <td>(přes <code>role_key</code>) + <code>relative_place/time_adverbs</code></td>
+          <td>obsahová role tokenu; čistá</td>
+          <td><span class="mark mark-prevzato">Převzato</span></td>
+        </tr>
+        <tr>
+          <td><code>relation_facts</code></td>
+          <td><code>(sent, grammar, holder=None) → [(pred, roles)]</code></td>
+          <td><code>relation_nouns</code>, <code>symmetric_relations</code></td>
+          <td>vztahové hrany; čistá</td>
+          <td><span class="mark mark-overeno">Ověřeno</span></td>
+        </tr>
+        <tr>
+          <td><code>Dataloader.build_indexes</code></td>
+          <td><code>() → {"documents":n, "terms":m}</code></td>
+          <td>— (jazykově neutrální)</td>
+          <td>přepočte tf·idf; <b>zapisuje</b> pkl indexy</td>
+          <td><span class="mark mark-prevzato">Převzato</span></td>
+        </tr>
+        <tr>
+          <td><code>Dataloader.select_files</code></td>
+          <td><code>(query_lemmas, top_files=None) → [(doc, score)]</code></td>
+          <td>— (čte indexy, ne cs.json)</td>
+          <td>seřazené soubory k mountu; čistá</td>
+          <td><span class="mark mark-prevzato">Převzato</span></td>
+        </tr>
+      </table>
+      </div>
+
+      <p><b>K reindexu.</b> <code>build_indexes</code> přepočítává <b>všechny</b> soubory, ne jen nový —
+      protože idf (unikátnost slova) závisí na počtu dokumentů, takže přidání jednoho souboru mění
+      váhy všude. To je jazykově neutrální krok (nečte <code>cs.json</code>), ale patří sem, protože
+      po přidání <i>dokumentu</i> je nutný; po přidání <i>vztahového slova</i> stačí naopak jen
+      <code>build_facts_all.py</code> (fakty), indexy se nemění. Rozlišit ta dvě přestavby je půl
+      úspěchu rozšiřování.</p>
+
+      <h2>Co už víš</h2>
+      <p>Víš, že <code>lang/cs.json</code> je <b>jediný</b> zdroj jazykových dat, že ho drží
+      <code>GrammarVzor.self.LANG</code> a že cesta k němu je sama datum (<code>config.json</code>).
+      Umíš přečíst každý klíč souboru — co v něm je, jaké rozhodnutí řídí a která funkce ho čte —
+      včetně dvou klíčů, které tam jsou jako rezerva bez čtenáře. Znáš kontrakt jádra
+      <code>role_key</code>, kde se surová anotace mění na náš klíč bez jediného českého slova v kódu,
+      a víš, že přidat vztah je zápis do <code>relation_nouns</code>/<code>symmetric_relations</code>
+      plus přestavba faktů, kdežto tázací slovo je <code>interrog_lemmas</code> v
+      <code>config.json</code> bez přestavby. A umíš pojmenovat čtyři nejčastější selhání rozšíření,
+      z nichž tři jsou <i>tiché</i>.</p>
+
+      <div class="pager">
+        <a href="dil-6.html"><span class="dir">← narativní díl</span>Díl VI — Rozšiřování</a>
+        <a href="dil-7.html"><span class="dir">další →</span>Díl VII — Provoz</a>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

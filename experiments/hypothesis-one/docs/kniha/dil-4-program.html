@@ -1,0 +1,508 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Díl IV — programová příloha — hypothesis-one</title>
+<link rel="stylesheet" href="assets/style.css">
+<script defer src="assets/mermaid.min.js"></script>
+<script defer src="assets/script.js"></script>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <p class="brand"><a href="index.html">hypothesis-one</a></p>
+    <p class="tag">knižní dokumentace</p>
+    <nav aria-label="Obsah knihy">
+      <a href="index.html">Úvod</a>
+      <p class="part">Díl I — Než začneme</p>
+      <a href="dil-1.html">I · Co řeší, slovník, mapa</a>
+      <p class="part">Díl II — První kroky</p>
+      <a href="dil-2.html">II · Instalace, běh, data</a>
+      <p class="part">Díl III — Cesta dat</p>
+      <a href="dil-3.html">III · Fáze pipeline</a>
+      <a href="dil-3-program.html" class="sub-prog">III · programová příloha</a>
+      <p class="part">Díl IV — Jak to funguje</p>
+      <a href="dil-4.html">IV · Automat, aktivace, fakty</a>
+      <a href="dil-4-program.html" class="sub-prog active">IV · programová příloha</a>
+      <p class="part">Díl V — Testování</p>
+      <a href="dil-5.html">V · Testy, tvary, měření</a>
+      <p class="part">Díl VI — Rozšiřování</p>
+      <a href="dil-6.html">VI · Data, vztahy, testy</a>
+      <a href="dil-6-program.html" class="sub-prog">VI · programová příloha</a>
+      <p class="part">Díl VII — Provoz</p>
+      <a href="dil-7.html">VII · UDPipe, viz, pasti</a>
+      <a href="dil-7-program.html" class="sub-prog">VII · programová příloha</a>
+      <p class="part">Díl VIII — Otevřené body</p>
+      <a href="dil-8.html">VIII · Nedodělky a cesty</a>
+      <p class="part">Přílohy</p>
+      <a href="prilohy.html">Rejstřík, konfigurace, registry</a>
+    </nav>
+  </aside>
+  <main class="main">
+    <div class="topbar">
+      <button class="iconbtn" id="theme-toggle" type="button" aria-label="Přepnout světlý/tmavý režim">◐ režim</button>
+    </div>
+    <div class="content">
+      <nav class="crumbs"><a href="index.html">Úvod</a> › <a href="dil-4.html">Díl IV</a> › programová příloha</nav>
+      <p class="eyebrow">Díl IV — programová příloha</p>
+      <h1>Aktivace, fakty, koreference — nad reálným kódem</h1>
+      <p class="lead">Tahle příloha je pro vývojáře, který četl narativní Díl IV a teď chce sáhnout do
+      kódu: <em>kterou funkci zavolat, co jí dát, co dostane a kde v souboru žije</em>. Vede jednu
+      otázku celým živým tahem — od rozsvícení grafu přes tok světla po hranách až po výběr vítěze
+      a zpětné přihřátí — a u každého kroku ukazuje skutečnou signaturu z <code>activation_field.py</code>,
+      <code>answering.py</code>, <code>fact_store.py</code>, <code>template_store.py</code> a
+      <code>fill_holes.py</code>, plus výstup, který jsem právě spustil. Nepředpokládám znalost NLP; každý
+      pojem vysvětlím, nebo odkážu do <a href="dil-1.html#slovnik">slovníku</a>.</p>
+
+      <p>Každý blok má tři vrstvy: <b>princip</b> (o co jde, nezávisle na kódu), <b>kontrakt</b>
+      (signatura + co bere, co vrací, jaký má vedlejší efekt) a <b>reálná ukázka</b> (skutečný vstup
+      a výstup z korpusu). Značka u nadpisu říká, jak moc věřit: <span class="mark mark-overeno">Ověřeno</span>
+      = spustil jsem v této session, <span class="mark mark-prevzato">Převzato</span> = odpovídá kódu, ale
+      neběželo teď, <span class="mark mark-navrh">Návrh</span> = záměr, ne hotová věc.</p>
+
+      <!-- ============================================================ -->
+      <h2 id="pole">1 · Datový model pole: uzly, hrany, soubory</h2>
+
+      <p>Než začneme s tahem, potřebuješ vidět, na čem se svítí. Aktivační pole
+      (<code>ActivationField</code> v <code>activation_field.py</code>) je tenký objekt nad třemi
+      slovníky. Není v něm žádná databáze ani strojové učení — jen teplo (čísla typu float) uložené
+      u slov a souborů, a graf, kterým teplo teče.</p>
+
+      <div class="tablewrap">
+      <table>
+        <thead><tr><th>Atribut</th><th>Typ</th><th>Význam</th></tr></thead>
+        <tbody>
+          <tr><td><code>words</code></td><td><code>{lemma: teplo}</code></td><td><b>Uzly-slova.</b> Kolik světla drží každé lemma (základní tvar slova). Prázdné = potmě.</td></tr>
+          <tr><td><code>files</code></td><td><code>{doc: teplo}</code></td><td><b>Uzly-soubory.</b> Jak moc je který dokument korpusu „ve hře" pro aktuální rozhovor.</td></tr>
+          <tr><td><code>adj</code></td><td><code>{lemma: {soused: vodivost}}</code></td><td><b>Hrany.</b> Vážený graf sousednosti slov — kudy a jak silně teče světlo. Symetrický.</td></tr>
+          <tr><td><code>idf</code></td><td><code>{lemma: idf}</code></td><td><b>Distinktivita slova.</b> Načtená z indexu (dataloader). Vysoké idf = vzácné, obsahové slovo; nízké = funkční („a", „být").</td></tr>
+        </tbody>
+      </table>
+      </div>
+
+      <p>Klíčová myšlenka: <b>uzel není řádek s významem, je to jen jméno se dvěma čísly</b> — kolik
+      má teplo (dynamické, mění se každý tah) a jaké má idf (statické, z dat). Hrana je taky jen číslo:
+      vodivost. Celý „rozum" systému je v tom, jak se tahle čísla během tahu přelijí.</p>
+
+      <h3>build_graph — stavba hran vodivostí <span class="mark mark-overeno">Ověřeno</span></h3>
+      <p><b>Princip.</b> Aby světlo mohlo z jednoho slova doputovat k příbuznému, musí mezi nimi vést
+      hrana. Hrany se nestaví z bigramů (soused vedle souseda), ale z <em>okna</em> uvnitř věty: dvě
+      obsahová slova, která spolu v okně stojí, se propojí. Tak se <code>pes</code> spojí se
+      <code>šelma</code>, i když je mezi nimi pět slov. Vodivost hrany = <code>idf(a)×idf(b)×exp(−d/tau)</code>:
+      dvě vzácná slova vedou silně, funkční slova (nízké idf) skoro vůbec, a čím dál od sebe, tím slaběji.</p>
+      <div class="sig">build_graph(corpus, grammar) → None (mění self.adj na místě)</div>
+      <p class="io"><b>vstup</b> <code>corpus</code> = mountované shardy (dict vět), <code>grammar</code> pro kanonizaci lemmat &nbsp;·&nbsp;
+      <b>výstup</b> žádný &nbsp;·&nbsp; <b>efekt</b> naplní <code>self.adj</code> (symetrické hrany s vodivostí).</p>
+      <p>Parametry <code>window</code> (šířka okna v obsahových tokenech) a <code>tau</code> (rychlost
+      útlumu se vzdáleností) jsou <b>data</b> v <code>config.json</code> bloku <code>activation</code>,
+      ne konstanty v kódu.</p>
+
+      <h3>Reálná ukázka datového modelu <span class="mark mark-overeno">Ověřeno</span></h3>
+      <p>Spuštění <code>python3 activation_field.py</code> mountuje dva soubory
+      (<code>wiki_karel_čapek</code>, <code>wiki_pes_domácí</code>), postaví graf, rozsvítí slova
+      <code>spisovatel</code> a <code>drama</code> a nechá světlo roztéct:</p>
+      <pre>horká slova po spreadu: [('drama', 2.79), ('spisovatel', 2.36), ('=', 1.01),
+                        ('a', 0.78), ('v', 0.47), ('český', 0.27),
+                        ('vědeckofantastický', 0.16), ('s', 0.15)]
+horké soubory: {'wiki_vítězslav_nezval': 0.1, 'wiki_jaroslav_seifert': 0.1,
+                'wiki_vladislav_vančura': 0.1, 'wiki_karel_čapek': 0.07,
+                'wiki_josef_čapek': 0.06, ...}</pre>
+      <p>Všimni si, že po rozsvícení <code>drama</code> a <code>spisovatel</code> se přihřálo
+      i <code>český</code> a <code>vědeckofantastický</code> — to je světlo, které doteklo po hranách
+      k sousedům v okně. Funkční slova (<code>a</code>, <code>v</code>, <code>s</code>) svítí slabě,
+      protože mají nízké idf a vedou málo.</p>
+
+      <!-- ============================================================ -->
+      <h2 id="tah">2 · Život jednoho tahu: rozsvícení → spread → decay → reinforce</h2>
+
+      <p>Teď spojíme kroky do jednoho průchodu. Když zavoláš <code>Answering.answer("Kde se narodil
+      Karel Čapek?")</code>, otázka projde tímto řetězem. Diagram sleduje <em>světlo</em>: kde se
+      zažehne, kudy teče a co po sobě nechá. Hledej dvě věci — kde se soubory a slova <b>rozsvítí</b>
+      (feed) a kde se teplo <b>přelije</b> po hranách (spread); zbytek je příprava dat a výběr vítěze.</p>
+
+      <pre class="mermaid">
+flowchart LR
+  accTitle: Zivot jednoho tahu v answer()
+  accDescr: Otazka projde parsovanim, vyberem souboru, stavbou grafu, rozsvicenim, sirenim, sberem kandidatu a vyberem viteze; na konci reinforce a decay drzi tema mezi tahy.
+  Q["Otázka (text)"] --> P["_parse: UDPipe 2 → tokeny"]
+  P --> QV["_question: q-VZOR · lemmata · role díry"]
+  QV --> SF["select_files: ② brána → horké soubory"]
+  SF --> MO["mount: šablony + fakty horkých (#60)"]
+  MO --> BG["build_graph: hrany idf×idf×proximity"]
+  BG --> FD["feed: uzly += idf · soubory += score"]
+  FD --> SP["spread: teplo teče po hranách (hops×)"]
+  SP --> CA["_candidates: predikát+role ∪ window-VZOR"]
+  CA --> AS["_assurance + _rank: glow-orders-ties"]
+  AS --> RE["reinforce: entita +1 · soubor +1"]
+  AS -. mezi tahy .-> DC["decay: teplo × decay"]
+      </pre>
+      <p>Slovně: text se rozparsuje UDPipe (jediná živá anotace v celém tahu), z tokenů se určí
+      tvar otázky, role díry a obsahová lemmata. Lemmata otevřou <em>bránu</em> — vyberou horké soubory
+      a namountují jen jejich data. Nad nimi se postaví graf, otázka rozsvítí uzly, světlo se rozteče,
+      matcher posbírá kandidáty a jistota vybere vítěze. Jasná odpověď přihřeje svou entitu a soubor
+      (aby navazující otázka věděla, o čem se mluví); <code>decay</code> naopak otevírá <em>příští</em>
+      navazující tah — utlumí staré téma, aby jen dosvítilo, ne přezářilo nové.</p>
+
+      <h3>feed — rozsvícení <span class="mark mark-overeno">Ověřeno</span></h3>
+      <p><b>Princip.</b> Každý tah dialogu je zdroj světla. Rozsvítí dvě věci naráz: <em>slova</em>
+      otázky (uzly-lemmata dostanou teplo úměrné své distinktivitě) a <em>soubory</em>, které ta slova
+      nesou nejsilněji (přes tf·idf bránu <code>select_files</code>). Váha uzlu je <code>idf</code>, ne
+      holá jednička — proto je světlo od začátku zacílené na obsah, ne na spojky.</p>
+      <div class="sig">feed(question_lemmas, dataloader) → None (kumuluje do self.words / self.files)</div>
+      <p class="io"><b>vstup</b> lemmata otázky, instance <code>Dataloader</code> (kvůli <code>select_files</code>) &nbsp;·&nbsp;
+      <b>výstup</b> žádný &nbsp;·&nbsp; <b>efekt</b> <code>words[lemma] += idf(lemma)</code> a <code>files[doc] += score</code>. Kumuluje se přes tahy (proto navazující otázka staví na tom, co ještě svítí).</p>
+
+      <h3>spread — tok světla po hranách <span class="mark mark-overeno">Ověřeno</span></h3>
+      <p><b>Princip.</b> Světlo nezůstane v zažehnutých uzlech — teče po hranách k sousedům, úměrně
+      <em>normalizované</em> vodivosti hrany a útlumu <code>spread_lambda</code>. Opakuje se
+      <code>hops</code>-krát. Tím se rozsvítí i slova, která v otázce vůbec nebyla, ale v korpusu s ní
+      těsně souvisí (kontext se „domyslí").</p>
+      <div class="sig">spread(hops=None) → None (přičítá teplo sousedům)</div>
+      <p class="io"><b>vstup</b> volitelně počet skoků (jinak z configu) &nbsp;·&nbsp;
+      <b>výstup</b> žádný &nbsp;·&nbsp; <b>efekt</b> pro každý horký uzel přičte sousedovi <code>heat · spread_lambda · (w / Σ vah)</code>; normalizace přes součet vah brání tomu, aby uzel s mnoha hranami vylil neúměrně moc světla.</p>
+
+      <h3>decay — útlum mezi tahy <span class="mark mark-prevzato">Převzato</span></h3>
+      <p><b>Princip.</b> Bez útlumu by pole s každou otázkou jen přisvěcovalo a téma by nikdy nezhaslo.
+      <code>decay</code> násobí všechno teplo (slova i soubory) faktorem <code>decay &lt; 1</code>:
+      světlo bez opory pohasne, o čem se mluvilo dvě otázky zpět, už jen slabě dosvítí. V samostatném
+      tahu (etalon) se nevolá; žije jen v interaktivní session (<code>carry_context=True</code>), kde
+      otevírá <em>navazující</em> otázku.</p>
+      <div class="sig">decay() → None (teplo *= decay pro words i files)</div>
+      <p class="io"><b>vstup</b> žádný &nbsp;·&nbsp; <b>výstup</b> žádný &nbsp;·&nbsp; <b>efekt</b> zmenší všechna tepla na místě. Parametr <code>decay</code> (0.7) je v configu.</p>
+
+      <h3>weight_answer — kolik světla má kandidát <span class="mark mark-overeno">Ověřeno</span></h3>
+      <p><b>Princip.</b> Kandidát na odpověď je vždycky dvojice <code>(odpověď, soubor)</code>. Jeho
+      „osvětlení" je součet dvou tepel: kolik svítí jeho soubor a kolik svítí jeho odpovědní entita
+      po spreadu. Tuhle jednu funkci sdílejí obě cesty matcheru — je to ten <em>glow</em>, kterým se
+      rozhodují remízy.</p>
+      <div class="sig">weight_answer(answer, doc) → float</div>
+      <p class="io"><b>vstup</b> lemma odpovědi, id souboru &nbsp;·&nbsp; <b>výstup</b> teplo (float) &nbsp;·&nbsp; <b>efekt</b> žádný (jen počítá): <code>files.get(doc,0) + words.get(answer,0)</code>.</p>
+
+      <h3>reinforce — zpětný tok <span class="mark mark-overeno">Ověřeno</span></h3>
+      <p><b>Princip.</b> Když je odpověď jasná, přihřeje zpětně svou entitu a svůj soubor (o +1).
+      Tím drží téma napříč tahy: po „Kdo je Karel Čapek?" zůstane <code>Karel</code> horký, takže
+      navazující „Kdy se narodil?" ví, koho se ptát, i když jméno nezopakuješ.</p>
+      <div class="sig">reinforce(answer, doc) → None</div>
+      <p class="io"><b>vstup</b> lemma odpovědi, id souboru &nbsp;·&nbsp; <b>výstup</b> žádný &nbsp;·&nbsp; <b>efekt</b> <code>words[answer] += 1</code>, <code>files[doc] += 1</code>. Volá se jen v režimu <code>answer</code> (ne u klarifikace ani u „nevím") — nejisté odpovědi téma neposilují.</p>
+
+      <aside class="rationale">
+        <span class="lbl">Zdůvodňovací blok — proč glow-orders-ties, ne glow-rozhoduje</span>
+        <dl>
+          <dt>Rozhodnutí</dt><dd>Mezi kandidáty rozhoduje nejdřív <b>struktura</b> (shoda role, vazba na známou entitu, typ), a teprve <b>remízu</b> láme světlo (glow). Světlo nikdy nepřebije strukturní shodu.</dd>
+          <dt>Problém</dt><dd>Aktivace je spojitá a „prosakuje": leaknuté světlo z horkého souboru umí být vyšší u špatné entity než u správné. Kdyby o vítězi rozhodoval jen glow, nejteplejší slovo by zvítězilo i tam, kde strukturně vůbec nesedí do díry.</dd>
+          <dt>Mechanismus</dt><dd>Vítěz se vybírá lexikograficky přes n-tici <code>(echo_ok, role_fit, known_ov, def_fit, type_fit, kind_pred, mq, glow)</code> — viz <code>_rank</code>. Glow je až poslední složka: uplatní se jedině, když jsou všechny strukturní složky shodné. Struktura tak drží kormidlo, světlo jen dolaďuje.</dd>
+          <dt>Zvažované alternativy</dt><dd><b>Jen glow (nejteplejší vyhrává):</b> měřeno regreduje — u „napsal"+who nesou všichni autoři stejnou (nulovou) vazbu, glow pak vybere protagonistu minulého tahu místo správného autora. <b>Jen struktura (bez glow):</b> nechá skutečné remízy nerozhodnuté; dvě strukturně shodné entity v jednom souboru by systém věčně nechal doptávat.</dd>
+          <dt>Kdy přestane platit</dt><dd>Až strukturní složky přestanou rozlišovat — nový typ otázky, pro který <code>role_fit</code>/<code>known_ov</code>/<code>type_fit</code> vracejí u všech kandidátů totéž. Pak zůstane rozhodovat jen glow a hrozí prosáklá chyba.</dd>
+          <dt>Cena</dt><dd>Pořadí složek v n-tici je ruční rozhodnutí (křehké místo). Přesně tuhle křehkost má nahradit naučená vrstva (<a href="dil-4.html">Díl IV</a>, sekce o směrování) — zatím vypnutá, protože na malém vzorku přeučuje.</dd>
+        </dl>
+      </aside>
+
+      <!-- ============================================================ -->
+      <h2 id="matcher">3 · Matcher a kandidáti — kdo vůbec soupeří</h2>
+
+      <p>Aktivace řekne <em>kde</em> a <em>jak jasně</em>; matcher řekne <em>kdo</em> jsou kandidáti a
+      <em>který</em> vyhrál. Kandidáti vznikají dvěma cestami, které se pak slijí do jednoho seznamu
+      dictů <code>{answer, role, doc, fact_ref, mq, kind}</code>.</p>
+
+      <h3>_candidates — sběr dvěma cestami <span class="mark mark-overeno">Ověřeno</span></h3>
+      <p><b>Princip.</b> Primární cesta je <b>predikát + role</b> (parent-model): otázka i fakt nesou
+      totéž sloveso (<code>narodit</code>) a tutéž roli díry (<code>where</code>), takže se potkají
+      bez ohledu na slovosled. Druhá cesta je <b>window-VZOR</b>: šablona, jejíž stín (posloupnost
+      slotů kolem tázacího slova) sedí na tvar otázky. Predikátová cesta je přesnější, ale přijme jen
+      fakt, který sám nese <em>známou entitu</em> otázky v jiné roli než odpovědní — jinak by
+      predikát „napsal" zaplavil seznam všemi autory.</p>
+      <div class="sig">_candidates(q_vzor, predicate, hole_role, known) → [dict]</div>
+      <p class="io"><b>vstup</b> query-VZOR, predikát, role díry, množina známých lemmat &nbsp;·&nbsp;
+      <b>výstup</b> list kandidátů (dict) &nbsp;·&nbsp; <b>efekt</b> žádný (kandidáti se berou z už namountovaných <code>FactStore</code>/<code>TemplateStore</code>). Kvantifikátory („množství", „počet") se odfiltrují — nikdy nejsou faktická odpověď.</p>
+
+      <h3>_rank — výběr vítěze (glow-orders-ties) <span class="mark mark-overeno">Ověřeno</span></h3>
+      <p><b>Princip.</b> Z kandidátů vybere jednoho přes lexikografickou n-tici popsanou v
+      zdůvodňovacím bloku výše. Čte v pořadí: odpověď není echo otázky → role sedí → fakt nese známou
+      entitu → definiční fit → typ sedí (Topos) → parent-model bije VZOR → přesná shoda VZORu →
+      a teprve nakonec glow.</p>
+      <div class="sig">_rank(cands, known_lemmas, hole_role) → dict (nejlepší kandidát)</div>
+      <p class="io"><b>vstup</b> kandidáti, lemmata otázky, role díry &nbsp;·&nbsp; <b>výstup</b> jeden vítězný dict &nbsp;·&nbsp; <b>efekt</b> žádný (čte pole přes <code>weight_answer</code>, ale nemění ho).</p>
+
+      <h3>_assurance — jasno / doptej se / nevím <span class="mark mark-overeno">Ověřeno</span></h3>
+      <p><b>Princip.</b> Tady se z výběru stává <em>dialogový stavový automat</em>. Nestačí mít vítěze
+      — musí být dost odlišený od druhého v pořadí. <code>_assurance</code> vrací trojici
+      <code>(mode, winner, offer)</code>: <b>answer</b> (silná evidence a vítěz se odděluje strukturou
+      NEBO dominantním světlem), <b>clarify</b> (evidence je, ale rivalové jsou rovnocenní → nabídne
+      top kandidáty a doptá se) a <b>unsure</b> (jen echo, žádná struktura → poctivé „nevím", nehádá).</p>
+      <div class="sig">_assurance(cands, known_lemmas, hole_role) → (mode, best, offer)</div>
+      <p class="io"><b>vstup</b> kandidáti, lemmata otázky, role díry &nbsp;·&nbsp; <b>výstup</b> režim (str), vítěz (dict|None), nabídka (list dictů) &nbsp;·&nbsp; <b>efekt</b> žádný. Cestou sloučí <em>aliasy</em> (varianty jména téže osoby) a sečte jejich glow, aby rozpadlé jméno („Barbora" + „Němcová") nesoupeřilo samo se sebou.</p>
+
+      <h3>weight (šablona) a match_scored — window-VZOR cesta <span class="mark mark-overeno">Ověřeno</span></h3>
+      <p><b>Princip.</b> Druhý zdroj kandidátů jsou perzistentní šablony (<code>template_store.py</code>):
+      každá je pár „stín faktu × stín otázky × odpověď". <code>match_scored</code> vrátí šablony, jejichž
+      query-VZOR sedí na tvar otázky, se skóre shody <code>mq</code> (přesná = 1.0, jinak fuzzy překryv
+      slotů). <code>ActivationField.weight</code> je jen DRY zkratka nad <code>weight_answer</code> pro
+      šablonu.</p>
+      <div class="sig">match_scored(query_vzor) → [(QueryTemplate, mq)]</div>
+      <p class="io"><b>vstup</b> query-VZOR (řetězec slotů) &nbsp;·&nbsp; <b>výstup</b> list párů (šablona, síla shody) &nbsp;·&nbsp; <b>efekt</b> žádný (čte index <code>by_query_vzor</code> nad mountnutými šablonami).</p>
+      <div class="sig">ActivationField.weight(tpl) → float</div>
+      <p class="io"><b>vstup</b> šablona &nbsp;·&nbsp; <b>výstup</b> teplo &nbsp;·&nbsp; <b>efekt</b> žádný — deleguje na <code>weight_answer(tpl.answer, tpl.fact_ref[0])</code>.</p>
+
+      <h3>Reálné odpovědi celého tahu <span class="mark mark-overeno">Ověřeno</span></h3>
+      <p>Spuštěno v této session přes <code>Answering.answer(q)</code> (každý tah s čistým polem):</p>
+      <pre>Kdo je Karel Čapek?          → spisovatel   [answer] via=pred  hole=state  cand=38
+Kdy se narodil Karel Čapek?  → 1890         [answer] via=pred  hole=when   cand=274
+Kde se narodil Karel Čapek?  → Svatoňovice  [answer] via=pred  hole=where  cand=276
+Kdo byl bratr Karla Čapka?   → Josef        [answer] via=pred  hole=who    cand=26
+Je pes šelma?                → ano          [answer] via=polar  hole=polar  cand=1
+Je kůň šelma?                → ne           [answer] via=polar  hole=polar  cand=1</pre>
+      <p>Sloupec <code>via</code> ukazuje vítěznou cestu (<code>pred</code> = predikát+role,
+      <code>polar</code> = ano/ne smyčka), <code>cand</code> je počet kandidátů, kteří šli do
+      výběru — všimni si, že „Kde se narodil" jich mělo 276 a přesto vyhrálo správné Svatoňovice:
+      to je práce jistoty a glow-orders-ties, ne štěstí.</p>
+
+      <div class="open-question">
+        <span class="lbl">Co nefunguje a proč</span>
+        <p>Naivní nápad je „vezmi nejteplejší entitu v poli". Selže tiše: na <code>Co napsal Karel
+        Čapek?</code> vrátí živý běh <b>známka</b> (přes window-VZOR, ne fakt) místo některého z jeho
+        děl — VZOR se strukturně trefil do špatného stínu a fakt-cesta pro autorství díla zatím nemá
+        oporu (chybí resolvovaný podmět, viz sekce koreference). Projeví se to jako <em>sebejistě
+        špatná</em> odpověď, ne jako pád — proto se úspěšnost měří i metrikou „confident-wrong".
+        Na velkém etalonu (145 otázek) je dnes <b>63/145 = 43 %</b> správně, 30 sebejistě špatně
+        (<i>měřeno</i>, <code>eval_large.py</code>); kategorie authorship-what je 0/3.</p>
+      </div>
+
+      <aside class="correct-way">
+        <span class="lbl">Correct way — cílový stav</span>
+        <p>Na „Co napsal Karel Čapek?" systém vrací některé jeho dílo — čerpá ho z faktu o autorství,
+        ne ze slova „známka", na které se náhodně trefil window-VZOR. Autorské otázky mají spolehlivou
+        faktovou oporu, takže kategorie authorship-what je zodpovězená, ne 0/3. A když fakt o autorství
+        chybí, systém raději přizná „nevím", než aby vydal sebejistě špatnou entitu — počet sebejistě
+        špatných odpovědí tím klesá.</p>
+      </aside>
+
+      <!-- ============================================================ -->
+      <h2 id="fakty">4 · Fakt-store a role — kde se otázka potká s faktem</h2>
+
+      <p><b>Princip.</b> Fakt je predikát (sloveso/vztah) plus role-sloty: <code>narodit
+      {who:[Karel], when:[1890], where:[Svatoňovice]}</code>. Fakty jsou shardované per soubor na
+      disku (<code>data/facts/&lt;doc&gt;.jsonl</code>) a do paměti se nahrávají jen <em>horké</em>
+      (koncept #60 — nikdy nedržíme celý korpus). Matching je <b>parent-model</b>: otázka a fakt se
+      potkají predikátem a rolí díry, což přežije slovosled — window-VZOR by „Kde se narodil X"
+      (okno kolem předsunutého „Kde") a „Narodil se v Y" (okno kolem místa) nesouměřil.</p>
+
+      <h3>Fact — jeden fakt <span class="mark mark-overeno">Ověřeno</span></h3>
+      <div class="sig">Fact(predicate, roles, doc, sent, text=None)</div>
+      <p class="io"><b>pole</b> <code>predicate</code> (str), <code>roles</code> (<code>{role: [lemma…]}</code>), <code>doc</code>/<code>sent</code> (provenience), <code>text</code> (volitelně věta) &nbsp;·&nbsp;
+      <b>serializace</b> <code>as_row()</code> → dict pro JSONL, <code>from_row(d)</code> ← z JSONL.</p>
+
+      <h3>match — join přes predikát a roli <span class="mark mark-overeno">Ověřeno</span></h3>
+      <p><b>Princip.</b> Vrátí lemmata slotu, který otázka hledá, ze všech mountnutých faktů daného
+      predikátu. Predikát je JOIN klíč, role díry vybere sloupec. O tom, který kandidát je správný,
+      rozhodne až vrstva ⑤ (glow-orders-ties) — <code>match</code> jen dodá suroviny.</p>
+      <div class="sig">match(predicate, hole_role) → [(lemma, Fact)]</div>
+      <p class="io"><b>vstup</b> predikát, role díry &nbsp;·&nbsp; <b>výstup</b> páry (lemma slotu, zdrojový fakt) &nbsp;·&nbsp; <b>efekt</b> žádný. Bez predikátu nebo role → <code>[]</code>.</p>
+      <p>Reálný běh <code>python3 fact_store.py</code> (52 shardů, mount <code>wiki_karel_čapek</code>):</p>
+      <pre>shardy: 52
+narodit×where: [('Svatoňovice', &lt;Fact&gt;), ('rodina', &lt;Fact&gt;), ('Svatoňovice', &lt;Fact&gt;)]</pre>
+      <p>Tady je vidět, proč sám fakt-store nestačí: role <code>where</code> nese <em>dvě</em> hodnoty
+      — <code>Svatoňovice</code> (skutečné místo) i <code>rodina</code> (spolu-hodnota z téže věty).
+      Vybrat správnou je práce experta Topos (níže) a jistoty.</p>
+
+      <h3>mount / append / document_ids — životní cyklus shardů <span class="mark mark-overeno">Ověřeno</span></h3>
+      <div class="sig">mount(doc_ids) → None (naplní self.mounted, přebuduje index)</div>
+      <p class="io"><b>vstup</b> seznam id souborů &nbsp;·&nbsp; <b>efekt</b> nahraje jejich <code>.jsonl</code> do paměti a přebuduje <code>by_predicate</code>/<code>by_ref</code>; studené soubory zůstanou na disku.</p>
+      <div class="sig">append(fact) → None &nbsp;|&nbsp; document_ids() → [doc]</div>
+      <p class="io"><b>append</b> připíše fakt do <code>&lt;doc&gt;.jsonl</code> (build-time, append-only) <span class="mark mark-prevzato">Převzato</span> &nbsp;·&nbsp; <b>document_ids</b> vrátí dostupné shardy.</p>
+
+      <!-- ============================================================ -->
+      <h2 id="koreference">5 · Koreference a díry — aby fakt nesl entitu, ne „on"</h2>
+
+      <p><b>Princip.</b> Čeština běžně vypouští podmět (pro-drop): „Narodil se v Malých Svatoňovicích"
+      nemá slovo „Čapek". Fakt z takové věty pak nese <code>where</code>, ale žádné <code>who</code> —
+      a otázka „Kde se narodil Čapek" se s ním nespojí, protože sdílená entita chybí. <b>Díra</b> je
+      placeholder (zájmeno nebo elidovaný podmět) ukazující na nepojmenovanou entitu; koreference ji
+      zaplní antecedentem. Detekce jde jen z <em>rysu</em> (PronType, Poss, Person, Tense), ne ze
+      seznamu tvarů — ÚFAL lemmatizuje ho/mu/jej… na <code>on</code> a rozliší je rysem, takže to
+      funguje univerzálně.</p>
+
+      <h3>detect — najdi díry ve větě <span class="mark mark-prevzato">Převzato</span></h3>
+      <div class="sig">detect(sent) → [ {i, cat, target, g, num} ]</div>
+      <p class="io"><b>vstup</b> anotovaná věta &nbsp;·&nbsp; <b>výstup</b> list děr (pozice, kategorie, cíl, rod, číslo) &nbsp;·&nbsp; <b>efekt</b> žádný. Kategorie: <code>pron3</code>/<code>person12</code> (osobní), <code>poss3</code>/<code>poss_reflex</code>/<code>poss12</code> (přivlastňovací), <code>dem</code> (ukazovací), <code>prodrop</code> (elidovaný podmět).</p>
+
+      <h3>resolve_document_identity — kdo je antecedent <span class="mark mark-prevzato">Převzato</span></h3>
+      <p><b>Princip.</b> Nejsilnější resolver: nad entitami běží malé aktivační pole (recency +
+      podmět váží víc), s útlumem <code>decay</code> na začátku věty a <em>kotvou identity</em> —
+      entita zavedená copulou („X je/byl Y") se stane protagonistou a drží teplo (<code>anchor_bonus</code>)
+      přes pasáž, aby ji lokálně salientní slovo nepřebilo. Díra se zaplní nejaktivnější souhlasnou
+      entitou; vyřešená díra referenta posílí (<code>reinforce</code>) → téma drží přes řetěz zájmen.</p>
+      <div class="sig">resolve_document_identity(sentences) → [(k, i, cat, lemma, conf)]</div>
+      <p class="io"><b>vstup</b> věty dokumentu v pořadí &nbsp;·&nbsp; <b>výstup</b> resoluce (věta, pozice, kategorie, lemma antecedenta|None, jistota 0–1) &nbsp;·&nbsp; <b>efekt</b> žádný. Souhlasí se přes překryv rodu (ÚFAL syncretismus = množina) a číslo; pád díry se dodá dle kategorie.</p>
+
+      <h3>resolved_subjects — join na fakty <span class="mark mark-prevzato">Převzato</span></h3>
+      <p><b>Princip.</b> Tenká vrstva, která z resolucí vytáhne <em>jen</em> pro-drop podměty přísudku
+      do mapy <code>(věta, predikát) → (podmět, jistota)</code>. Tuhle mapu čte <code>build_facts_all.py</code>
+      a doplní chybějící <code>who</code>-slot do faktu — tím se odemkne predikátová cesta.</p>
+      <div class="sig">resolved_subjects(sentences) → {(k, predikát): (lemma, conf)}</div>
+      <p class="io"><b>vstup</b> věty dokumentu v pořadí &nbsp;·&nbsp; <b>výstup</b> mapa pro doplnění who-slotů &nbsp;·&nbsp; <b>efekt</b> žádný (build-time použití). V posledním buildu doplnila who do faktů z korpusu; přesný počet je <span class="todo">OVĚŘIT: přestavět build_facts_all a odečíst „koref-who"</span>.</p>
+
+      <div class="open-question">
+        <span class="lbl">Co nefunguje a proč</span>
+        <p>Naivní řešení „vezmi nejbližší podmět vlevo" (baseline <code>resolve_document</code>) selže
+        na řetězech zájmen, kde téma drží protagonista dál v textu, ne poslední zmíněné jméno. Selhání
+        je tiché: fakt dostane <em>špatnou</em> entitu do who, a otázka se pak trefí do cizího faktu.
+        Proto existuje aktivační varianta s kotvou identity — měří se fill-rate proti baseline
+        (<code>python3 fill_holes.py</code>, funkce <code>_measure</code>).</p>
+      </div>
+
+      <aside class="correct-way">
+        <span class="lbl">Correct way — cílový stav</span>
+        <p>Koreference dosadí do díry skutečného protagonistu i v dlouhých řetězech zájmen — fakt tak
+        nese v roli <code>who</code> správnou entitu, ne poslední náhodně zmíněné jméno, a navazující
+        otázka se trefí do svého faktu, ne do cizího. Když si systém dosazením není jistý, entitu do
+        faktu radši nevloží a díru přizná, místo aby tiše zapsal špatný podmět. Tiché pády koreference
+        tak z mapy faktů mizí.</p>
+      </aside>
+
+      <!-- ============================================================ -->
+      <h2 id="subsystemy">6 · Subsystémy Chronos · Mnemos · Topos</h2>
+
+      <p>Tři pojmenované experti z původního konceptu (parent). Každý má na starost jednu dimenzi
+      odpovědi: čas, paměť, prostor. Liší se zralostí — jeden žije, jeden je částečný, jeden je zatím
+      jen záměr. Stav jsem ověřil greppem, ne z hlavy.</p>
+
+      <h3>Chronos (čas) — žije <span class="mark mark-overeno">Ověřeno</span></h3>
+      <p><b>Dnes.</b> <code>chronos.py</code> rozpozná <em>rok</em> (4místné NUM v rozsahu 1000–2100)
+      a přiřadí ho k hlavnímu predikátu věty (root verb). Tím fakt dostane <code>when</code>-slot
+      i z běžného textu, ne jen z biografické závorky. <b>Vazba na program:</b> volá se ve
+      <code>build_facts_all.py</code> (řádky 55–85) vedle bio a vztahových faktů — rok se doplní do
+      existujícího faktu, nebo se založí nový.</p>
+      <div class="sig">Chronos.temporal_facts(sent, grammar) → [(predikát, rok)]</div>
+      <p class="io"><b>vstup</b> anotovaná věta, grammar &nbsp;·&nbsp; <b>výstup</b> páry (predikát root-slovesa, rok jako str) &nbsp;·&nbsp; <b>efekt</b> žádný. Bez root-verbu nebo bez roku → <code>[]</code>. Rozsah roků je v configu (<code>year_min</code>/<code>year_max</code>).</p>
+      <p>Reálný běh <code>python3 chronos.py</code> nad článkem o R.U.R.:</p>
+      <pre>[('mít', '1921')]     :: Premiéra hry měla proběhnout v Národním divadle v Praze…
+[('složit', '1977')]  :: V roce 1977 složil podle hry R.U.R. stejnojmennou operu…
+[('vzniknout', '2019')]:: V roce 2019 vznikl další projekt oslavující sté výročí…</pre>
+      <p>Proto „Kdy měla R.U.R. premiéru?" může najít rok 1921 přes fakt <code>mít {when:[1921]}</code>
+      — rok visel v podřízené klauzuli, ale patří k události věty.</p>
+      <p><b>Doprogramovat.</b> Relativní čas („včera", „v 19. století"), plné datum, intervaly a řazení
+      událostí. Parent to má hotové (<code>resolve_temporal</code>), jde o přenos.</p>
+
+      <aside class="correct-way">
+        <span class="lbl">Correct way — cílový stav</span>
+        <p>Systém rozumí času v plné šíři — vedle holého roku i relativním údajům („včera",
+        „v 19. století"), plnému datu a intervalům — a dokáže události seřadit a porovnat na časové ose.
+        Otázka mířící na relativní čas nebo na pořadí událostí tak dostane odpověď, ne prázdno.</p>
+      </aside>
+
+      <h3>Topos (prostor) — částečně <span class="mark mark-overeno">Ověřeno</span></h3>
+      <p><b>Dnes.</b> <code>topos.py</code> umí <em>typovou diskriminaci</em>: <code>is_place(lemma)</code>
+      řekne, zda je lemma místo (je v gazetteeru GEO entit z NER). To rozliší správnou hodnotu
+      <code>where</code>-slotu mezi kandidáty téže role. <b>Vazba na program:</b>
+      <code>answering.py</code> volá <code>is_place</code> ve třech místech — <code>_rank</code> (složka
+      <code>type_fit</code>), <code>_assurance</code> a <code>_gate_feats</code>: u díry
+      <code>where</code> dostane bod kandidát, který je opravdu místo. Gazetteer staví
+      <code>build_gazetteer.py</code> (data, ne kód); místo se do faktů dostává i přes
+      <code>extract_bio._place</code>.</p>
+      <div class="sig">Topos.is_place(lemma) → bool</div>
+      <p class="io"><b>vstup</b> lemma &nbsp;·&nbsp; <b>výstup</b> True/False &nbsp;·&nbsp; <b>efekt</b> žádný (čte množinu <code>places</code> z gazetteeru).</p>
+      <p>Reálný běh <code>python3 topos.py</code>:</p>
+      <pre>gazetteer: 770 míst
+  Svatoňovice    is_place=True
+  Praha          is_place=True
+  rodina         is_place=False
+  škola          is_place=False</pre>
+      <p>Přesně tohle vyřeší remízu <code>where:[Svatoňovice, rodina]</code> z fakt-store výše:
+      <code>Svatoňovice</code> dostane <code>type_fit=1</code>, <code>rodina</code> nulu.</p>
+      <p><b>Doprogramovat.</b> Gazetteer seed (chybějící obce), směr (k + dativ), a hlavně
+      <em>containment</em> (Praha ⊂ Čechy) pro otázky typu „Kde v Čechách…". Parent má containment
+      hotové; přidá se, až ho měření vyžádá.</p>
+
+      <aside class="correct-way">
+        <span class="lbl">Correct way — cílový stav</span>
+        <p>Systém rozumí prostoru jako celku: pozná i menší obce (úplný gazetteer), rozliší směr
+        (k + dativ) od místa a chápe vztah obsažení Praha ⊂ Čechy. Na otázku „Kde v Čechách se
+        narodil…" proto odpoví správným místem uvnitř zadané oblasti, ne jen na holé „Kde".</p>
+      </aside>
+
+      <h3>Mnemos (paměť/zápis) — návrh <span class="mark mark-navrh">Návrh</span></h3>
+      <p><b>Dnes.</b> Neexistuje. Grep přes všechny <code>*.py</code> nenašel žádnou write-path,
+      <code>memory.jsonl</code> ani modul <code>mnemos</code> — jediný výskyt slova „event-log" je
+      v docstringu <code>template_store.py</code> a týká se <em>build-time</em> perzistence šablon,
+      ne runtime paměti dialogu. hypothesis-one si tedy z rozhovoru nic trvale nepamatuje; parent má
+      k tomu <code>memory.jsonl</code>, tady zabudováno není.</p>
+      <div class="open-question">
+        <span class="lbl">Otevřená otázka — jak doprogramovat Mnemos</span>
+        <p>Cíl je write-path, kterou by si systém pamatoval, co se v dialogu vyřešilo: zápis
+        vyřešených faktů zpět do mapy (aby příště nemusel odvozovat znovu) a projekce event-logu
+        (posloupnost tahů jako přehratelná stopa). Technicky by Mnemos seděl vedle
+        <code>reinforce</code> — zatímco reinforce hřeje pole jen do konce session, Mnemos by
+        perzistoval. Zatím je to záměr, ne kód; v knize značen <span class="mark mark-navrh">Návrh</span>.</p>
+      </div>
+
+      <aside class="correct-way">
+        <span class="lbl">Correct way — cílový stav</span>
+        <p>Systém si z dialogu pamatuje, co se vyřešilo — vyřešená fakta drží i po zavření session
+        a průběh tahů zůstává jako zpětně přehratelná stopa. Na dřív zodpovězenou otázku proto
+        neodvozuje odpověď znovu, ale čte ji z paměti. Paměť dialogu je trvalá vrstva vedle světla
+        v poli, které dnes vydrží jen do konce session.</p>
+      </aside>
+
+      <!-- ============================================================ -->
+      <h2 id="kontrakty">7 · Tabulka kontraktů</h2>
+
+      <p>Přehled všech funkcí z této přílohy — signatura, efekt a míra důvěry. „Efekt" rozlišuje, zda
+      funkce jen počítá, mění pole na místě, nebo zapisuje na disk.</p>
+
+      <div class="tablewrap">
+      <table>
+        <thead><tr><th>Soubor</th><th>Signatura</th><th>Efekt</th><th>Důvěra</th></tr></thead>
+        <tbody>
+          <tr><td rowspan="6"><code>activation_field.py</code></td><td><code>build_graph(corpus, grammar)</code></td><td>mění <code>adj</code> na místě</td><td><span class="mark mark-overeno">Ověřeno</span></td></tr>
+          <tr><td><code>feed(question_lemmas, dataloader)</code></td><td>kumuluje do <code>words</code>/<code>files</code></td><td><span class="mark mark-overeno">Ověřeno</span></td></tr>
+          <tr><td><code>spread(hops=None)</code></td><td>přičítá teplo sousedům</td><td><span class="mark mark-overeno">Ověřeno</span></td></tr>
+          <tr><td><code>decay()</code></td><td>teplo × decay (na místě)</td><td><span class="mark mark-prevzato">Převzato</span></td></tr>
+          <tr><td><code>weight_answer(answer, doc) → float</code></td><td>jen počítá</td><td><span class="mark mark-overeno">Ověřeno</span></td></tr>
+          <tr><td><code>reinforce(answer, doc)</code></td><td>entita +1, soubor +1</td><td><span class="mark mark-overeno">Ověřeno</span></td></tr>
+          <tr><td rowspan="6"><code>answering.py</code></td><td><code>answer(question, carry_context=False, …) → dict|None</code></td><td>mění pole/mount, čte disk</td><td><span class="mark mark-overeno">Ověřeno</span></td></tr>
+          <tr><td><code>_question(toks) → (q_vzor, lemmas, hole_role)</code></td><td>jen počítá</td><td><span class="mark mark-overeno">Ověřeno</span></td></tr>
+          <tr><td><code>_predicate(toks) → str|None</code></td><td>jen počítá</td><td><span class="mark mark-overeno">Ověřeno</span></td></tr>
+          <tr><td><code>_candidates(q_vzor, predicate, hole_role, known) → [dict]</code></td><td>jen počítá (nad mountnutými)</td><td><span class="mark mark-overeno">Ověřeno</span></td></tr>
+          <tr><td><code>_rank(cands, known_lemmas, hole_role) → dict</code></td><td>jen počítá</td><td><span class="mark mark-overeno">Ověřeno</span></td></tr>
+          <tr><td><code>_assurance(cands, known_lemmas, hole_role) → (mode, best, offer)</code></td><td>jen počítá</td><td><span class="mark mark-overeno">Ověřeno</span></td></tr>
+          <tr><td rowspan="3"><code>fact_store.py</code></td><td><code>match(predicate, hole_role) → [(lemma, Fact)]</code></td><td>jen počítá</td><td><span class="mark mark-overeno">Ověřeno</span></td></tr>
+          <tr><td><code>mount(doc_ids)</code></td><td>nahraje shardy, přebuduje index</td><td><span class="mark mark-overeno">Ověřeno</span></td></tr>
+          <tr><td><code>append(fact)</code></td><td>zapíše na disk (append-only)</td><td><span class="mark mark-prevzato">Převzato</span></td></tr>
+          <tr><td rowspan="2"><code>template_store.py</code></td><td><code>match_scored(query_vzor) → [(QueryTemplate, mq)]</code></td><td>jen počítá</td><td><span class="mark mark-overeno">Ověřeno</span></td></tr>
+          <tr><td><code>mount(doc_ids)</code></td><td>nahraje shardy, přebuduje indexy</td><td><span class="mark mark-overeno">Ověřeno</span></td></tr>
+          <tr><td rowspan="3"><code>fill_holes.py</code></td><td><code>detect(sent) → [díra]</code></td><td>jen počítá</td><td><span class="mark mark-prevzato">Převzato</span></td></tr>
+          <tr><td><code>resolve_document_identity(sentences) → [(k,i,cat,lemma,conf)]</code></td><td>jen počítá</td><td><span class="mark mark-prevzato">Převzato</span></td></tr>
+          <tr><td><code>resolved_subjects(sentences) → {(k,pred):(lemma,conf)}</code></td><td>jen počítá (build-time)</td><td><span class="mark mark-prevzato">Převzato</span></td></tr>
+          <tr><td><code>chronos.py</code></td><td><code>temporal_facts(sent, grammar) → [(pred, rok)]</code></td><td>jen počítá</td><td><span class="mark mark-overeno">Ověřeno</span></td></tr>
+          <tr><td><code>topos.py</code></td><td><code>is_place(lemma) → bool</code></td><td>jen počítá</td><td><span class="mark mark-overeno">Ověřeno</span></td></tr>
+          <tr><td><code>—</code></td><td>Mnemos (paměť/zápis)</td><td>neexistuje</td><td><span class="mark mark-navrh">Návrh</span></td></tr>
+        </tbody>
+      </table>
+      </div>
+
+      <p>Parametry, které tahle příloha zmiňuje (<code>decay</code>, <code>spread_lambda</code>,
+      <code>hops</code>, <code>window</code>, <code>tau</code>), nejsou konstanty v kódu — jsou to
+      data v <code>config.json</code>, bloku <code>activation</code>. Změna chování pole (delší dosah
+      světla, pomalejší útlum) je změna JSONu, ne zásah do <code>activation_field.py</code>.</p>
+
+      <h2>Co už umíš</h2>
+      <p>Víš, z čeho se skládá aktivační pole (<code>words</code>, <code>files</code>, <code>adj</code>,
+      <code>idf</code>) a jak se hrany staví z okenní ko-okurence s vodivostí
+      <code>idf×idf×proximity</code>. Umíš přečíst celý životní cyklus tahu — rozsvícení
+      (<code>feed</code>), tok světla (<code>spread</code>), sběr kandidátů dvěma cestami
+      (<code>_candidates</code>), výběr vítěze (<code>_rank</code> přes glow-orders-ties), rozhodnutí
+      jasno/doptej/nevím (<code>_assurance</code>) a paměť mezi tahy (<code>reinforce</code>/<code>decay</code>).
+      Rozumíš, proč fakt-store matchuje predikátem a proč potřebuje koreferenci k doplnění pro-drop
+      podmětů. A víš, jak na tom jsou tři experti: Chronos žije (roky), Topos umí typ místa (containment
+      čeká), Mnemos je zatím jen návrh.</p>
+
+      <div class="pager">
+        <a href="dil-4.html"><span class="dir">← zpět na narativ</span>Díl IV — Automat, aktivace, fakty</a>
+        <a href="dil-6.html"><span class="dir">další příloha →</span>Díl VI — Rozšiřování</a>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

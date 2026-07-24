@@ -16,15 +16,28 @@
     <p class="tag">knižní dokumentace</p>
     <nav aria-label="Obsah knihy">
       <a href="index.html">Úvod</a>
-      <p class="part">Díl I — Než začneme</p><a href="dil-1.html">I · Co řeší, slovník, mapa</a>
-      <p class="part">Díl II — První kroky</p><a href="dil-2.html" class="active">II · Instalace, běh, data</a>
-      <p class="part">Díl III — Cesta dat</p><a href="dil-3.html">III · Fáze pipeline</a>
-      <p class="part">Díl IV — Jak to funguje</p><a href="dil-4.html">IV · Automat, aktivace, fakty</a>
-      <p class="part">Díl V — Testování</p><a href="dil-5.html">V · Testy, tvary, měření</a>
-      <p class="part">Díl VI — Rozšiřování</p><a href="dil-6.html">VI · Data, vztahy, testy</a>
-      <p class="part">Díl VII — Provoz</p><a href="dil-7.html">VII · UDPipe, viz, pasti</a>
-      <p class="part">Díl VIII — Otevřené body</p><a href="dil-8.html">VIII · Nedodělky a cesty</a>
-      <p class="part">Přílohy</p><a href="prilohy.html">Rejstřík, konfigurace, registry</a>
+      <p class="part">Díl I — Než začneme</p>
+      <a href="dil-1.html">I · Co řeší, slovník, mapa</a>
+      <p class="part">Díl II — První kroky</p>
+      <a href="dil-2.html" class="active">II · Instalace, běh, data</a>
+      <p class="part">Díl III — Cesta dat</p>
+      <a href="dil-3.html">III · Fáze pipeline</a>
+      <a href="dil-3-program.html" class="sub-prog">III · programová příloha</a>
+      <p class="part">Díl IV — Jak to funguje</p>
+      <a href="dil-4.html">IV · Automat, aktivace, fakty</a>
+      <a href="dil-4-program.html" class="sub-prog">IV · programová příloha</a>
+      <p class="part">Díl V — Testování</p>
+      <a href="dil-5.html">V · Testy, tvary, měření</a>
+      <p class="part">Díl VI — Rozšiřování</p>
+      <a href="dil-6.html">VI · Data, vztahy, testy</a>
+      <a href="dil-6-program.html" class="sub-prog">VI · programová příloha</a>
+      <p class="part">Díl VII — Provoz</p>
+      <a href="dil-7.html">VII · UDPipe, viz, pasti</a>
+      <a href="dil-7-program.html" class="sub-prog">VII · programová příloha</a>
+      <p class="part">Díl VIII — Otevřené body</p>
+      <a href="dil-8.html">VIII · Nedodělky a cesty</a>
+      <p class="part">Přílohy</p>
+      <a href="prilohy.html">Rejstřík, konfigurace, registry</a>
     </nav>
   </aside>
 
@@ -175,6 +188,15 @@ sequenceDiagram
       bez chyby; UDPipe se volá až při první otázce, takže se zdá, že „to nastartovalo" a teprve
       dotaz to celé shodí. Pravidlo: než se ptáš, ověř, že služba na 8092 skutečně odpovídá.</p>
 
+      <aside class="correct-way">
+        <span class="lbl">Correct way — cílový stav</span>
+        <p>Systém pozná už při startu, že UDPipe 2 na portu 8092 neodpovídá, a ohlásí to jasnou
+        hláškou dřív, než položíš první otázku — ne až odmítnutým spojením uprostřed dotazu. Když
+        na portu poslouchá cizí služba, rozezná, že vrácený rozbor je nesmyslný, a odmítne ho místo
+        toho, aby z něj tiše počítal odpověď. Uživatel tak z jediného řádku ví, že chybí živá
+        služba, a nehledá chybu ve své otázce.</p>
+      </aside>
+
       <h2 id="2-3">II.3 Přestavba dat z nuly <span class="mark mark-prevzato">Převzato</span></h2>
 
       <p>Když se poprvé podíváš do složky <code>data/</code>, možná tě překvapí, že v Gitu skoro nic
@@ -266,6 +288,15 @@ flowchart TD
       přepočítávají celé, ne jen nový soubor, a proto po každém zásahu do <code>data/raw/</code>
       musí projít <b>všech pět kroků</b>, ne jen anotace. Pravidlo do paměti: <i>přidat data</i> se
       rovná <i>přestavět data</i>.</p>
+
+      <aside class="correct-way">
+        <span class="lbl">Correct way — cílový stav</span>
+        <p>Systém pozná, že surové texty jsou novější než odvozená data — že přestavba proběhla jen
+        zčásti a zůstalo se u kroku ① — a než začne odpovídat, ohlásí, že indexy, fakty i šablony
+        jsou zastaralé. Na dotaz z čerstvě přidaného textu pak nevrátí zavádějící „o tom nemám jasná
+        data", jako by soubor neexistoval, ale dá najevo, že chybí přepočet. Odpověď „nevím" tak vždy
+        znamená skutečnou nepřítomnost faktu, ne nedokončený build.</p>
+      </aside>
 
       <h2>Co už umíš</h2>
       <p>Umíš připravit prostředí (<code>.venv</code>, <code>requirements.txt</code>) a víš, že jediná

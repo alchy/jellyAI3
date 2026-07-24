@@ -159,3 +159,33 @@ aside dd { margin: 0 0 .2rem; }
 /* kapitola v menu, která se teprve píše (kostra) */
 .sidebar .soon { display: block; padding: .18rem .4rem; color: var(--muted);
   opacity: .5; font-size: .92rem; cursor: default; }
+
+/* programová příloha: signatura funkce + kontrakt */
+.sig { font-family: var(--mono); font-size: .82rem; background: var(--code-bg);
+  color: var(--accent); padding: .3rem .6rem; border-radius: 7px; border: 1px solid var(--line);
+  display: inline-block; margin: .2rem 0; }
+.io { font-size: .9rem; color: var(--muted); margin: .1rem 0 .8rem; }
+.io b { color: var(--ink); font-family: var(--mono); font-size: .82rem; }
+
+/* sidebar: programová příloha jako pod-odkaz dílu */
+.sidebar a.sub-prog { margin-left: .7rem; font-size: .84rem; opacity: .82;
+  border-left: 2px solid var(--line); border-radius: 0 6px 6px 0; }
+.sidebar a.sub-prog::before { content: "↳ "; color: var(--accent); opacity: .7; }
+.sidebar a.sub-prog.active { opacity: 1; }
+
+/* narativ → programová příloha (ukazatel pod H1) */
+.prog-callout { font-family: var(--mono); font-size: .82rem; background: var(--accent-soft);
+  border: 1px solid var(--line); border-left: 3px solid var(--accent);
+  border-radius: 7px; padding: .5rem .8rem; margin: 0 0 1.4rem; }
+.prog-callout a { color: var(--accent); text-decoration: none; font-weight: 600; }
+.prog-callout a:hover { text-decoration: underline; }
+
+/* "Correct way" — cílový/ideální stav u každé nedokonalosti (CO, ne JAK) */
+aside.correct-way { background: rgba(46,107,69,.10); border-left: 4px solid var(--overeno);
+  border-radius: 10px; padding: 1rem 1.2rem; margin: 1.2rem 0 1.6rem; font-size: .95rem; }
+aside.correct-way .lbl { font-family: var(--mono); font-size: .72rem; text-transform: uppercase;
+  letter-spacing: .06em; color: var(--overeno); display: block; margin-bottom: .3rem; }
+aside.correct-way p:last-child { margin-bottom: 0; }
+@media (prefers-color-scheme: dark) { aside.correct-way { background: rgba(127,199,155,.09); } }
+:root[data-theme="dark"] aside.correct-way { background: rgba(127,199,155,.09); }
+:root[data-theme="light"] aside.correct-way { background: rgba(46,107,69,.10); }

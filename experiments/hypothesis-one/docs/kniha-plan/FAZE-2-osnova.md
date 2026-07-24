@@ -128,5 +128,23 @@ Po schválení: fáze 3 (kostra + 1 vzorová kapitola s ověřeným Mermaid z `f
 - **Fáze 3 (kostra):** hotovo + **OVĚŘENO** — Mermaid stateDiagram v dil-4-1 se vykresluje z
   `file://` bez sítě, přepínač režimu funguje (potvrzeno uživatelem v prohlížeči). Offline setup
   (lokální mermaid.min.js v10) tím doložen jako funkční pro všechny další kapitoly.
-- **Fáze 4 (psaní):** ZBÝVÁ — kapitoly Díl I–VIII ve stylu vzorové IV.1, ze zdrojů FÁZE-1.
-- **Fáze 5 (ověření):** ZBÝVÁ — spuštění postupů, značky důvěry, tabulka ověření, přesun do docs/.
+- **Fáze 4 (psaní):** HOTOVO (commit 531b750) — všech 8 dílů + přílohy (dil-1..8.html, prilohy.html)
+  napsáno 9 paralelními agenty dle AUTOR-GUIDE, review hlavním modelem. Vzorová IV.1 vložena do dil-4,
+  samostatný soubor smazán. Ověřeno strojově: tagy vyvážené, žádné mrtvé odkazy, 15 Mermaid diagramů,
+  jen skutečná čísla, dopředné soon→odkazy. Sidebar sjednocen (díl-level).
+- **Fáze 4b (programové přílohy — VÝVOJÁŘSKÁ VRSTVA):** HOTOVO — ke kódově významným dílům vznikly
+  přílohy `dil-3/4/6/7-program.html` (manuál PROGRAM-GUIDE.md, 4 agenti, review hl. modelem). Princip
+  „princip → kontrakt funkce (vstup→výstup) → reálná ukázka z korpusu"; reálné signatury + výstupy
+  spuštěné proti kódu. Pokryto (požadavky uživatele): slovo→lemma→druh→token, VZOR formát/uložení/
+  stavba/načtení, UDPipe cache (LINDAT cloud vs port 8092 — ověřeno), indexy+brána ②, cs.json co/proč/
+  kde-čteno, aktivace souborů/uzlů/hran (spread/decay/reinforce), fakt-store+role, koreference/díry,
+  subsystémy Chronos(žije)/Topos(částečně)/Mnemos(návrh), viewBase integrace, **logování+diagnostika
+  (runtime neloguje → doporučení zapnutelné stopy)**. Sidebar sjednocen (14 stránek, pod-odkazy
+  `sub-prog` + `prog-callout` z narativu). Gap-check proti staré docs/ proveden per příloha.
+- **Konvence „Correct way":** ke KAŽDÉ nedokonalosti (open-question / „Co nefunguje a proč" = skutečný
+  dluh / Návrh) přidán blok `<aside class="correct-way">` s CÍLOVÝM stavem (CO, ne JAK) — 38 bloků
+  napříč knihou (5 agentů, konvence CONVENTION-correct-way.md). By-design a uživatelské chyby
+  přeskočeny (dnešek = ideál). Ověřeno: tag-balance OK, 0 mrtvých odkazů, 38 cw=lbl.
+- **Fáze 5 (ověření + přesun):** ZBÝVÁ — (a) vizuální kontrola všech Mermaid diagramů v prohlížeči
+  (struktura ověřena strojově, konstrukce shodná s ověřenou IV.1); (b) DESTRUKTIVNÍ přesun
+  docs/kniha/ → docs/ (nahradí starou sadu 24 souborů) — až po vizuální kontrole a potvrzení uživatele.

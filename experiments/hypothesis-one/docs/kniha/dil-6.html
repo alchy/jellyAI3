@@ -16,15 +16,28 @@
     <p class="tag">knižní dokumentace</p>
     <nav aria-label="Obsah knihy">
       <a href="index.html">Úvod</a>
-      <p class="part">Díl I — Než začneme</p><a href="dil-1.html">I · Co řeší, slovník, mapa</a>
-      <p class="part">Díl II — První kroky</p><a href="dil-2.html">II · Instalace, běh, data</a>
-      <p class="part">Díl III — Cesta dat</p><a href="dil-3.html">III · Fáze pipeline</a>
-      <p class="part">Díl IV — Jak to funguje</p><a href="dil-4.html">IV · Automat, aktivace, fakty</a>
-      <p class="part">Díl V — Testování</p><a href="dil-5.html">V · Testy, tvary, měření</a>
-      <p class="part">Díl VI — Rozšiřování</p><a href="dil-6.html" class="active">VI · Data, vztahy, testy</a>
-      <p class="part">Díl VII — Provoz</p><a href="dil-7.html">VII · UDPipe, viz, pasti</a>
-      <p class="part">Díl VIII — Otevřené body</p><a href="dil-8.html">VIII · Nedodělky a cesty</a>
-      <p class="part">Přílohy</p><a href="prilohy.html">Rejstřík, konfigurace, registry</a>
+      <p class="part">Díl I — Než začneme</p>
+      <a href="dil-1.html">I · Co řeší, slovník, mapa</a>
+      <p class="part">Díl II — První kroky</p>
+      <a href="dil-2.html">II · Instalace, běh, data</a>
+      <p class="part">Díl III — Cesta dat</p>
+      <a href="dil-3.html">III · Fáze pipeline</a>
+      <a href="dil-3-program.html" class="sub-prog">III · programová příloha</a>
+      <p class="part">Díl IV — Jak to funguje</p>
+      <a href="dil-4.html">IV · Automat, aktivace, fakty</a>
+      <a href="dil-4-program.html" class="sub-prog">IV · programová příloha</a>
+      <p class="part">Díl V — Testování</p>
+      <a href="dil-5.html">V · Testy, tvary, měření</a>
+      <p class="part">Díl VI — Rozšiřování</p>
+      <a href="dil-6.html" class="active">VI · Data, vztahy, testy</a>
+      <a href="dil-6-program.html" class="sub-prog">VI · programová příloha</a>
+      <p class="part">Díl VII — Provoz</p>
+      <a href="dil-7.html">VII · UDPipe, viz, pasti</a>
+      <a href="dil-7-program.html" class="sub-prog">VII · programová příloha</a>
+      <p class="part">Díl VIII — Otevřené body</p>
+      <a href="dil-8.html">VIII · Nedodělky a cesty</a>
+      <p class="part">Přílohy</p>
+      <a href="prilohy.html">Rejstřík, konfigurace, registry</a>
     </nav>
   </aside>
 
@@ -36,6 +49,7 @@
       <nav class="crumbs"><a href="index.html">Úvod</a> › Díl VI — Rozšiřování</nav>
       <p class="eyebrow">Díl VI — Rozšiřování</p>
       <h1>Díl VI — Rozšiřování: data, vztahy, testy</h1>
+      <p class="prog-callout">Pro vývojáře: <a href="dil-6-program.html">programová příloha — kontrakty funkcí a reálné ukázky nad kódem →</a></p>
 
       <p class="lead">Kde jsme a kam jdeme: v Dílu V jsme se naučili systém <b>měřit</b> — etalony,
       rozpad po kategoriích, sebevědomě špatné odpovědi. Teď ho začneme <b>měnit</b>. Tenhle díl je
@@ -146,6 +160,17 @@ deterministických šablon: …  soubory: 53</code></pre>
       uvěříš, že je vadný systém, ne že chybí krok. Pravidlo: <b>každá změna v <code>data/raw/</code>
       = celá přestavba ①→②→④.</b> A protože idf závisí na počtu souborů, nestačí přeindexovat jen
       nový soubor; krok 2 musí přepočítat všechno.</p>
+
+      <aside class="correct-way">
+        <span class="lbl">Correct way — cílový stav</span>
+        <p>Systém pozná, že v <code>data/raw/</code> přibyl nebo se změnil text, ke kterému zatím
+        chybí odpovídající shard, index a fakty, a takový nesoulad <b>ohlásí</b> dřív, než začne
+        odpovídat. Uživatel proto nikdy nedostane tichou starou odpověď z jiného souboru ani úporné
+        „nemám data", jako by nový text neexistoval — místo dojmu „vadný systém" vidí jasnou zprávu,
+        že surová a odvozená data se rozešla a je potřeba přestavba. Nový obsah je dotazovatelný právě
+        tehdy, když o něm všechny datové vrstvy vědí, a rozpor mezi <code>data/raw/</code> a odvozenými
+        daty se nikdy neprojeví jako tiše špatná odpověď.</p>
+      </aside>
 
       <h2 id="6-2">VI.2 Přidat vztahové slovo nebo tázací slovo <span class="mark mark-prevzato">Převzato</span></h2>
 

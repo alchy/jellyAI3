@@ -16,15 +16,28 @@
     <p class="tag">knižní dokumentace</p>
     <nav aria-label="Obsah knihy">
       <a href="index.html">Úvod</a>
-      <p class="part">Díl I — Než začneme</p><a href="dil-1.html">I · Co řeší, slovník, mapa</a>
-      <p class="part">Díl II — První kroky</p><a href="dil-2.html">II · Instalace, běh, data</a>
-      <p class="part">Díl III — Cesta dat</p><a href="dil-3.html">III · Fáze pipeline</a>
-      <p class="part">Díl IV — Jak to funguje</p><a href="dil-4.html">IV · Automat, aktivace, fakty</a>
-      <p class="part">Díl V — Testování</p><a href="dil-5.html">V · Testy, tvary, měření</a>
-      <p class="part">Díl VI — Rozšiřování</p><a href="dil-6.html">VI · Data, vztahy, testy</a>
-      <p class="part">Díl VII — Provoz</p><a href="dil-7.html">VII · UDPipe, viz, pasti</a>
-      <p class="part">Díl VIII — Otevřené body</p><a href="dil-8.html" class="active">VIII · Nedodělky a cesty</a>
-      <p class="part">Přílohy</p><a href="prilohy.html">Rejstřík, konfigurace, registry</a>
+      <p class="part">Díl I — Než začneme</p>
+      <a href="dil-1.html">I · Co řeší, slovník, mapa</a>
+      <p class="part">Díl II — První kroky</p>
+      <a href="dil-2.html">II · Instalace, běh, data</a>
+      <p class="part">Díl III — Cesta dat</p>
+      <a href="dil-3.html">III · Fáze pipeline</a>
+      <a href="dil-3-program.html" class="sub-prog">III · programová příloha</a>
+      <p class="part">Díl IV — Jak to funguje</p>
+      <a href="dil-4.html">IV · Automat, aktivace, fakty</a>
+      <a href="dil-4-program.html" class="sub-prog">IV · programová příloha</a>
+      <p class="part">Díl V — Testování</p>
+      <a href="dil-5.html">V · Testy, tvary, měření</a>
+      <p class="part">Díl VI — Rozšiřování</p>
+      <a href="dil-6.html">VI · Data, vztahy, testy</a>
+      <a href="dil-6-program.html" class="sub-prog">VI · programová příloha</a>
+      <p class="part">Díl VII — Provoz</p>
+      <a href="dil-7.html">VII · UDPipe, viz, pasti</a>
+      <a href="dil-7-program.html" class="sub-prog">VII · programová příloha</a>
+      <p class="part">Díl VIII — Otevřené body</p>
+      <a href="dil-8.html" class="active">VIII · Nedodělky a cesty</a>
+      <p class="part">Přílohy</p>
+      <a href="prilohy.html">Rejstřík, konfigurace, registry</a>
     </nav>
   </aside>
 
@@ -126,6 +139,16 @@ flowchart TD
         </dl>
       </aside>
 
+      <aside class="correct-way">
+        <span class="lbl">Correct way — cílový stav</span>
+        <p>Systém dojde k odpovědi <b>procházením uzlů grafu a jejich hran</b>, ne skórováním plochých
+        kandidátů po souborech. Identita entity je uzel, na který se navěsí všechna fakta o ní, takže
+        „otec Kundery" najde správného Ludvíka bez záměny se jmenovcem a hrana se nikdy neuchytí na
+        špatném konci (swap). Relation, doména R.U.R. i rozpad jmen tím přestávají být tři samostatné
+        záplaty — mizí společně, protože stojí na jednom pevném kořeni. <em>(Cesty k tomuto stavu
+        načrtává blok výše — tento odstavec popisuje jen cíl, ne cestu.)</em></p>
+      </aside>
+
       <h3>Co nefunguje a proč</h3>
       <p>Nejpřirozenější první nápad nováčka je nesahat na architekturu a slabé kategorie
       „dohnat pravidly": <i>chybí vztahy? přidáme víc pravidel na extrakci vztahů.</i> Zní to
@@ -136,6 +159,15 @@ flowchart TD
       přesnosti, takže se vrátila. Poučení je to samé, které dává diagram: bez uzlu s identitou
       nemá kam vést spolehlivá hrana. Proto relation, R.U.R. i rozpad jmen míří na jeden kořen,
       ne na tři samostatné záplaty.</p>
+
+      <aside class="correct-way">
+        <span class="lbl">Correct way — cílový stav</span>
+        <p>Rozšiřování extrakce vztahů je <b>net-positive, ne net-neutral</b>: nové pravidlo přidá
+        správné fakty, aniž by úměrně přibývalo záměn, protože každá hrana visí na stabilní identitě
+        entity a nemá kam swapnout. „Dohnat slabé kategorie pravidly" pak skutečně funguje — pokrytí
+        roste a přesnost neklesá, takže se rozšíření nemusí vracet. <em>(Cesta k tomu vede přes uzel
+        s identitou popsaný výše, ne přes další povrchová pravidla.)</em></p>
+      </aside>
 
       <h2 id="8-2-extrakce">Nedodělky extrakce faktů</h2>
       <p>Tři body níž jsou nedodělky ve vytěžování faktů z textu. Data skoro vždycky ve větě jsou
@@ -156,6 +188,14 @@ flowchart TD
         </dl>
       </aside>
 
+      <aside class="correct-way">
+        <span class="lbl">Correct way — cílový stav</span>
+        <p>Systém vytěží i <b>verb-vztahy, oblique vazby a zájmenný genitiv</b>, ne jen kopulový vzor,
+        a kategorie relation drží na úrovni ostatních silných kategorií místo dnešních 4/18. Každá
+        vztahová hrana se navěsí na správné konce, protože oba konce jsou stabilní uzly entit, takže
+        přidané vztahy měří net-positive a už se nevracejí jako net-neutral.</p>
+      </aside>
+
       <aside class="open-question">
         <span class="lbl">Otevřený bod · nedodělek</span>
         <dl>
@@ -170,6 +210,14 @@ flowchart TD
         </dl>
       </aside>
 
+      <aside class="correct-way">
+        <span class="lbl">Correct way — cílový stav</span>
+        <p>Systém navěsí datum na správnou událost i <b>mimo biografickou závorku</b> — na „Hru napsal
+        roku 1920" odpoví <i>1920</i> stejně spolehlivě, jako dnes odpovídají data v bio-závorce.
+        Kategorie temporal drží na úrovni bio-datumů (fakticky 100 %) namísto dnešních 9/25, protože
+        when-hrana sedí u události, ke které patří, bez záměny za cizí datum.</p>
+      </aside>
+
       <aside class="open-question">
         <span class="lbl">Otevřený bod · nedodělek</span>
         <dl>
@@ -182,6 +230,14 @@ flowchart TD
           <dt>Signál</dt><dd>Přijde požadavek „chci systém učit za běhu", nebo je potřeba opravit chybný fakt bez reindexu.</dd>
           <dt>Kde se dotkneš</dt><dd><code>answering.py</code> (příkazová větev), <code>fact_store.py</code> (zápis + provenience), <code>extract_*</code> (vytěžení z uživatelovy věty), <code>config.json</code>.</dd>
         </dl>
+      </aside>
+
+      <aside class="correct-way">
+        <span class="lbl">Correct way — cílový stav</span>
+        <p>Uživatel systém <b>učí za běhu</b>: věta „Zapamatuj si, že …" přidá nový fakt s proveniencí
+        <i>user</i>, aniž by bylo nutné přidávat dokument a přestavovat indexy. Nový fakt se zapíše,
+        aniž otráví mapu, a při konfliktu s korpusem je jednoznačné, který zdroj má přednost, takže
+        systém umí korpus za chodu doplňovat i opravovat.</p>
       </aside>
 
       <h2 id="8-3-omezeni">Známá omezení domény a mountu</h2>
@@ -202,6 +258,14 @@ flowchart TD
         </dl>
       </aside>
 
+      <aside class="correct-way">
+        <span class="lbl">Correct way — cílový stav</span>
+        <p>Dotaz „Co je R.U.R.?" <b>mountne správnou doménu</b> a odpoví „drama Karla Čapka", ne
+        „bůh" — zkratka přestane o doméně rozhodovat podle rozpadlých tokenů R/U/R. Zmizí celá třída
+        „zkratková entita mountne cizí doménu", ne jen R.U.R., protože o cíli dotazu rozhoduje
+        identita entity jako uzel s vlastními hranami, ne tokenizace.</p>
+      </aside>
+
       <aside class="open-question">
         <span class="lbl">Otevřený bod · známé omezení</span>
         <dl>
@@ -214,6 +278,14 @@ flowchart TD
           <dt>Signál</dt><dd>Dotazy mimo biblickou doménu mají bibli mezi horkými soubory a její přítomnost měnitelně ovlivní odpověď.</dd>
           <dt>Kde se dotkneš</dt><dd><code>dataloader.select_files</code>, doclinks, <code>config.json</code> (<code>doclink_top</code>).</dd>
         </dl>
+      </aside>
+
+      <aside class="correct-way">
+        <span class="lbl">Correct way — cílový stav</span>
+        <p>Velký a frekventovaný soubor se rozsvítí <b>jen tehdy, když s dotazem skutečně souvisí</b> —
+        biblický soubor u Čapek-dotazu zůstane chladný místo dnešní aktivace ~0,7. Teplo teče po
+        entitách, ne po ploše souboru, takže velikost dokumentu přestává o mountu rozhodovat a horké
+        soubory odrážejí skutečnou oporu v dotazu.</p>
       </aside>
 
       <h2 id="8-4-provizorium">Vědomé provizorium a nerozhodnutý směr</h2>
@@ -235,6 +307,15 @@ flowchart TD
         </dl>
       </aside>
 
+      <aside class="correct-way">
+        <span class="lbl">Correct way — cílový stav</span>
+        <p>Systém <b>spolehlivě rozliší, kdy odpovědět a kdy mlčet</b>, a drží počet sebevědomě
+        špatných odpovědí u nuly bez klasifikátoru, který si malý vzorek pamatuje nazpaměť. Rozhodnutí
+        odpověď/mlčení platí stejně na neviděných otázkách jako na trénovacích — křížová validace
+        a reálný běh dávají shodný výsledek, ne dnešní rozpor 68,8 % v LOO proti −19 potlačeným
+        odpovědím v provozu.</p>
+      </aside>
+
       <aside class="open-question">
         <span class="lbl">Otevřený bod · nerozhodnuto / směr</span>
         <dl>
@@ -247,6 +328,14 @@ flowchart TD
           <dt>Signál</dt><dd>Měření ukáže, kolik gold odpovědí leží <i>mezi</i> větami. Dnešní diagnostika (87 % uvnitř věty) říká, že mezivětný potenciál je malý — proto „nerozhodnuto", ne „nedodělek".</dd>
           <dt>Kde se dotkneš</dt><dd><code>grammar_vzor.py</code> (frame_sig, šířka r), <code>activation_field.py</code>, <code>answering.py</code>.</dd>
         </dl>
+      </aside>
+
+      <aside class="correct-way">
+        <span class="lbl">Correct way — cílový stav</span>
+        <p>Systém najde i fakt, jehož odpověď leží <b>přes hranici věty</b> — účelová klauzule zdědí
+        místo z věty předchozí a elipsa táhnoucí se přes větu se dopočítá. Uzavřená smyčka fakt ↔
+        dotaz ↔ odpověď drží i mezivětně, takže je pokrytý i ten zbytek gold odpovědí, který neleží
+        uvnitř jedné věty (podle měření menšina nad rámec 87 % stejnovětných).</p>
       </aside>
 
       <h2 id="8-5-pozorovani">Pozorování: fáze slité do UDPipe</h2>
@@ -347,6 +436,16 @@ flowchart TD
       diagnostika ukazuje, že <b>87 % odpovědí už ve větě je</b>, nejde o to dosáhnout dál, ale
       o to reprezentovat entitu tak, aby se na ni dala spolehlivě navěsit hrana. To je jádro, na
       kterém stojí skoro všechno ostatní v tomhle dílu.</p>
+
+      <aside class="correct-way">
+        <span class="lbl">Correct way — cílový stav (souhrn registru)</span>
+        <p>Kdyby byly všechny body registru vyřešeny, systém by odpovídal <b>po uzlech grafu</b>
+        a slabé kategorie by dotáhly ostatní: relation, temporal, atribut i počet by držely na úrovni
+        kopuly a polohy, zkratkové i cizí domény by se mountovaly správně a velký soubor by nikoho
+        nepřehříval. Sebevědomě špatných odpovědí by zbývalo minimum, uživatel by mohl systém učit za
+        běhu a etalon by se posunul z dnešních 43 % výš — protože zmizel <b>společný kořen</b>, na
+        kterém většina slabých kategorií visí.</p>
+      </aside>
 
       <h2>Co už umíš</h2>
       <p>Prošel jsi devět míst, kde hypothesis-one <b>není hotový</b> — a víš u každého, jestli jde

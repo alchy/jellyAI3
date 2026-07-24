@@ -1,0 +1,598 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Díl III — programová příloha — hypothesis-one</title>
+<link rel="stylesheet" href="assets/style.css">
+<script defer src="assets/mermaid.min.js"></script>
+<script defer src="assets/script.js"></script>
+</head>
+<body>
+<div class="layout">
+
+  <aside class="sidebar">
+    <p class="brand"><a href="index.html">hypothesis-one</a></p>
+    <p class="tag">knižní dokumentace</p>
+    <nav aria-label="Obsah knihy">
+      <a href="index.html">Úvod</a>
+      <p class="part">Díl I — Než začneme</p>
+      <a href="dil-1.html">I · Co řeší, slovník, mapa</a>
+      <p class="part">Díl II — První kroky</p>
+      <a href="dil-2.html">II · Instalace, běh, data</a>
+      <p class="part">Díl III — Cesta dat</p>
+      <a href="dil-3.html">III · Fáze pipeline</a>
+      <a href="dil-3-program.html" class="sub-prog active">III · programová příloha</a>
+      <p class="part">Díl IV — Jak to funguje</p>
+      <a href="dil-4.html">IV · Automat, aktivace, fakty</a>
+      <a href="dil-4-program.html" class="sub-prog">IV · programová příloha</a>
+      <p class="part">Díl V — Testování</p>
+      <a href="dil-5.html">V · Testy, tvary, měření</a>
+      <p class="part">Díl VI — Rozšiřování</p>
+      <a href="dil-6.html">VI · Data, vztahy, testy</a>
+      <a href="dil-6-program.html" class="sub-prog">VI · programová příloha</a>
+      <p class="part">Díl VII — Provoz</p>
+      <a href="dil-7.html">VII · UDPipe, viz, pasti</a>
+      <a href="dil-7-program.html" class="sub-prog">VII · programová příloha</a>
+      <p class="part">Díl VIII — Otevřené body</p>
+      <a href="dil-8.html">VIII · Nedodělky a cesty</a>
+      <p class="part">Přílohy</p>
+      <a href="prilohy.html">Rejstřík, konfigurace, registry</a>
+    </nav>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <button class="iconbtn" id="theme-toggle" type="button" aria-label="Přepnout světlý/tmavý režim">◐ režim</button>
+    </div>
+    <div class="content">
+      <nav class="crumbs"><a href="index.html">Úvod</a> › <a href="dil-3.html">Díl III</a> › programová příloha</nav>
+      <p class="eyebrow">Díl III — programová příloha</p>
+      <h1>Cesta dat: kontrakty, cache a VZOR pro vývojáře</h1>
+
+      <p class="lead">Narativní <a href="dil-3.html">Díl III</a> prošel osm fází pěšky a u každé řekl,
+      co do ní vstupuje a co vystupuje. Tahle příloha jde o patro níž — k funkcím. Ke každému
+      mechanismu najdeš <b>princip</b> (nezávisle na kódu), <b>kontrakt</b> (jak ho realizuje konkrétní
+      funkce: co bere, co vrací, co mění na disku) a <b>reálnou ukázku</b> ze skutečného korpusu. Cílem
+      je, abys po přečtení věděl, <i>kterou funkci zavolat, co jí dát, co dostaneš a kde v kódu to je</i>.
+      Píšu pro Python-vývojáře, který o tomhle projektu ani o zpracování jazyka zatím nic neví; nové
+      pojmy vysvětluji při prvním výskytu nebo odkazuji do slovníku v <a href="dil-1.html#slovnik">Dílu I</a>.</p>
+
+      <p>Soustředíme se na to, co narativ jen naznačil: jak se z jednoho slova stane <b>token</b>
+      (III·1), proč a jak existuje <b>anotační cache</b> (III·2), jak dataloader staví <b>indexy a bránu</b>
+      (III·3), jaký přesně tvar má <b>VZOR</b> — kde je uložený, jak se staví a jak se načítá (III·4) —
+      a jak čtyři extraktory slijí <b>mapu faktů</b> (III·5). Na konci je souhrnná
+      <a href="#kontrakty">tabulka kontraktů</a> všech funkcí s jejich značkou důvěry.</p>
+
+      <p>K značkám důvěry: <span class="mark mark-overeno">Ověřeno</span> znamená, že jsem výstup
+      <i>spustil v této session</i> (například vytáhl token z shardu nebo řádek z fakt-storu);
+      <span class="mark mark-prevzato">Převzato</span> znamená, že popis odpovídá zdrojovému kódu, ale
+      sám jsem ho nespouštěl; <span class="mark mark-navrh">Návrh</span> je nápad, který v kódu ještě
+      není. Neověřené cesty značím <span class="todo">OVĚŘIT: …</span> a nehádám.</p>
+
+      <p class="full">Než půjdeme po funkcích, jedna orientační mapa. Sleduj, kde se surové slovo mění
+      na token, kudy token teče do cache a jak se z něj odvodí tři pomalé produkty (indexy, VZORy, fakty),
+      které živý dotaz jen čte.</p>
+
+<pre class="mermaid">
+flowchart TD
+  accTitle: Od slova ke třem produktům, které čte dotaz
+  accDescr: Surové slovo projde UDPipe anotací na token, ten se uloží do shardu (cache), a ze shardů se odvodí tf·idf indexy, VZOR-šablony a fakty; živý dotaz je jen čte.
+  W["slovo v .txt"] --> U["UDPipe 2 (LINDAT REST)"]
+  U --> T["token: form/lemma/upos/feats/head/deprel/offsety"]
+  T --> S["shard data/corpus/&lt;doc&gt;.pkl (cache)"]
+  S --> IDX["indexy data/index/ (tf·idf)"]
+  S --> VZ["VZOR-šablony data/templates/"]
+  S --> FA["fakty data/facts/"]
+  IDX --> Q["živý dotaz (answering.py)"]
+  VZ --> Q
+  FA --> Q
+</pre>
+
+      <p>Slovní čtení: jediné místo, kde běží „umělá inteligence" (neuronová anotace UDPipe 2), je
+      přechod <code>W → T</code>. Od tokenu dál je všechno symbolické počítání nad daty. Cache
+      (<code>S</code>) tenhle drahý přechod ukládá, aby se nemusel opakovat. Tři šipky z shardu jsou
+      tři nezávislé pomalé produkty; živý dotaz (<code>Q</code>) je jen konzument.</p>
+
+      <!-- ============================ TOKEN ============================ -->
+      <h2 id="token">III·1 Slovo → token → lemma → slovní druh</h2>
+
+      <p><b>Princip.</b> Počítač nevidí ve větě „slova" — vidí řetězec znaků. Aby s ní šlo pracovat
+      pravidly, musí se každé slovo proměnit v <b>token</b>: malý záznam, který kromě samotného tvaru
+      nese i to, <i>čím to slovo je</i> — jaký má základní tvar (lemma), jaký slovní druh a na kterém
+      jiném slově mluvnicky visí. Tenhle rozbor je v našem projektu jediný krok, který dělá vnější
+      neuronový nástroj; všechno ostatní si projekt počítá sám.</p>
+
+      <h3>Kontrakt: parsování anotace na tokeny</h3>
+      <p>Surový text pošle metoda <code>_udpipe2</code> na server UDPipe 2, který vrátí formát
+      <b>CoNLL-U</b> — prostý tabulkový text, řádek na token. Metoda <code>parse_conllu</code> z něj
+      poskládá seznam vět, kde každá věta je seznam token-slovníků.</p>
+
+      <div class="sig">AnnotateCorpus.parse_conllu(text) → (list[list[dict]], model_name) <span class="mark mark-overeno">Ověřeno</span></div>
+      <p class="io"><b>bere</b> CoNLL-U text z UDPipe 2 · <b>vrací</b> věty jako seznamy tokenů + jméno
+      skutečně použitého modelu · <b>efekt</b> žádný (čistá funkce).</p>
+
+      <p>Token je obyčejný <code>dict</code> s pevnou sadou klíčů (viz <code>annotate_corpus.py</code>,
+      řádek 112). Tohle je celý „obsah" jednoho slova, se kterým dál pracuje celý projekt:</p>
+      <div class="tablewrap">
+      <table>
+        <tr><th>Klíč tokenu</th><th>Co nese</th><th>Příklad — slovo „Karel" (věta 0)</th></tr>
+        <tr><td><code>form</code></td><td>tvar tak, jak stojí v textu</td><td><code>Karel</code></td></tr>
+        <tr><td><code>lemma</code></td><td>základní tvar (1. pád j. č. / infinitiv)</td><td><code>Karel</code></td></tr>
+        <tr><td><code>upos</code></td><td>univerzální slovní druh</td><td><code>PROPN</code> (vlastní jméno)</td></tr>
+        <tr><td><code>feats</code></td><td>slovník mluvnických rysů (pád, čas, rod, <code>NameType</code>…)</td><td><code>{NameType: Giv, …}</code></td></tr>
+        <tr><td><code>head</code></td><td>1-based id slova, na kterém tenhle token visí (<code>0</code> = kořen věty)</td><td><code>25</code></td></tr>
+        <tr><td><code>deprel</code></td><td>typ té závislosti</td><td><code>nsubj</code> (podmět)</td></tr>
+        <tr><td><code>start</code> / <code>end</code></td><td>znakové offsety v původním souboru</td><td>např. <code>0</code> / <code>5</code></td></tr>
+      </table>
+      </div>
+      <p>Všimni si jedné pasti pro nováčka: <b><code>NameType</code> není samostatný klíč tokenu</b> —
+      žije uvnitř <code>feats</code> (tj. <code>tok["feats"]["NameType"]</code>). Kdo hledá
+      <code>tok["NameType"]</code>, nenajde nic. Offsety <code>start/end</code> čte
+      <code>parse_conllu</code> z pole <code>TokenRange</code> v posledním sloupci CoNLL-U — a aby je
+      UDPipe vůbec poslal, volá se s parametrem <code>tokenizer=ranges</code> (řádek 202). Tyhle dva
+      offsety jsou nit, díky které se dá kterákoli pozdější odpověď ukázat na přesné znaky ve zdroji.</p>
+
+      <h3>Kontrakt: kanonizace lemmatu</h3>
+      <p><b>Princip.</b> Lemma z UDPipe je dobrý základ, ale ne vždy ten, který chceme jako klíč. Čeština
+      tvoří přivlastňovací přídavná jména („Karlova sestra", „Čapkův bratr"), a ta chceme svést zpět na
+      jméno osoby. To dělá jediná funkce, aby všechny fáze kanonizovaly stejně.</p>
+
+      <div class="sig">GrammarVzor.canon_lemma(tok) → lemma <span class="mark mark-overeno">Ověřeno</span></div>
+      <p class="io"><b>bere</b> token-slovník · <b>vrací</b> kanonické lemma (str) · <b>efekt</b> žádný.
+      Přivlastňovací <code>ADJ</code> s rysem <code>Poss=Yes</code> se převede na základní jméno
+      (Karlova → <code>Karel</code>, Čapkův → <code>Čapek</code>); přípony jsou data v
+      <code>cs.json</code> (<code>possessive_adj_suffixes</code>: <code>ův, ový, in</code>). Pomocná
+      <code>_epen_stem</code> doplní vypadlé „-e-" (Čapk → <code>Čapek</code>).</p>
+
+      <p class="full">Podívej se na celou cestu jednoho slova z ptačí perspektivy. Vlevo znaky, vpravo
+      hotový token, se kterým už umí pracovat pravidla.</p>
+<pre class="mermaid">
+flowchart TD
+  accTitle: Cesta slova na token
+  accDescr: Znaky slova jdou do UDPipe, ten vrátí CoNLL-U řádek, parse_conllu z něj udělá token-slovník, canon_lemma případně upraví lemma.
+  CH["znaky 'Karel'"] --> NET["UDPipe 2: tokenizace + morfologie + rozbor"]
+  NET --> ROW["CoNLL-U řádek (10 sloupců)"]
+  ROW --> TOK["parse_conllu → token: form / lemma / upos / feats / head / deprel / offsety"]
+  TOK --> CAN["canon_lemma (přivlastňovací ADJ → jméno)"]
+  CAN --> OUT["kanonické lemma pro klíče faktů/VZORu"]
+</pre>
+
+      <h3>Reálná ukázka <span class="mark mark-overeno">Ověřeno</span></h3>
+      <p>Tohle je skutečný výstup — vytažený v této session ze shardu
+      <code>data/corpus/wiki_karel_čapek.pkl</code>, věta 0 („Karel Čapek , rodným jménem Karel Antonín
+      Čapek ( 9 . ledna 1890 Malé Svatoňovice – …"):</p>
+<pre><code> #  form      lemma    upos   deprel  head  NameType
+ 1  Karel     Karel    PROPN  nsubj    25   Giv
+ 2  Čapek     Čapek    PROPN  flat      1   Giv
+ 3  ,         ,        PUNCT  punct     5
+ 4  rodným    rodný    ADJ    amod      5
+ 5  jménem    jméno    NOUN   nmod      1
+ 6  Karel     Karel    PROPN  appos     1   Giv
+ 7  Antonín   Antonín  PROPN  flat      6   Giv
+ 8  Čapek     Čapek    PROPN  flat      6   Giv
+ 9  (         (        PUNCT  punct    12
+10  9         9        NUM    nummod   12
+11  .         .        PUNCT  punct    10
+12  ledna     leden    NOUN   dep       6</code></pre>
+      <p>Čti to takto: „Karel" (token 1) je <code>PROPN</code> (vlastní jméno) v roli
+      <code>nsubj</code> (podmět), který mluvnicky visí na tokenu 25 (přísudku věty); rys
+      <code>NameType=Giv</code> říká, že jde o křestní jméno. „ledna" má <code>lemma=leden</code> —
+      základní tvar, po kterém se hledá, ať už ve větě stojí „ledna", „lednu" nebo „lednem". Právě lemma
+      a slovní druh jsou to, co token přidává nad holý řetězec znaků.</p>
+
+      <!-- ============================ CACHE ============================ -->
+      <h2 id="cache">III·2 Anotační cache — proč, jak se staví, jak s ní program nakládá</h2>
+
+      <p><b>Princip: proč vůbec cache.</b> Anotace z minulé sekce je jediný <i>drahý</i> a <i>vzdálený</i>
+      krok celé pipeline — text se posílá přes síť na server UDPipe 2 provozovaný ÚFAL MFF UK
+      (LINDAT REST) a čeká se na odpověď. Kdyby se to dělalo při každém dotazu, byl by systém pomalý a
+      závislý na dostupnosti cizí služby. Proto se anotace udělá <b>jednou předem</b> a její výsledek se
+      uloží na disk. Runtime pak korpus už jen čte — v rozhodovací smyčce dotazu <i>neběží žádný neuron</i>,
+      což je základní teze projektu (deterministický, dohledatelný běh).</p>
+
+      <aside class="rationale">
+        <span class="lbl">Poznámka k adresám UDPipe (ověřeno greppem)</span>
+        <p>V <code>config.json</code> jsou <b>dvě</b> URL a je snadné je zaměnit.
+        Anotační i živá cesta používají <code>preprocessing.udpipe2_url</code> =
+        <code>https://lindat.mff.cuni.cz/services/udpipe/api/process</code> (vzdálený LINDAT cloud) —
+        ověřeno tím, že <code>answering.py</code> parsuje otázku přes <code>self.parser._udpipe2()</code>,
+        kde <code>self.parser</code> je instance <code>AnnotateCorpus</code>. Druhá adresa
+        <code>services.udpipe_url</code> = <code>http://127.0.0.1:8092/parse</code> se v hlavní
+        pipeline <b>nepoužívá</b> — čtou ji jen pomocné/starší skripty (<code>phase1.py</code>,
+        <code>sim_*.py</code>, <code>demo_table.py</code>, <code>roles.py</code>). Kdo tedy staví korpus,
+        potřebuje síť na LINDAT, ne lokální port 8092.</p>
+      </aside>
+
+      <h3>Kontrakt: stavba cache a přírůstkovost</h3>
+      <p><b>Princip: jak se staví.</b> Anotátor projde všechny <code>*.txt</code> ve vstupní složce a
+      každý zanotuje do <b>samostatného shardu</b> — jeden pickle na dokument. To není detail: samostatné
+      shardy dovolí za běhu nahrát (<i>mountnout</i>) jen ty soubory, které se dotazu týkají, ne celý
+      korpus (koncept <b>fragmentový graf</b>, #60). A hlavně je stavba <b>přírůstková</b>: dokument, jehož
+      shard je novější než jeho zdroj, se přeskočí.</p>
+
+      <div class="sig">AnnotateCorpus.run() → None (zapisuje na disk) <span class="mark mark-prevzato">Převzato</span></div>
+      <p class="io"><b>bere</b> nic (cesty a model z <code>config.json</code> bloku
+      <code>preprocessing</code>) · <b>vrací</b> nic · <b>efekt</b> zapíše
+      <code>data/corpus/&lt;doc&gt;.pkl</code> pro každý vstupní soubor + souhrn
+      <code>data/corpus/_meta.json</code>. Vstupní <code>.txt</code> nikdy nepřepisuje.</p>
+
+      <p>Jak program pozná, že je něco už nacachováno, je jednoduché a stojí za zapamatování (řádek 264):</p>
+<pre><code>shard = os.path.join(corpus_dir, f"{doc_id}.pkl")
+if os.path.exists(shard) and os.path.getmtime(shard) >= os.path.getmtime(path):
+    ...  # shard je aktuální (novější než raw) → přeskoč, jen započítej
+</code></pre>
+      <p>Test je tedy <b>čas poslední změny souboru</b> (<code>mtime</code>): je-li shard mladší nebo
+      stejně starý jako jeho <code>.txt</code>, považuje se za platný a UDPipe se nevolá. Když upravíš
+      zdroj, jeho <code>.txt</code> zmládne, podmínka přestane platit a jen ten jeden dokument se
+      přeanotuje. To je celý mechanismus invalidace — žádné hashe, žádná databáze.</p>
+
+      <h3>Kontrakt: jak program s cache nakládá za běhu</h3>
+      <p>Runtime cache <b>jen čte</b>, nikdy do ní nezapisuje. Čtení obstarává dataloader:</p>
+      <div class="sig">Dataloader.load_shard(doc_id) → {(doc_id, idx): {entities, sentences}} <span class="mark mark-overeno">Ověřeno</span></div>
+      <p class="io"><b>bere</b> id dokumentu · <b>vrací</b> záznamy toho jednoho shardu · <b>efekt</b>
+      žádný (jen <code>pickle.load</code> z disku).</p>
+      <div class="sig">Dataloader.mount(doc_ids) → {(doc_id, idx): rec} <span class="mark mark-prevzato">Převzato</span></div>
+      <p class="io"><b>bere</b> seznam id (horkých souborů) · <b>vrací</b> jejich shardy sloučené do
+      jednoho korpusu · <b>efekt</b> žádný. Unmount = ten slovník prostě zahodit.</p>
+
+      <h3>Formát shardu a reálné počty <span class="mark mark-overeno">Ověřeno</span></h3>
+      <p>Shard je <code>dict</code>, kde klíč je dvojice <code>(doc_id, index_věty)</code> a hodnota nese
+      <code>entities</code> a <code>sentences</code> (věty jako seznamy tokenů). Pole
+      <code>sentences</code> je záměrně seznam — v praxi obsahuje právě jednu větu na záznam:</p>
+<pre><code>{ ("wiki_karel_čapek", 0): {
+    "entities":  [{"text": "Karel Čapek", "type": "P", "start": …, "end": …},
+                  {"text": "Svatoňovice", "type": "G", …}, …],
+    "sentences": [[ {token 1}, {token 2}, … ]] },
+  ("wiki_karel_čapek", 1): { … }, … }</code></pre>
+      <p>Skutečný stav na disku (spočteno v této session): <b>53</b> shardů
+      <code>data/corpus/*.pkl</code>; <code>_meta.json</code> hlásí <code>documents=53</code>,
+      <code>sentences=21199</code>, <code>model=czech-pdtc-ud-2.17-251125</code> (shodný s pinnutým —
+      důkaz reprodukovatelnosti: kdyby server model vyměnil, čísla by se rozešla). Entity se
+      <b>neberou z hotového seznamu jmen</b>, ale odvozují z rysu <code>NameType</code>, a osobní span
+      drží jen souvislé tokeny <b>shodného pádu</b> (metoda <code>entities_from_nametype</code>) — proto
+      „Ježíš" (1. pád) a „Duchem" (7. pád) neslepí do neexistující osoby.</p>
+
+      <!-- ============================ INDEXY ============================ -->
+      <h2 id="indexy">III·3 Indexy a brána ② — které soubory rozsvítit</h2>
+
+      <p><b>Princip.</b> Anotovaný korpus je bohatý, ale za běhu dotazu ho nechceme číst celý. Dataloader
+      spočítá pro každý soubor <b>statistiku</b>, která bleskově odpoví na otázku „které soubory se týkají
+      těchhle slov?". Základ je <b>tf·idf</b>: jak často se slovo v souboru vyskytuje (<i>tf</i>, četnost)
+      krát jak je <i>unikátní</i> napříč korpusem (<i>idf</i>). Slovo „být" je všude → nízké idf → skoro
+      neváží; „Svatoňovice" je v jednom souboru → vysoké idf → nasměruje. To je <b>brána ②</b>.</p>
+
+      <div class="sig">Dataloader.build_indexes() → {"documents": n, "terms": m} <span class="mark mark-prevzato">Převzato</span></div>
+      <p class="io"><b>bere</b> nic (čte všechny shardy z <code>corpus_dir</code>) · <b>vrací</b> souhrn
+      · <b>efekt</b> zapíše pět indexů do <code>data/index/</code>. Přepočítává <i>všechno</i> — idf
+      závisí na počtu dokumentů, takže po přidání souboru musí být celá tabulka aktuální.</p>
+      <div class="sig">Dataloader.select_files(query_lemmas, top_files=None) → [(doc, skóre)] <span class="mark mark-prevzato">Převzato</span></div>
+      <p class="io"><b>bere</b> lemmata dotazu (iterable, nebo dict lemma→teplo) · <b>vrací</b> soubory
+      sestupně podle shody, deterministicky (remízy dle jména), jen se skóre &gt; 0 · <b>efekt</b> žádný
+      (líné čtení per-soubor indexů).</p>
+      <div class="sig">Dataloader.load_idf() → {"idf": {lemma: idf}, "n": počet} <span class="mark mark-prevzato">Převzato</span></div>
+      <p class="io"><b>bere</b> nic · <b>vrací</b> globální tabulku vah (jas) slov · <b>efekt</b> žádný.
+      Tuhle tabulku čte i aktivační pole v <a href="dil-4-program.html">Dílu IV</a>.</p>
+
+      <p>Nad tf·idf staví <code>build_indexes</code> čtyři pomocné indexy, každý řeší jednu slabinu čisté
+      četnosti. Tady je jejich přehled i s tím, kam se ukládají:</p>
+      <div class="tablewrap">
+      <table>
+        <tr><th>Index</th><th>Soubor v <code>data/index/</code></th><th>K čemu</th></tr>
+        <tr><td>tf·idf per soubor</td><td><code>&lt;doc&gt;.pkl</code></td><td>základní výběr souborů (L2-normovaný vektor vah).</td></tr>
+        <tr><td>globální idf</td><td><code>_idf.pkl</code></td><td>váha/jas každého slova; sdílí ho i aktivační pole.</td></tr>
+        <tr><td>podmětový</td><td><code>_subjects.pkl</code></td><td>kolikrát je entita <i>podmětem</i> v souboru — „Slovo" ukáže na Jana, ne na četnost v bibli.</td></tr>
+        <tr><td>aliasy</td><td><code>_aliases.pkl</code></td><td>různá jména téže osoby → jedna identita (Barbora Panklová ≡ Božena Němcová).</td></tr>
+        <tr><td>doc-graf</td><td><code>_doclinks.pkl</code></td><td>hrany mezi dokumenty = sdílené distinktivní entity; bonusový co-mount (Čapek → i R.U.R.).</td></tr>
+      </table>
+      </div>
+      <p>Prahy jsou data v <code>config.json</code> bloku <code>dataloader</code>:
+      <code>min_count=2</code> (slovo s výskytem 1 se do indexu nedostane), <code>top_files=8</code>
+      (kolik souborů brána vezme), <code>subject_min=3</code>, <code>doclink_top=2</code>. Kdo přidá
+      dokument a <b>zapomene zavolat <code>build_indexes()</code></b>, dostane tichou chybu: shard na
+      disku je, ale žádný dotaz ho nevybere — je „neviditelný".</p>
+
+      <!-- ============================ VZOR ============================ -->
+      <h2 id="vzor">III·4 VZOR — formát, kde je uložen, jak se staví, jak se načítá</h2>
+
+      <p><b>Princip.</b> Chceme, aby otázka „Kdo je Karel Čapek?" našla ve větě „…byl český
+      <b>spisovatel</b>." odpověď, aniž bychom měli seznam všech možných otázek. Trik: popíšeme
+      <i>strukturu</i> okolí slova, ne slovo samo. Tomu popisu říkáme <b>VZOR</b> (jako mluvnický vzor
+      „pán" zastupuje tisíce slov). VZOR je <b>přesný na gramatiku, ale slepý k lexému</b>: „byl český
+      spisovatel." a „byl slavný malíř." mají identický VZOR. Pokrytí se pak nezískává rozmazáním jednoho
+      vzoru, ale množstvím přesných.</p>
+
+      <h3>Formát VZORu</h3>
+      <p>Stavební kámen je <b>SLOT</b> — obálka jednoho tokenu: slovní druh plus nosné rysy (u jmen pád,
+      u sloves čas). Pád je v češtině nositel role (1. pád = kdo, 3. = komu, 4. = koho), proto ho SLOT
+      vždy drží.</p>
+      <div class="sig">GrammarVzor.slot(tok) → str <span class="mark mark-overeno">Ověřeno</span></div>
+      <p class="io"><b>bere</b> token · <b>vrací</b> SLOT, např. <code>PROPN:Nom</code>,
+      <code>NOUN:Nom</code>, u interpunkce ponechaný znak (<code>,</code> <code>.</code>) · <b>efekt</b> žádný.</p>
+
+      <p>VZOR je <b>řetězec SLOTŮ v okně kolem jednoho slova (pivotu)</b>, oddělených znakem
+      <code>·</code>: <code>r</code> slotů vlevo, pivot, <code>r</code> slotů vpravo a na konci modalita
+      věty (tečka / otazník). Poloměr <code>r</code> je konfigurační (<code>radius=1</code>); okraj věty
+      se značí <code>^</code> a <code>$</code>.</p>
+      <div class="sig">GrammarVzor.frame_sig(toks, i, modality, r=None) → str <span class="mark mark-overeno">Ověřeno</span></div>
+      <p class="io"><b>bere</b> větu, index pivotu <code>i</code>, koncovou modalitu · <b>vrací</b> VZOR
+      (str) · <b>efekt</b> žádný. Reálně (spuštěno v této session) pro pivot „spisovatel" ve větě 0
+      Čapka: SLOT <code>NOUN:Nom</code>, VZOR <code>ADJ:Nom·NOUN:Nom·,·.</code> (vlevo „český", pivot,
+      vpravo čárka, modalita tečka).</p>
+
+      <h3>Kde je VZOR uložen</h3>
+      <p>VZOR sám o sobě je jen řetězec — ukládá se jako součást <b>šablony</b> (<code>QueryTemplate</code>)
+      a <b>faktu</b> (<code>Fact</code>). Obojí je shardované po dokumentu, aby šlo mountovat jen horké
+      soubory. Následující tabulka je mapa perzistence celé fáze syntézy (cesty ověřeny greppem v
+      <code>config.json</code> a ve store-modulech):</p>
+      <div class="tablewrap">
+      <table>
+        <tr><th>Co</th><th>Kde na disku</th><th>Formát</th><th>Zdroj cesty</th></tr>
+        <tr><td>registr vazeb fakt↔otázka</td><td><code>registry.jsonl</code> (kořen projektu)</td><td>JSONL, řádek = vazba</td><td><code>synthesis.registry</code></td></tr>
+        <tr><td>VZOR-šablony</td><td><code>data/templates/&lt;doc&gt;.jsonl</code> + <code>_meta.json</code></td><td>JSONL, řádek = <code>QueryTemplate</code></td><td><code>template_store.dir</code></td></tr>
+        <tr><td>fakty</td><td><code>data/facts/&lt;doc&gt;.jsonl</code></td><td>JSONL, řádek = <code>Fact</code></td><td><code>fact_store.dir</code></td></tr>
+        <tr><td>gazetteer míst</td><td><code>data/gazetteer.json</code></td><td>JSON (lemmata GEO)</td><td><code>topos.gazetteer</code></td></tr>
+      </table>
+      </div>
+      <p>Jeden řádek šablony (<code>QueryTemplate.as_row()</code>) drží <b>čtyři</b> klíčové části:
+      VZOR faktu (kde je díra), VZOR otázky, roli díry a odpověď — plus provenienci <code>fact_ref</code>
+      = <code>[doc, sent]</code> a stabilní <code>id</code> (hash pro deduplikaci). Skutečný řádek z disku
+      (věta 0 Čapka, ověřeno v této session):</p>
+<pre><code>{"id": "006f780b4ab6",
+ "fact_vzor":  "ADJ:Nom·NOUN:Nom·,·.",
+ "query_vzor": "ADJ:Nom·PRON:Nom·,·?",
+ "role": "state", "answer": "spisovatel",
+ "surface_q": null,
+ "fact_ref": ["wiki_karel_čapek", 0], "origin": "deterministic"}</code></pre>
+
+      <h3>Jak se VZOR staví</h3>
+      <p>Stavba je dvoukroková a stojí za pochopení, protože je v ní elegantní myšlenka.
+      <b>Krok 1 — registr</b>: <code>synth_registry.py</code> projde každou faktickou větu, najde
+      predikát a u každého odpovědního slotu (podmět, předmět, určení) spočte <code>frame_sig</code> na
+      pozici toho slotu — to je <b>VZOR faktu</b> (<code>fact_vzor</code>, kde je „díra"). Zapíše se do
+      <code>registry.jsonl</code>.</p>
+      <div class="sig">SynthRegistry.run() → {"bindings", "predicates", "answer_slots"} <span class="mark mark-prevzato">Převzato</span></div>
+      <p class="io"><b>bere</b> nic (mountne celý korpus) · <b>vrací</b> souhrn · <b>efekt</b> zapíše
+      <code>registry.jsonl</code>.</p>
+
+      <p><b>Krok 2 — transpozice na VZOR otázky</b>: <code>build_templates_all.py</code> vezme každý
+      <code>fact_vzor</code> a udělá z něj <code>query_vzor</code> jednoduchou <b>transpozicí</b> — na
+      místě pivotu (odpovědi) nahradí SLOT <b>tázacím slotem</b> a modalitu změní na otazník. Tázací
+      sloty jsou data v <code>cs.json</code> (klíč <code>interrogative_slots</code>): role
+      <code>state</code> a <code>who</code> → <code>PRON:Nom</code>, <code>where</code>/<code>when</code>
+      → <code>ADV</code>, <code>whom_what</code> → <code>PRON:Acc</code>, <code>whose_of_what</code> →
+      <code>PRON:Gen</code>, <code>with_whom_what</code> → <code>PRON:Ins</code> a tak dál. Na příkladu
+      výše je transpozice vidět doslova: pivot <code>NOUN:Nom</code> se stal <code>PRON:Nom</code> a
+      koncová <code>.</code> se stala <code>?</code>.</p>
+      <div class="sig">SynthQueries._deterministic_vzor(fact_vzor, role) → query_vzor|None <span class="mark mark-overeno">Ověřeno</span></div>
+      <p class="io"><b>bere</b> VZOR faktu + roli díry · <b>vrací</b> VZOR otázky (nebo <code>None</code>,
+      když pro roli není tázací slot) · <b>efekt</b> žádný. Výsledek je přesně to, co dá parsování
+      <i>reálné</i> otázky té struktury — proto se otázka a fakt v runtime potkají.</p>
+
+      <aside class="rationale">
+        <span class="lbl">Zdůvodňovací blok — proč deterministická transpozice, a ne generované otázky</span>
+        <dl>
+          <dt>Rozhodnutí</dt><dd>VZOR otázky odvozovat <b>mechanickou transpozicí</b> VZORu faktu
+          (pivot → tázací slot, modalita → „?"), ne generovat text otázek jazykovým modelem.</dd>
+          <dt>Problém</dt><dd>Aby otázka našla fakt, musí mít <i>stejný</i> strukturní otisk. Kdybychom
+          otázky psali ručně nebo je nechali generovat, pokrytí by bylo náhodné — na některé role by
+          šablona chyběla a matcher by mlčel, i když fakt existuje.</dd>
+          <dt>Mechanismus</dt><dd>Fakt-VZOR i query-VZOR jsou tentýž řetězec SLOTŮ; transpozice mění jen
+          jeden slot a modalitu. Tím je <b>garantováno</b>, že na každou díru s definovaným tázacím
+          slotem vznikne přesně jedna šablona, jejíž query-VZOR se rovná tomu, co vyrobí
+          <code>frame_sig</code> nad skutečnou otázkou. Je to <i>totéž</i> primitivum transpozice, jaké
+          se používá při dosazování do role díry v koreferenci — jedno pravidlo pro dvě věci.</dd>
+          <dt>Zvažované alternativy</dt><dd><b>Generovat parafráze jazykovým modelem (Ollama):</b> kód to
+          umí (origin <code>"ollama"</code>) a přidává povrchovou variabilitu, ale bez sítě a nedeterministicky
+          — proto je deterministická transpozice <i>páteří</i>, model jen bonus. <b>Ručně psané šablony:</b>
+          neškálují na desítky domén a rozpadnou se při každé změně poloměru VZORu.</dd>
+          <dt>Kdy to přestane platit</dt><dd>Když má role prázdný tázací slot, šablona nevznikne (funkce
+          vrátí <code>None</code>). A když je poloměr VZORu tak malý, že dvě různé věty dostanou týž VZOR,
+          transpozice zdědí tu nejednoznačnost.</dd>
+          <dt>Cena</dt><dd>Šablon je hodně (jedna na každý odpovědní slot každé věty) a jsou křehké vůči
+          přesnosti anotace — špatný <code>deprel</code> od UDPipe dá špatný fakt-VZOR a tím i špatnou otázku.</dd>
+        </dl>
+      </aside>
+
+      <p class="full">Celá stavba VZORu na jednom obrázku. Sleduj, že <code>fact_vzor</code> vzniká v
+      registru a <code>query_vzor</code> je jeho transpozice; obojí končí jako řádek šablony na disku.</p>
+<pre class="mermaid">
+flowchart TD
+  accTitle: Stavba VZOR-šablony ze shardu na disk
+  accDescr: Ze shardu synth_registry spočte fact_vzor do registry.jsonl, build_templates_all ho transponuje na query_vzor a uloží QueryTemplate do template shardu; runtime mountne jen horké a matchuje.
+  SH["shard (věta + odpovědní slot)"] --> FR["synth_registry.frame_sig → fact_vzor"]
+  FR --> REG["registry.jsonl (fact_vzor + role + lemma)"]
+  REG --> TR["build_templates_all: transpozice pivot→tázací slot, . → ?"]
+  TR --> QT["QueryTemplate: fact_vzor / query_vzor / role / answer / fact_ref"]
+  QT --> DISK["data/templates/&lt;doc&gt;.jsonl"]
+  DISK --> MNT["runtime: TemplateStore.mount(horké soubory)"]
+  MNT --> MCH["match_scored(query_vzor otázky)"]
+</pre>
+
+      <h3>Jak se VZOR načítá</h3>
+      <p>Za běhu se šablony <b>nedrží všechny</b> — mountnou se jen horké soubory (ty, které vybrala
+      brána ②) a nad nimi se postaví indexy podle query-VZORu.</p>
+      <div class="sig">TemplateStore.mount(doc_ids) → None <span class="mark mark-prevzato">Převzato</span></div>
+      <p class="io"><b>bere</b> id horkých souborů · <b>vrací</b> nic · <b>efekt</b> načte jejich
+      <code>&lt;doc&gt;.jsonl</code> do <code>self.mounted</code> a přebuduje index
+      <code>by_query_vzor</code>. Studený soubor zůstane na disku.</p>
+      <div class="sig">TemplateStore.match_scored(query_vzor) → [(QueryTemplate, mq)] <span class="mark mark-prevzato">Převzato</span></div>
+      <p class="io"><b>bere</b> VZOR otázky · <b>vrací</b> shodné šablony se sílou shody
+      <code>mq</code> (exaktní = 1.0, jinak fuzzy překryv slotů nad prahem
+      <code>fuzzy_min_overlap=0.5</code>) · <b>efekt</b> žádný. Mezi stejně silnými rozhodne až aktivace
+      (<a href="dil-4-program.html">Díl IV</a>).</p>
+
+      <h3>Co nefunguje a proč</h3>
+      <p>Nováčka napadne párovat otázku a fakt <b>podle slov</b> — když se v otázce i faktu vyskytne
+      „narodit" a „Čapek", je to shoda. Selže to na slovosledu: „Kde se narodil Čapek?" má okno kolem
+      fronted „Kde", zatímco fakt „Narodil se ve Svatoňovicích" má okno kolem místa uprostřed — jejich
+      window-VZORy se nepotkají. Proto je window-VZOR jen jemný tie-break a hlavní spoj nese
+      <b>predikát + role</b> přes fakt-store (viz další sekce). VZOR řeší <i>tvar</i>, predikát řeší
+      <i>totožnost</i>.</p>
+
+      <!-- ============================ SYNTEZA ============================ -->
+      <h2 id="synteza">III·5 Syntéza mapy faktů — čtyři toky do jednoho fakt-storu</h2>
+
+      <p><b>Princip.</b> Fakt je <b>predikát</b> (o čem se mluví) plus <b>role-sloty</b> (kdo, kde, kdy,
+      čím) plus provenience (odkud pochází). Mapu faktů skládají čtyři nezávislé toky, které se slévají
+      do jednoho fakt-storu. Orchestruje je <code>build_facts_all.py</code>.</p>
+
+      <div class="sig">build_facts_all.main() → None (zapisuje data/facts/) <span class="mark mark-prevzato">Převzato</span></div>
+      <p class="io"><b>bere</b> nic (čte <code>registry.jsonl</code> + shardy pro koreferenci) ·
+      <b>vrací</b> nic · <b>efekt</b> smaže a znovu zapíše <code>data/facts/&lt;doc&gt;.jsonl</code>.
+      Agreguje řádky registru se stejným <code>(doc, sent, predikát)</code> do jednoho <code>Fact</code>
+      a doplní chybějící podmět <b>koreferencí</b> (pro-drop „on/ona" → <code>who</code>).</p>
+
+      <p>Datový model faktu je prostý — a provenience (<code>doc</code>, <code>sent</code>) je jeho
+      součástí, ne přílepkem:</p>
+<pre class="mermaid">
+classDiagram
+  accTitle: Datový model faktu a čtyři toky syntézy
+  accDescr: Fakt nese predikát, slovník rolí na lemmata a provenienci doc plus sent; plní ho čtyři zdroje: registr, biografická závorka, Chronos a vztahové hrany.
+  class Fact {
+    +predicate
+    +roles
+    +doc
+    +sent
+    +text
+  }
+  class Zdroje {
+    registr_synth
+    bio_zavorka
+    chronos_cas
+    vztah_hrana
+  }
+  Zdroje --> Fact : plni sloty
+</pre>
+
+      <p>Čtyři toky a jejich kontrakty:</p>
+      <div class="sig">extract_bio.bio_facts(sent, grammar) → [(predikát, roles)] <span class="mark mark-prevzato">Převzato</span></div>
+      <p class="io"><b>bere</b> úvodní větu + grammar · <b>vrací</b> fakty <code>narodit</code>/<code>zemřít</code>
+      · <b>efekt</b> žádný. Rozparsuje wikipediální závorku „Osoba (datum místo – datum místo)": levá půle
+      před en-pomlčkou = narození, pravá = úmrtí; rok = 4místné NUM, místo = entita <code>Geo</code>.</p>
+      <div class="sig">chronos.Chronos.temporal_facts(sent, grammar) → [(predikát, rok)] <span class="mark mark-prevzato">Převzato</span></div>
+      <p class="io"><b>bere</b> větu + grammar · <b>vrací</b> roky přiřazené k <i>hlavnímu</i> predikátu
+      (root VERB) · <b>efekt</b> žádný. Dá <code>when</code>-slot i z běžného textu, ne jen ze závorky;
+      rozsah roku je v <code>config.json</code> (<code>year_min=1000</code>, <code>year_max=2100</code>).</p>
+      <div class="sig">extract_relations.relation_facts(sent, grammar, holder=None) → [(vztah, roles)] <span class="mark mark-prevzato">Převzato</span></div>
+      <p class="io"><b>bere</b> větu, grammar, případného držitele (protagonistu dokumentu pro pro-drop)
+      · <b>vrací</b> vztahové hrany · <b>efekt</b> žádný. Z kopuly „podmět byl &lt;vztah&gt; &lt;osoba&gt;"
+      udělá hranu: predikát = vztah-slovo (<code>bratr</code>), <code>who</code> = držitel,
+      <code>whose_of_what</code> = cílová osoba. Symetrické vztahy (bratr, manžel) se uloží obousměrně.</p>
+
+      <aside class="rationale">
+        <span class="lbl">Zdůvodňovací blok — vztah jako HRANA mezi osobami</span>
+        <dl>
+          <dt>Rozhodnutí</dt><dd>Příbuzenský vztah ukládat jako <b>fakt s dvěma osobami</b>
+          (<code>who</code> + <code>whose_of_what</code>), ne jako pouhou vlastnost jedné.</dd>
+          <dt>Problém</dt><dd>Věta „Byl mladším bratrem Josefa Čapka" běžnou extrakcí vydá jen
+          <code>state=bratr</code> a <b>ztratí obě osoby</b> — na „Kdo byl bratr Karla?" není z čeho odpovědět.</dd>
+          <dt>Mechanismus</dt><dd>Z kopulové konstrukce se udělá hrana; symetrické vztahy obousměrně, takže
+          funguje „bratr Karla" i „bratr Josefa". Měřeno na velkém etalonu: kategorie <b>relation</b> se
+          posunula z <b>0 na 4/18</b>.</dd>
+          <dt>Zvažované alternativy</dt><dd><b>Uložit vztah jako stav</b> (<code>state=bratr</code>):
+          jednodušší, ale ztrácí druhou entitu. <b>Rozšířit na slovesné a genitivní vztahy:</b> zkoušeno a
+          změřeno jako net-neutral (stejně chyb kolik oprav) → vráceno; čeká na node-based retrieval.</dd>
+          <dt>Kdy to přestane platit</dt><dd>Mimo kopulový vzor — slovesné a bezsponové genitivní vztahy se
+          dnes nevytěží.</dd>
+          <dt>Cena</dt><dd>Pokrytí jen 4/18; symetrie zdvojuje fakty; celé to visí na tom, že UDPipe označí
+          obě jména jako <code>NameType</code>.</dd>
+        </dl>
+      </aside>
+
+      <h3>Reálná ukázka <span class="mark mark-overeno">Ověřeno</span></h3>
+      <p>Skutečné řádky z <code>data/facts/wiki_karel_čapek.jsonl</code>, vytažené v této session:</p>
+<pre><code>{"predicate": "být",     "roles": {"who": ["Karel"], "state": ["spisovatel"]},
+ "doc": "wiki_karel_čapek", "sent": 0, "text": null}
+{"predicate": "narodit", "roles": {"where": ["Svatoňovice", "rodina"], "who": ["Karel"]},
+ "doc": "wiki_karel_čapek", "sent": 4, "text": null}</code></pre>
+      <p>Na druhém řádku je vidět reálná nedokonalost i její řešení: role <code>where</code> nese vedle
+      správného „Svatoňovice" i šum „rodina". Poslední míli — vybrat mezi kandidáty téže role ten, který
+      je opravdu <i>místo</i> — řeší až za běhu expert <b>Topos</b> přes gazetteer (<code>topos.is_place</code>,
+      viz <a href="dil-4-program.html">Díl IV</a>). Mapa faktů tedy může být „špinavá"; čistí ji až výběr
+      slotu podle typu entity. Na disku je (spočteno v této session) <b>52</b> fakt-shardů a <b>52</b>
+      template-shardů proti <b>53</b> korpusovým — jeden dokument nevydá žádný fakt.</p>
+
+      <h3>Chyby a jak se projeví</h3>
+      <p>Syntéza selhává <b>tiše</b>: vstup projde, jen výstupní fakt je jiný, než čekáš, a poznáš to až
+      etalonem (<a href="dil-5.html">Díl V</a>). Dvě opravené pasti to ilustrují.
+      <code>is_factual</code> kdysi zahazovala větu při <i>jakémkoli</i> otazníku (i osamoceném „?" v
+      závorce) — ztrácela se úvodní definiční věta; oprava bere jen <b>koncový</b> otazník. A u souvětí
+      „Králík je býložravec, který využívá…" fallback na „první sloveso" chytal sloveso vedlejší věty
+      místo spony hlavní — oprava dává <b>kopule hlavní klauzule přednost</b> (viz <code>_binding</code>
+      v <code>synth_registry.py</code>, řádek 83).</p>
+
+      <aside class="correct-way">
+        <span class="lbl">Correct way — cílový stav</span>
+        <p>Vadná extrakce se pozná ve chvíli, kdy vzniká: když věta nevydá očekávaný fakt nebo se
+        predikát naváže na špatné sloveso, systém to ohlásí už při stavbě mapy faktů — nezůstane tichá
+        regrese, na kterou se přijde teprve měřením. Etalon pak kvalitu <b>potvrzuje</b>, místo aby jako
+        jediný odhaloval, že se něco rozbilo.</p>
+      </aside>
+
+      <!-- ============================ KONTRAKTY ============================ -->
+      <h2 id="kontrakty">III·6 Tabulka kontraktů</h2>
+
+      <p>Souhrn všech funkcí, o kterých byla řeč, s tím, co berou, co vrací, jaký mají vedlejší efekt a
+      jak jsou ověřené. Efekt <b>čistá</b> = žádný vedlejší efekt; <b>disk</b> = zapisuje soubory;
+      <b>čte</b> = jen čte z disku.</p>
+      <div class="tablewrap">
+      <table>
+        <tr><th>Funkce</th><th>Bere</th><th>Vrací</th><th>Efekt</th><th>Důvěra</th></tr>
+        <tr><td><code>AnnotateCorpus.parse_conllu</code></td><td>CoNLL-U text</td><td>věty[tokenů] + model</td><td>čistá</td><td><span class="mark mark-overeno">Ověřeno</span></td></tr>
+        <tr><td><code>AnnotateCorpus.entities_from_nametype</code></td><td>tokeny věty</td><td>entity {text,type,start,end}</td><td>čistá</td><td><span class="mark mark-prevzato">Převzato</span></td></tr>
+        <tr><td><code>AnnotateCorpus.run</code></td><td>—</td><td>—</td><td>disk (corpus + _meta)</td><td><span class="mark mark-prevzato">Převzato</span></td></tr>
+        <tr><td><code>GrammarVzor.canon_lemma</code></td><td>token</td><td>lemma</td><td>čistá</td><td><span class="mark mark-overeno">Ověřeno</span></td></tr>
+        <tr><td><code>GrammarVzor.slot</code></td><td>token</td><td>SLOT (str)</td><td>čistá</td><td><span class="mark mark-overeno">Ověřeno</span></td></tr>
+        <tr><td><code>GrammarVzor.frame_sig</code></td><td>věta, i, modalita</td><td>VZOR (str)</td><td>čistá</td><td><span class="mark mark-overeno">Ověřeno</span></td></tr>
+        <tr><td><code>GrammarVzor.role_key</code></td><td>deprel, upos, feats, prep</td><td>role (str)|None</td><td>čistá</td><td><span class="mark mark-overeno">Ověřeno</span></td></tr>
+        <tr><td><code>Dataloader.load_shard</code></td><td>doc_id</td><td>shard-dict</td><td>čte</td><td><span class="mark mark-overeno">Ověřeno</span></td></tr>
+        <tr><td><code>Dataloader.build_indexes</code></td><td>—</td><td>{documents, terms}</td><td>disk (index)</td><td><span class="mark mark-prevzato">Převzato</span></td></tr>
+        <tr><td><code>Dataloader.select_files</code></td><td>lemmata dotazu</td><td>[(doc, skóre)]</td><td>čte</td><td><span class="mark mark-prevzato">Převzato</span></td></tr>
+        <tr><td><code>Dataloader.mount</code></td><td>[doc_id]</td><td>korpus-dict</td><td>čte</td><td><span class="mark mark-prevzato">Převzato</span></td></tr>
+        <tr><td><code>SynthRegistry.run</code></td><td>—</td><td>souhrn</td><td>disk (registry.jsonl)</td><td><span class="mark mark-prevzato">Převzato</span></td></tr>
+        <tr><td><code>SynthQueries._deterministic_vzor</code></td><td>fact_vzor, role</td><td>query_vzor|None</td><td>čistá</td><td><span class="mark mark-overeno">Ověřeno</span></td></tr>
+        <tr><td><code>TemplateStore.mount</code></td><td>[doc_id]</td><td>—</td><td>čte</td><td><span class="mark mark-prevzato">Převzato</span></td></tr>
+        <tr><td><code>TemplateStore.match_scored</code></td><td>query_vzor</td><td>[(tpl, mq)]</td><td>čistá</td><td><span class="mark mark-prevzato">Převzato</span></td></tr>
+        <tr><td><code>FactStore.match</code></td><td>predikát, role díry</td><td>[(lemma, Fact)]</td><td>čistá</td><td><span class="mark mark-overeno">Ověřeno</span></td></tr>
+        <tr><td><code>build_facts_all.main</code></td><td>—</td><td>—</td><td>disk (facts)</td><td><span class="mark mark-prevzato">Převzato</span></td></tr>
+        <tr><td><code>extract_bio.bio_facts</code></td><td>věta, grammar</td><td>[(pred, roles)]</td><td>čistá</td><td><span class="mark mark-prevzato">Převzato</span></td></tr>
+        <tr><td><code>chronos.temporal_facts</code></td><td>věta, grammar</td><td>[(pred, rok)]</td><td>čistá</td><td><span class="mark mark-prevzato">Převzato</span></td></tr>
+        <tr><td><code>extract_relations.relation_facts</code></td><td>věta, grammar, holder</td><td>[(vztah, roles)]</td><td>čistá</td><td><span class="mark mark-prevzato">Převzato</span></td></tr>
+      </table>
+      </div>
+
+      <aside class="open-question">
+        <span class="lbl">Co jsem neověřil</span>
+        <p>Živý tah <code>Answering.answer(question, …)</code> vrací dict
+        <code>{answer, mode, offer, fact_ref, hole_role, candidates, via}</code> a měl by na „Kdo je
+        Karel Čapek?" vrátit <b>spisovatel</b>, na „Kdo byl bratr Karla Čapka?" vrátit <b>Josef</b>. To
+        <span class="todo">OVĚŘIT: nespuštěno v této session</span> — parsování otázky vyžaduje síť na
+        LINDAT, kterou jsem tu neměl. Popis odpovídá kódu <code>answering.py</code> a shodě VZORů, kterou
+        jsem ověřil na disku, proto <span class="mark mark-prevzato">Převzato</span>. Kompletní rozbor
+        živého tahu je v <a href="dil-4-program.html">programové příloze Dílu IV</a>.</p>
+      </aside>
+
+      <!-- ============================ ZÁVĚR ============================ -->
+      <h2>Co už umíš</h2>
+      <p>Umíš pojmenovat funkci pro každý krok cesty dat: <code>parse_conllu</code> udělá z CoNLL-U
+      tokeny, <code>canon_lemma</code> je kanonizuje, <code>AnnotateCorpus.run</code> je uloží do
+      přírůstkové cache (invalidace přes <code>mtime</code>), <code>build_indexes</code> postaví bránu ②,
+      <code>frame_sig</code> spočte VZOR, dvojice <code>synth_registry</code> + <code>build_templates_all</code>
+      z něj transpozicí udělá VZOR-šablonu, a čtyři extraktory (<code>synth_registry</code>,
+      <code>extract_bio</code>, <code>chronos</code>, <code>extract_relations</code>) slijí mapu faktů.
+      Víš, kde přesně to na disku leží (<code>data/corpus</code>, <code>data/index</code>,
+      <code>data/facts</code>, <code>data/templates</code>) a v jakém formátu. A víš, které tvrzení jsem
+      ověřil spuštěním a které jen přečetl z kódu.</p>
+      <p>Další patro — co se z těchhle produktů stane za běhu jednoho dotazu, jak teče „světlo" a jak se
+      počítá jistota — rozebírá <a href="dil-4-program.html">programová příloha Dílu IV</a>.</p>
+
+      <div class="pager">
+        <a href="dil-3.html"><span class="dir">← zpět na narativ</span>Díl III — Cesta dat</a>
+        <a href="dil-4-program.html"><span class="dir">další příloha →</span>Díl IV — programová příloha</a>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

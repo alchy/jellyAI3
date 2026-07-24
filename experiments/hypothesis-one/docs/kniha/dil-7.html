@@ -16,15 +16,28 @@
     <p class="tag">knižní dokumentace</p>
     <nav aria-label="Obsah knihy">
       <a href="index.html">Úvod</a>
-      <p class="part">Díl I — Než začneme</p><a href="dil-1.html">I · Co řeší, slovník, mapa</a>
-      <p class="part">Díl II — První kroky</p><a href="dil-2.html">II · Instalace, běh, data</a>
-      <p class="part">Díl III — Cesta dat</p><a href="dil-3.html">III · Fáze pipeline</a>
-      <p class="part">Díl IV — Jak to funguje</p><a href="dil-4.html">IV · Automat, aktivace, fakty</a>
-      <p class="part">Díl V — Testování</p><a href="dil-5.html">V · Testy, tvary, měření</a>
-      <p class="part">Díl VI — Rozšiřování</p><a href="dil-6.html">VI · Data, vztahy, testy</a>
-      <p class="part">Díl VII — Provoz</p><a href="dil-7.html" class="active">VII · UDPipe, viz, pasti</a>
-      <p class="part">Díl VIII — Otevřené body</p><a href="dil-8.html">VIII · Nedodělky a cesty</a>
-      <p class="part">Přílohy</p><a href="prilohy.html">Rejstřík, konfigurace, registry</a>
+      <p class="part">Díl I — Než začneme</p>
+      <a href="dil-1.html">I · Co řeší, slovník, mapa</a>
+      <p class="part">Díl II — První kroky</p>
+      <a href="dil-2.html">II · Instalace, běh, data</a>
+      <p class="part">Díl III — Cesta dat</p>
+      <a href="dil-3.html">III · Fáze pipeline</a>
+      <a href="dil-3-program.html" class="sub-prog">III · programová příloha</a>
+      <p class="part">Díl IV — Jak to funguje</p>
+      <a href="dil-4.html">IV · Automat, aktivace, fakty</a>
+      <a href="dil-4-program.html" class="sub-prog">IV · programová příloha</a>
+      <p class="part">Díl V — Testování</p>
+      <a href="dil-5.html">V · Testy, tvary, měření</a>
+      <p class="part">Díl VI — Rozšiřování</p>
+      <a href="dil-6.html">VI · Data, vztahy, testy</a>
+      <a href="dil-6-program.html" class="sub-prog">VI · programová příloha</a>
+      <p class="part">Díl VII — Provoz</p>
+      <a href="dil-7.html" class="active">VII · UDPipe, viz, pasti</a>
+      <a href="dil-7-program.html" class="sub-prog">VII · programová příloha</a>
+      <p class="part">Díl VIII — Otevřené body</p>
+      <a href="dil-8.html">VIII · Nedodělky a cesty</a>
+      <p class="part">Přílohy</p>
+      <a href="prilohy.html">Rejstřík, konfigurace, registry</a>
     </nav>
   </aside>
 
@@ -36,6 +49,7 @@
       <nav class="crumbs"><a href="index.html">Úvod</a> › Díl VII</nav>
       <p class="eyebrow">Díl VII — Provoz a řešení potíží</p>
       <h1>Provoz a řešení potíží</h1>
+      <p class="prog-callout">Pro vývojáře: <a href="dil-7-program.html">programová příloha — kontrakty funkcí a reálné ukázky nad kódem →</a></p>
 
       <p class="lead">Kde jsme a kam jdeme: v Dílu VI jsi přidával data, vztahová slova a testy —
       měnil jsi, <i>co</i> systém umí. Tenhle díl je o něčem jiném: co dělat, když systém přestane
@@ -128,6 +142,16 @@
       zdvořilé „nevím" na všechno — takže si výpadku snadno nevšimneš a začneš hledat chybu v datech,
       kde žádná není.</p>
 
+      <aside class="correct-way">
+        <span class="lbl">Correct way — cílový stav</span>
+        <p>Když UDPipe na portu 8092 přestane odpovídat, systém to <b>ohlásí jako provozní událost</b>
+        ve chvíli, kdy nastane — ne až tím, že na každou otázku začne vracet zdvořilé „nevím".
+        Odolnost zůstává (dotaz nespadne výjimkou a systém raději mlčí, než by hádal), ale výpadek je
+        <b>okamžitě rozpoznatelný</b>: obsluha z jediného záznamu ví, že umlkl rozbor otázky, a nehledá
+        neexistující chybu v datech. Rozdíl mezi „neběží živá služba" a „na tohle opravdu nemám fakt"
+        je z chování systému čitelný na první pohled.</p>
+      </aside>
+
       <h2 id="7-2">VII.2 Živá vizualizace <code>viz.py</code> <span class="mark mark-prevzato">Převzato</span></h2>
       <p>Když chceš <b>vidět</b>, co se v systému děje — které soubory se otázkou rozsvítí, kudy teče
       světlo, jaká odpevěď vyhraje — slouží k tomu <code>viz.py</code>. Napojuje se na <b>živý</b>
@@ -192,6 +216,15 @@
       zůstala stará. Systém pak buď neví nic, nebo odpovídá podle zastaralého korpusu. Řešení je
       reindex na serveru (VII.4).</p>
 
+      <aside class="correct-way">
+        <span class="lbl">Correct way — cílový stav</span>
+        <p>Po nasazení systém <b>nikdy tiše neodpovídá nad prázdným nebo zastaralým korpusem</b>: při
+        startu pozná, že odvozená data na cílovém stroji chybí nebo neodpovídají surovým textům, a tento
+        stav <b>hlásí</b>, místo aby vracel odpovědi ze staré verze nebo „neví" úplně všechno. Obsluha se
+        o mrtvých datech dozví z jasné zprávy, ne až z divných odpovědí uživatelů. Odpovídá se teprve nad
+        čerstvými daty přestavěnými z <code>data/raw/</code> přímo na tomto stroji.</p>
+      </aside>
+
       <h3>Past 2 — naučená brána přeučuje (proto je vypnutá) <span class="mark mark-prevzato">Převzato</span></h3>
       <p>Systém umí volitelně použít <b>naučenou bránu</b> (soubor <code>gate.json</code>) — malý
       klasifikátor, který podle rysů odhaduje, jestli odpovědi věřit. V konfiguraci je ale
@@ -209,6 +242,16 @@
       odpovědí: systém začne „nevím" i tam, kde předtím odpovídal správně. Podrobný rozbor je v
       <a href="dil-8.html">Dílu VIII</a>.</p>
 
+      <aside class="correct-way">
+        <span class="lbl">Correct way — cílový stav</span>
+        <p>Systém má <b>spolehlivou bránu důvěry</b>, která odpověď utlumí právě u <b>sebevědomě
+        špatných</b> případů — těch −13, které slibovala křížová validace — a přitom <b>nesebere ty
+        správné</b>. V ostrém běhu se chová stejně jako v řízeném testu, takže může být <b>zapnutá</b>
+        bez rizika, že místo dvou pochybných odpovědí umlčí devatenáct včetně dobrých. Uživatel díky
+        ní dostane odpověď, kdykoli si jí je systém jistý, a poctivé „nevím" jen tam, kde by jinak
+        hádal.</p>
+      </aside>
+
       <h3>Past 3 — R.U.R. a doménová kolize <span class="mark mark-prevzato">Převzato</span></h3>
       <p>Zkratka „R.U.R." se při tokenizaci rozpadne na <b>R / U / R</b> — tři jednopísmenné tokeny.
       Ty nesou skoro nulovou rozlišovací sílu, takže otázka „Co je R.U.R.?" nerozsvítí soubor o Čapkově
@@ -221,6 +264,16 @@
       propojená, že se aktivuje i pro dotazy, které s ní nesouvisí (i pro čapkovskou otázku ~0,7
       aktivace). Když ve <code>viz.py</code> vidíš, že se „ze zálohy" rozsvítil biblický soubor, není
       to náhoda — je to tahle past.</p>
+
+      <aside class="correct-way">
+        <span class="lbl">Correct way — cílový stav</span>
+        <p>Na „Co je R.U.R.?" systém odpoví <b>o Čapkově hře</b>, protože zkratku drží jako <b>jednu
+        entitu</b>, ne jako tři bezmocné jednopísmenné tokeny, které odnese nejsilnější soused. Žádný
+        rozsáhlý a hustě propojený dokument — typicky bible — <b>nepřeválcuje mount</b> dotazu, s nímž
+        tematicky nesouvisí; soubor se rozsvítí podle toho, čeho se otázka týká, ne podle své velikosti
+        v korpusu. Doménová kolize tak nevede k sebevědomě špatné odpovědi „R.U.R. → bůh", ale ke
+        správné odpovědi, nebo aspoň k poctivému doptání.</p>
+      </aside>
 
       <h3>Rozhodovací postup: „proč mi systém vrací nesmysl"</h3>
       <p>Když systém vrací nesmysl nebo pořád „nevím", nehádej příčinu — projdi ji v pořadí. Postup

@@ -1,0 +1,515 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Díl VII — programová příloha — hypothesis-one</title>
+<link rel="stylesheet" href="assets/style.css">
+<script defer src="assets/mermaid.min.js"></script>
+<script defer src="assets/script.js"></script>
+</head>
+<body>
+<div class="layout">
+
+  <aside class="sidebar">
+    <p class="brand"><a href="index.html">hypothesis-one</a></p>
+    <p class="tag">knižní dokumentace</p>
+    <nav aria-label="Obsah knihy">
+      <a href="index.html">Úvod</a>
+      <p class="part">Díl I — Než začneme</p>
+      <a href="dil-1.html">I · Co řeší, slovník, mapa</a>
+      <p class="part">Díl II — První kroky</p>
+      <a href="dil-2.html">II · Instalace, běh, data</a>
+      <p class="part">Díl III — Cesta dat</p>
+      <a href="dil-3.html">III · Fáze pipeline</a>
+      <a href="dil-3-program.html" class="sub-prog">III · programová příloha</a>
+      <p class="part">Díl IV — Jak to funguje</p>
+      <a href="dil-4.html">IV · Automat, aktivace, fakty</a>
+      <a href="dil-4-program.html" class="sub-prog">IV · programová příloha</a>
+      <p class="part">Díl V — Testování</p>
+      <a href="dil-5.html">V · Testy, tvary, měření</a>
+      <p class="part">Díl VI — Rozšiřování</p>
+      <a href="dil-6.html">VI · Data, vztahy, testy</a>
+      <a href="dil-6-program.html" class="sub-prog">VI · programová příloha</a>
+      <p class="part">Díl VII — Provoz</p>
+      <a href="dil-7.html">VII · UDPipe, viz, pasti</a>
+      <a href="dil-7-program.html" class="sub-prog active">VII · programová příloha</a>
+      <p class="part">Díl VIII — Otevřené body</p>
+      <a href="dil-8.html">VIII · Nedodělky a cesty</a>
+      <p class="part">Přílohy</p>
+      <a href="prilohy.html">Rejstřík, konfigurace, registry</a>
+    </nav>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <button class="iconbtn" id="theme-toggle" type="button" aria-label="Přepnout světlý/tmavý režim">◐ režim</button>
+    </div>
+    <div class="content">
+      <nav class="crumbs"><a href="index.html">Úvod</a> › <a href="dil-7.html">Díl VII</a> › programová příloha</nav>
+      <p class="eyebrow">Díl VII — programová příloha</p>
+      <h1>Vizualizace viewBase: okno do aktivačního pole</h1>
+
+      <p class="lead">Tahle příloha je pro vývojáře, který si přečetl narativní <a href="dil-7.html">Díl VII</a>
+      a teď chce vidět do kódu: <b>jak přesně</b> je živá vizualizace <code>viz.py</code> napojená na
+      odpovídací jádro, kterou funkci zavolat, co jí předat a co dostane zpět. Ukážeme, že celá
+      integrace viewBase se vejde do jednoho souboru a jednoho adaptéru — a hlavně, proč je to tak
+      schválně. Kdo NLP nezná, nevadí: stačí umět Python. Vizualizace je totiž jen <b>okno</b>, ne
+      druhý mozek.</p>
+
+      <h2 id="p1">Úvod — viewBase je okno, ne mozek <span class="mark mark-overeno">Ověřeno</span></h2>
+      <p>Systém odpovídá na otázky pomocí <b>aktivačního pole</b> (Díl IV): slova otázky rozsvítí graf,
+      světlo teče po vodivých hranách, VZOR a míra jistoty doostří odpověď. Celý tenhle výpočet žije
+      v objektu <code>Answering</code> a nepotřebuje k ničemu obrazovku — spustíš ho z terminálu přes
+      <code>ask.py</code> a dostaneš text. Vizualizace do toho nevstupuje: jen <b>zrcadlí</b> stav pole
+      na plátno v prohlížeči, aby bylo vidět, které soubory se rozsvítily, kudy světlo teklo a která
+      entita nakonec vyhrála. Když si zapamatuješ jedinou větu, ať je to tahle: <b>viewBase je
+      volitelný výstup do stejného aktivačního pole, ne druhá odpovídací logika</b>.</p>
+      <p>Praktický důsledek: <code>ask.py</code> i <code>viz.py</code> volají <b>stejnou</b> metodu
+      <code>answer(q, carry_context=True)</code>. Textový běh a grafický běh se tedy nikdy nerozejdou
+      v tom, <i>co</i> odpoví — liší se jen tím, jestli výsledek vypíšou řádkem, nebo ho rozsvítí na
+      grafu. Kdyby vizualizace počítala odpověď po svém, měl bys dva systémy, které si můžou
+      odporovat; takhle máš jeden systém a jedno okno do něj.</p>
+
+      <p>Že jde opravdu o totéž volání, se dá ověřit přímo v obou souborech:</p>
+<pre><code># ask.py  (běh bez viewBase)
+r = a.answer(q, carry_context=True)          # světlo i mount PŘETRVAJÍ mezi tahy
+
+# viz.py  (běh s viewBase)
+r = a.answer(q, carry_context=True)           # plný tah: mount+světlo přetrvá</code></pre>
+      <p>Stejný argument <code>carry_context=True</code> na obou stranách znamená stejné chování:
+      navazující otázka („Kdy se narodil?") si vezme téma z minulého tahu, protože světlo z „Karel
+      Čapek" ještě nepohaslo. Grep obou souborů to potvrzuje — <code>answer(q, carry_context=True)</code>
+      je jediné místo, kde se v obou během ptá jádra.</p>
+
+      <h2 id="p2">Jediné místo integrace — líný adaptér <span class="mark mark-overeno">Ověřeno</span></h2>
+      <p>viewBase je knihovna z nadřazeného projektu (<code>jellyai</code>). Aby na ní jádro
+      hypothesis-one nebylo závislé, je <b>celá</b> integrace stažená do jednoho importu na jednom
+      místě. Grep to ukazuje černé na bílém — v <code>viz.py</code> je jediný řádek, který viewBase
+      vůbec zmiňuje:</p>
+<pre><code>from jellyai.viz.viewbase_view import ViewBaseView       # noqa: E402</code></pre>
+      <p>Žádný jiný soubor experimentu viewBase neimportuje. <code>viz.py</code> tak funguje jako
+      <b>hranice</b>: za ní je grafika, před ní čisté deterministické jádro, které o žádném plátně neví.
+      Import je navíc <b>líný</b> — samotná knihovna <code>viewbase</code> se natáhne až uvnitř
+      konstruktoru adaptéru (<code>ViewBaseView.__init__</code>), ne při načtení modulu. Když viewBase
+      není nainstalovaný, nespadne import celého programu, ale až pokus vizualizaci opravdu spustit, a
+      to s <b>akční hláškou</b> místo záhadného <code>ModuleNotFoundError</code>:</p>
+<pre><code># jellyai/viz/viewbase_view.py — konstruktor adaptéru
+try:
+    import viewbase as vb
+except ImportError as exc:
+    raise JellyError(
+        "viewBase není nainstalovaný — nainstaluj ho: pip install viewbase "
+        "(je volitelný, jádro jellyAI3 ho nepotřebuje).") from exc</code></pre>
+
+      <p>Na diagramu sleduj tok jedné otázky: uživatel ji napíše v prohlížeči, <code>viz.py</code> ji
+      předá jádru, jádro spočítá stav pole a <code>viz.py</code> ho přes adaptér vykreslí zpět do
+      prohlížeče. Jádro (vlevo) o prohlížeči neví — mluví jen s <code>viz.py</code>.</p>
+
+<pre class="mermaid">
+flowchart LR
+  accTitle: Integrace viewBase — okno do aktivačního pole
+  accDescr: Uživatel píše otázku v prohlížeči, viz.py ji přes handler on_ask předá metodě answer objektu Answering, dostane zpět stav pole, funkcí render ho promítne přes adaptér ViewBaseView a ten přes WebSocket pushne graf do prohlížeče. Jádro Answering o prohlížeči neví.
+  USER["uživatel napíše otázku"]
+  BROW["prohlížeč: graf, terminál, panely"]
+  subgraph VIZ["viz.py — jediné místo importu viewBase"]
+    PROC["process(): answer(carry_context=True)"]
+    REND["render(): dynamický loader"]
+  end
+  ADAP["ViewBaseView — líný adaptér"]
+  subgraph JADRO["jádro (běží i bez viewBase)"]
+    ANS["Answering — aktivační pole"]
+  end
+  USER --> BROW
+  BROW -- "on_ask(q)" --> PROC
+  PROC -- "answer(q)" --> ANS
+  ANS -- "stav pole: words, files, mode" --> PROC
+  PROC --> REND
+  REND -- "add_node / remove_node / flow" --> ADAP
+  ADAP -- "WebSocket push" --> BROW
+</pre>
+      <p>Slovy: šipka <code>answer(q)</code> je jediné pojítko mezi grafickou vrstvou a jádrem. Zbytek
+      obrázku (adaptér, WebSocket, prohlížeč) je „okno" — kdybys ho celý odřízl, jádro odpovídá dál,
+      jen bez obrazovky.</p>
+
+      <h2 id="p3">Životní cyklus vizualizace — <code>process → build_view → render</code> <span class="mark mark-prevzato">Převzato</span></h2>
+      <p>Vizualizace má tři funkce a každá má jednu odpovědnost. <code>process</code> se ptá jádra a
+      vrací <b>surový stav</b> pole. <code>build_view</code> jednou postaví plátno a vrátí <b>handler</b>,
+      který se zavolá při každém dotazu. <code>render</code> (uvnitř <code>build_view</code>) ten stav
+      <b>překreslí</b> na graf. Projdeme je v pořadí, v jakém běží.</p>
+
+      <h3>process — jeden tah s řetězením kontextu</h3>
+      <p><b>Princip:</b> spustit jeden dotaz proti živému jádru tak, aby světlo a namountované soubory
+      z minulého tahu <b>nezmizely</b> — právě jejich pohasínání je to, co má vizualizace ukazovat.
+      Funkce proto pole nečistí; jen zavolá <code>answer</code> s řetězením kontextu a posbírá, co je
+      po tahu v poli.</p>
+      <div class="sig">process(answering, q) → dict</div>
+      <p class="io"><b>vstup</b> <code>answering</code> (živý <code>Answering</code>), <code>q</code>
+      (otázka jako text) · <b>výstup</b> slovník
+      <code>{mounted, seed, words, files, best, mode, offer}</code> — namountované soubory, slova
+      otázky, teplota slov a souborů, nejlepší odpověď, režim a nabídka k doptání · <b>efekt</b> zavolá
+      <code>answer(q, carry_context=True)</code>; <b>nemaže</b> pole ani mount — světlo přetrvá a
+      pohasíná (decay uvnitř <code>answer</code>).</p>
+      <p>Klíčové místo je uvnitř — dvě věci, které <code>process</code> dělá, a víc ne:</p>
+<pre><code>seed = [l.lower() for l in a._question(a._parse(q))[1]]   # slova otázky (pro flow/barvu)
+r = a.answer(q, carry_context=True)                       # plný tah: mount+světlo přetrvá</code></pre>
+      <p>Řádek <code>seed</code> si zvlášť vytáhne lemmata otázky, aby je <code>render</code> mohl
+      obarvit modře a vést od nich tok k odpovědi. Druhý řádek je ten samý plný tah, jaký dělá
+      <code>ask.py</code>. Nic mezi tím — <code>process</code> jádro <b>neřídí</b>, jen se ptá.</p>
+
+      <h3>build_view — postavit okno jednou</h3>
+      <p><b>Princip:</b> plátno, terminál a panely se mají postavit <b>jednou</b> při startu, ne při
+      každém dotazu. <code>build_view</code> proto vrátí dvojici: hotový pohled a funkci
+      <code>on_ask</code>, kterou terminál zavolá pokaždé, když uživatel něco napíše. Server se tu
+      ještě nespouští — to dělá až <code>main</code>.</p>
+      <div class="sig">build_view(answering) → (view, on_ask)</div>
+      <p class="io"><b>vstup</b> <code>answering</code> · <b>výstup</b> dvojice
+      <code>(ViewBaseView, on_ask)</code> — plátno a handler jednoho dotazu · <b>efekt</b> vytvoří
+      <code>ViewBaseView("hypothesis-one · živý dialog")</code>, otevře <b>panel uzlů</b>
+      (<code>open_nodes_panel</code>) a <b>panel dokumentů</b> (<code>open_docs_panel</code>); panely
+      jsou „nice-to-have" — když je viewBase neumí otevřít, kód to tiše přejde a graf běží dál.</p>
+      <p>Handler <code>on_ask(q)</code> je krátká sekvence: zavolá <code>process</code>, výsledek předá
+      <code>render</code> a do terminálu napíše lidsky čitelný řádek podle režimu. Právě tady se rozhodne,
+      co uživatel uvidí v konzoli:</p>
+<pre><code># on_ask — co se napíše do terminálu podle režimu (odpovídá kódu)
+❓ Kdo je Karel Čapek?
+  → spisovatel   (rozsvíceno: wiki_karel_čapek, …)
+
+❓ Kdy měla premiéru hra R.U.R.?
+  nejsem si jist — mám: 1921, 1932, pes. Upřesni?
+
+❓ Co je R.U.R.?
+  — o tom nemám jasná data (nehádám)</code></pre>
+      <p>Tři větve odpovídají třem režimům jádra (Díl IV): <b>answer</b> vypíše odpověď a které soubory
+      se rozsvítily, <b>clarify</b> nabídne možnosti k upřesnění, <b>unsure</b> přizná „nehádám".
+      Reálné příklady jsou z korpusu — „Kdo je Karel Čapek? → spisovatel" je ověřená živá odpověď,
+      „1921, 1932, pes" je skutečná nabídka doptání zaznamenaná ve staré dokumentaci.</p>
+
+      <h3>render — dynamický loader</h3>
+      <p><b>Princip:</b> graf nemá být statická mapa celého korpusu, ale <b>živý řez</b> tím, co právě
+      svítí. Proto se při každém tahu uzly, které vychladly, <b>odeberou</b>, a nové horké se
+      <b>přidají</b> s jasem podle aktivace. Tomuhle chování říkáme dynamický loader: plátno drží jen
+      to, co je teď relevantní.</p>
+      <div class="sig">render(st) → None</div>
+      <p class="io"><b>vstup</b> <code>st</code> (slovník z <code>process</code>) · <b>výstup</b> nic ·
+      <b>efekt</b> mění plátno na místě přes adaptér: <code>remove_node</code> pro vychladlé,
+      <code>add_node</code>/<code>update_node</code> pro horké (jas = aktivace), <code>add_edge</code>
+      pro vodivé hrany, <code>flow</code> pro tok otázka→odpověď, <code>write_nodes</code>/<code>write_docs</code>
+      pro panely.</p>
+      <p>Vnitřek je jádro celé vizualizace. Nejdřív se poskládá množina uzlů, které mají svítit —
+      modrá slova otázky, kontext podle tepla, a odpovědní uzel obarvený podle režimu:</p>
+<pre><code>for w in st["seed"]:                             # slova otázky (modrá)
+    new[w] = dict(label=w, color=SEED_COL, size=1.6)
+for h, w in ctx:                                 # rozsvícený kontext (jas dle tepla)
+    new.setdefault(w, dict(label=w, color=CTX_COL, size=round(0.6 + 1.7 * h / hmax, 2)))
+if ans_id:                                        # odpověď (barva dle režimu)
+    new[ans_id] = dict(label=(ans + " ✓") if st["mode"] == "answer" else ans,
+                       color=ANSWER_COL.get(st["mode"], "#8a94a3"), size=2.3)</code></pre>
+      <p>Barva odpovědi je tabulka <code>ANSWER_COL</code>: zelená <code>#5aff9a</code> pro
+      <code>answer</code>, oranžová <code>#ffb15a</code> pro <code>clarify</code>, šedá
+      <code>#8a94a3</code> pro <code>unsure</code>. Pak přijde vlastní loader — rozdíl mezi tím, co je
+      na plátně teď (<code>shown</code>), a tím, co má být (<code>new</code>):</p>
+<pre><code>for old in shown - set(new):                     # DYNAMICKÝ LOADER: odeber staré
+    view.remove_node(old)
+for nid, meta in new.items():                    # přidej/aktualizuj nové
+    (view.update_node if nid in shown else view.add_node)(nid, **meta)</code></pre>
+      <p>Nakonec, když existuje odpovědní uzel, vede se od prvního slova otázky k odpovědi světelný
+      tok a kamera se na odpověď zaostří (<code>view.flow([seed[0], ans_id])</code> a
+      <code>view.focus(ans_id)</code>). Panely dole se přepíšou top-uzly podle jasu a top-dokumenty
+      podle aktivace — dokument pod prahem <code>0.05</code> z panelu <b>zmizí</b>, takže je vidět, jak
+      téma mezi tahy pohasíná.</p>
+      <p><b>Reálná ukázka:</b> na otázku „Kdo je Karel Čapek?" se z <code>seed</code> stanou modré uzly
+      „kdo", „karel", „čapek", kontext rozsvítí sousedy z rozsvíceného souboru
+      <code>wiki_karel_čapek</code>, a přibude zelený uzel <code>spisovatel ✓</code> (režim
+      <code>answer</code>). Světlo teče od „kdo" k „spisovatel". Položíš-li vzápětí „Kdy se narodil?",
+      modré uzly se vymění, ale <code>wiki_karel_čapek</code> zůstane teplý (kontext se řetězí) a
+      přibude zelený uzel <code>1890 ✓</code>.</p>
+
+      <aside class="rationale">
+        <span class="lbl">Zdůvodňovací blok</span>
+        <dl>
+          <dt>Rozhodnutí</dt><dd>viewBase je <b>oddělené okno</b> do aktivačního pole, ne součást
+          odpovídací logiky: celá vazba je jeden import v <code>viz.py</code> a tenký adaptér
+          <code>ViewBaseView</code>, jádro (<code>Answering</code>) o vizualizaci neví.</dd>
+          <dt>Problém</dt><dd>Kdyby grafika sahala do rozhodování, vznikly by dvě cesty k odpovědi —
+          textová (<code>ask.py</code>) a grafická — které se můžou rozejít. Ladil bys pak dojem
+          z obrázku, který neodpovídá tomu, co systém opravdu vrací, a viewBase (výzkumná, volitelná
+          závislost) by se stal povinným pro běh.</dd>
+          <dt>Mechanismus</dt><dd>Obě cesty volají tutéž metodu <code>answer(q, carry_context=True)</code>.
+          <code>viz.py</code> jen přečte stav pole PO tahu (<code>words</code>, <code>files</code>,
+          <code>mode</code>) a promítne ho na plátno. Import viewBase je líný a stažený na jedno místo,
+          takže když knihovna chybí, spadne jen vizualizace — s akční hláškou — a jádro běží dál.</dd>
+          <dt>Zvažované alternativy</dt><dd><b>Počítat rozvržení grafu ve vizualizaci</b> (vlastní
+          skórování uzlů pro hezčí obrázek): rozešlo by obraz s realitou a zdvojilo logiku, kterou
+          bys musel udržovat na dvou místech. <b>Zabudovat viewBase do jádra</b> (import v
+          <code>answering.py</code>): udělalo by z volitelné výzkumné knihovny tvrdou runtime
+          závislost — <code>ask.py</code> by bez ní nespustil.</dd>
+          <dt>Kdy to přestane platit</dt><dd>Až by vizualizace potřebovala data, která jádro po tahu
+          nevystavuje (např. mezikroky spreadu uvnitř jednoho tahu). Pak by <code>process</code>
+          musel jádro instrumentovat — a hranice „okno, ne mozek" by se začala stírat. Signál:
+          <code>viz.py</code> by musel volat privátní kroky <code>Answering</code>, ne jen
+          <code>answer()</code>.</dd>
+          <dt>Cena</dt><dd>Vizualizace vidí jen <b>stav po tahu</b>, ne animaci uvnitř tahu — tok
+          <code>flow</code> je dokreslený efekt mezi koncovými uzly, ne skutečná trajektorie světla
+          krok po kroku.</dd>
+        </dl>
+      </aside>
+
+      <h2 id="p4">Adaptér — uzly, hrany, tok, panely <span class="mark mark-prevzato">Převzato</span></h2>
+      <p>Adaptér <code>ViewBaseView</code> (soubor <code>jellyai/viz/viewbase_view.py</code>) je
+      <b>jediné místo</b>, kde se s viewBase mluví. <code>viz.py</code> ho používá jako sadu příkazů
+      „přidej uzel", „odeber uzel", „pusť tok", „napiš do panelu" — a adaptér je překládá na volání
+      knihovny <code>viewbase</code> (canvas) a pushuje přes WebSocket do prohlížeče. Metody jsou
+      <b>idempotentní</b> a chyby drží pod pokličkou: neznámý uzel se při <code>remove</code> i
+      <code>update</code> tiše přeskočí, aby jeden špatný tah neshodil celé okno. Tady jsou ty, které
+      <code>render</code> a <code>on_ask</code> skutečně volají:</p>
+
+      <div class="tablewrap">
+      <table>
+        <tr><th>Metoda</th><th>Princip → efekt</th><th>Signatura</th></tr>
+        <tr>
+          <td><code>add_node</code></td>
+          <td>Přidá nebo aktualizuje uzel (jas, barva, popisek). Idempotentní — druhé volání se
+          stejným id jen přepíše meta.</td>
+          <td><code>add_node(node_id, **meta) → None</code></td>
+        </tr>
+        <tr>
+          <td><code>update_node</code></td>
+          <td>Živě změní <b>existující</b> uzel (push přes WebSocket). Uzel, který plátno nezná
+          (ještě nevznikl nebo byl odebrán), se <b>přeskočí</b> — aktivace ho nesmí vzkřísit.</td>
+          <td><code>update_node(node_id, **attrs) → None</code></td>
+        </tr>
+        <tr>
+          <td><code>remove_node</code></td>
+          <td>Odebere uzel i s jeho hranami — to je krok „vychladlo" v dynamickém loaderu. Neznámý
+          uzel = ignorováno.</td>
+          <td><code>remove_node(node_id) → None</code></td>
+        </tr>
+        <tr>
+          <td><code>add_edge</code></td>
+          <td>Přidá hranu mezi dvěma zobrazenými uzly (v <code>render</code> nese vodivost a jas).
+          Idempotentní — duplicitní hrana nevadí.</td>
+          <td><code>add_edge(src, dst, **meta) → None</code></td>
+        </tr>
+        <tr>
+          <td><code>flow</code></td>
+          <td>Animuje světelné částice po trase otázka→odpověď. Předáš jen konce, cestu mezi nimi si
+          viewBase najde sám (BFS). Kratší než dva body = nic.</td>
+          <td><code>flow(path) → None</code></td>
+        </tr>
+        <tr>
+          <td><code>focus</code></td>
+          <td>Vystředí kameru na uzel (obdoba kliknutí) — v <code>render</code> na odpověď. Neznámý
+          uzel kameru nehýbe.</td>
+          <td><code>focus(node_id) → None</code></td>
+        </tr>
+        <tr>
+          <td><code>open_terminal</code></td>
+          <td>Otevře konzolové okno; <code>on_input(řádek)</code> dostane, co uživatel napsal — sem se
+          napojí <code>on_ask</code>. Okno je nezavíratelné (po zavření neobnovitelné).</td>
+          <td><code>open_terminal(on_input) → None</code></td>
+        </tr>
+        <tr>
+          <td><code>write</code></td>
+          <td>Připíše text do konzole (uživatel ho vidí v prohlížeči, ne na stdoutu serveru). Sem
+          <code>on_ask</code> píše odpověď / doptání / „nevím".</td>
+          <td><code>write(text) → None</code></td>
+        </tr>
+        <tr>
+          <td><code>open_docs_panel</code> / <code>write_docs</code></td>
+          <td>Druhé okno — živý panel nejaktivnějších dokumentů (attention nad soubory).
+          <code>write_docs</code> ho po každém tahu přepíše seřazenými <code>(dokument, jas)</code>.</td>
+          <td><code>open_docs_panel() → None</code> · <code>write_docs(ranked) → None</code></td>
+        </tr>
+        <tr>
+          <td><code>open_nodes_panel</code> / <code>write_nodes</code></td>
+          <td>Aktivační okno — uzly seřazené podle jasu (největší nahoře). <code>write_nodes</code>
+          ho po každém tahu přepíše seřazenými <code>(uzel, jas)</code>.</td>
+          <td><code>open_nodes_panel() → None</code> · <code>write_nodes(ranked) → None</code></td>
+        </tr>
+        <tr>
+          <td><code>serve</code></td>
+          <td>Nastartuje webserver. <code>block=True</code> drží proces (standalone běh);
+          <code>block=False</code> vrátí handle. <code>viz.py</code> volá
+          <code>serve(open_browser=False, block=True)</code>.</td>
+          <td><code>serve(open_browser=True, block=True) → ViewBaseView</code></td>
+        </tr>
+        <tr>
+          <td><code>stop</code></td>
+          <td>Složí webserver (uvolní handle). Adaptér je i context manager — <code>with</code> ho
+          zavře sám.</td>
+          <td><code>stop() → None</code></td>
+        </tr>
+      </table>
+      </div>
+      <p>Adaptér umí i víc (naplnit plátno hotovým faktovým grafem přes <code>from_graph</code>/<code>feed_fact</code>,
+      živě zapomínat fakty přes <code>remove_facts</code>), ale <code>viz.py</code> tyhle cesty
+      nepoužívá — staví graf <b>ručně z aktivačního pole</b>, uzel po uzlu, protože kreslí to, co
+      právě svítí, ne celý statický graf faktů.</p>
+
+      <h2 id="p5">Self-restart a provoz — <code>.viz.pid</code> a port 8080 <span class="mark mark-prevzato">Převzato</span></h2>
+      <p>Vizualizaci budeš při ladění spouštět pořád dokola. Aby ses nemusel starat o zabíjení staré
+      instance a uvolňování portu, dělá to <code>viz.py</code> sám — funkcí <code>_claim_singleton</code>,
+      kterou zavolá hned na začátku <code>main</code>.</p>
+      <div class="sig">_claim_singleton() → None</div>
+      <p class="io"><b>vstup</b> nic · <b>výstup</b> nic · <b>efekt</b> přečte PID předchozí instance
+      z <code>.viz.pid</code>; pokud ten proces žije, pošle mu <code>SIGTERM</code> a počká až ~5&nbsp;s,
+      dokud neuvolní port; pak zapíše <b>vlastní</b> PID do <code>.viz.pid</code> a zaregistruje
+      <code>atexit</code> úklid (při ukončení soubor smaže, ale jen když je jeho).</p>
+      <p>Efekt je, že <b>re-run <code>viz.py</code> sám zabije starou instanci</b> a nikdy nedostaneš
+      „address already in use" na portu 8080. Soubor <code>.viz.pid</code> leží v adresáři experimentu
+      a je <b>gitignorovaný</b> (ověřeno: <code>.gitignore</code> řádek 7) — do repozitáře se
+      nedostane. Kdyby proces spadl bez úklidu a port přesto zůstal zablokovaný, smaž
+      <code>.viz.pid</code> ručně a spusť znovu.</p>
+      <p>Spouští se <b>interpretrem z <code>.venv</code></b> (viewBase žije tam, ne v systémovém
+      Pythonu), server naběhne na <b>portu 8080</b> a blokuje (drží proces), dokud ho neukončíš
+      Ctrl-C:</p>
+<pre><code>.venv/bin/python experiments/hypothesis-one/viz.py
+# → viewBase na http://127.0.0.1:8080  (Ctrl-C ukončí)</code></pre>
+      <p>Celý <code>main</code> je čtyřřádkový a shrnuje životní cyklus této přílohy: zaber singleton,
+      postav pohled, otevři terminál, servíruj.</p>
+<pre><code>def main():
+    _claim_singleton()                       # re-run sám zabije starou instanci (self-restart)
+    view, on_ask = build_view(Answering())   # postav pohled + handler
+    view.open_terminal(on_ask)               # napoj konzoli na on_ask
+    view.write("Ptej se — graf se rozsvítí. Např.: Kdo napsal Švejka?\n")
+    view.serve(open_browser=False, block=True)   # nastartuj server (drží proces)</code></pre>
+      <p>Všimni si, že <code>Answering()</code> se vytvoří přesně jednou a předá do
+      <code>build_view</code> — to je ten živý objekt, kterého se pak každý dotaz ptá. Port 8080 (viz)
+      je jiný než port 8092 (UDPipe z narativního Dílu VII): první je okno, druhé je jazykový rozbor,
+      na kterém stojí jádro.</p>
+
+      <h2 id="log">Logování a diagnostika — co máš dnes a co dopsat <span class="mark mark-overeno">Ověřeno</span></h2>
+      <p>Až budeš ladit špatnou odpověď, narazíš na nepříjemnost: <b>runtime skoro nic neloguje</b>.
+      Ověřeno greppem v této session — v celém experimentu není <code>import logging</code>, není
+      telemetrie, není zápis na <code>stderr</code> ani zachytávání <code>traceback</code>, a
+      <code>config.json</code> nemá žádný <code>debug</code>/<code>verbose</code>/<code>log</code>
+      přepínač. Diagnostický <code>print()</code> žije jen ve vývojových a měřicích skriptech
+      (<code>eval_large.py</code>, <code>sim_*.py</code>, <code>nn_pilot.py</code>), ne v živé
+      odpovědní cestě. <code>ask.py</code> vypíše pouze výsledek podle režimu — odpověď, nabídku
+      k doptání, nebo „nehádám" — ale <b>ne proč</b> к němu došel.</p>
+
+      <h3>Co dnes reálně vidíš (a kniha to nikde neříká)</h3>
+      <p>Stopa rozhodnutí <b>existuje</b>, jen je skrytá v návratové hodnotě. Metoda
+      <code>answer()</code> nevrací holý řetězec, ale <b>bohatý slovník</b> — a právě ta pole jsou
+      tvůj hlavní diagnostický nástroj. <code>ask.py</code> z něj bohužel ukazuje jen
+      <code>answer</code> a zbytek zahodí.</p>
+      <div class="sig">answer(question, carry_context=False, hole_override=None, return_features=False) → dict|None</div>
+      <p class="io"><b>diagnostická pole dictu</b> <code>mode</code> (answer/clarify/unsure — proč
+      takový režim), <code>via</code> (vítězná cesta: <code>pred</code> = predikát+role,
+      <code>polar</code> = ano/ne), <code>hole_role</code> (jakou roli otázka hledá),
+      <code>candidates</code> (kolik kandidátů šlo do výběru), <code>fact_ref</code> (z kterého
+      <b>souboru a věty</b> odpověď pochází — provenience), <code>offer</code> (co by nabídl při
+      doptání) · <code>return_features=True</code> navíc vrátí 13 strukturních rysů, které čte
+      naučená brána.</p>
+      <p>V praxi tedy dnes troubleshooting znamená otevřít Python a zavolat <code>answer()</code>
+      ručně — dict ti řekne víc než terminál:</p>
+<pre><code>&gt;&gt;&gt; from answering import Answering
+&gt;&gt;&gt; a = Answering()
+&gt;&gt;&gt; a.answer("Kde se narodil Karel Čapek?")
+{'answer': 'Svatoňovice', 'mode': 'answer', 'via': 'pred',
+ 'hole_role': 'where', 'candidates': 276, 'fact_ref': ('wiki_karel_čapek', 3), ...}
+#   ↑ odpověď      ↑ jistá     ↑ přes fakt   ↑ hledá místo   ↑ z 276 kandidátů  ↑ odkud</code></pre>
+      <p>Vedle toho máš tři nepřímé stopy, každou pro jiný účel: <b>živé aktivační pole</b> ve
+      <code>viz.py</code> (vidíš, které soubory se rozsvítily a kudy teklo světlo — vizuální ekvivalent
+      logu, ale potřebuje prohlížeč), <b>rozpad po kategoriích</b> z <code>eval_large.py</code>
+      (souhrnná diagnostika nad zlatou sadou, ne nad tvou ad-hoc otázkou) a při skutečné výjimce
+      holý <b>Python traceback</b> na stdout (žádné zabalení, žádný kontext otázky).</p>
+
+      <h3>Proč to pro troubleshooting nestačí</h3>
+      <p>Tři konkrétní díry, na které narazíš, až něco spadne v provozu:</p>
+      <p><b>Tiché selhání se nikam nezapíše.</b> Když <code>ask.py</code> řekne „nehádám" nebo vrátí
+      špatnou entitu, nikde nezůstane záznam, <em>proč</em> — které soubory se (ne)rozsvítily, kteří
+      kandidáti prohráli a o kolik. Po zavření session je ta informace pryč; nedá se zrekonstruovat
+      z ničeho, co systém uložil.</p>
+      <p><b>Chyby infrastruktury nejsou vidět, dokud nespadne celý tah.</b> Výpadek UDPipe (LINDAT
+      cloud i lokální port), prázdný nebo zastaralý shard cache, chybějící soubor v gazetteeru —
+      žádná z těchto věcí se neloguje jako varování. Buď projdou tiše (a zkreslí odpověď), nebo
+      spadne celý dotaz s tracebackem bez kontextu.</p>
+      <p><b>Zapnout podrobnost nejde jedním přepínačem.</b> Chceš-li vidět stopu, musíš dopsat
+      <code>print()</code> do <code>answering.py</code> a smazat ho potom — není žádný
+      <code>--trace</code> ani proměnná prostředí, kterou bys diagnostiku dočasně rozsvítil.</p>
+
+      <aside class="correct-way">
+        <span class="lbl">Correct way — cílový stav</span>
+        <p>Za každou odpovědí zůstává strukturovaná stopa, z níž lze kdykoli zpětně vysvětlit,
+        <b>proč</b> systém odpověděl právě takto — které soubory se rozsvítily, kteří kandidáti
+        prohráli a o kolik, z které věty odpověď pochází. Výpadek UDPipe, prázdný shard i chybějící
+        místo v gazetteeru se ohlásí jako <b>varování ve chvíli, kdy nastanou</b>, ne až pádem celého
+        tahu. Míra podrobnosti diagnostiky se ovládá zvenčí, bez zásahu do kódu, a ve vypnutém stavu
+        nemění chování systému ani o řádek. <em>(Tento blok popisuje cílový stav, ne cestu k němu —
+        tu načrtává doporučení níže.)</em></p>
+      </aside>
+
+      <aside class="open-question">
+        <span class="lbl">Doporučení — přidat zapnutelnou stopu rozhodnutí <span class="mark mark-navrh">Návrh</span></span>
+        <dl>
+          <dt>Cíl</dt><dd>Aby se špatná odpověď dala <b>zpětně</b> vysvětlit bez zásahu do kódu —
+          jeden přepínač, jedna strukturovaná stopa na tah, žádná změna chování při vypnutém stavu.</dd>
+          <dt>1 · Trace na jeden přepínač</dt><dd>Přidej do <code>config.json</code> blok
+          <code>"debug": {"trace": false}</code> (nebo čti proměnnou <code>HYPO_TRACE=1</code>). Když
+          je zapnutý, <code>answer()</code> na konci vypíše na <code>stderr</code> <b>jeden řádek JSON</b>
+          složený z dictu, který už dnes vrací — <code>{q, mode, via, hole_role, candidates, top3:
+          [(answer, score)], lit_files, fact_ref, elapsed_ms}</code>. Je to skoro zadarmo: data existují,
+          jen se nikam nezapisují. <code>top3</code> a <code>lit_files</code> jsou to, co dnes chybí
+          nejvíc — ukážou prohrané rivaly a rozsvícené soubory.</dd>
+          <dt>2 · Hlásit tiché pády</dt><dd>Obal volání UDPipe a nahrání shardu do <code>try</code> a
+          při chybě zaloguj <b>varování</b> (ne pád): „UDPipe nedostupný — padám na cache", „shard
+          &lt;doc&gt; prázdný". Dnes se to buď spolkne, nebo shodí celý tah.</dd>
+          <dt>3 · <code>ask.py --trace</code></dt><dd>Přepínač, který za odpověď dopíše čitelně
+          <code>via</code>, <code>candidates</code> a <code>fact_ref</code> — nejrychlejší okno do
+          rozhodnutí bez otevírání Pythonu nebo prohlížeče.</dd>
+          <dt>Volitelně: stopa na disk</dt><dd><code>data/trace.jsonl</code> (append-only, jako fakty
+          a šablony) by dal <b>post-hoc</b> analýzu celé session — a je to zároveň první krok
+          k subsystému <b>Mnemos</b> (paměť/event-log, viz <a href="dil-4-program.html#subsystemy">Díl IV,
+          programová příloha</a>). Zůstává gitignorovaný jako ostatní data.</dd>
+          <dt>Proč Návrh, ne hotovo</dt><dd>Logování je nízkoriziková infrastruktura, ale i tady platí
+          <em>měř-first</em>: přidává I/O a šum, takže se zapíná přepínačem a měří se, že vypnutý stav
+          nemění ani jeden řádek etalonu. Do té doby je to doporučení, ne součást runtime.</dd>
+        </dl>
+      </aside>
+
+      <h2 id="p6">Co nefunguje a proč <span class="mark mark-prevzato">Převzato</span></h2>
+      <p>Nejčastější omyl je zaměnit pád vizualizace za pád systému. Nejsou to stejné věci — a rozdíl
+      je přesně ta hranice, o které je celá tahle příloha.</p>
+      <p><b>viewBase spadne ≠ jádro spadne.</b> Když viewBase není nainstalovaný, selže konstrukce
+      <code>ViewBaseView</code> s hláškou „viewBase není nainstalovaný — nainstaluj ho: pip install
+      viewbase". To se ale stane <b>jen</b> ve <code>viz.py</code>. <code>ask.py</code>, testy i
+      reindex běží dál — nic z jádra viewBase neimportuje. Pravidlo: když nejde okno, ptej se přes
+      <code>ask.py</code>; systém je v pořádku, chybí jen obrazovka.</p>
+      <p><b>Systémový Python vizualizaci nespustí.</b> První pokus nováčka bývá <code>python viz.py</code>.
+      Selže hned na importu <code>ViewBaseView</code> s <code>ModuleNotFoundError</code>, protože
+      viewBase je nainstalovaný jen v <code>.venv</code>. Není to tichá chyba (dostaneš výjimku), ale
+      je matoucí — vypadá to, že je rozbitá vizualizace, přitom chybí jen správný interpret. Vždy
+      spouštěj přes <code>.venv/bin/python</code>.</p>
+      <p><b>Panely jsou nice-to-have.</b> Kdyby viewBase neuměl otevřít panel uzlů nebo dokumentů,
+      <code>build_view</code> to obalí <code>try/except</code> a tiše přejde — graf a terminál běží dál.
+      To je záměr: panely jsou pohodlí, ne podmínka. Nevýhoda: když panel nevyskočí, snadno si toho
+      nevšimneš a myslíš, že je něco rozbité, přitom jen chybí okrasa.</p>
+      <p><b>Vizualizace ukazuje stav po tahu, ne uvnitř tahu.</b> Kdo čeká, že uvidí světlo krok po
+      kroku, jak se šíří sítí, bude zklamán: <code>process</code> vrací pole až <b>po</b> dokončení
+      <code>answer()</code>, takže <code>flow</code> je dokreslený efekt mezi koncovými uzly, ne
+      záznam skutečné trajektorie. Chceš-li mezikroky, musela by je vystavit metoda jádra — a to je
+      přesně bod, kde by okno začalo sahat do mozku (viz zdůvodňovací blok výše).</p>
+
+      <h2>Co už umíš</h2>
+      <p>Teď víš, že vizualizace <code>viz.py</code> je <b>okno do stejného aktivačního pole</b>, ne
+      druhá logika: obě cesty (text i graf) volají tutéž <code>answer(q, carry_context=True)</code>.
+      Znáš tři funkce životního cyklu — <code>process</code> (jeden tah bez čištění pole),
+      <code>build_view</code> (okno a handler <code>on_ask</code>) a <code>render</code> (dynamický
+      loader: odeber vychladlé, přidej horké, veď tok k odpovědi) — a víš, kterou metodu adaptéru
+      <code>ViewBaseView</code> volají a co dělá. Rozumíš self-restartu přes <code>.viz.pid</code> a
+      portu 8080, umíš vizualizaci spustit z <code>.venv</code> a poznáš, proč její pád neznamená pád
+      systému. Kdo chce vidět, jak jádro odpovědi <b>počítá</b> (aktivační pole, VZOR, míra jistoty),
+      najde to v <a href="dil-4.html">programové rovině Dílu IV</a>; provozní kontext (UDPipe, pasti,
+      nasazení) je v narativním <a href="dil-7.html">Dílu VII</a>.</p>
+
+      <div class="pager">
+        <a href="dil-7.html"><span class="dir">← narativní díl</span>Díl VII — Provoz a řešení potíží</a>
+        <a href="dil-8.html"><span class="dir">další →</span>Díl VIII — Otevřené body</a>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

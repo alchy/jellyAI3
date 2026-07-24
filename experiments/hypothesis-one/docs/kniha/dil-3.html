@@ -16,15 +16,28 @@
     <p class="tag">knižní dokumentace</p>
     <nav aria-label="Obsah knihy">
       <a href="index.html">Úvod</a>
-      <p class="part">Díl I — Než začneme</p><a href="dil-1.html">I · Co řeší, slovník, mapa</a>
-      <p class="part">Díl II — První kroky</p><a href="dil-2.html">II · Instalace, běh, data</a>
-      <p class="part">Díl III — Cesta dat</p><a href="dil-3.html" class="active">III · Fáze pipeline</a>
-      <p class="part">Díl IV — Jak to funguje</p><a href="dil-4.html">IV · Automat, aktivace, fakty</a>
-      <p class="part">Díl V — Testování</p><a href="dil-5.html">V · Testy, tvary, měření</a>
-      <p class="part">Díl VI — Rozšiřování</p><a href="dil-6.html">VI · Data, vztahy, testy</a>
-      <p class="part">Díl VII — Provoz</p><a href="dil-7.html">VII · UDPipe, viz, pasti</a>
-      <p class="part">Díl VIII — Otevřené body</p><a href="dil-8.html">VIII · Nedodělky a cesty</a>
-      <p class="part">Přílohy</p><a href="prilohy.html">Rejstřík, konfigurace, registry</a>
+      <p class="part">Díl I — Než začneme</p>
+      <a href="dil-1.html">I · Co řeší, slovník, mapa</a>
+      <p class="part">Díl II — První kroky</p>
+      <a href="dil-2.html">II · Instalace, běh, data</a>
+      <p class="part">Díl III — Cesta dat</p>
+      <a href="dil-3.html" class="active">III · Fáze pipeline</a>
+      <a href="dil-3-program.html" class="sub-prog">III · programová příloha</a>
+      <p class="part">Díl IV — Jak to funguje</p>
+      <a href="dil-4.html">IV · Automat, aktivace, fakty</a>
+      <a href="dil-4-program.html" class="sub-prog">IV · programová příloha</a>
+      <p class="part">Díl V — Testování</p>
+      <a href="dil-5.html">V · Testy, tvary, měření</a>
+      <p class="part">Díl VI — Rozšiřování</p>
+      <a href="dil-6.html">VI · Data, vztahy, testy</a>
+      <a href="dil-6-program.html" class="sub-prog">VI · programová příloha</a>
+      <p class="part">Díl VII — Provoz</p>
+      <a href="dil-7.html">VII · UDPipe, viz, pasti</a>
+      <a href="dil-7-program.html" class="sub-prog">VII · programová příloha</a>
+      <p class="part">Díl VIII — Otevřené body</p>
+      <a href="dil-8.html">VIII · Nedodělky a cesty</a>
+      <p class="part">Přílohy</p>
+      <a href="prilohy.html">Rejstřík, konfigurace, registry</a>
     </nav>
   </aside>
 
@@ -36,6 +49,7 @@
       <nav class="crumbs"><a href="index.html">Úvod</a> › Díl III</nav>
       <p class="eyebrow">Díl III — Cesta dat projektem</p>
       <h1>Cesta dat projektem</h1>
+      <p class="prog-callout">Pro vývojáře: <a href="dil-3-program.html">programová příloha — kontrakty funkcí a reálné ukázky nad kódem →</a></p>
 
       <p class="lead">V Dílu II jsme projekt rozjeli a položili mu první otázku. Teď zpomalíme a
       půjdeme po té otázce pěšky: od okamžiku, kdy je věta „Karel Čapek byl český spisovatel"
@@ -137,6 +151,15 @@ spisovatele Josefa Čapka.</code></pre>
       annotátor bere jen <code>*.txt</code>, takže <code>*.md</code> nebo <code>*.text</code> beze slova
       zmizí z korpusu. Obojí se pozná až o dvě fáze dál (dokument chybí ve výpisu indexů), ne tady —
       proto se vyplatí po přidání dat zkontrolovat, že se soubor v přestavbě opravdu objevil.</p>
+
+      <aside class="correct-way">
+        <span class="lbl">Correct way — cílový stav</span>
+        <p>Systém ohlásí problém už při načtení surového souboru: text, který není v UTF-8 (a „Čapek"
+        by se rozpadl na „Äapek"), i soubor s nečekanou příponou (<code>*.md</code>, <code>*.text</code>)
+        se ozvou varováním ve chvíli, kdy vstupují do pipeline — ne až o dvě fáze dál jako dokument,
+        který „záhadně chybí" v indexech. Z jediné hlášky tak poznáš, že se text kvůli kódování nebo
+        příponě nedostal do korpusu, a nemusíš to dohledávat zpětně.</p>
+      </aside>
 
       <!-- ============================ III.2 ============================ -->
       <h2 id="3-2">III.2 Anotace UDPipe 2 — z textu jazykově rozebraný korpus <span class="mark mark-prevzato">Převzato</span></h2>
@@ -273,6 +296,16 @@ flowchart TD
       osoba pro pozdější fáze „neexistuje" jako entita — pozná se to tak, že vztahové a biografické
       fakty (III.5) se z věty nevytěží, přestože věta vypadá v pořádku.</p>
 
+      <aside class="correct-way">
+        <span class="lbl">Correct way — cílový stav</span>
+        <p>Výpadek UDPipe se ozve varováním ve chvíli, kdy nastane, a vynechaná dávka se nezanese do
+        korpusu jako tichá díra — fakt, který v surovém textu je, se v datech neztratí bez upozornění.
+        Zkratka „R.U.R." drží pohromadě jako jeden token i na živé cestě dotazu, takže <i>„Co je
+        R.U.R.?"</i> míří do správné domény a ne přes rozpadlá písmena R/U/R do bible. A když UDPipe
+        u jména vynechá <code>NameType</code>, systém osobu přesto rozpozná, takže se z věty vytěží
+        i vztahové a biografické fakty.</p>
+      </aside>
+
       <!-- ============================ III.3 ============================ -->
       <h2 id="3-3">III.3 Indexace — kde co hledat <span class="mark mark-prevzato">Převzato</span></h2>
 
@@ -351,6 +384,14 @@ flowchart TD
       práh <code>min_count</code>=2 — slovo, které se v souboru objeví jen jednou, se do indexu nedostane;
       u velmi krátkých dokumentů to může znamenat, že se soubor nerozsvítí na slovo, které v něm
       doslova je.</p>
+
+      <aside class="correct-way">
+        <span class="lbl">Correct way — cílový stav</span>
+        <p>Slovo, které v dokumentu doslova stojí, ten dokument rozsvítí i tehdy, když se v něm
+        vyskytne jen jednou — u krátkých souborů práh <code>min_count</code>=2 nezastíní pojem, který
+        je pro daný text distinktivní. Systém tak odpoví z každého souboru, v němž hledané slovo
+        skutečně je, ne jen z těch dost dlouhých na to, aby se slovo stihlo zopakovat.</p>
+      </aside>
 
       <!-- ============================ III.4 ============================ -->
       <h2 id="3-4">III.4 Gramatika a VZOR — jaký tvar má odpověď <span class="mark mark-prevzato">Převzato</span></h2>
@@ -435,6 +476,16 @@ flowchart TD
       sousedy, takže dvě mluvnicky odlišné věty mohou dostat týž VZOR a splynout. Pro tyhle případy má
       projekt kurátorskou databázi (<code>curated.json</code>), která roli u konkrétního VZORu ručně
       přebije.</p>
+
+      <aside class="correct-way">
+        <span class="lbl">Correct way — cílový stav</span>
+        <p>VZOR rozliší i dvě věty, které se liší až za hranicí nejbližšího souseda, takže mluvnicky
+        odlišné konstrukce nesplynou do jednoho otisku a nepotřebují ruční přebití v
+        <code>curated.json</code> — kurátorská databáze zůstává výjimkou, ne berličkou. A rozhodnutí
+        o roli unese i to, když UDPipe podmět či předmět označí nepřesně: opře se o víc než jediný
+        rys, takže se křivá anotace nepromítne rovnou do křivého faktu a špatné odpovědi o dvě fáze
+        dál.</p>
+      </aside>
 
       <!-- ============================ III.5 ============================ -->
       <h2 id="3-5">III.5 Syntéza mapy faktů — z vět se stanou tvrzení <span class="mark mark-prevzato">Převzato</span></h2>
@@ -606,6 +657,15 @@ classDiagram
       staré téma i tam, kde už nemá — proto se při otázce s <i>vlastní</i> entitou minulý žár i mount
       záměrně zhasnou.</p>
 
+      <aside class="correct-way">
+        <span class="lbl">Correct way — cílový stav</span>
+        <p>Mount drží domény oddělené: dotaz o Čapkovi nabere jen soubory jeho světa a bible se do
+        výběru nevloudí, aby přinesla cizí kandidáty. Odpověď na otázku z jedné domény tak nikdy
+        nepřijde sebevědomě z druhé (jako u pasti R.U.R.) — plošně častá slova bible přestanou
+        zaplevelovat výběr souborů. Když správná odpověď v mountnutých souborech není, systém raději
+        mlčí, než by ji vzal z nesouvisející domény.</p>
+      </aside>
+
       <!-- ============================ III.7 ============================ -->
       <h2 id="3-7">III.7 Odpověď a režim — co systém vlastně řekne <span class="mark mark-overeno">Ověřeno</span></h2>
 
@@ -659,6 +719,15 @@ classDiagram
       Když je moc tvrdý, sklouzne z <code>answer</code> do <code>clarify</code> a otravuje doptáváním
       tam, kde odpověď zná. Ani jedno se nepozná z jednoho dotazu — pozná se to jen na <b>etalonu</b>
       (Díl V), kde se měří poměr správných k sebevědomě špatným.</p>
+
+      <aside class="correct-way">
+        <span class="lbl">Correct way — cílový stav</span>
+        <p>Práh jistoty je vykalibrovaný tak, že systém drží obě hrany zároveň: sebevědomě špatných
+        odpovědí, kterých je dnes na velkém etalonu 30, ubývá k nule, aniž by přitom začal zbytečně
+        doptávat tam, kde odpověď zná. Režim <code>answer</code> se objeví právě tehdy, když je vítěz
+        opravdu jistý; jinak systém sáhne po <code>clarify</code>, nebo po poctivém <code>unsure</code>.
+        Kalibrace platí napříč etalonem, ne jen u jednoho šťastného dotazu.</p>
+      </aside>
 
       <!-- ============================ III.8 ============================ -->
       <h2 id="3-8">III.8 Rozhraní mezi fázemi — a nit k původnímu textu <span class="mark mark-prevzato">Převzato</span></h2>
@@ -724,6 +793,15 @@ flowchart LR
       hned na začátku, aby R.U.R. nepadalo), je otevřená otázka, kterou vede <a href="dil-8.html">Díl
       VIII</a>. Zde ji zmiňujeme jen jako <b>pozorování o skutečném stavu</b>, ať tě širokost fáze III.2
       nepřekvapí.</p>
+
+      <aside class="correct-way">
+        <span class="lbl">Correct way — cílový stav</span>
+        <p>Předzpracování je rozdělené na samostatné, ovladatelné kroky, takže má systém kontrolu nad
+        každým z nich zvlášť — včetně vlastní tokenizace zkratek hned na začátku, aby se „R.U.R."
+        nikdy nerozpadlo na R/U/R ani na živé cestě dotazu. Široká fáze III.2 tak není daná tím, že
+        se použil hotový nástroj „všechno naráz"; jednotlivé kroky (normalizace, segmentace,
+        tokenizace, morfologie, rozbor) jdou upravit nezávisle na sobě.</p>
+      </aside>
 
       <!-- ============================ ZÁVĚR ============================ -->
       <h2>Co už umíš</h2>

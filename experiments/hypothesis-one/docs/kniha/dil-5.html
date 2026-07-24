@@ -29,15 +29,28 @@
     <p class="tag">knižní dokumentace</p>
     <nav aria-label="Obsah knihy">
       <a href="index.html">Úvod</a>
-      <p class="part">Díl I — Než začneme</p><a href="dil-1.html">I · Co řeší, slovník, mapa</a>
-      <p class="part">Díl II — První kroky</p><a href="dil-2.html">II · Instalace, běh, data</a>
-      <p class="part">Díl III — Cesta dat</p><a href="dil-3.html">III · Fáze pipeline</a>
-      <p class="part">Díl IV — Jak to funguje</p><a href="dil-4.html">IV · Automat, aktivace, fakty</a>
-      <p class="part">Díl V — Testování</p><a href="dil-5.html" class="active">V · Testy, tvary, měření</a>
-      <p class="part">Díl VI — Rozšiřování</p><a href="dil-6.html">VI · Data, vztahy, testy</a>
-      <p class="part">Díl VII — Provoz</p><a href="dil-7.html">VII · UDPipe, viz, pasti</a>
-      <p class="part">Díl VIII — Otevřené body</p><a href="dil-8.html">VIII · Nedodělky a cesty</a>
-      <p class="part">Přílohy</p><a href="prilohy.html">Rejstřík, konfigurace, registry</a>
+      <p class="part">Díl I — Než začneme</p>
+      <a href="dil-1.html">I · Co řeší, slovník, mapa</a>
+      <p class="part">Díl II — První kroky</p>
+      <a href="dil-2.html">II · Instalace, běh, data</a>
+      <p class="part">Díl III — Cesta dat</p>
+      <a href="dil-3.html">III · Fáze pipeline</a>
+      <a href="dil-3-program.html" class="sub-prog">III · programová příloha</a>
+      <p class="part">Díl IV — Jak to funguje</p>
+      <a href="dil-4.html">IV · Automat, aktivace, fakty</a>
+      <a href="dil-4-program.html" class="sub-prog">IV · programová příloha</a>
+      <p class="part">Díl V — Testování</p>
+      <a href="dil-5.html" class="active">V · Testy, tvary, měření</a>
+      <p class="part">Díl VI — Rozšiřování</p>
+      <a href="dil-6.html">VI · Data, vztahy, testy</a>
+      <a href="dil-6-program.html" class="sub-prog">VI · programová příloha</a>
+      <p class="part">Díl VII — Provoz</p>
+      <a href="dil-7.html">VII · UDPipe, viz, pasti</a>
+      <a href="dil-7-program.html" class="sub-prog">VII · programová příloha</a>
+      <p class="part">Díl VIII — Otevřené body</p>
+      <a href="dil-8.html">VIII · Nedodělky a cesty</a>
+      <p class="part">Přílohy</p>
+      <a href="prilohy.html">Rejstřík, konfigurace, registry</a>
     </nav>
   </aside>
 
@@ -209,6 +222,17 @@ flowchart TD
         </dl>
       </aside>
 
+      <aside class="correct-way">
+        <span class="lbl">Correct way — cílový stav</span>
+        <p>Všech šest pater testů žije. Vedle jednotkových, metrických a regresních drží
+        <b>smluvní</b> patro tvar rozhraní (že <code>answer()</code> vždy vrátí trojici
+        <code>{answer, mode, offer}</code> a že fakt nese provenienci <code>(doc, sent)</code>),
+        <b>vlastnostní</b> patro hlídá invarianty nad náhodně generovaným vstupem („stejný vstup →
+        stejný výstup", „prázdno nikdy neshodí program") a <b>zátěžové</b> patro ověří velký
+        i záměrně škaredý vstup včetně času zpracování. Regrese, kterou dnes etalon jen <i>chytí</i>,
+        ale neumí lokalizovat do modulu, tak spadne rovnou do patra, které ji pojmenuje.</p>
+      </aside>
+
       <h2 id="5-3">V.3 Matice tvarů dat</h2>
       <p>Tady je jádro testovací rozvahy. U běžného programu je vstup pár typů (číslo, řetězec,
       seznam). U jazyka je vstupem <b>věta</b>, a táž věta — dokonce týž význam — se dá napsat
@@ -299,6 +323,18 @@ flowchart TD
       prázdný seznam kandidátů, index mimo rozsah, dělení nulou. Systém sice má režim NO_QVZOR
       (nedokázal otázku vůbec uchopit → poctivě nic), ale že na prázdný nebo obludně dlouhý vstup
       <i>nespadne</i>, dnes nikdo neověřuje.</p>
+
+      <aside class="correct-way">
+        <span class="lbl">Correct way — cílový stav</span>
+        <p>Systém rozpozná totéž slovo bez ohledu na tvar zápisu: „capek" bez háčku i „KAREL ČAPEK"
+        kapitálkami vede na lemma „Čapek", nezlomitelná mezera i typografická pomlčka v „9.&nbsp;ledna"
+        nebo „1890–1938" se sjednotí na kanonický znak, a zkratka „R.U.R." zůstane <b>jedním
+        tokenem</b> — nerozpadne se na R/U/R ani nepřitáhne biblický korpus. Prázdný vstup, samá
+        interpunkce i obludně dlouhý odstavec projdou bez pádu (poctivé mlčení nebo NO_QVZOR, nikdy
+        traceback), a dvě formulace téhož faktu dají tentýž výsledek (dnes drží 8 ze 14 skupin
+        parafrází). Každou z těchto os přitom potvrzuje <b>cílený test</b>, ne jen nepřímé krytí
+        lemmatizací.</p>
+      </aside>
 
       <h2 id="5-4">V.4 Zlaté sady</h2>
       <p>Etalonu se lidově říká <b>zlatá sada</b> (gold set): ručně sestavený seznam otázek se
@@ -480,6 +516,17 @@ VELKÝ ETALON — 145 otázek
       (4/18): vztah „otec" se nepodařilo vytěžit jako spolehlivou hranu, tak systém vrátil jiné
       jméno z okolí. Je to confident-wrong — přesně ta třída chyb, kterou má míra jistoty tlačit
       dolů. Správně je Ludvík.</p>
+
+      <aside class="correct-way">
+        <span class="lbl">Correct way — cílový stav</span>
+        <p>Kategorie, které dnes leží na nule nebo těsně nad ní, dosahují úrovně těch silných:
+        „Kolik měla dětí Božena Němcová?" vrátí <b>čtyři</b> (count), „Co napsal Karel Čapek?" vydá
+        dílo místo prázdna (authorship-what), „Kdo byl otcem Milana Kundery?" vrátí <b>Ludvíka</b>
+        (relation) a vlastnosti i taxonomie přestanou být slepé místo. „Kdo navrhl slovo robot?"
+        i „Co je R.U.R.?" odpovědí z Čapkovy domény (Josef, drama), protože „R.U.R." se už nemountuje
+        na bibli a nevrací „Ježíš". Celková úspěšnost tím vystoupá nad dnešních 43&nbsp;% a sebevědomě
+        špatných odpovědí (dnes 30) ubývá.</p>
+      </aside>
 
       <h2>Co už umíš</h2>
       <p>Teď víš, proč se jazykový systém netestuje rovností: odpověď je <b>rozdělení</b> přijatelných
