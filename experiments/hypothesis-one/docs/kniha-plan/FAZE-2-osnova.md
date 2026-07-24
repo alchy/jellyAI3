@@ -117,3 +117,16 @@ Pokrývá copula, temporal, spatial, relation, carry_context — a máme k tomu 
 3. **Osnova** (odd. 4) — díly/kapitoly, ukázkové vlákno Karel Čapek?
 
 Po schválení: fáze 3 (kostra + 1 vzorová kapitola s ověřeným Mermaid z `file://`) → fáze 4 (psaní) → fáze 5 (ověření).
+
+---
+
+## 7. Stav realizace
+
+- **Fáze 1 (průzkum):** hotovo → FAZE-1-pruzkum.md.
+- **Fáze 2 (osnova):** SCHVÁLENO — čtenář = Python-začátečník bez NLP; umístění = nahradit docs/
+  (vývoj v docs/kniha/, přesun na konci); osnova Díl I–VIII + vlákno Karel Čapek.
+- **Fáze 3 (kostra):** hotovo + **OVĚŘENO** — Mermaid stateDiagram v dil-4-1 se vykresluje z
+  `file://` bez sítě, přepínač režimu funguje (potvrzeno uživatelem v prohlížeči). Offline setup
+  (lokální mermaid.min.js v10) tím doložen jako funkční pro všechny další kapitoly.
+- **Fáze 4 (psaní):** ZBÝVÁ — kapitoly Díl I–VIII ve stylu vzorové IV.1, ze zdrojů FÁZE-1.
+- **Fáze 5 (ověření):** ZBÝVÁ — spuštění postupů, značky důvěry, tabulka ověření, přesun do docs/.
