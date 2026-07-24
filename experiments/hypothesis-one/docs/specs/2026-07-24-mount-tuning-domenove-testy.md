@@ -75,6 +75,13 @@ Ground truth **ověřen ručně proti raw textu** (`data/raw/wiki_*.txt`), ne pr
 - `python3 eval_domain.py --sweep` — porovná off/replace/union/union_cap (parse-cached),
   vypíše, KDE se módy liší → rozhodovací materiál pro finální `mode`.
 
+Každý běh navíc zapíše **HTML scoreboard** do `docs/last-test.html` (modul `test_report.py`,
+`write_scoreboard` — offline, laděné s `docs/style.css`, světlé i tmavé téma): velké skóre,
+skóre po doménách (meter bary), a per-doména tabulky *otázka → odpověď systému → očekávaná
+odpověď → mód* (+ vítězný soubor u collision). Reprezentativní vzorek (`sample=N` = všechny
+propady + N passů) nebo vše (default). Stránka je odkázaná z `docs/index.html`, gitignored
+(generovaný snímek, jako `baseline_large.json`).
+
 Skórování mode-aware (jako eval_large): honest-negative/unsure PASS když NEodpoví
 sebevědomě; clarify PASS když se doptá; answer PASS když answer + odpověď sedí; u
 collision navíc `expect_doc`.

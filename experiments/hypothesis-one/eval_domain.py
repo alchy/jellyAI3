@@ -17,14 +17,17 @@ Spuštění:
 import os
 import sys
 import json
+import datetime
 from collections import defaultdict
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 from answering import Answering                      # noqa: E402
 from eval_large import accept, _clear                # noqa: E402
+import test_report                                   # noqa: E402
 
 GOLD = os.path.join(HERE, "gold_domain.json")
+DOCS = os.path.join(HERE, "docs", "last-test.html")
 
 # módy kompozice mountu (answering._compose_mount) pro --sweep
 SWEEP = {
@@ -88,6 +91,18 @@ def run(a, items):
     return rows
 
 
+def _norm(rows):
+    """(item, ans_ok, doc_ok, got, mode) → normalizované dict řádky pro test_report."""
+    return [{"kind": it.get("kind", "?"), "q": it["q"], "got": got,
+             "expect": it.get("expect", []), "mode": gm, "ok": ans_ok,
+             "doc_ok": doc_ok, "expect_doc": it.get("expect_doc")}
+            for it, ans_ok, doc_ok, got, gm in rows]
+
+
+def _stamp():
+    return datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+
+
 def summarize(rows, label=""):
     n = len(rows)
     npass = sum(1 for _, ok, _, _, _ in rows if ok)
@@ -111,6 +126,14 @@ def main_single():
     items = load_items()
     rows = run(a, items)
     summarize(rows)
+    mode = a.entity_retrieval.get("mode", "union") if a.entity_retrieval.get("enabled") else "off"
+    test_report.write_scoreboard(
+        DOCS, "Poslední test — doménový etalon", _norm(rows),
+        subtitle="Collision (routing scoreboard) + coverage (per-entita). Ground truth ověřený "
+                 "proti raw korpusu. Otázka → odpověď systému → očekávaná odpověď, po doménách.",
+        config_label=f"mount mode = {mode}", timestamp=_stamp(),
+        source=f"gold_domain.json · {len(items)} otázek")
+    print(f"→ {DOCS}")
     print("\n-- PROPADY (ANS=špatná odpověď, DOC=špatný soubor) --")
     for it, ok, dok, got, gm in rows:
         if ok and dok is not False:
@@ -137,6 +160,15 @@ def main_sweep():
         rows = run(a, items)
         npass, coll_ans, coll_doc = summarize(rows, label=f"[{name}] ")
         res[name] = rows
+    # scoreboard = default (union) běh + porovnání módů
+    mode_summary = [(m, sum(1 for _, ok, _, _, _ in res[m] if ok), n) for m in SWEEP]
+    test_report.write_scoreboard(
+        DOCS, "Poslední test — doménový etalon", _norm(res["union"]),
+        subtitle="Collision (routing scoreboard) + coverage (per-entita). Sweep přes módy "
+                 "kompozice mountu; per-otázka tabulka je pro default mode = union.",
+        config_label="mount mode = union (default)", timestamp=_stamp(),
+        source=f"gold_domain.json · {n} otázek", mode_summary=mode_summary)
+    print(f"\n→ {DOCS}")
     # kde se módy liší (rozhodovací materiál pro finální mode)
     print(f"\n{'='*66}\n-- KDE SE MÓDY LIŠÍ (odpověď/soubor) --")
     ref = res["off"]
